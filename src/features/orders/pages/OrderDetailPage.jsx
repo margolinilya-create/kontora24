@@ -4,6 +4,7 @@ import { useOrderDetail } from '../hooks/useOrders'
 import { StatusBadge } from '../components/StatusBadge'
 import { StatusSwitcher } from '../components/StatusSwitcher'
 import { OrderEditForm } from '../components/OrderEditForm'
+import { OrderComments } from '../components/OrderComments'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { CommercialProposal } from '@/features/kp/components/CommercialProposal'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
@@ -101,6 +102,9 @@ export default function OrderDetailPage() {
 
           {/* Edit form */}
           <OrderEditForm order={order} onSaved={refetch} />
+
+          {/* Comments */}
+          <OrderComments orderId={order.id} />
         </div>
 
         {/* Sidebar */}

@@ -1,12 +1,84 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { useAnalytics } from '../hooks/useAnalytics'
+import { useState, useEffect } from 'react'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
-import { formatPrice } from '@/shared/lib/utils'
+import { formatPrice, formatDate } from '@/shared/lib/utils'
+import { subDays, subMonths, startOfDay, format, differenceInHours } from 'date-fns'
 
 const COLORS = ['#e94560', '#1a1a2e', '#16213e', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6']
+const PERIODS = [
+  { key: '7d', label: '7 дней', getStart: () => subDays(new Date(), 7) },
+  { key: '30d', label: '30 дней', getStart: () => subDays(new Date(), 30) },
+  { key: '90d', label: '3 месяца', getStart: () => subMonths(new Date(), 3) },
+  { key: 'all', label: 'Всё время', getStart: () => new Date('2020-01-01') },
+]
 
 export default function AnalyticsPage() {
-  const { stats, loading } = useAnalytics()
+  const [period, setPeriod] = useState('30d')
+  const [data, setData] = useState({ orders: [], statusHistory: [] })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetch() {
+      setLoading(true)
+      const startDate = PERIODS.find((p) => p.key === period)?.getStart() || subDays(new Date(), 30)
+
+      const [ordersRes, historyRes] = await Promise.all([
+        supabase.from('orders').select('*').gte('created_at', startDate.toISOString()),
+        supabase.from('order_status_history').select('*').gte('created_at', startDate.toISOString()),
+      ])
+
+      setData({ orders: ordersRes.data || [], statusHistory: historyRes.data || [] })
+      setLoading(false)
+    }
+    fetch()
+  }, [period])
+
+  const orders = data.orders
+  const doneOrders = orders.filter((o) => o.status === 'done')
+  const revenue = doneOrders.reduce((s, o) => s + (Number(o.price_final) || 0), 0)
+  const totalCost = doneOrders.reduce((s, o) => s + (Number(o.cost_total) || 0), 0)
+  const avgCheck = doneOrders.length > 0 ? revenue / doneOrders.length : 0
+  const cancelledCount = orders.filter((o) => o.status === 'cancelled').length
+  const conversionRate = orders.length > 0 ? ((doneOrders.length / orders.length) * 100).toFixed(1) : 0
+
+  // Revenue by type
+  const byType = {}
+  doneOrders.forEach((o) => {
+    if (!byType[o.order_type]) byType[o.order_type] = { revenue: 0, count: 0, cost: 0 }
+    byType[o.order_type].revenue += Number(o.price_final) || 0
+    byType[o.order_type].cost += Number(o.cost_total) || 0
+    byType[o.order_type].count += 1
+  })
+  const typeData = Object.entries(byType).map(([type, d]) => ({
+    name: ORDER_TYPES[type]?.label || type, ...d, margin: d.revenue - d.cost,
+  }))
+
+  // Status pie
+  const byStatus = {}
+  orders.forEach((o) => { byStatus[o.status] = (byStatus[o.status] || 0) + 1 })
+  const statusData = Object.entries(byStatus).map(([s, v]) => ({ name: ORDER_STATUSES[s]?.label || s, value: v }))
+
+  // Avg time per stage (from status history)
+  const stageTimes = {}
+  const orderHistoryMap = {}
+  data.statusHistory.forEach((h) => {
+    if (!orderHistoryMap[h.order_id]) orderHistoryMap[h.order_id] = []
+    orderHistoryMap[h.order_id].push(h)
+  })
+  Object.values(orderHistoryMap).forEach((history) => {
+    history.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    for (let i = 1; i < history.length; i++) {
+      const stage = history[i - 1].to_status
+      const hours = differenceInHours(new Date(history[i].created_at), new Date(history[i - 1].created_at))
+      if (!stageTimes[stage]) stageTimes[stage] = []
+      stageTimes[stage].push(hours)
+    }
+  })
+  const avgStageData = Object.entries(stageTimes).map(([stage, times]) => ({
+    name: ORDER_STATUSES[stage]?.label || stage,
+    hours: Math.round(times.reduce((a, b) => a + b, 0) / times.length),
+  })).filter((d) => d.hours > 0)
 
   if (loading) {
     return (
@@ -16,32 +88,36 @@ export default function AnalyticsPage() {
     )
   }
 
-  // Prepare chart data
-  const typeData = Object.entries(stats.byType).map(([type, d]) => ({
-    name: ORDER_TYPES[type]?.label || type,
-    revenue: d.revenue,
-    cost: d.cost,
-    margin: d.revenue - d.cost,
-    count: d.count,
-  }))
-
-  const statusData = Object.entries(stats.byStatus).map(([status, count]) => ({
-    name: ORDER_STATUSES[status]?.label || status,
-    value: count,
-  }))
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Аналитика</h1>
-        <p className="text-text-muted">Выручка, маржинальность, статистика по типам</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Аналитика</h1>
+          <p className="text-text-muted">Финансы и производственные метрики</p>
+        </div>
+        <div className="flex gap-2">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                period === p.key ? 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Выручка (готовые)" value={formatPrice(stats.revenue)} />
-        <StatCard label="Всего заказов" value={stats.totalOrders} />
-        <StatCard label="Средний чек" value={formatPrice(stats.avgCheck)} />
+      {/* Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <StatCard label="Выручка" value={formatPrice(revenue)} />
+        <StatCard label="Себестоимость" value={formatPrice(totalCost)} />
+        <StatCard label="Маржа" value={formatPrice(revenue - totalCost)} accent />
+        <StatCard label="Заказов" value={orders.length} />
+        <StatCard label="Средний чек" value={formatPrice(avgCheck)} />
+        <StatCard label="Конверсия" value={`${conversionRate}%`} sub={`${cancelledCount} отмен`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -51,15 +127,12 @@ export default function AnalyticsPage() {
           {typeData.length === 0 ? (
             <p className="text-text-muted text-sm py-8 text-center">Нет данных</p>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={280}>
               <BarChart data={typeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip
-                  formatter={(value) => formatPrice(value)}
-                  contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }}
-                />
+                <Tooltip formatter={(v) => formatPrice(v)} contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
                 <Bar dataKey="revenue" name="Выручка" fill="#e94560" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="cost" name="Себестоимость" fill="#1a1a2e" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -67,25 +140,16 @@ export default function AnalyticsPage() {
           )}
         </div>
 
-        {/* Orders by status */}
+        {/* Status pie */}
         <div className="bg-surface rounded-xl border border-border p-5">
           <h2 className="font-semibold mb-4">Заказы по статусам</h2>
           {statusData.length === 0 ? (
             <p className="text-text-muted text-sm py-8 text-center">Нет данных</p>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={280}>
               <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
-                >
-                  {statusData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
+                <Pie data={statusData} cx="50%" cy="50%" outerRadius={90} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                  {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
@@ -94,47 +158,66 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* Production metrics: avg time per stage */}
+      {avgStageData.length > 0 && (
+        <div className="bg-surface rounded-xl border border-border p-5">
+          <h2 className="font-semibold mb-4">Среднее время на этап (часы)</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={avgStageData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
+              <Tooltip formatter={(v) => `${v} ч`} contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
+              <Bar dataKey="hours" fill="#e94560" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Margin table */}
       {typeData.length > 0 && (
         <div className="bg-surface rounded-xl border border-border p-5">
-          <h2 className="font-semibold mb-4">Маржинальность по типам</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left py-2 font-medium text-text-muted">Тип</th>
-                <th className="text-right py-2 font-medium text-text-muted">Заказов</th>
-                <th className="text-right py-2 font-medium text-text-muted">Выручка</th>
-                <th className="text-right py-2 font-medium text-text-muted">Себестоимость</th>
-                <th className="text-right py-2 font-medium text-text-muted">Маржа</th>
-                <th className="text-right py-2 font-medium text-text-muted">%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {typeData.map((row) => (
-                <tr key={row.name} className="border-b border-border last:border-0">
-                  <td className="py-2 font-medium">{row.name}</td>
-                  <td className="py-2 text-right">{row.count}</td>
-                  <td className="py-2 text-right">{formatPrice(row.revenue)}</td>
-                  <td className="py-2 text-right text-text-muted">{formatPrice(row.cost)}</td>
-                  <td className="py-2 text-right text-success font-medium">{formatPrice(row.margin)}</td>
-                  <td className="py-2 text-right text-text-muted">
-                    {row.revenue > 0 ? ((row.margin / row.revenue) * 100).toFixed(1) + '%' : '—'}
-                  </td>
+          <h2 className="font-semibold mb-4">Маржинальность</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 font-medium text-text-muted">Тип</th>
+                  <th className="text-right py-2 font-medium text-text-muted">Заказов</th>
+                  <th className="text-right py-2 font-medium text-text-muted">Выручка</th>
+                  <th className="text-right py-2 font-medium text-text-muted">Себестоимость</th>
+                  <th className="text-right py-2 font-medium text-text-muted">Маржа</th>
+                  <th className="text-right py-2 font-medium text-text-muted">%</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {typeData.map((r) => (
+                  <tr key={r.name} className="border-b border-border last:border-0">
+                    <td className="py-2 font-medium">{r.name}</td>
+                    <td className="py-2 text-right">{r.count}</td>
+                    <td className="py-2 text-right">{formatPrice(r.revenue)}</td>
+                    <td className="py-2 text-right text-text-muted">{formatPrice(r.cost)}</td>
+                    <td className="py-2 text-right text-success font-medium">{formatPrice(r.margin)}</td>
+                    <td className="py-2 text-right text-text-muted">
+                      {r.revenue > 0 ? ((r.margin / r.revenue) * 100).toFixed(1) + '%' : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, sub, accent }) {
   return (
-    <div className="bg-surface rounded-xl border border-border p-5">
-      <p className="text-sm text-text-muted">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
+    <div className={`rounded-xl border p-4 ${accent ? 'bg-accent/5 border-accent/20' : 'bg-surface border-border'}`}>
+      <p className="text-xs text-text-muted">{label}</p>
+      <p className={`text-xl font-bold mt-1 ${accent ? 'text-accent' : ''}`}>{value}</p>
+      {sub && <p className="text-xs text-text-muted mt-0.5">{sub}</p>}
     </div>
   )
 }

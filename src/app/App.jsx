@@ -1,6 +1,7 @@
 import { useEffect, Suspense } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { useAuthStore } from '@/features/auth/store'
+import { useThemeStore } from '@/shared/stores/theme-store'
 import { Toaster } from '@/shared/components/Toaster'
 import { routes } from './routes'
 
@@ -16,10 +17,12 @@ function LoadingFallback() {
 
 export function App() {
   const initialize = useAuthStore((s) => s.initialize)
+  const initTheme = useThemeStore((s) => s.init)
 
   useEffect(() => {
     initialize()
-  }, [initialize])
+    initTheme()
+  }, [initialize, initTheme])
 
   return (
     <>

@@ -17,6 +17,17 @@
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
+/* Dark mode */
+.dark {
+  --color-primary: #e2e8f0;
+  --color-primary-light: #cbd5e1;
+  --color-surface: #1e1e2e;
+  --color-surface-dim: #151521;
+  --color-border: #2d2d44;
+  --color-text: #e2e8f0;
+  --color-text-muted: #94a3b8;
+}
+
 body {
   font-family: var(--font-sans);
   color: var(--color-text);

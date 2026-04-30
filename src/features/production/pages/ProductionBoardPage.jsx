@@ -1,36 +1,66 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useOrders } from '@/features/orders/hooks/useOrders'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
+import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
 import { formatRelative } from '@/shared/lib/utils'
 
-const COLUMNS = [
-  { status: 'design', label: 'Дизайн' },
-  { status: 'print', label: 'Печать' },
-  { status: 'assembly', label: 'Сборка' },
-]
-
 export default function ProductionBoardPage() {
+  const { profile } = useAuth()
+  const [showMine, setShowMine] = useState(false)
+  const [sortBy, setSortBy] = useState('created') // 'created' | 'deadline'
+
   const { orders: designOrders, refetch: r1 } = useOrders({ status: 'design' })
   const { orders: printOrders, refetch: r2 } = useOrders({ status: 'print' })
   const { orders: assemblyOrders, refetch: r3 } = useOrders({ status: 'assembly' })
-
   const refetchAll = () => { r1(); r2(); r3() }
 
+  function filterAndSort(orders) {
+    let filtered = showMine && profile ? orders.filter((o) => o.assigned_to === profile.id) : orders
+    if (sortBy === 'deadline') {
+      filtered = [...filtered].sort((a, b) => {
+        if (!a.deadline) return 1
+        if (!b.deadline) return -1
+        return new Date(a.deadline) - new Date(b.deadline)
+      })
+    }
+    return filtered
+  }
+
   const columns = [
-    { ...COLUMNS[0], orders: designOrders },
-    { ...COLUMNS[1], orders: printOrders },
-    { ...COLUMNS[2], orders: assemblyOrders },
+    { status: 'design', label: 'Дизайн', orders: filterAndSort(designOrders) },
+    { status: 'print', label: 'Печать', orders: filterAndSort(printOrders) },
+    { status: 'assembly', label: 'Сборка', orders: filterAndSort(assemblyOrders) },
   ]
 
   const total = designOrders.length + printOrders.length + assemblyOrders.length
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Производство</h1>
-        <p className="text-text-muted">{total} заказов в работе</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Производство</h1>
+          <p className="text-text-muted">{total} заказов в работе</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowMine(!showMine)}
+            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${showMine ? 'bg-accent text-white' : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'}`}
+          >
+            {showMine ? 'Мои' : 'Все'}
+          </button>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+          >
+            <option value="created">По дате</option>
+            <option value="deadline">По дедлайну</option>
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -47,7 +77,7 @@ export default function ProductionBoardPage() {
             <div className="space-y-3">
               {col.orders.length === 0 ? (
                 <div className="bg-surface rounded-xl border border-border border-dashed p-8 text-center">
-                  <p className="text-text-muted text-sm">Пусто</p>
+                  <p className="text-text-muted text-sm">{showMine ? 'Нет моих заказов' : 'Пусто'}</p>
                 </div>
               ) : (
                 col.orders.map((order) => (
@@ -56,13 +86,23 @@ export default function ProductionBoardPage() {
                       <Link to={`/orders/${order.id}`} className="font-semibold text-accent hover:underline">
                         #{order.number}
                       </Link>
-                      <StatusBadge status={order.status} />
+                      <div className="flex items-center gap-1.5">
+                        <ClaimButton order={order} onClaimed={refetchAll} />
+                        <StatusBadge status={order.status} />
+                      </div>
                     </div>
-                    <p className="text-sm text-text-muted mb-2">
+                    <p className="text-sm text-text-muted mb-1">
                       {ORDER_TYPES[order.order_type]?.label} · {order.width_mm}×{order.height_mm} · {order.qty} шт
                     </p>
-                    {order.client?.name && <p className="text-xs text-text-muted mb-2">{order.client.name}</p>}
-                    <div className="flex items-center justify-between pt-2 border-t border-border">
+                    {order.deadline && (
+                      <p className={`text-xs mb-1 ${new Date(order.deadline) < new Date() ? 'text-danger font-medium' : 'text-text-muted'}`}>
+                        Дедлайн: {new Date(order.deadline).toLocaleDateString('ru-RU')}
+                      </p>
+                    )}
+                    {order.assignee?.display_name && (
+                      <p className="text-xs text-text-muted">→ {order.assignee.display_name}</p>
+                    )}
+                    <div className="flex items-center justify-between pt-2 mt-2 border-t border-border">
                       <span className="text-xs text-text-muted">{formatRelative(order.created_at)}</span>
                       <StatusSwitcher order={order} onUpdated={refetchAll} />
                     </div>

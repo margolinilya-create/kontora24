@@ -15,6 +15,7 @@ const PrintQueuePage = lazy(() => import('@/features/production/pages/PrintQueue
 const AssemblyQueuePage = lazy(() => import('@/features/production/pages/AssemblyQueuePage'))
 const WarehousePage = lazy(() => import('@/features/warehouse/pages/WarehousePage'))
 const ClientsPage = lazy(() => import('@/features/clients/pages/ClientsPage'))
+const ClientDetailPage = lazy(() => import('@/features/clients/pages/ClientDetailPage'))
 const AnalyticsPage = lazy(() => import('@/features/analytics/pages/AnalyticsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'))
 
@@ -40,6 +41,7 @@ export const routes = [
       { path: 'production/assembly', element: <AuthGuard roles={['admin', 'manager', 'assembler']}><AssemblyQueuePage /></AuthGuard> },
       { path: 'warehouse', element: <AuthGuard roles={['admin', 'manager']}><WarehousePage /></AuthGuard> },
       { path: 'clients', element: <AuthGuard roles={['admin', 'manager']}><ClientsPage /></AuthGuard> },
+      { path: 'clients/:id', element: <AuthGuard roles={['admin', 'manager']}><ClientDetailPage /></AuthGuard> },
       { path: 'analytics', element: <AuthGuard roles={['admin', 'manager']}><AnalyticsPage /></AuthGuard> },
       { path: 'settings', element: <AuthGuard roles={['admin']}><SettingsPage /></AuthGuard> },
       { path: '*', element: <NotFoundPage /> },

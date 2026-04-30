@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useClients } from '../hooks/useClients'
 import { ClientForm } from '../components/ClientForm'
 import { useDebounce } from '@/shared/hooks/useDebounce'
@@ -62,7 +63,7 @@ export default function ClientsPage() {
             <tbody>
               {clients.map((client) => (
                 <tr key={client.id} className="border-b border-border last:border-0 hover:bg-surface-dim/50">
-                  <td className="px-4 py-3 font-medium">{client.name}</td>
+                  <td className="px-4 py-3 font-medium"><Link to={`/clients/${client.id}`} className="text-accent hover:underline">{client.name}</Link></td>
                   <td className="px-4 py-3 text-text-muted">{client.phone || '—'}</td>
                   <td className="px-4 py-3 text-text-muted">{client.email || '—'}</td>
                   <td className="px-4 py-3 text-text-muted truncate max-w-[200px]">{client.comment || '—'}</td>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSettings, useUsers } from '../hooks/useSettings'
+import { ProfileCard } from '../components/ProfileCard'
 import { ROLES } from '@/shared/constants'
 import { DEFAULTS } from '@/features/calculator/lib/calculator'
 import { toast } from '@/shared/stores/toast-store'
@@ -13,6 +14,7 @@ export default function SettingsPage() {
         <p className="text-text-muted">Параметры производства и управление пользователями</p>
       </div>
 
+      <ProfileCard />
       <CalculatorSettings />
       <UserManagement />
     </div>

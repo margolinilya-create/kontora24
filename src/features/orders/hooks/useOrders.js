@@ -157,6 +157,26 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
       p_changed_by: user.id,
     })
   }
+
+  // Notify Bitrix24 about status change (fire-and-forget)
+  try {
+    const { data: order } = await supabase.from('orders').select('number, bitrix_deal_id, price_final, cost_total').eq('id', orderId).single()
+    if (order?.bitrix_deal_id) {
+      fetch('/api/bitrix/status-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          order_number: order.number,
+          status: toStatus,
+          price_final: order.price_final,
+          cost_total: order.cost_total,
+          bitrix_deal_id: order.bitrix_deal_id,
+          bitrix_webhook_url: localStorage.getItem('bitrix_webhook_url') || '',
+        }),
+      }).catch(() => {}) // silent fail
+    }
+  } catch {} // non-critical
 }
 
 export async function updateOrder(orderId, updates) {

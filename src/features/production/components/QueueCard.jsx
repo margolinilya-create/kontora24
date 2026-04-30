@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
+import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatRelative } from '@/shared/lib/utils'
 
@@ -11,7 +12,10 @@ export function QueueCard({ order, onUpdated }) {
         <Link to={`/orders/${order.id}`} className="text-lg font-semibold text-accent hover:underline">
           #{order.number}
         </Link>
-        <StatusBadge status={order.status} />
+        <div className="flex items-center gap-2">
+          <ClaimButton order={order} onClaimed={onUpdated} />
+          <StatusBadge status={order.status} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-sm">
@@ -33,12 +37,12 @@ export function QueueCard({ order, onUpdated }) {
         </div>
       </div>
 
-      {order.client?.name && (
-        <p className="text-sm text-text-muted">Клиент: {order.client.name}</p>
+      {order.assignee?.display_name && (
+        <p className="text-xs text-text-muted">Исполнитель: {order.assignee.display_name}</p>
       )}
 
-      {order.notes && (
-        <p className="text-sm text-text-muted truncate">📝 {order.notes}</p>
+      {order.client?.name && (
+        <p className="text-sm text-text-muted">Клиент: {order.client.name}</p>
       )}
 
       <div className="flex items-center justify-between pt-2 border-t border-border">

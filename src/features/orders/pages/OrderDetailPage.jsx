@@ -5,6 +5,8 @@ import { StatusBadge } from '../components/StatusBadge'
 import { StatusSwitcher } from '../components/StatusSwitcher'
 import { OrderEditForm } from '../components/OrderEditForm'
 import { OrderComments } from '../components/OrderComments'
+import { OrderAttachments } from '../components/OrderAttachments'
+import { OrderTimeline } from '../components/OrderTimeline'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { CommercialProposal } from '@/features/kp/components/CommercialProposal'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
@@ -54,6 +56,9 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
+      {/* Timeline */}
+      <OrderTimeline order={order} history={history} />
+
       {/* Tech Card */}
       <TechCardActions order={order} />
 
@@ -102,6 +107,9 @@ export default function OrderDetailPage() {
 
           {/* Edit form */}
           <OrderEditForm order={order} onSaved={refetch} />
+
+          {/* Attachments */}
+          <OrderAttachments orderId={order.id} />
 
           {/* Comments */}
           <OrderComments orderId={order.id} />

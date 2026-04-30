@@ -149,6 +149,14 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
   await supabase.from('order_status_history').insert({
     order_id: orderId, from_status: fromStatus, to_status: toStatus, changed_by: user.id,
   })
+
+  // Auto-deduct materials when entering "print"
+  if (toStatus === 'print') {
+    await supabase.rpc('auto_deduct_materials', {
+      p_order_id: orderId,
+      p_changed_by: user.id,
+    })
+  }
 }
 
 export async function updateOrder(orderId, updates) {

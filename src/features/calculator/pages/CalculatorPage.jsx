@@ -15,6 +15,14 @@ const INITIAL = {
   designVariants: 1,
 }
 
+const PRESETS = [
+  { label: '50×50', width: 50, height: 50 },
+  { label: '70×70', width: 70, height: 70 },
+  { label: '90×50', width: 90, height: 50 },
+  { label: '100×100', width: 100, height: 100 },
+  { label: '150×150', width: 150, height: 150 },
+]
+
 export default function CalculatorPage() {
   const [form, setForm] = useState(INITIAL)
   const navigate = useNavigate()
@@ -93,6 +101,26 @@ export default function CalculatorPage() {
               </select>
             </div>
 
+            {/* Presets */}
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Быстрый размер</label>
+              <div className="flex flex-wrap gap-1.5">
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => { update('width', p.width); update('height', p.height) }}
+                    className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                      Number(form.width) === p.width && Number(form.height) === p.height
+                        ? 'bg-accent text-white' : 'bg-surface-dim text-text-muted hover:bg-border'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Dimensions */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -156,6 +184,14 @@ export default function CalculatorPage() {
               />
               <span className="text-sm">Ламинация</span>
             </label>
+
+            <button
+              type="button"
+              onClick={() => setForm(INITIAL)}
+              className="w-full border border-border text-text-muted hover:bg-surface-dim font-medium rounded-lg py-2 text-sm transition-colors"
+            >
+              Сбросить
+            </button>
           </div>
 
           {/* Volume discount table */}

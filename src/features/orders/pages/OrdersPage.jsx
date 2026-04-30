@@ -5,6 +5,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { ORDER_STATUSES, ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatRelative } from '@/shared/lib/utils'
 import { useDebounce } from '@/shared/hooks/useDebounce'
+import { exportCSV } from '@/shared/lib/export'
 import { usePagination } from '@/shared/hooks/usePagination'
 import { Pagination } from '@/shared/components/Pagination'
 import { TableSkeleton } from '@/shared/components/Skeleton'
@@ -67,12 +68,32 @@ export default function OrdersPage() {
             {totalCount > 0 ? `${totalCount} заказов` : 'Управление заказами'}
           </p>
         </div>
-        <Link
-          to="/calculator"
-          className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
-        >
-          + Новый заказ
-        </Link>
+        <div className="flex items-center gap-2">
+          {orders.length > 0 && (
+            <button
+              onClick={() => exportCSV(orders, [
+                { key: 'number', label: '№' },
+                { key: 'order_type', label: 'Тип' },
+                { key: 'width_mm', label: 'Ширина' },
+                { key: 'height_mm', label: 'Высота' },
+                { key: 'qty', label: 'Тираж' },
+                { key: 'status', label: 'Статус' },
+                { key: 'price_final', label: 'Цена' },
+                { key: 'cost_total', label: 'Себестоимость' },
+                { key: 'created_at', label: 'Создан' },
+              ], 'orders.csv')}
+              className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2.5 text-sm transition-colors"
+            >
+              CSV
+            </button>
+          )}
+          <Link
+            to="/calculator"
+            className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
+          >
+            + Новый заказ
+          </Link>
+        </div>
       </div>
 
       {/* Search */}

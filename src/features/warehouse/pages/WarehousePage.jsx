@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { useMaterials } from '../hooks/useMaterials'
 import { MaterialCard } from '../components/MaterialCard'
 import { StockModal } from '../components/StockModal'
+import { MaterialForm } from '../components/MaterialForm'
 import { MATERIAL_TYPES } from '@/shared/constants'
 
 export default function WarehousePage() {
   const { materials, loading, refetch } = useMaterials()
   const [selectedMaterial, setSelectedMaterial] = useState(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showLowOnly, setShowLowOnly] = useState(false)
 
   const lowStockCount = materials.filter(
     (m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty)
@@ -23,6 +26,22 @@ export default function WarehousePage() {
               <span className="text-danger ml-2">({lowStockCount} с низким остатком)</span>
             )}
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {lowStockCount > 0 && (
+            <button
+              onClick={() => setShowLowOnly(!showLowOnly)}
+              className={`px-3 py-2 rounded-lg text-sm transition-colors ${showLowOnly ? 'bg-danger text-white' : 'border border-border text-text-muted hover:bg-surface-dim'}`}
+            >
+              {showLowOnly ? 'Все' : 'Мало на складе'}
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors"
+          >
+            + Материал
+          </button>
         </div>
       </div>
 
@@ -53,7 +72,7 @@ export default function WarehousePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {materials.map((m) => (
+          {materials.filter((m) => !showLowOnly || (m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty))).map((m) => (
             <MaterialCard
               key={m.id}
               material={m}
@@ -72,6 +91,14 @@ export default function WarehousePage() {
             setSelectedMaterial(null)
             refetch()
           }}
+        />
+      )}
+
+      {/* Create material form */}
+      {showCreateForm && (
+        <MaterialForm
+          onClose={() => setShowCreateForm(false)}
+          onCreated={() => { setShowCreateForm(false); refetch() }}
         />
       )}
     </div>

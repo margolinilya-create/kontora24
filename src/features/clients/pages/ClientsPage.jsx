@@ -56,7 +56,7 @@ export default function ClientsPage() {
                 <th className="text-left px-4 py-3 font-medium text-text-muted">Имя</th>
                 <th className="text-left px-4 py-3 font-medium text-text-muted">Телефон</th>
                 <th className="text-left px-4 py-3 font-medium text-text-muted">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">Комментарий</th>
+                <th className="text-left px-4 py-3 font-medium text-text-muted">Теги</th>
                 <th className="text-right px-4 py-3 font-medium text-text-muted">Добавлен</th>
               </tr>
             </thead>
@@ -66,7 +66,13 @@ export default function ClientsPage() {
                   <td className="px-4 py-3 font-medium"><Link to={`/clients/${client.id}`} className="text-accent hover:underline">{client.name}</Link></td>
                   <td className="px-4 py-3 text-text-muted">{client.phone || '—'}</td>
                   <td className="px-4 py-3 text-text-muted">{client.email || '—'}</td>
-                  <td className="px-4 py-3 text-text-muted truncate max-w-[200px]">{client.comment || '—'}</td>
+                  <td className="px-4 py-3">
+                    {client.tags?.length > 0 ? (
+                      <div className="flex gap-1 flex-wrap">
+                        {client.tags.map((t) => <span key={t} className="bg-accent/10 text-accent text-[10px] px-1.5 py-0.5 rounded-full">{t}</span>)}
+                      </div>
+                    ) : <span className="text-text-muted">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-right text-text-muted">{formatDate(client.created_at)}</td>
                 </tr>
               ))}

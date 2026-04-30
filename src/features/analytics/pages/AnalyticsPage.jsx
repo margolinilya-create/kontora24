@@ -21,14 +21,25 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function fetch() {
       setLoading(true)
-      const startDate = PERIODS.find((p) => p.key === period)?.getStart() || subDays(new Date(), 30)
+      const periodDef = PERIODS.find((p) => p.key === period) || PERIODS[1]
+      const startDate = periodDef.getStart()
+      // Previous period for comparison
+      const periodMs = Date.now() - startDate.getTime()
+      const prevStart = new Date(startDate.getTime() - periodMs)
 
-      const [ordersRes, historyRes] = await Promise.all([
-        supabase.from('orders').select('*, client:clients(name)').gte('created_at', startDate.toISOString()),
+      const [ordersRes, historyRes, matTxRes, prevOrdersRes] = await Promise.all([
+        supabase.from('orders').select('*, client:clients(name), assignee:profiles!assigned_to(display_name)').gte('created_at', startDate.toISOString()),
         supabase.from('order_status_history').select('*').gte('created_at', startDate.toISOString()),
+        supabase.from('material_transactions').select('*, material:materials(name, type, unit)').gte('created_at', startDate.toISOString()),
+        period !== 'all' ? supabase.from('orders').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', startDate.toISOString()) : Promise.resolve({ data: [] }),
       ])
 
-      setData({ orders: ordersRes.data || [], statusHistory: historyRes.data || [] })
+      setData({
+        orders: ordersRes.data || [],
+        statusHistory: historyRes.data || [],
+        materialTx: matTxRes.data || [],
+        prevOrders: prevOrdersRes.data || [],
+      })
       setLoading(false)
     }
     fetch()
@@ -105,6 +116,30 @@ export default function AnalyticsPage() {
   })
   const topClients = Object.values(clientRevenue).sort((a, b) => b.revenue - a.revenue).slice(0, 10)
 
+  // Previous period comparison
+  const prevDone = (data.prevOrders || []).filter((o) => o.status === 'done')
+  const prevRevenue = prevDone.reduce((s, o) => s + (Number(o.price_final) || 0), 0)
+  const revenueDelta = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue * 100).toFixed(0) : null
+
+  // Workload by assignee
+  const workload = {}
+  orders.filter((o) => o.status === 'done' && o.assignee).forEach((o) => {
+    const name = o.assignee?.display_name || 'Не назначен'
+    if (!workload[name]) workload[name] = 0
+    workload[name] += 1
+  })
+  const workloadData = Object.entries(workload).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
+
+  // Material consumption
+  const matConsumption = {}
+  ;(data.materialTx || []).filter((t) => Number(t.delta) < 0).forEach((t) => {
+    const name = t.material?.name || 'Неизвестно'
+    const unit = t.material?.unit || ''
+    if (!matConsumption[name]) matConsumption[name] = { total: 0, unit }
+    matConsumption[name].total += Math.abs(Number(t.delta))
+  })
+  const matData = Object.entries(matConsumption).map(([name, d]) => ({ name, ...d }))
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -137,10 +172,10 @@ export default function AnalyticsPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatCard label="Выручка" value={formatPrice(revenue)} />
+        <StatCard label="Выручка" value={formatPrice(revenue)} sub={revenueDelta !== null ? `${revenueDelta > 0 ? '+' : ''}${revenueDelta}% к прошлому` : null} />
         <StatCard label="Себестоимость" value={formatPrice(totalCost)} />
         <StatCard label="Маржа" value={formatPrice(revenue - totalCost)} accent />
-        <StatCard label="Заказов" value={orders.length} />
+        <StatCard label="Заказов" value={orders.length} sub={data.prevOrders?.length > 0 ? `было ${data.prevOrders.length}` : null} />
         <StatCard label="Средний чек" value={formatPrice(avgCheck)} />
         <StatCard label="Конверсия" value={`${conversionRate}%`} sub={`${cancelledCount} отмен`} />
       </div>
@@ -268,6 +303,39 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                   <span className="font-semibold text-sm">{formatPrice(c.revenue)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Workload by assignee */}
+        {workloadData.length > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <h2 className="font-semibold mb-4">Загрузка по исполнителям</h2>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={workloadData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                <Bar dataKey="count" name="Заказов" fill="#1a1a2e" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Material consumption */}
+        {matData.length > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <h2 className="font-semibold mb-4">Расход материалов</h2>
+            <div className="space-y-3">
+              {matData.map((m) => (
+                <div key={m.name} className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{m.name}</span>
+                  <span className="text-text-muted">{m.total.toFixed(2)} {m.unit}</span>
                 </div>
               ))}
             </div>

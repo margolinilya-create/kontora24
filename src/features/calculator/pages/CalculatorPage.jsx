@@ -5,6 +5,7 @@ import { createOrder } from '@/features/orders/hooks/useOrders'
 import { ORDER_TYPES, VOLUME_DISCOUNTS } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { formatPrice, formatNumber } from '@/shared/lib/utils'
+import { LayoutPreview } from '../components/LayoutPreview'
 
 const INITIAL = {
   orderType: 'sticker_cut',
@@ -223,6 +224,9 @@ export default function CalculatorPage() {
             </div>
           </div>
         </div>
+
+        {/* Layout preview */}
+        <LayoutPreview width={Number(form.width)} height={Number(form.height)} itemsPerSheet={result.itemsPerSheet} sheets={result.sheets} />
 
         {/* Results */}
         <div className="lg:col-span-2 space-y-4">

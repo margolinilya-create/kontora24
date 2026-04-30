@@ -3,6 +3,7 @@ import { useSettings, useUsers } from '../hooks/useSettings'
 import { ProfileCard } from '../components/ProfileCard'
 import { ROLES } from '@/shared/constants'
 import { DEFAULTS } from '@/features/calculator/lib/calculator'
+import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { formatDateTime } from '@/shared/lib/utils'
 
@@ -16,7 +17,9 @@ export default function SettingsPage() {
 
       <ProfileCard />
       <CalculatorSettings />
+      <MarkupSettings />
       <UserManagement />
+      <InviteUser />
     </div>
   )
 }
@@ -144,6 +147,101 @@ function UserManagement() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function MarkupSettings() {
+  const { value: markups, loading, save } = useSettings('markups')
+  const [form, setForm] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  const defaultMarkups = {
+    sticker_cut: 4.0, sticker_kiss: 4.0, stickerpack: 4.0,
+    sticker3D: 4.5, stickerpack3D: 4.5, rect: 4.0, big: 4.0,
+  }
+
+  if (markups && !form) setForm({ ...defaultMarkups, ...markups })
+  if (!form && !loading) setForm(defaultMarkups)
+
+  async function handleSave() {
+    setSaving(true)
+    try { await save(form) } catch (err) { toast.error(err.message) }
+    finally { setSaving(false) }
+  }
+
+  if (loading || !form) return null
+
+  return (
+    <div className="bg-surface rounded-xl border border-border p-5">
+      <h2 className="font-semibold mb-4">Наценки по типам</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {Object.entries(form).map(([key, val]) => (
+          <div key={key}>
+            <label className="block text-xs text-text-muted mb-1">{key}</label>
+            <input
+              type="number"
+              value={val}
+              onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })}
+              step="0.1"
+              min="1"
+              className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+            />
+          </div>
+        ))}
+      </div>
+      <button onClick={handleSave} disabled={saving} className="mt-3 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors disabled:opacity-50">
+        {saving ? '...' : 'Сохранить наценки'}
+      </button>
+    </div>
+  )
+}
+
+function InviteUser() {
+  const [email, setEmail] = useState('')
+  const [sending, setSending] = useState(false)
+
+  async function handleInvite(e) {
+    e.preventDefault()
+    if (!email) return
+    setSending(true)
+    try {
+      const { error } = await supabase.auth.admin.inviteUserByEmail(email)
+      if (error) throw error
+      toast.success(`Приглашение отправлено на ${email}`)
+      setEmail('')
+    } catch (err) {
+      // Fallback: try magic link if admin API not available
+      try {
+        const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
+        if (error) throw error
+        toast.success(`Ссылка для входа отправлена на ${email}`)
+        setEmail('')
+      } catch (err2) {
+        toast.error('Ошибка: ' + (err2.message || err.message))
+      }
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="bg-surface rounded-xl border border-border p-5">
+      <h2 className="font-semibold mb-4">Пригласить пользователя</h2>
+      <form onSubmit={handleInvite} className="flex gap-2">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="email@example.com"
+          required
+          className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+        />
+        <button type="submit" disabled={sending} className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors disabled:opacity-50">
+          {sending ? '...' : 'Пригласить'}
+        </button>
+      </form>
+      <p className="text-xs text-text-muted mt-2">Новый пользователь получит роль "Сборщик". Роль можно изменить выше.</p>
     </div>
   )
 }

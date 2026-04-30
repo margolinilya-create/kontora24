@@ -1,0 +1,16 @@
+{
+  "name": "Kontora24",
+  "short_name": "Kontora24",
+  "description": "Стикерное производство — MES/WMS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

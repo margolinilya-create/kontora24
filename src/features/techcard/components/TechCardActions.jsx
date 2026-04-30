@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 import { TechCard } from './TechCard'
 import { toast } from '@/shared/stores/toast-store'
 
@@ -28,6 +29,22 @@ export function TechCardActions({ order }) {
     }
   }
 
+  async function exportPDF() {
+    if (!cardRef.current) return
+    setExporting(true)
+    try {
+      const canvas = await html2canvas(cardRef.current, { scale: 2, backgroundColor: '#ffffff' })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297)
+      pdf.save(`techcard-${order.number}.pdf`)
+    } catch (err) {
+      toast.error('Ошибка PDF: ' + err.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   function handlePrint() {
     setShowPreview(true)
     setTimeout(() => window.print(), 100)
@@ -50,6 +67,13 @@ export function TechCardActions({ order }) {
               className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50"
             >
               {exporting ? '...' : 'PNG'}
+            </button>
+            <button
+              onClick={exportPDF}
+              disabled={exporting}
+              className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50"
+            >
+              PDF
             </button>
             <button
               onClick={handlePrint}

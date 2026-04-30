@@ -24,7 +24,7 @@ export default function AnalyticsPage() {
       const startDate = PERIODS.find((p) => p.key === period)?.getStart() || subDays(new Date(), 30)
 
       const [ordersRes, historyRes] = await Promise.all([
-        supabase.from('orders').select('*').gte('created_at', startDate.toISOString()),
+        supabase.from('orders').select('*, client:clients(name)').gte('created_at', startDate.toISOString()),
         supabase.from('order_status_history').select('*').gte('created_at', startDate.toISOString()),
       ])
 
@@ -79,6 +79,31 @@ export default function AnalyticsPage() {
     name: ORDER_STATUSES[stage]?.label || stage,
     hours: Math.round(times.reduce((a, b) => a + b, 0) / times.length),
   })).filter((d) => d.hours > 0)
+
+  // Revenue trend by day
+  const revenueTrend = {}
+  doneOrders.forEach((o) => {
+    const day = format(new Date(o.created_at), 'dd.MM')
+    if (!revenueTrend[day]) revenueTrend[day] = 0
+    revenueTrend[day] += Number(o.price_final) || 0
+  })
+  const trendData = Object.entries(revenueTrend).map(([day, rev]) => ({ day, revenue: Math.round(rev) }))
+
+  // Top clients
+  const clientRevenue = {}
+  doneOrders.forEach((o) => {
+    const name = o.client_id || 'Без клиента'
+    if (!clientRevenue[name]) clientRevenue[name] = { revenue: 0, count: 0, name: 'Без клиента' }
+    clientRevenue[name].revenue += Number(o.price_final) || 0
+    clientRevenue[name].count += 1
+  })
+  // We need client names — use orders with client relation
+  orders.forEach((o) => {
+    if (o.client_id && clientRevenue[o.client_id]) {
+      clientRevenue[o.client_id].name = o.client?.name || o.client_id
+    }
+  })
+  const topClients = Object.values(clientRevenue).sort((a, b) => b.revenue - a.revenue).slice(0, 10)
 
   if (loading) {
     return (
@@ -208,6 +233,47 @@ export default function AnalyticsPage() {
           </div>
         </div>
       )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue trend */}
+        {trendData.length > 1 && (
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <h2 className="font-semibold mb-4">Тренд выручки</h2>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => formatPrice(v)} contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                <Line type="monotone" dataKey="revenue" stroke="#e94560" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Top clients */}
+        {topClients.length > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <h2 className="font-semibold mb-4">Топ клиенты</h2>
+            <div className="space-y-2">
+              {topClients.map((c, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-accent/10 text-accent text-xs font-bold flex items-center justify-center">
+                      {i + 1}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium">{c.name}</p>
+                      <p className="text-xs text-text-muted">{c.count} заказов</p>
+                    </div>
+                  </div>
+                  <span className="font-semibold text-sm">{formatPrice(c.revenue)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

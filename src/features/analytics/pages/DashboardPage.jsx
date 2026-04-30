@@ -11,14 +11,15 @@ export default function DashboardPage() {
   const isManager = hasRole(['admin', 'manager'])
   const role = profile?.role
 
-  const [data, setData] = useState({ orders: [], statusCounts: {}, lowStock: [], myOrders: [] })
+  const [data, setData] = useState({ orders: [], statusCounts: {}, lowStock: [], myOrders: [], deadlines: [], activity: [] })
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [ordersRes, materialsRes] = await Promise.all([
+    const [ordersRes, materialsRes, activityRes] = await Promise.all([
       supabase.from('orders').select('*, client:clients(name)').order('created_at', { ascending: false }).limit(50),
       supabase.from('materials').select('*'),
+      supabase.from('order_status_history').select('*, changed_by_profile:profiles!changed_by(display_name)').order('created_at', { ascending: false }).limit(15),
     ])
 
     const orders = ordersRes.data || []
@@ -28,11 +29,16 @@ export default function DashboardPage() {
     orders.forEach((o) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1 })
 
     const lowStock = materials.filter((m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty))
-
-    // My orders — assigned to current user
     const myOrders = profile ? orders.filter((o) => o.assigned_to === profile.id && o.status !== 'done' && o.status !== 'cancelled') : []
 
-    setData({ orders, statusCounts, lowStock, myOrders })
+    // Deadlines — orders with deadline in next 3 days
+    const now = new Date()
+    const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+    const deadlines = orders
+      .filter((o) => o.deadline && o.status !== 'done' && o.status !== 'cancelled' && new Date(o.deadline) <= threeDays)
+      .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+
+    setData({ orders, statusCounts, lowStock, myOrders, deadlines, activity: activityRes.data || [] })
     setLoading(false)
   }, [profile])
 
@@ -175,6 +181,49 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* Deadlines */}
+          {data.deadlines.length > 0 && (
+            <div className="bg-surface rounded-xl border border-danger/30 p-5">
+              <h2 className="font-semibold mb-3 text-danger">Дедлайны ({data.deadlines.length})</h2>
+              <div className="space-y-2">
+                {data.deadlines.map((o) => {
+                  const overdue = new Date(o.deadline) < new Date()
+                  return (
+                    <Link key={o.id} to={`/orders/${o.id}`} className="flex items-center justify-between text-sm py-1.5 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
+                      <span className="font-medium">#{o.number}</span>
+                      <span className={overdue ? 'text-danger font-semibold' : 'text-warning'}>
+                        {overdue ? 'Просрочен!' : new Date(o.deadline).toLocaleDateString('ru-RU')}
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Activity feed */}
+          {data.activity.length > 0 && (
+            <div className="bg-surface rounded-xl border border-border p-5">
+              <h2 className="font-semibold mb-3">Активность</h2>
+              <div className="space-y-2">
+                {data.activity.slice(0, 8).map((a) => (
+                  <div key={a.id} className="flex items-start gap-2 text-xs">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 flex-shrink-0" />
+                    <div>
+                      <span className="font-medium">{a.changed_by_profile?.display_name || 'Система'}</span>
+                      {' '}
+                      <span className="text-text-muted">
+                        {a.from_status ? `${ORDER_STATUSES[a.from_status]?.label} → ` : ''}
+                        {ORDER_STATUSES[a.to_status]?.label || a.to_status}
+                      </span>
+                      <span className="text-text-muted ml-1">· {formatRelative(a.created_at)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Quick actions */}
           {isManager && (

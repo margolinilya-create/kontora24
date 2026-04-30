@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { calculate, DEFAULTS, getVolumeDiscount } from '../lib/calculator'
 import { createOrder } from '@/features/orders/hooks/useOrders'
 import { ORDER_TYPES, VOLUME_DISCOUNTS } from '@/shared/constants'
@@ -24,7 +24,15 @@ const PRESETS = [
 ]
 
 export default function CalculatorPage() {
-  const [form, setForm] = useState(INITIAL)
+  const [searchParams] = useSearchParams()
+  const initialFromParams = {
+    ...INITIAL,
+    ...(searchParams.get('width') && { width: Number(searchParams.get('width')) }),
+    ...(searchParams.get('height') && { height: Number(searchParams.get('height')) }),
+    ...(searchParams.get('qty') && { qty: Number(searchParams.get('qty')) }),
+    ...(searchParams.get('type') && { orderType: searchParams.get('type') }),
+  }
+  const [form, setForm] = useState(initialFromParams)
   const navigate = useNavigate()
 
   const is3D = form.orderType === 'sticker3D' || form.orderType === 'stickerpack3D'

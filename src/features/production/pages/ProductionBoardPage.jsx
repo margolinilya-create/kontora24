@@ -7,6 +7,7 @@ import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
 import { formatRelative } from '@/shared/lib/utils'
+import { differenceInHours, differenceInMinutes } from 'date-fns'
 
 export default function ProductionBoardPage() {
   const { profile } = useAuth()
@@ -103,7 +104,14 @@ export default function ProductionBoardPage() {
                       <p className="text-xs text-text-muted">→ {order.assignee.display_name}</p>
                     )}
                     <div className="flex items-center justify-between pt-2 mt-2 border-t border-border">
-                      <span className="text-xs text-text-muted">{formatRelative(order.created_at)}</span>
+                      <span className="text-xs text-text-muted" title="Время в статусе">
+                        {(() => {
+                          const h = differenceInHours(new Date(), new Date(order.updated_at))
+                          if (h < 1) return `${differenceInMinutes(new Date(), new Date(order.updated_at))} мин`
+                          if (h < 24) return `${h} ч`
+                          return `${Math.floor(h / 24)} дн`
+                        })()}
+                      </span>
                       <StatusSwitcher order={order} onUpdated={refetchAll} />
                     </div>
                   </div>

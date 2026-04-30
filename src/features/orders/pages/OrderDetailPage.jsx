@@ -45,13 +45,29 @@ export default function OrderDetailPage() {
           <h1 className="text-2xl font-bold">Заказ #{order.number}</h1>
           <StatusBadge status={order.status} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {order.bitrix_url && (
+            <a
+              href={order.bitrix_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2 text-sm transition-colors"
+            >
+              Bitrix24 ↗
+            </a>
+          )}
           <button
             onClick={() => setShowKP(true)}
             className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2 text-sm transition-colors"
           >
             КП
           </button>
+          <Link
+            to={`/calculator?width=${order.width_mm}&height=${order.height_mm}&qty=${order.qty}&type=${order.order_type}`}
+            className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2 text-sm transition-colors"
+          >
+            Повторить
+          </Link>
           <StatusSwitcher order={order} onUpdated={refetch} />
         </div>
       </div>

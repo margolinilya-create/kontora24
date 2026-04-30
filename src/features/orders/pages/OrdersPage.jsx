@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useOrders } from '../hooks/useOrders'
 import { StatusBadge } from '../components/StatusBadge'
 import { ORDER_STATUSES, ORDER_TYPES } from '@/shared/constants'
+import { TableSkeleton } from '@/shared/components/Skeleton'
 import { formatPrice, formatDate, formatRelative } from '@/shared/lib/utils'
 
 export default function OrdersPage() {
@@ -47,9 +48,7 @@ export default function OrdersPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
-        </div>
+        <TableSkeleton rows={6} cols={7} />
       ) : error ? (
         <div className="bg-red-50 text-danger rounded-xl p-4 text-sm">{error}</div>
       ) : orders.length === 0 ? (

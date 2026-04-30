@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { updateOrderStatus } from '../hooks/useOrders'
 import { STATUS_TRANSITIONS, CAN_CANCEL_ROLES, ORDER_STATUSES } from '@/shared/constants'
+import { toast } from '@/shared/stores/toast-store'
 
 export function StatusSwitcher({ order, onUpdated }) {
   const { profile } = useAuth()
@@ -24,7 +25,7 @@ export function StatusSwitcher({ order, onUpdated }) {
       await updateOrderStatus(order.id, currentStatus, toStatus)
       onUpdated?.()
     } catch (err) {
-      alert('Ошибка: ' + err.message)
+      toast.error('Ошибка: ' + err.message)
     } finally {
       setLoading(false)
     }

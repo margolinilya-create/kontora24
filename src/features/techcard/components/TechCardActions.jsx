@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import { TechCard } from './TechCard'
+import { toast } from '@/shared/stores/toast-store'
 
 export function TechCardActions({ order }) {
   const cardRef = useRef(null)
@@ -21,7 +22,7 @@ export function TechCardActions({ order }) {
       link.href = canvas.toDataURL('image/png')
       link.click()
     } catch (err) {
-      alert('Ошибка экспорта: ' + err.message)
+      toast.error('Ошибка экспорта: ' + err.message)
     } finally {
       setExporting(false)
     }

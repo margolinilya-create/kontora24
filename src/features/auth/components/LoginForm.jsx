@@ -40,26 +40,29 @@ export function LoginForm() {
 
         <form onSubmit={handleSubmit} className="bg-surface rounded-xl shadow-sm border border-border p-6 space-y-4">
           {error && (
-            <div className="bg-red-50 text-danger text-sm rounded-lg p-3">
+            <div className="bg-danger/10 text-danger text-sm rounded-lg p-3" role="alert">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1.5">Email</label>
+            <label htmlFor="login-email" className="block text-sm font-medium mb-1.5">Email</label>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
               placeholder="email@example.com"
               required
+              autoFocus
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1.5">Пароль</label>
+            <label htmlFor="login-password" className="block text-sm font-medium mb-1.5">Пароль</label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

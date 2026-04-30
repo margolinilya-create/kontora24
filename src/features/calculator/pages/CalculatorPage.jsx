@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { calculate, DEFAULTS, getVolumeDiscount } from '../lib/calculator'
 import { createOrder } from '@/features/orders/hooks/useOrders'
 import { ORDER_TYPES, VOLUME_DISCOUNTS } from '@/shared/constants'
+import { toast } from '@/shared/stores/toast-store'
 import { formatPrice, formatNumber } from '@/shared/lib/utils'
 
 const INITIAL = {
@@ -59,7 +60,7 @@ export default function CalculatorPage() {
       })
       navigate(`/orders/${order.id}`)
     } catch (err) {
-      alert('Ошибка создания заказа: ' + err.message)
+      toast.error('Ошибка создания заказа: ' + err.message)
     } finally {
       setCreating(false)
     }

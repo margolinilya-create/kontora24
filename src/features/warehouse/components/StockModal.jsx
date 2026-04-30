@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { addMaterialTransaction } from '../hooks/useMaterials'
+import { toast } from '@/shared/stores/toast-store'
 
 export function StockModal({ material, onClose, onDone }) {
   const [delta, setDelta] = useState('')
@@ -21,7 +22,7 @@ export function StockModal({ material, onClose, onDone }) {
       })
       onDone()
     } catch (err) {
-      alert('Ошибка: ' + err.message)
+      toast.error('Ошибка: ' + err.message)
     } finally {
       setLoading(false)
     }

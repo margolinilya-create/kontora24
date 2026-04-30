@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { formatOrderType } from '@/features/techcard/utils'
 import { formatPrice } from '@/shared/lib/utils'
+import { toast } from '@/shared/stores/toast-store'
 
 export function CommercialProposal({ order, onClose }) {
   const [clientName, setClientName] = useState(order?.client?.name || '')
@@ -10,7 +11,7 @@ export function CommercialProposal({ order, onClose }) {
   function handleCopy() {
     const text = generateKPText(order, clientName)
     navigator.clipboard.writeText(text)
-    alert('КП скопировано в буфер обмена')
+    toast.success('КП скопировано в буфер обмена')
   }
 
   return (

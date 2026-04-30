@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail } from '../hooks/useOrders'
 import { StatusBadge } from '../components/StatusBadge'
 import { StatusSwitcher } from '../components/StatusSwitcher'
+import { OrderEditForm } from '../components/OrderEditForm'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { CommercialProposal } from '@/features/kp/components/CommercialProposal'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
@@ -97,6 +98,9 @@ export default function OrderDetailPage() {
               <p className="text-sm text-text-muted whitespace-pre-wrap">{order.notes}</p>
             </div>
           )}
+
+          {/* Edit form */}
+          <OrderEditForm order={order} onSaved={refetch} />
         </div>
 
         {/* Sidebar */}

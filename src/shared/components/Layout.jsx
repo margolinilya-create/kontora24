@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { ErrorBoundary } from './ErrorBoundary'
 import { cn } from '@/shared/lib/utils'
 
 export function Layout() {
@@ -47,7 +48,9 @@ export function Layout() {
 
         {/* Content */}
         <main className="p-4 sm:p-6">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

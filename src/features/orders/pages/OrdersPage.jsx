@@ -3,21 +3,68 @@ import { Link } from 'react-router-dom'
 import { useOrders } from '../hooks/useOrders'
 import { StatusBadge } from '../components/StatusBadge'
 import { ORDER_STATUSES, ORDER_TYPES } from '@/shared/constants'
+import { formatPrice, formatRelative } from '@/shared/lib/utils'
+import { useDebounce } from '@/shared/hooks/useDebounce'
+import { usePagination } from '@/shared/hooks/usePagination'
+import { Pagination } from '@/shared/components/Pagination'
 import { TableSkeleton } from '@/shared/components/Skeleton'
-import { formatPrice, formatDate, formatRelative } from '@/shared/lib/utils'
 
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
-  const { orders, loading, error } = useOrders({ status: statusFilter })
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('created_at')
+  const [sortAsc, setSortAsc] = useState(false)
+
+  const debouncedSearch = useDebounce(search, 300)
+  const [pPage, setPPage] = useState(1)
+  const [pPerPage, setPPerPage] = useState(25)
+
+  const from = (pPage - 1) * pPerPage
+  const to = pPage * pPerPage - 1
+
+  const { orders, totalCount, loading, error } = useOrders({
+    status: statusFilter,
+    search: debouncedSearch,
+    sortBy,
+    sortAsc,
+    from,
+    to,
+  })
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pPerPage))
+  const pagination = {
+    page: pPage, totalPages, totalCount, perPage: pPerPage,
+    hasNext: pPage < totalPages, hasPrev: pPage > 1,
+    nextPage: () => setPPage((p) => Math.min(p + 1, totalPages)),
+    prevPage: () => setPPage((p) => Math.max(p - 1, 1)),
+    changePerPage: (n) => { setPPerPage(n); setPPage(1) },
+  }
+
+  function handleSort(col) {
+    if (sortBy === col) { setSortAsc(!sortAsc) }
+    else { setSortBy(col); setSortAsc(false) }
+  }
+
+  function SortHeader({ col, children }) {
+    return (
+      <th
+        className="text-left px-4 py-3 font-medium text-text-muted cursor-pointer hover:text-text select-none"
+        onClick={() => handleSort(col)}
+      >
+        {children}
+        {sortBy === col && <span className="ml-1">{sortAsc ? '↑' : '↓'}</span>}
+      </th>
+    )
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Заказы</h1>
           <p className="text-text-muted">
-            {orders.length > 0 ? `${orders.length} заказов` : 'Управление заказами производства'}
+            {totalCount > 0 ? `${totalCount} заказов` : 'Управление заказами'}
           </p>
         </div>
         <Link
@@ -28,15 +75,24 @@ export default function OrdersPage() {
         </Link>
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-md">
+        <svg className="absolute left-3 top-2.5 w-4 h-4 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+        </svg>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Поиск по номеру или заметкам..."
+          className="w-full pl-9 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+        />
+      </div>
+
       {/* Status filters */}
       <div className="flex flex-wrap gap-2">
-        <FilterButton
-          active={statusFilter === 'all'}
-          onClick={() => setStatusFilter('all')}
-          label="Все"
-        />
+        <FilterBtn active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} label="Все" />
         {Object.entries(ORDER_STATUSES).map(([key, s]) => (
-          <FilterButton
+          <FilterBtn
             key={key}
             active={statusFilter === key}
             onClick={() => setStatusFilter(key)}
@@ -46,98 +102,81 @@ export default function OrdersPage() {
         ))}
       </div>
 
-      {/* Content */}
+      {/* Table */}
       {loading ? (
         <TableSkeleton rows={6} cols={7} />
       ) : error ? (
-        <div className="bg-red-50 text-danger rounded-xl p-4 text-sm">{error}</div>
+        <div className="bg-danger/10 text-danger rounded-xl p-4 text-sm" role="alert">{error}</div>
       ) : orders.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="bg-surface rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surface-dim">
-                  <th className="text-left px-4 py-3 font-medium text-text-muted">#</th>
-                  <th className="text-left px-4 py-3 font-medium text-text-muted">Тип</th>
-                  <th className="text-left px-4 py-3 font-medium text-text-muted">Размер</th>
-                  <th className="text-left px-4 py-3 font-medium text-text-muted">Тираж</th>
-                  <th className="text-left px-4 py-3 font-medium text-text-muted">Статус</th>
-                  <th className="text-left px-4 py-3 font-medium text-text-muted">Клиент</th>
-                  <th className="text-right px-4 py-3 font-medium text-text-muted">Цена</th>
-                  <th className="text-right px-4 py-3 font-medium text-text-muted">Создан</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-b border-border last:border-0 hover:bg-surface-dim/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <Link to={`/orders/${order.id}`} className="font-medium text-accent hover:underline">
-                        {order.number}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-text-muted">
-                      {ORDER_TYPES[order.order_type]?.label || order.order_type}
-                    </td>
-                    <td className="px-4 py-3 text-text-muted">
-                      {order.width_mm}×{order.height_mm} мм
-                    </td>
-                    <td className="px-4 py-3">{order.qty} шт</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={order.status} />
-                    </td>
-                    <td className="px-4 py-3 text-text-muted">
-                      {order.client?.name || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {formatPrice(order.price_final)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-text-muted">
-                      {formatRelative(order.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="bg-surface rounded-xl border border-border p-12 text-center">
+          <h3 className="text-lg font-semibold mb-1">{search ? 'Ничего не найдено' : 'Нет заказов'}</h3>
+          <p className="text-text-muted text-sm mb-4">{search ? 'Попробуйте другой запрос' : 'Создайте первый заказ через калькулятор'}</p>
+          {!search && (
+            <Link to="/calculator" className="inline-flex bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors">
+              Калькулятор
+            </Link>
+          )}
         </div>
+      ) : (
+        <>
+          <div className="bg-surface rounded-xl border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surface-dim">
+                    <SortHeader col="number">#</SortHeader>
+                    <th className="text-left px-4 py-3 font-medium text-text-muted">Тип</th>
+                    <th className="text-left px-4 py-3 font-medium text-text-muted">Размер</th>
+                    <SortHeader col="qty">Тираж</SortHeader>
+                    <th className="text-left px-4 py-3 font-medium text-text-muted">Статус</th>
+                    <th className="text-left px-4 py-3 font-medium text-text-muted">Исполнитель</th>
+                    <SortHeader col="price_final">Цена</SortHeader>
+                    <SortHeader col="created_at">Создан</SortHeader>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr key={order.id} className="border-b border-border last:border-0 hover:bg-surface-dim/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <Link to={`/orders/${order.id}`} className="font-medium text-accent hover:underline">
+                          {order.number}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-text-muted">
+                        {ORDER_TYPES[order.order_type]?.label || order.order_type}
+                      </td>
+                      <td className="px-4 py-3 text-text-muted">
+                        {order.width_mm}×{order.height_mm}
+                      </td>
+                      <td className="px-4 py-3">{order.qty}</td>
+                      <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
+                      <td className="px-4 py-3 text-text-muted">
+                        {order.assignee?.display_name || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">{formatPrice(order.price_final)}</td>
+                      <td className="px-4 py-3 text-right text-text-muted">{formatRelative(order.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <Pagination {...pagination} />
+        </>
       )}
     </div>
   )
 }
 
-function FilterButton({ active, onClick, label, colorClass = '' }) {
+function FilterBtn({ active, onClick, label, colorClass = '' }) {
   return (
     <button
       onClick={onClick}
       className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-        active
-          ? colorClass || 'bg-primary text-white'
-          : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
+        active ? colorClass || 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
       } ${active && colorClass ? 'font-medium' : ''}`}
     >
       {label}
     </button>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="bg-surface rounded-xl border border-border p-12 text-center">
-      <div className="w-16 h-16 rounded-full bg-surface-dim flex items-center justify-center mx-auto mb-4">
-        <svg className="w-8 h-8 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-        </svg>
-      </div>
-      <h3 className="text-lg font-semibold mb-1">Нет заказов</h3>
-      <p className="text-text-muted text-sm mb-4">Создайте первый заказ через калькулятор</p>
-      <Link
-        to="/calculator"
-        className="inline-flex bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
-      >
-        Открыть калькулятор
-      </Link>
-    </div>
   )
 }

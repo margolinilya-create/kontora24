@@ -1,40 +1,147 @@
-import { DEFAULTS } from '@/features/calculator/lib/calculator'
+import { useState } from 'react'
+import { useSettings, useUsers } from '../hooks/useSettings'
 import { ROLES } from '@/shared/constants'
+import { DEFAULTS } from '@/features/calculator/lib/calculator'
+import { toast } from '@/shared/stores/toast-store'
+import { formatDateTime } from '@/shared/lib/utils'
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold">Настройки</h1>
-        <p className="text-text-muted">Управление параметрами производства</p>
+        <p className="text-text-muted">Параметры производства и управление пользователями</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h2 className="font-semibold mb-4">Параметры калькулятора</h2>
-          <div className="space-y-3 text-sm">
-            {Object.entries(DEFAULTS).map(([key, val]) => (
-              <div key={key} className="flex justify-between items-center">
-                <span className="text-text-muted">{key}</span>
-                <input
-                  type="number"
-                  defaultValue={val}
-                  className="w-28 rounded-lg border border-border px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-accent/50"
-                  disabled
-                />
-              </div>
-            ))}
+      <CalculatorSettings />
+      <UserManagement />
+    </div>
+  )
+}
+
+function CalculatorSettings() {
+  const { value: settings, loading, save } = useSettings('calculator')
+  const [form, setForm] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  // Initialize form when settings load
+  if (settings && !form) {
+    setForm({ ...DEFAULTS, ...settings })
+  }
+
+  if (loading || !form) {
+    return (
+      <div className="bg-surface rounded-xl border border-border p-5">
+        <h2 className="font-semibold mb-4">Параметры калькулятора</h2>
+        <div className="animate-pulse space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-8 bg-border/50 rounded" />)}
+        </div>
+      </div>
+    )
+  }
+
+  const fields = [
+    { key: 'printWidth', label: 'Ширина печатного блока (мм)', step: 1 },
+    { key: 'heightMargin', label: 'Тех. отступ по высоте (мм)', step: 1 },
+    { key: 'gap', label: 'Зазор между изделиями (мм)', step: 1 },
+    { key: 'cutSpeed', label: 'Скорость реза (мм/с)', step: 1 },
+    { key: 'lamSpeed', label: 'Скорость ламинации (мм/с)', step: 1 },
+    { key: 'resinPerCm2', label: 'Расход смолы (г/см²)', step: 0.001 },
+    { key: 'resinPourTime', label: 'Время заливки листа (сек)', step: 1 },
+    { key: 'laborCostPerHour', label: 'Стоимость труда (₽/час)', step: 10 },
+    { key: 'filmPricePerM2', label: 'Плёнка (₽/м²)', step: 1 },
+    { key: 'inkPricePerM2', label: 'Краска (₽/м²)', step: 1 },
+    { key: 'resinPricePerG', label: 'Смола (₽/г)', step: 0.01 },
+    { key: 'lamPricePerM2', label: 'Ламинация (₽/м²)', step: 1 },
+  ]
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await save(form)
+    } catch (err) {
+      toast.error('Ошибка: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-surface rounded-xl border border-border p-5">
+      <h2 className="font-semibold mb-4">Параметры калькулятора</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {fields.map((f) => (
+          <div key={f.key}>
+            <label htmlFor={`calc-${f.key}`} className="block text-sm text-text-muted mb-1">{f.label}</label>
+            <input
+              id={`calc-${f.key}`}
+              type="number"
+              value={form[f.key] ?? ''}
+              onChange={(e) => setForm({ ...form, [f.key]: Number(e.target.value) })}
+              step={f.step}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+            />
           </div>
-          <p className="text-xs text-text-muted mt-4">
-            Редактирование будет доступно после подключения таблицы settings в Supabase.
-          </p>
-        </div>
-
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h2 className="font-semibold mb-4">Пользователи</h2>
-          <p className="text-text-muted text-sm">Управление пользователями будет здесь.</p>
-        </div>
+        ))}
       </div>
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="mt-4 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-5 py-2.5 text-sm transition-colors disabled:opacity-50"
+      >
+        {saving ? 'Сохранение...' : 'Сохранить настройки'}
+      </button>
+    </div>
+  )
+}
+
+function UserManagement() {
+  const { users, loading, updateUserRole } = useUsers()
+
+  return (
+    <div className="bg-surface rounded-xl border border-border p-5">
+      <h2 className="font-semibold mb-4">Пользователи</h2>
+
+      {loading ? (
+        <div className="animate-pulse space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 bg-border/50 rounded" />)}
+        </div>
+      ) : users.length === 0 ? (
+        <p className="text-text-muted text-sm">Нет пользователей</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-2 font-medium text-text-muted">Имя</th>
+                <th className="text-left py-2 font-medium text-text-muted">Email</th>
+                <th className="text-left py-2 font-medium text-text-muted">Роль</th>
+                <th className="text-right py-2 font-medium text-text-muted">Добавлен</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id} className="border-b border-border last:border-0">
+                  <td className="py-3 font-medium">{user.display_name || user.name}</td>
+                  <td className="py-3 text-text-muted">{user.email || '—'}</td>
+                  <td className="py-3">
+                    <select
+                      value={user.role}
+                      onChange={(e) => updateUserRole(user.id, e.target.value)}
+                      className="rounded border border-border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-accent/50"
+                    >
+                      {Object.entries(ROLES).map(([key, r]) => (
+                        <option key={key} value={key}>{r.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-3 text-right text-text-muted text-xs">{formatDateTime(user.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

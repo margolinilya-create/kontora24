@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 
 export function useOrders(filters = {}) {
   const [orders, setOrders] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -12,13 +13,13 @@ export function useOrders(filters = {}) {
     try {
       let query = supabase
         .from('orders')
-        .select('*, client:clients(name, phone), assignee:profiles!assigned_to(display_name, role)')
-        .order('created_at', { ascending: false })
+        .select('*, client:clients(name, phone), assignee:profiles!assigned_to(display_name, role)', { count: 'exact' })
 
+      // Filters
       if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status)
       }
-      if (filters.orderType) {
+      if (filters.orderType && filters.orderType !== 'all') {
         query = query.eq('order_type', filters.orderType)
       }
       if (filters.search) {
@@ -31,35 +32,39 @@ export function useOrders(filters = {}) {
         }
       }
 
-      const { data, error: err } = await query
+      // Sort
+      const sortCol = filters.sortBy || 'created_at'
+      const sortAsc = filters.sortAsc ?? false
+      query = query.order(sortCol, { ascending: sortAsc })
+
+      // Pagination
+      if (filters.from !== undefined && filters.to !== undefined) {
+        query = query.range(filters.from, filters.to)
+      }
+
+      const { data, error: err, count } = await query
       if (err) throw err
       setOrders(data || [])
+      setTotalCount(count || 0)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [filters.status, filters.orderType, filters.search])
+  }, [filters.status, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to])
 
-  useEffect(() => {
-    fetchOrders()
-  }, [fetchOrders])
+  useEffect(() => { fetchOrders() }, [fetchOrders])
 
-  // Realtime subscription
+  // Realtime
   useEffect(() => {
     const channel = supabase
       .channel('orders-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrders()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
       .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [fetchOrders])
 
-  return { orders, loading, error, refetch: fetchOrders }
+  return { orders, totalCount, loading, error, refetch: fetchOrders }
 }
 
 export function useOrderDetail(id) {
@@ -85,7 +90,6 @@ export function useOrderDetail(id) {
           .eq('order_id', id)
           .order('created_at', { ascending: false }),
       ])
-
       if (orderRes.error) throw orderRes.error
       setOrder(orderRes.data)
       setHistory(historyRes.data || [])
@@ -101,31 +105,34 @@ export function useOrderDetail(id) {
   return { order, history, loading, error, refetch: fetchDetail }
 }
 
+export function useProfiles(role) {
+  const [profiles, setProfiles] = useState([])
+  useEffect(() => {
+    async function fetch() {
+      let query = supabase.from('profiles').select('id, display_name, role')
+      if (role) query = query.eq('role', role)
+      const { data } = await query.order('display_name')
+      setProfiles(data || [])
+    }
+    fetch()
+  }, [role])
+  return profiles
+}
+
 export async function createOrder(orderData) {
-  // Get current user
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
   const { data, error } = await supabase
     .from('orders')
-    .insert({
-      ...orderData,
-      created_by: user.id,
-      status: 'new',
-    })
+    .insert({ ...orderData, created_by: user.id, status: 'new' })
     .select()
     .single()
-
   if (error) throw error
 
-  // Log initial status
   await supabase.from('order_status_history').insert({
-    order_id: data.id,
-    from_status: null,
-    to_status: 'new',
-    changed_by: user.id,
+    order_id: data.id, from_status: null, to_status: 'new', changed_by: user.id,
   })
-
   return data
 }
 
@@ -137,14 +144,10 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
     .from('orders')
     .update({ status: toStatus, updated_at: new Date().toISOString() })
     .eq('id', orderId)
-
   if (error) throw error
 
   await supabase.from('order_status_history').insert({
-    order_id: orderId,
-    from_status: fromStatus,
-    to_status: toStatus,
-    changed_by: user.id,
+    order_id: orderId, from_status: fromStatus, to_status: toStatus, changed_by: user.id,
   })
 }
 
@@ -153,6 +156,5 @@ export async function updateOrder(orderId, updates) {
     .from('orders')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', orderId)
-
   if (error) throw error
 }

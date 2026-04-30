@@ -21,7 +21,8 @@ export function LoginForm() {
       await signIn(email, password)
       navigate(from, { replace: true })
     } catch (err) {
-      setError(err.message || 'Ошибка входа')
+      const msg = err.message?.includes('Invalid login') ? 'Неверный email или пароль' : err.message || 'Ошибка входа'
+      setError(msg)
     } finally {
       setLoading(false)
     }

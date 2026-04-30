@@ -1,0 +1,280 @@
+import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { calculate, DEFAULTS, getVolumeDiscount } from '../lib/calculator'
+import { createOrder } from '@/features/orders/hooks/useOrders'
+import { ORDER_TYPES, VOLUME_DISCOUNTS } from '@/shared/constants'
+import { formatPrice, formatNumber } from '@/shared/lib/utils'
+
+const INITIAL = {
+  orderType: 'sticker_cut',
+  width: 50,
+  height: 50,
+  qty: 100,
+  needLam: false,
+  designVariants: 1,
+}
+
+export default function CalculatorPage() {
+  const [form, setForm] = useState(INITIAL)
+  const navigate = useNavigate()
+
+  const is3D = form.orderType === 'sticker3D' || form.orderType === 'stickerpack3D'
+
+  const result = useMemo(
+    () => calculate({
+      width: Number(form.width) || 0,
+      height: Number(form.height) || 0,
+      qty: Number(form.qty) || 1,
+      orderType: form.orderType,
+      needLam: form.needLam,
+      is3D,
+    }),
+    [form.width, form.height, form.qty, form.orderType, form.needLam, is3D]
+  )
+
+  function update(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const [creating, setCreating] = useState(false)
+
+  async function handleCreateOrder() {
+    setCreating(true)
+    try {
+      const order = await createOrder({
+        order_type: form.orderType,
+        width_mm: Number(form.width),
+        height_mm: Number(form.height),
+        qty: Number(form.qty),
+        design_variants: Number(form.designVariants) || 1,
+        need_lam: form.needLam,
+        cost_materials: result.costMaterials,
+        cost_labor: result.costLabor,
+        cost_total: result.costTotal,
+        markup: result.markup,
+        discount_pct: result.discount,
+        price_final: result.priceFinal,
+        price_per_unit: result.pricePerUnit,
+        prod_days: result.prodDays,
+      })
+      navigate(`/orders/${order.id}`)
+    } catch (err) {
+      alert('Ошибка создания заказа: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Калькулятор</h1>
+        <p className="text-text-muted">Рассчитайте стоимость заказа</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Input form */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
+            <h2 className="font-semibold">Параметры</h2>
+
+            {/* Order type */}
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Тип продукции</label>
+              <select
+                value={form.orderType}
+                onChange={(e) => update('orderType', e.target.value)}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+              >
+                {Object.entries(ORDER_TYPES).map(([key, t]) => (
+                  <option key={key} value={key}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Dimensions */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Ширина, мм</label>
+                <input
+                  type="number"
+                  value={form.width}
+                  onChange={(e) => update('width', e.target.value)}
+                  min="1"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Высота, мм</label>
+                <input
+                  type="number"
+                  value={form.height}
+                  onChange={(e) => update('height', e.target.value)}
+                  min="1"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                />
+              </div>
+            </div>
+
+            {/* Quantity */}
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Тираж
+                {result.discount > 0 && (
+                  <span className="ml-2 text-success text-xs">−{(result.discount * 100).toFixed(0)}% скидка</span>
+                )}
+              </label>
+              <input
+                type="number"
+                value={form.qty}
+                onChange={(e) => update('qty', e.target.value)}
+                min="1"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+              />
+            </div>
+
+            {/* Design variants */}
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Кол-во видов</label>
+              <input
+                type="number"
+                value={form.designVariants}
+                onChange={(e) => update('designVariants', e.target.value)}
+                min="1"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+              />
+            </div>
+
+            {/* Lamination */}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.needLam}
+                onChange={(e) => update('needLam', e.target.checked)}
+                className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
+              />
+              <span className="text-sm">Ламинация</span>
+            </label>
+          </div>
+
+          {/* Volume discount table */}
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <h3 className="text-sm font-semibold mb-3">Скидки за объём</h3>
+            <div className="space-y-1">
+              {VOLUME_DISCOUNTS.map((d) => {
+                const isActive = form.qty >= d.min && form.qty <= d.max
+                return (
+                  <div
+                    key={d.min}
+                    className={`flex justify-between text-xs px-2 py-1 rounded ${
+                      isActive ? 'bg-success/10 text-success font-medium' : 'text-text-muted'
+                    }`}
+                  >
+                    <span>{d.max === Infinity ? `${d.min}+` : `${d.min}–${d.max}`} шт</span>
+                    <span>{d.discount === 0 ? '—' : `−${(d.discount * 100).toFixed(0)}%`}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Results */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Price card */}
+          <div className="bg-primary text-white rounded-xl p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+              <div>
+                <p className="text-white/60 text-sm">Цена за тираж</p>
+                <p className="text-3xl font-bold mt-1">{formatPrice(result.priceFinal)}</p>
+              </div>
+              <div>
+                <p className="text-white/60 text-sm">Цена за штуку</p>
+                <p className="text-2xl font-bold mt-1">{formatPrice(result.pricePerUnit)}</p>
+              </div>
+              <div>
+                <p className="text-white/60 text-sm">Срок</p>
+                <p className="text-2xl font-bold mt-1">{result.prodDays} дн.</p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleCreateOrder}
+              disabled={creating}
+              className="mt-6 w-full bg-accent hover:bg-accent-hover text-white font-medium rounded-lg py-3 text-sm transition-colors disabled:opacity-50"
+            >
+              {creating ? 'Создание...' : 'Оформить заказ'}
+            </button>
+          </div>
+
+          {/* Cost breakdown */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-surface rounded-xl border border-border p-5">
+              <h3 className="font-semibold mb-3">Материалы</h3>
+              <div className="space-y-2 text-sm">
+                <Row label="Плёнка" value={formatPrice(result.costFilm)} sub={`${formatNumber(result.filmM2, 3)} м²`} />
+                <Row label="Краска" value={formatPrice(result.costInk)} sub={`${formatNumber(result.inkM2, 3)} м²`} />
+                {form.needLam && <Row label="Ламинация" value={formatPrice(result.costLam)} sub={`${formatNumber(result.lamM2, 3)} м²`} />}
+                {is3D && <Row label="Смола" value={formatPrice(result.costResin)} sub={`${formatNumber(result.resinG, 1)} г`} />}
+                <div className="border-t border-border pt-2 flex justify-between font-medium">
+                  <span>Итого материалы</span>
+                  <span>{formatPrice(result.costMaterials)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-surface rounded-xl border border-border p-5">
+              <h3 className="font-semibold mb-3">Производство</h3>
+              <div className="space-y-2 text-sm">
+                <Row label="Раскладка" value={`${result.itemsPerSheet} шт/лист`} sub={`${result.sheets} листов`} />
+                <Row label="Резка" value={`${formatNumber(result.cutTimeHours)} ч`} />
+                {form.needLam && <Row label="Ламинация" value={`${formatNumber(result.lamTimeHours)} ч`} />}
+                {is3D && <Row label="Заливка смолой" value={`${formatNumber(result.resinTimeHours)} ч`} />}
+                <div className="border-t border-border pt-2 flex justify-between font-medium">
+                  <span>Труд ({formatNumber(result.totalHours)} ч)</span>
+                  <span>{formatPrice(result.costLabor)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <h3 className="font-semibold mb-3">Итог</h3>
+            <div className="space-y-2 text-sm">
+              <Row label="Себестоимость" value={formatPrice(result.costTotal)} />
+              <Row label={`Наценка ×${result.markup}`} value={formatPrice(result.costTotal * result.markup)} />
+              {result.discount > 0 && (
+                <Row
+                  label={`Скидка −${(result.discount * 100).toFixed(0)}%`}
+                  value={`−${formatPrice(result.costTotal * result.markup * result.discount)}`}
+                  className="text-success"
+                />
+              )}
+              <div className="border-t border-border pt-2 flex justify-between font-bold text-base">
+                <span>Итого</span>
+                <span>{formatPrice(result.priceFinal)}</span>
+              </div>
+              <div className="flex justify-between text-text-muted">
+                <span>Маржа</span>
+                <span>{formatPrice(result.margin)} ({result.marginPct}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, value, sub, className = '' }) {
+  return (
+    <div className={`flex justify-between items-baseline ${className}`}>
+      <span className="text-text-muted">{label}</span>
+      <div className="text-right">
+        <span>{value}</span>
+        {sub && <span className="block text-xs text-text-muted">{sub}</span>}
+      </div>
+    </div>
+  )
+}

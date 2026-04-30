@@ -3,6 +3,8 @@
  * Source of truth: docs/kontora24-plan.md §7
  */
 
+import { ORDER_TYPES, VOLUME_DISCOUNTS } from '@/shared/constants'
+
 // Default constants (can be overridden via settings)
 export const DEFAULTS = {
   printWidth: 1230,        // mm — width of print block
@@ -19,35 +21,14 @@ export const DEFAULTS = {
   lamPricePerM2: 120,      // ₽/m²
 }
 
-// Markup by order type
-const MARKUPS = {
-  sticker_cut: 4.0,
-  sticker_kiss: 4.0,
-  stickerpack: 4.0,
-  sticker3D: 4.5,
-  stickerpack3D: 4.5,
-  rect: 4.0,
-  big: 4.0,
-}
-
-// Volume discounts
-const DISCOUNTS = [
-  { min: 1, max: 9, pct: 0 },
-  { min: 10, max: 24, pct: 0.05 },
-  { min: 25, max: 49, pct: 0.10 },
-  { min: 50, max: 99, pct: 0.15 },
-  { min: 100, max: 199, pct: 0.20 },
-  { min: 200, max: 499, pct: 0.25 },
-  { min: 500, max: Infinity, pct: 0.30 },
-]
-
 export function getVolumeDiscount(qty) {
-  const tier = DISCOUNTS.find((d) => qty >= d.min && qty <= d.max)
-  return tier ? tier.pct : 0
+  if (qty <= 0) return 0
+  const tier = VOLUME_DISCOUNTS.find((d) => qty >= d.min && qty <= d.max)
+  return tier ? tier.discount : 0
 }
 
 export function getMarkup(orderType) {
-  return MARKUPS[orderType] ?? 4.0
+  return ORDER_TYPES[orderType]?.markup ?? 4.0
 }
 
 /**
@@ -63,7 +44,10 @@ export function getMarkup(orderType) {
  * @returns {Object} calculation result
  */
 export function calculate(input) {
-  const { width, height, qty, orderType, needLam = false, is3D = false, overrides = {} } = input
+  const { orderType, needLam = false, is3D = false, overrides = {} } = input
+  const width = Math.max(0, Number(input.width) || 0)
+  const height = Math.max(0, Number(input.height) || 0)
+  const qty = Math.max(0, Math.floor(Number(input.qty) || 0))
   const C = { ...DEFAULTS, ...overrides }
 
   // 1. Layout
@@ -108,7 +92,7 @@ export function calculate(input) {
   const markup = getMarkup(orderType)
   const discount = getVolumeDiscount(qty)
   const priceFinal = costTotal * markup * (1 - discount)
-  const pricePerUnit = priceFinal / qty
+  const pricePerUnit = qty > 0 ? priceFinal / qty : 0
   const margin = priceFinal - costTotal
 
   // 11. Production estimate (rough)
@@ -146,7 +130,7 @@ export function calculate(input) {
     priceFinal: round(priceFinal),
     pricePerUnit: round(pricePerUnit),
     margin: round(margin),
-    marginPct: round((margin / priceFinal) * 100, 1),
+    marginPct: priceFinal > 0 ? round((margin / priceFinal) * 100, 1) : 0,
 
     // Production
     prodDays,

@@ -61,19 +61,20 @@ export function TechCardActions({ order }) {
       </div>
 
       {showPreview && (
-        <div className="mt-4">
-          <div className="bg-gray-100 rounded-xl p-4 flex justify-center overflow-auto">
-            <div className="shadow-lg">
+        <div className="mt-4 print:mt-0">
+          <div className="bg-surface-dim rounded-xl p-4 flex justify-center overflow-auto print:bg-white print:p-0 print:rounded-none">
+            <div className="shadow-lg print:shadow-none" id="tech-card-print">
               <TechCard ref={cardRef} order={order} />
             </div>
           </div>
         </div>
       )}
 
-      {/* Print-only styles */}
       <style>{`
         @media print {
-          body > *:not(#tech-card-print) { display: none !important; }
+          body > * { display: none !important; }
+          #tech-card-print { display: block !important; position: fixed; top: 0; left: 0; }
+          #tech-card-print * { display: revert !important; }
           @page { size: A4; margin: 0; }
         }
       `}</style>

@@ -22,7 +22,13 @@ export function useOrders(filters = {}) {
         query = query.eq('order_type', filters.orderType)
       }
       if (filters.search) {
-        query = query.or(`number.eq.${filters.search},notes.ilike.%${filters.search}%`)
+        const s = filters.search.replace(/[,()]/g, '')
+        const num = parseInt(s, 10)
+        if (!isNaN(num)) {
+          query = query.or(`number.eq.${num},notes.ilike.%${s}%`)
+        } else {
+          query = query.ilike('notes', `%${s}%`)
+        }
       }
 
       const { data, error: err } = await query
@@ -60,12 +66,13 @@ export function useOrderDetail(id) {
   const [order, setOrder] = useState(null)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
+  const fetchDetail = useCallback(async () => {
     if (!id) return
-
-    async function fetch() {
-      setLoading(true)
+    setLoading(true)
+    setError(null)
+    try {
       const [orderRes, historyRes] = await Promise.all([
         supabase
           .from('orders')
@@ -79,15 +86,19 @@ export function useOrderDetail(id) {
           .order('created_at', { ascending: false }),
       ])
 
-      if (orderRes.data) setOrder(orderRes.data)
-      if (historyRes.data) setHistory(historyRes.data)
+      if (orderRes.error) throw orderRes.error
+      setOrder(orderRes.data)
+      setHistory(historyRes.data || [])
+    } catch (err) {
+      setError(err.message)
+    } finally {
       setLoading(false)
     }
-
-    fetch()
   }, [id])
 
-  return { order, history, loading }
+  useEffect(() => { fetchDetail() }, [fetchDetail])
+
+  return { order, history, loading, error, refetch: fetchDetail }
 }
 
 export async function createOrder(orderData) {

@@ -13,7 +13,8 @@ export function useClients(search = '') {
       .order('created_at', { ascending: false })
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
+      const s = search.replace(/[,()]/g, '')
+      query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`)
     }
 
     const { data } = await query

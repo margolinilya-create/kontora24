@@ -56,14 +56,12 @@ export async function addMaterialTransaction({ materialId, delta, reason, orderI
   })
   if (error) throw error
 
-  // Update stock qty
-  const { data: mat } = await supabase.from('materials').select('stock_qty').eq('id', materialId).single()
-  if (mat) {
-    await supabase
-      .from('materials')
-      .update({ stock_qty: Number(mat.stock_qty) + delta, updated_at: new Date().toISOString() })
-      .eq('id', materialId)
-  }
+  // Atomic stock update via RPC
+  const { error: rpcError } = await supabase.rpc('update_stock', {
+    p_material_id: materialId,
+    p_delta: delta,
+  })
+  if (rpcError) throw rpcError
 }
 
 export async function createMaterial({ type, name, unit, stockQty, minQty, pricePerUnit }) {

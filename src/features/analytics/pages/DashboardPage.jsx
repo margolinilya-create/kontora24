@@ -7,7 +7,8 @@ import { formatPrice, formatRelative } from '@/shared/lib/utils'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 
 export default function DashboardPage() {
-  const { profile } = useAuth()
+  const { profile, hasRole } = useAuth()
+  const isManager = hasRole(['admin', 'manager'])
   const [data, setData] = useState({ orders: [], statusCounts: {}, lowStock: [] })
   const [loading, setLoading] = useState(true)
 
@@ -104,7 +105,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <StatusBadge status={order.status} />
-                    <span className="text-sm font-medium">{formatPrice(order.price_final)}</span>
+                    {isManager && <span className="text-sm font-medium">{formatPrice(order.price_final)}</span>}
                   </div>
                 </Link>
               ))}

@@ -12,6 +12,7 @@ export const ORDER_STATUSES = {
 
 // Status transitions per role
 export const STATUS_TRANSITIONS = {
+  admin: { new: 'design', design: 'design_done', design_done: 'print', print: 'print_done', print_done: 'assembly', assembly: 'done' },
   manager: { new: 'design', design_done: 'print', print_done: 'assembly' },
   designer: { design: 'design_done' },
   printer: { print: 'print_done' },

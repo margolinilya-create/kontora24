@@ -10,7 +10,7 @@ import { formatPrice, formatDate, formatDateTime, formatNumber } from '@/shared/
 
 export default function OrderDetailPage() {
   const { id } = useParams()
-  const { order, history, loading } = useOrderDetail(id)
+  const { order, history, loading, refetch } = useOrderDetail(id)
   const [showKP, setShowKP] = useState(false)
 
   if (loading) {
@@ -48,7 +48,7 @@ export default function OrderDetailPage() {
           >
             КП
           </button>
-          <StatusSwitcher order={order} onUpdated={() => window.location.reload()} />
+          <StatusSwitcher order={order} onUpdated={refetch} />
         </div>
       </div>
 

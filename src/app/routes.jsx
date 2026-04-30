@@ -2,6 +2,7 @@ import { lazy } from 'react'
 import { Layout } from '@/shared/components/Layout'
 import { AuthGuard } from '@/features/auth/components/AuthGuard'
 import { LoginForm } from '@/features/auth/components/LoginForm'
+import { NotFoundPage } from '@/shared/components/NotFoundPage'
 
 // Lazy-loaded pages
 const DashboardPage = lazy(() => import('@/features/analytics/pages/DashboardPage'))
@@ -39,6 +40,7 @@ export const routes = [
       { path: 'clients', element: <AuthGuard roles={['admin', 'manager']}><ClientsPage /></AuthGuard> },
       { path: 'analytics', element: <AuthGuard roles={['admin', 'manager']}><AnalyticsPage /></AuthGuard> },
       { path: 'settings', element: <AuthGuard roles={['admin']}><SettingsPage /></AuthGuard> },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ]

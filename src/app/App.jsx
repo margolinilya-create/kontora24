@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { useAuthStore } from '@/features/auth/store'
 import { useThemeStore } from '@/shared/stores/theme-store'
 import { Toaster } from '@/shared/components/Toaster'
+import { OfflineIndicator } from '@/shared/components/OfflineIndicator'
 import { routes } from './routes'
 
 const router = createBrowserRouter(routes)
@@ -30,6 +31,7 @@ export function App() {
         <RouterProvider router={router} />
       </Suspense>
       <Toaster />
+      <OfflineIndicator />
     </>
   )
 }

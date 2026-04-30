@@ -5,7 +5,9 @@ import { StatusBadge } from '../components/StatusBadge'
 import { ORDER_STATUSES, ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatRelative } from '@/shared/lib/utils'
 import { useDebounce } from '@/shared/hooks/useDebounce'
+import { updateOrderStatus } from '../hooks/useOrders'
 import { exportCSV } from '@/shared/lib/export'
+import { toast } from '@/shared/stores/toast-store'
 import { usePagination } from '@/shared/hooks/usePagination'
 import { Pagination } from '@/shared/components/Pagination'
 import { TableSkeleton } from '@/shared/components/Skeleton'
@@ -17,6 +19,8 @@ export default function OrdersPage() {
   const [sortBy, setSortBy] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
   const [viewMode, setViewMode] = useState('table') // 'table' | 'kanban'
+  const [selected, setSelected] = useState(new Set())
+  const [bulkAction, setBulkAction] = useState('')
 
   const debouncedSearch = useDebounce(search, 300)
   const [pPage, setPPage] = useState(1)
@@ -160,11 +164,53 @@ export default function OrdersPage() {
         <OrdersKanban orders={orders} onUpdated={() => { /* refetch handled by realtime */ }} />
       ) : (
         <>
+          {/* Bulk actions bar */}
+          {selected.size > 0 && (
+            <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex items-center gap-3 mb-4">
+              <span className="text-sm font-medium">{selected.size} выбрано</span>
+              <select
+                value={bulkAction}
+                onChange={(e) => setBulkAction(e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm"
+              >
+                <option value="">Действие...</option>
+                <option value="cancelled">Отменить</option>
+              </select>
+              <button
+                onClick={async () => {
+                  if (!bulkAction) return
+                  for (const id of selected) {
+                    const order = orders.find((o) => o.id === id)
+                    if (order) await updateOrderStatus(id, order.status, bulkAction).catch(() => {})
+                  }
+                  toast.success(`${selected.size} заказов обновлено`)
+                  setSelected(new Set())
+                  setBulkAction('')
+                }}
+                disabled={!bulkAction}
+                className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-3 py-1.5 text-sm disabled:opacity-50"
+              >
+                Применить
+              </button>
+              <button onClick={() => setSelected(new Set())} className="text-sm text-text-muted hover:text-text">
+                Снять выбор
+              </button>
+            </div>
+          )}
+
           <div className="bg-surface rounded-xl border border-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-surface-dim">
+                    <th className="px-3 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selected.size === orders.length && orders.length > 0}
+                        onChange={(e) => setSelected(e.target.checked ? new Set(orders.map((o) => o.id)) : new Set())}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                    </th>
                     <SortHeader col="number">#</SortHeader>
                     <th className="text-left px-4 py-3 font-medium text-text-muted">Тип</th>
                     <th className="text-left px-4 py-3 font-medium text-text-muted">Размер</th>
@@ -177,7 +223,19 @@ export default function OrdersPage() {
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-border last:border-0 hover:bg-surface-dim/50 transition-colors">
+                    <tr key={order.id} className={`border-b border-border last:border-0 hover:bg-surface-dim/50 transition-colors ${selected.has(order.id) ? 'bg-accent/5' : ''}`}>
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(order.id)}
+                          onChange={(e) => {
+                            const next = new Set(selected)
+                            e.target.checked ? next.add(order.id) : next.delete(order.id)
+                            setSelected(next)
+                          }}
+                          className="w-4 h-4 rounded border-border"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <Link to={`/orders/${order.id}`} className="font-medium text-accent hover:underline">
                           {order.number}

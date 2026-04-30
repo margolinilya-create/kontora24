@@ -6,6 +6,8 @@ import { ORDER_TYPES, VOLUME_DISCOUNTS } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { formatPrice, formatNumber } from '@/shared/lib/utils'
 import { LayoutPreview } from '../components/LayoutPreview'
+import { CompareMode } from '../components/CompareMode'
+import { CalcHistory, saveCalcToHistory } from '../components/CalcHistory'
 
 const INITIAL = {
   orderType: 'sticker_cut',
@@ -75,6 +77,7 @@ export default function CalculatorPage() {
         price_per_unit: result.pricePerUnit,
         prod_days: result.prodDays,
       })
+      saveCalcToHistory(form, result)
       navigate(`/orders/${order.id}`)
     } catch (err) {
       toast.error('Ошибка создания заказа: ' + err.message)
@@ -227,6 +230,12 @@ export default function CalculatorPage() {
 
         {/* Layout preview */}
         <LayoutPreview width={Number(form.width)} height={Number(form.height)} itemsPerSheet={result.itemsPerSheet} sheets={result.sheets} />
+
+        {/* Compare mode */}
+        <CompareMode baseForm={form} />
+
+        {/* Calc history */}
+        <CalcHistory onRestore={(restored) => setForm({ ...INITIAL, ...restored })} />
 
         {/* Results */}
         <div className="lg:col-span-2 space-y-4">

@@ -6,6 +6,7 @@ import { StatusSwitcher } from '../components/StatusSwitcher'
 import { OrderEditForm } from '../components/OrderEditForm'
 import { OrderComments } from '../components/OrderComments'
 import { OrderAttachments } from '../components/OrderAttachments'
+import { OrderPdfExport } from '../components/OrderPdfExport'
 import { OrderTimeline } from '../components/OrderTimeline'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { CommercialProposal } from '@/features/kp/components/CommercialProposal'
@@ -56,6 +57,7 @@ export default function OrderDetailPage() {
               Bitrix24 ↗
             </a>
           )}
+          <OrderPdfExport order={order} />
           <button
             onClick={() => setShowKP(true)}
             className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2 text-sm transition-colors"

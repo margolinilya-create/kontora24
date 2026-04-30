@@ -12,6 +12,7 @@ import { usePagination } from '@/shared/hooks/usePagination'
 import { Pagination } from '@/shared/components/Pagination'
 import { TableSkeleton } from '@/shared/components/Skeleton'
 import { OrdersKanban } from '../components/OrdersKanban'
+import { SavedFilters } from '../components/SavedFilters'
 
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
@@ -144,6 +145,12 @@ export default function OrdersPage() {
           />
         ))}
       </div>
+
+      {/* Saved filters */}
+      <SavedFilters
+        currentFilter={statusFilter}
+        onApply={(f) => setStatusFilter(f)}
+      />
 
       {/* Table */}
       {loading ? (

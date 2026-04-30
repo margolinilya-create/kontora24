@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { jsPDF } from 'jspdf'
 import { supabase } from '@/shared/lib/supabase'
+import { toast } from '@/shared/stores/toast-store'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
 import { formatPrice, formatDate } from '@/shared/lib/utils'
 import { subDays, subMonths, startOfDay, format, differenceInHours } from 'date-fns'
@@ -155,7 +157,43 @@ export default function AnalyticsPage() {
           <h1 className="text-2xl font-bold">Аналитика</h1>
           <p className="text-text-muted">Финансы и производственные метрики</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => {
+              try {
+                const doc = new jsPDF('p', 'mm', 'a4')
+                doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+                doc.text('Kontora24 — Аналитика', 15, 20)
+                doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+                doc.text(`Период: ${PERIODS.find((p) => p.key === period)?.label}`, 15, 28)
+                let y = 38
+                const rows = [
+                  ['Выручка', formatPrice(revenue)],
+                  ['Себестоимость', formatPrice(totalCost)],
+                  ['Маржа', formatPrice(revenue - totalCost)],
+                  ['Заказов', String(orders.length)],
+                  ['Средний чек', formatPrice(avgCheck)],
+                  ['Конверсия', `${conversionRate}%`],
+                ]
+                rows.forEach(([l, v]) => { doc.text(l + ':', 15, y); doc.text(v, 80, y); y += 6 })
+                y += 5
+                if (typeData.length > 0) {
+                  doc.setFont('helvetica', 'bold'); doc.text('Маржинальность по типам', 15, y); y += 7
+                  doc.setFont('helvetica', 'normal'); doc.setFontSize(9)
+                  typeData.forEach((r) => {
+                    doc.text(`${r.name}: ${r.count} заказов, выручка ${formatPrice(r.revenue)}, маржа ${formatPrice(r.margin)}`, 15, y); y += 5
+                  })
+                }
+                doc.setFontSize(7); doc.setTextColor(150)
+                doc.text(`Kontora24 · ${new Date().toLocaleDateString('ru-RU')}`, 15, 285)
+                doc.save('analytics.pdf')
+                toast.success('PDF экспортирован')
+              } catch (e) { toast.error('Ошибка: ' + e.message) }
+            }}
+            className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-1.5 text-sm transition-colors"
+          >
+            PDF
+          </button>
           {PERIODS.map((p) => (
             <button
               key={p.key}

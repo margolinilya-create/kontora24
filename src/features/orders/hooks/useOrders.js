@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useId } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 
 async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
@@ -14,6 +14,7 @@ async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 1
 }
 
 export function useOrders(filters = {}) {
+  const hookId = useId()
   const [orders, setOrders] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -25,7 +26,7 @@ export function useOrders(filters = {}) {
     try {
       let query = supabase
         .from('orders')
-        .select('*, client:clients(name, phone), assignee:profiles!assigned_to(display_name, role), attachments:order_attachments(id, file_name, file_url)', { count: 'exact' })
+        .select('*, client:clients(name, phone), assignee:profiles!assigned_to(display_name, role), attachments:order_attachments(id, file_name, file_path, mime_type)', { count: 'exact' })
 
       // Filters
       if (filters.status && filters.status !== 'all') {
@@ -69,12 +70,13 @@ export function useOrders(filters = {}) {
 
   // Realtime
   useEffect(() => {
+    const channelName = `orders-${hookId.replace(/:/g, '')}`
     const channel = supabase
-      .channel('orders-changes')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [fetchOrders])
+  }, [fetchOrders, hookId])
 
   return { orders, totalCount, loading, error, refetch: fetchOrders }
 }

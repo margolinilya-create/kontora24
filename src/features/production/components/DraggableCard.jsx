@@ -8,6 +8,7 @@ import { DryingTimer } from './DryingTimer'
 import { OperationChecklist } from './OperationChecklist'
 import { TechCardPreview } from './TechCardPreview'
 import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
+import { supabase } from '@/shared/lib/supabase'
 import { differenceInHours, differenceInMinutes } from 'date-fns'
 
 const PRIORITY_BORDER = {
@@ -77,11 +78,13 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
 
       {/* Attachment thumbnail */}
       {!isOverlay && order.attachments?.length > 0 && (() => {
-        const img = order.attachments.find(a => /\.(png|jpg|jpeg|webp)$/i.test(a.file_name))
-        if (!img) return null
+        const img = order.attachments.find(a => a.mime_type?.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(a.file_name))
+        if (!img?.file_path) return null
+        const { data } = supabase.storage.from('order-files').getPublicUrl(img.file_path)
+        if (!data?.publicUrl) return null
         return (
-          <div className="mt-1 rounded-lg overflow-hidden h-16">
-            <img src={img.file_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <div className="rounded-lg overflow-hidden h-16">
+            <img src={data.publicUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
           </div>
         )
       })()}

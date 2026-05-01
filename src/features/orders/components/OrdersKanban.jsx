@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { StatusBadge } from './StatusBadge'
 import { StatusSwitcher } from './StatusSwitcher'
 import { ORDER_STATUSES, ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatRelative } from '@/shared/lib/utils'

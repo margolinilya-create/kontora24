@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { updateOrderStatus } from '../hooks/useOrders'
-import { STATUS_TRANSITIONS, CAN_CANCEL_ROLES, ORDER_STATUSES, getNextStatus } from '@/shared/constants'
+import { CAN_CANCEL_ROLES, ORDER_STATUSES, getNextStatus } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 
 export function StatusSwitcher({ order, onUpdated }) {

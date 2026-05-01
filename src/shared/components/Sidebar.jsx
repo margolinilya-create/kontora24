@@ -37,7 +37,7 @@ const COUNT_MAP = {
   '/production/resin': 'resin_pouring',
 }
 
-export function Sidebar({ collapsed, onToggle }) {
+export function Sidebar({ collapsed }) {
   const { profile, signOut } = useAuth()
   const { theme, toggle: toggleTheme } = useThemeStore()
   const counts = useSidebarStore((s) => s.counts)

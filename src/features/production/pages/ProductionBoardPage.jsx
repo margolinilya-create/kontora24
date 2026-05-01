@@ -83,7 +83,7 @@ export default function ProductionBoardPage() {
   const [pendingMove, setPendingMove] = useState(null) // optimistic: { orderId, targetStatus }
   const [todayDone, setTodayDone] = useState(0)
 
-  const { orders: allFetchedOrders, loading, refetch } = useOrders()
+  const { orders: allFetchedOrders, refetch } = useOrders()
 
   useEffect(() => {
     async function fetchTodayDone() {

@@ -1,18 +1,4 @@
-import { Link, useMatches } from 'react-router-dom'
-
-const ROUTE_NAMES = {
-  '/': 'Dashboard',
-  '/orders': 'Заказы',
-  '/calculator': 'Калькулятор',
-  '/production/design': 'Дизайн',
-  '/production/print': 'Печать',
-  '/production/assembly': 'Сборка',
-  '/production': 'Производство',
-  '/warehouse': 'Склад',
-  '/clients': 'Клиенты',
-  '/analytics': 'Аналитика',
-  '/settings': 'Настройки',
-}
+import { Link } from 'react-router-dom'
 
 export function Breadcrumbs({ items }) {
   if (!items || items.length === 0) return null

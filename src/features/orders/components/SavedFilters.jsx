@@ -13,7 +13,7 @@ export function SavedFilters({ currentFilter, onApply }) {
   useEffect(() => {
     try {
       setFilters(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'))
-    } catch {}
+    } catch { /* ignored */ }
   }, [])
 
   function saveFilter(e) {

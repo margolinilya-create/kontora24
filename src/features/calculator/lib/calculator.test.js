@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculate, getVolumeDiscount, getMarkup, DEFAULTS } from './calculator'
+import { calculate, getVolumeDiscount, getMarkup } from './calculator'
 
 describe('getVolumeDiscount', () => {
   it('returns 0 for qty 1-9', () => {

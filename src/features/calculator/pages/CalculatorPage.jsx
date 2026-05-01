@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { calculate, DEFAULTS, getVolumeDiscount } from '../lib/calculator'
+import { calculate } from '../lib/calculator'
 import { createOrder } from '@/features/orders/hooks/useOrders'
 import { ORDER_TYPES, VOLUME_DISCOUNTS, PRIORITIES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'

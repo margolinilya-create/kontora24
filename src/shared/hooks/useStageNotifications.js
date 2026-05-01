@@ -27,7 +27,7 @@ export function useStageNotifications() {
         schema: 'public',
         table: 'order_status_history',
       }, (payload) => {
-        const { to_status, order_id, changed_by } = payload.new
+        const { to_status, changed_by } = payload.new
 
         // Don't notify yourself
         if (changed_by === profile.id) return

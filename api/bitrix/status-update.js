@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { order_id, order_number, status, price_final, cost_total, bitrix_deal_id } = req.body
+    const { order_number, status, price_final, cost_total, bitrix_deal_id } = req.body
 
     if (!bitrix_deal_id) {
       return res.status(200).json({ skipped: true, reason: 'No Bitrix deal ID' })

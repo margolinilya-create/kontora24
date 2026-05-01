@@ -19,7 +19,7 @@ import { calculate } from '@/features/calculator/lib/calculator'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
-import { formatPrice, formatDate, formatDateTime, formatNumber } from '@/shared/lib/utils'
+import { formatPrice, formatDate, formatDateTime } from '@/shared/lib/utils'
 
 export default function OrderDetailPage() {
   const { id } = useParams()

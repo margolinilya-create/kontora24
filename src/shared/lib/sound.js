@@ -14,5 +14,5 @@ export function playNotificationSound() {
     gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
     oscillator.start(audioContext.currentTime)
     oscillator.stop(audioContext.currentTime + 0.3)
-  } catch {}
+  } catch { /* ignored */ }
 }

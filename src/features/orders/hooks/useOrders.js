@@ -204,7 +204,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
         }),
       }).catch(() => {}) // silent fail after all retries
     }
-  } catch {} // non-critical
+  } catch { /* ignored */ } // non-critical
 }
 
 export async function updateOrder(orderId, updates) {

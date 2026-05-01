@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_STATUSES } from '@/shared/constants'
 import { addDays, format, startOfDay, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
 

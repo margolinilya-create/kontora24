@@ -17,7 +17,7 @@ export function saveCalcToHistory(form, result) {
     }
     history.unshift(entry)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, MAX_ITEMS)))
-  } catch {}
+  } catch { /* ignored */ }
 }
 
 export function CalcHistory({ onRestore }) {
@@ -27,7 +27,7 @@ export function CalcHistory({ onRestore }) {
   useEffect(() => {
     try {
       setHistory(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'))
-    } catch {}
+    } catch { /* ignored */ }
   }, [open])
 
   if (history.length === 0) return null

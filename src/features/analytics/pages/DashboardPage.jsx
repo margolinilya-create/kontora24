@@ -88,9 +88,9 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     const [ordersRes, materialsRes, activityRes] = await Promise.all([
-      supabase.from('orders').select('*, client:clients(name)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('materials').select('*'),
-      supabase.from('order_status_history').select('*, changed_by_profile:profiles!changed_by(display_name), order:orders!order_id(number)').order('created_at', { ascending: false }).limit(15),
+      supabase.from('k24_orders').select('*, client:k24_clients(name)').order('created_at', { ascending: false }).limit(50),
+      supabase.from('k24_materials').select('*'),
+      supabase.from('k24_order_status_history').select('*, changed_by_profile:k24_profiles!changed_by(display_name), order:k24_orders!order_id(number)').order('created_at', { ascending: false }).limit(15),
     ])
 
     const orders = ordersRes.data || []
@@ -121,13 +121,13 @@ export default function DashboardPage() {
 
     const [todayRes, weekRes] = await Promise.all([
       supabase
-        .from('order_status_history')
+        .from('k24_order_status_history')
         .select('id', { count: 'exact', head: true })
         .eq('changed_by', profile.id)
         .eq('to_status', 'done')
         .gte('created_at', todayStart),
       supabase
-        .from('order_status_history')
+        .from('k24_order_status_history')
         .select('id', { count: 'exact', head: true })
         .eq('changed_by', profile.id)
         .eq('to_status', 'done')
@@ -146,7 +146,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { fetchData(); fetchWorkerStats() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'k24_orders' }, () => { fetchData(); fetchWorkerStats() })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [fetchData, fetchWorkerStats])
@@ -158,7 +158,7 @@ export default function DashboardPage() {
     async function fetchChartData() {
       const since = subDays(new Date(), 7).toISOString()
       const { data } = await supabase
-        .from('orders')
+        .from('k24_orders')
         .select('price_final, created_at')
         .gte('created_at', since)
         .neq('status', 'cancelled')

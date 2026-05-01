@@ -27,7 +27,7 @@ export function useStageNotifications() {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'order_status_history',
+        table: 'k24_order_status_history',
       }, (payload) => {
         const { to_status, changed_by } = payload.new
 

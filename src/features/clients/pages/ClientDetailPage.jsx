@@ -16,8 +16,8 @@ export default function ClientDetailPage() {
     async function fetch() {
       setLoading(true)
       const [clientRes, ordersRes] = await Promise.all([
-        supabase.from('clients').select('*').eq('id', id).single(),
-        supabase.from('orders').select('*').eq('client_id', id).order('created_at', { ascending: false }),
+        supabase.from('k24_clients').select('*').eq('id', id).single(),
+        supabase.from('k24_orders').select('*').eq('client_id', id).order('created_at', { ascending: false }),
       ])
       setClient(clientRes.data)
       setOrders(ordersRes.data || [])

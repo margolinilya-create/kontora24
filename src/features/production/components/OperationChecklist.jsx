@@ -13,7 +13,7 @@ export function OperationChecklist({ order, compact = false }) {
   async function toggle(operation) {
     const updated = { ...checklist, [operation]: !checklist[operation] }
     setChecklist(updated)
-    await supabase.from('orders').update({ checklist: updated }).eq('id', order.id)
+    await supabase.from('k24_orders').update({ checklist: updated }).eq('id', order.id)
   }
 
   if (compact) {

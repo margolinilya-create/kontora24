@@ -13,8 +13,8 @@ export function ConsumptionChart() {
     async function fetch() {
       const since = subDays(new Date(), 30).toISOString()
       const { data: txs } = await supabase
-        .from('material_transactions')
-        .select('delta, created_at, material:materials(name, type, unit, stock_qty)')
+        .from('k24_material_transactions')
+        .select('delta, created_at, material:k24_materials(name, type, unit, stock_qty)')
         .lt('delta', 0)
         .gte('created_at', since)
 

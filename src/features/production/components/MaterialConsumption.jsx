@@ -17,9 +17,9 @@ export function MaterialConsumption({ order }) {
 
   const loadData = useCallback(async () => {
     const [matRes, txRes] = await Promise.all([
-      supabase.from('materials').select('*').order('name'),
-      supabase.from('material_transactions')
-        .select('*, material:materials(name, unit, type)')
+      supabase.from('k24_materials').select('*').order('name'),
+      supabase.from('k24_material_transactions')
+        .select('*, material:k24_materials(name, unit, type)')
         .eq('order_id', order.id)
         .lt('delta', 0)
         .order('created_at', { ascending: false }),
@@ -39,7 +39,7 @@ export function MaterialConsumption({ order }) {
     try {
       const qty = Number(formData.qty)
 
-      const { error } = await supabase.from('material_transactions').insert({
+      const { error } = await supabase.from('k24_material_transactions').insert({
         material_id: formData.materialId,
         order_id: order.id,
         delta: -Math.abs(qty),

@@ -8,7 +8,7 @@ export function useSettings(key) {
 
   const fetchSettings = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('settings').select('value').eq('key', key).single()
+    const { data } = await supabase.from('k24_settings').select('value').eq('key', key).single()
     setValue(data?.value || null)
     setLoading(false)
   }, [key])
@@ -17,7 +17,7 @@ export function useSettings(key) {
 
   async function saveSettings(newValue) {
     const { error } = await supabase
-      .from('settings')
+      .from('k24_settings')
       .upsert({ key, value: newValue, updated_at: new Date().toISOString() })
     if (error) throw error
     setValue(newValue)
@@ -34,7 +34,7 @@ export function useUsers() {
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
-      .from('profiles')
+      .from('k24_profiles')
       .select('*')
       .order('created_at', { ascending: false })
     setUsers(data || [])
@@ -45,7 +45,7 @@ export function useUsers() {
 
   async function updateUserRole(userId, newRole) {
     const { error } = await supabase
-      .from('profiles')
+      .from('k24_profiles')
       .update({ role: newRole })
       .eq('id', userId)
     if (error) throw error

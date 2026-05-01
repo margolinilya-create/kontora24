@@ -34,8 +34,8 @@ export default function OrderDetailPage() {
     try {
       // Load current calculator settings and markups from DB
       const [settingsRes, markupsRes] = await Promise.all([
-        supabase.from('settings').select('value').eq('key', 'calculator').single(),
-        supabase.from('settings').select('value').eq('key', 'markups').single(),
+        supabase.from('k24_settings').select('value').eq('key', 'calculator').single(),
+        supabase.from('k24_settings').select('value').eq('key', 'markups').single(),
       ])
       const overrides = settingsRes.data?.value || {}
       const markups = markupsRes.data?.value || {}

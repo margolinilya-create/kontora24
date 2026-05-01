@@ -476,7 +476,7 @@ function IntegrationLog() {
   useEffect(() => {
     async function fetchLogs() {
       const { data } = await supabase
-        .from('integration_log')
+        .from('k24_integration_log')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50)

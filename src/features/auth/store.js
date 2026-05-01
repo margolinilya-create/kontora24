@@ -11,7 +11,7 @@ export const useAuthStore = create((set, get) => ({
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('k24_profiles')
           .select('*')
           .eq('id', session.user.id)
           .single()
@@ -27,7 +27,7 @@ export const useAuthStore = create((set, get) => ({
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('k24_profiles')
           .select('*')
           .eq('id', session.user.id)
           .single()

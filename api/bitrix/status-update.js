@@ -23,7 +23,7 @@ export default async function handler(req, res) {
 
     // Read Bitrix config from settings table
     const { data: settingsRow } = await supabase
-      .from('settings')
+      .from('k24_settings')
       .select('value')
       .eq('key', 'bitrix')
       .single()

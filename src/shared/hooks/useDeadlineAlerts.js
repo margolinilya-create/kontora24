@@ -15,7 +15,7 @@ export function useDeadlineAlerts() {
       tomorrow.setHours(23, 59, 59, 999)
 
       const { data } = await supabase
-        .from('orders')
+        .from('k24_orders')
         .select('number, deadline, status')
         .lte('deadline', tomorrow.toISOString().split('T')[0])
         .not('status', 'in', '("done","cancelled")')

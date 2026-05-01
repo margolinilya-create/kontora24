@@ -8,7 +8,7 @@ export function useClients(search = '') {
   const fetchClients = useCallback(async () => {
     setLoading(true)
     let query = supabase
-      .from('clients')
+      .from('k24_clients')
       .select('*, orders(created_at)')
       .order('created_at', { ascending: false })
 
@@ -48,7 +48,7 @@ export function useClientOrders(clientId) {
     async function fetch() {
       setLoading(true)
       const { data } = await supabase
-        .from('orders')
+        .from('k24_orders')
         .select('*')
         .eq('client_id', clientId)
         .order('created_at', { ascending: false })
@@ -63,7 +63,7 @@ export function useClientOrders(clientId) {
 
 export async function createClient({ name, phone, email, comment, tags }) {
   const { data, error } = await supabase
-    .from('clients')
+    .from('k24_clients')
     .insert({ name, phone, email, comment, tags: tags || [] })
     .select()
     .single()
@@ -73,7 +73,7 @@ export async function createClient({ name, phone, email, comment, tags }) {
 
 export async function updateClient(id, updates) {
   const { error } = await supabase
-    .from('clients')
+    .from('k24_clients')
     .update(updates)
     .eq('id', id)
   if (error) throw error

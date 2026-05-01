@@ -15,8 +15,8 @@ export function ProductionCalendar() {
       const endDate = addDays(today, 14)
 
       const { data } = await supabase
-        .from('orders')
-        .select('id, number, order_type, deadline, status, qty, width_mm, height_mm, assigned_to, assignee:profiles!assigned_to(display_name)')
+        .from('k24_orders')
+        .select('id, number, order_type, deadline, status, qty, width_mm, height_mm, assigned_to, assignee:k24_profiles!assigned_to(display_name)')
         .not('status', 'in', '("done","cancelled")')
         .not('deadline', 'is', null)
         .lte('deadline', endDate.toISOString().split('T')[0])

@@ -26,8 +26,8 @@ export function useOrders(filters = {}) {
     setError(null)
     try {
       let query = supabase
-        .from('orders')
-        .select('*, client:clients(name, phone), assignee:profiles!assigned_to(display_name, role), attachments:order_attachments(id, file_name, file_path, mime_type)', { count: 'exact' })
+        .from('k24_orders')
+        .select('*, client:k24_clients(name, phone), assignee:k24_profiles!assigned_to(display_name, role), attachments:k24_order_attachments(id, file_name, file_path, mime_type)', { count: 'exact' })
 
       // Filters
       if (filters.status && filters.status !== 'all') {
@@ -74,7 +74,7 @@ export function useOrders(filters = {}) {
     const channelName = `orders-${hookId.replace(/:/g, '')}`
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'k24_orders' }, () => fetchOrders())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [fetchOrders, hookId])
@@ -95,13 +95,13 @@ export function useOrderDetail(id) {
     try {
       const [orderRes, historyRes] = await Promise.all([
         supabase
-          .from('orders')
-          .select('*, client:clients(*), assignee:profiles!assigned_to(*), creator:profiles!created_by(*)')
+          .from('k24_orders')
+          .select('*, client:k24_clients(*), assignee:k24_profiles!assigned_to(*), creator:k24_profiles!created_by(*)')
           .eq('id', id)
           .single(),
         supabase
-          .from('order_status_history')
-          .select('*, changed_by_profile:profiles!changed_by(display_name, role)')
+          .from('k24_order_status_history')
+          .select('*, changed_by_profile:k24_profiles!changed_by(display_name, role)')
           .eq('order_id', id)
           .order('created_at', { ascending: false }),
       ])
@@ -124,7 +124,7 @@ export function useProfiles(role) {
   const [profiles, setProfiles] = useState([])
   useEffect(() => {
     async function fetch() {
-      let query = supabase.from('profiles').select('id, display_name, role')
+      let query = supabase.from('k24_profiles').select('id, display_name, role')
       if (role) query = query.eq('role', role)
       const { data } = await query.order('display_name')
       setProfiles(data || [])
@@ -139,13 +139,13 @@ export async function createOrder(orderData) {
   if (!user) throw new Error('Not authenticated')
 
   const { data, error } = await supabase
-    .from('orders')
+    .from('k24_orders')
     .insert({ ...orderData, created_by: user.id, status: 'new' })
     .select()
     .single()
   if (error) throw error
 
-  await supabase.from('order_status_history').insert({
+  await supabase.from('k24_order_status_history').insert({
     order_id: data.id, from_status: null, to_status: 'new', changed_by: user.id,
   })
 
@@ -160,19 +160,19 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
   if (!user) throw new Error('Not authenticated')
 
   const { error } = await supabase
-    .from('orders')
+    .from('k24_orders')
     .update({ status: toStatus, updated_at: new Date().toISOString() })
     .eq('id', orderId)
   if (error) throw error
 
-  await supabase.from('order_status_history').insert({
+  await supabase.from('k24_order_status_history').insert({
     order_id: orderId, from_status: fromStatus, to_status: toStatus, changed_by: user.id,
   })
 
   // Set drying timer when entering resin_pouring
   if (toStatus === 'resin_pouring') {
     const dryUntil = new Date(Date.now() + MS_PER_DAY).toISOString()
-    await supabase.from('orders').update({ dry_until: dryUntil }).eq('id', orderId)
+    await supabase.from('k24_orders').update({ dry_until: dryUntil }).eq('id', orderId)
   }
 
   // Auto-deduct materials when entering "print"
@@ -192,7 +192,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
 
   // Notify Bitrix24 about status change (non-blocking with retry)
   try {
-    const { data: order } = await supabase.from('orders').select('number, bitrix_deal_id, price_final, cost_total').eq('id', orderId).single()
+    const { data: order } = await supabase.from('k24_orders').select('number, bitrix_deal_id, price_final, cost_total').eq('id', orderId).single()
     if (order?.bitrix_deal_id) {
       fetchWithRetry('/api/bitrix/status-update', {
         method: 'POST',
@@ -212,7 +212,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
 
 export async function updateOrder(orderId, updates) {
   const { error } = await supabase
-    .from('orders')
+    .from('k24_orders')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', orderId)
   if (error) throw error

@@ -19,7 +19,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
   useEffect(() => {
     if (!isOpen) return
     // Load available materials
-    supabase.from('materials').select('*').order('name').then(({ data }) => {
+    supabase.from('k24_materials').select('*').order('name').then(({ data }) => {
       setMaterials(data || [])
     })
     setStep('confirm')
@@ -35,7 +35,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
       const savedTimer = JSON.parse(localStorage.getItem(TIMER_KEY) || 'null')
       if (savedTimer && savedTimer.orderId === order.id) {
         const endedAt = new Date()
-        await supabase.from('time_entries')
+        await supabase.from('k24_time_entries')
           .update({ ended_at: endedAt.toISOString(), duration_minutes: Math.round((endedAt - new Date(savedTimer.startedAt || endedAt)) / 60000) })
           .eq('id', savedTimer.entryId)
           .is('ended_at', null)
@@ -45,7 +45,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
       // 2. Record material consumption (if any)
       for (const item of consumption) {
         if (!item.materialId || !item.qty) continue
-        await supabase.from('material_transactions').insert({
+        await supabase.from('k24_material_transactions').insert({
           material_id: item.materialId,
           order_id: order.id,
           delta: -Math.abs(Number(item.qty)),

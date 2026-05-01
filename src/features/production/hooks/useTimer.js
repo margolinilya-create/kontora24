@@ -17,7 +17,7 @@ export function useTimer(orderId) {
 
     async function load() {
       const { data } = await supabase
-        .from('time_entries')
+        .from('k24_time_entries')
         .select('*')
         .eq('order_id', orderId)
         .order('created_at', { ascending: false })
@@ -27,7 +27,7 @@ export function useTimer(orderId) {
       const saved = JSON.parse(localStorage.getItem(ACTIVE_TIMER_KEY) || 'null')
       if (saved && saved.orderId === orderId && saved.entryId) {
         const { data: entry } = await supabase
-          .from('time_entries')
+          .from('k24_time_entries')
           .select('*')
           .eq('id', saved.entryId)
           .single()
@@ -60,7 +60,7 @@ export function useTimer(orderId) {
   const start = useCallback(async (status) => {
     if (!profile || !orderId) return
     const { data, error } = await supabase
-      .from('time_entries')
+      .from('k24_time_entries')
       .insert({
         order_id: orderId,
         user_id: profile.id,
@@ -81,7 +81,7 @@ export function useTimer(orderId) {
     const durationMinutes = Math.round((endedAt - new Date(activeEntry.started_at)) / 60000)
 
     const { error } = await supabase
-      .from('time_entries')
+      .from('k24_time_entries')
       .update({ ended_at: endedAt.toISOString(), duration_minutes: durationMinutes })
       .eq('id', activeEntry.id)
     if (error) throw error
@@ -91,7 +91,7 @@ export function useTimer(orderId) {
 
     // Refresh entries
     const { data } = await supabase
-      .from('time_entries')
+      .from('k24_time_entries')
       .select('*')
       .eq('order_id', activeEntry.order_id)
       .order('created_at', { ascending: false })

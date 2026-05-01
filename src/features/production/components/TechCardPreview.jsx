@@ -11,7 +11,7 @@ export function TechCardPreview({ orderId, isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen || !orderId) return
     setLoading(true)
-    supabase.from('orders').select('*').eq('id', orderId).single()
+    supabase.from('k24_orders').select('*').eq('id', orderId).single()
       .then(({ data }) => { setOrder(data); setLoading(false) })
   }, [isOpen, orderId])
 

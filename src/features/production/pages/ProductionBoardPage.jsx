@@ -90,7 +90,7 @@ export default function ProductionBoardPage() {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const { count } = await supabase
-        .from('order_status_history')
+        .from('k24_order_status_history')
         .select('*', { count: 'exact', head: true })
         .eq('to_status', 'done')
         .gte('created_at', today.toISOString())

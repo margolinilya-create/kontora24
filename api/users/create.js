@@ -28,7 +28,7 @@ export default async function handler(req, res) {
   }
 
   const { data: callerProfile } = await supabase
-    .from('profiles')
+    .from('k24_profiles')
     .select('role')
     .eq('id', caller.id)
     .single()
@@ -70,14 +70,14 @@ export default async function handler(req, res) {
 
     // Update profile with correct role and display_name
     const { error: profileError } = await supabase
-      .from('profiles')
+      .from('k24_profiles')
       .update({ role, display_name, email })
       .eq('id', authData.user.id)
 
     if (profileError) {
       // Profile might not exist yet (trigger delay), try insert
       await supabase
-        .from('profiles')
+        .from('k24_profiles')
         .upsert({ id: authData.user.id, role, display_name, email })
     }
 

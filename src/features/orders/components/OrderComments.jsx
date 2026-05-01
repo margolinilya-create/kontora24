@@ -16,7 +16,7 @@ export function OrderComments({ orderId }) {
 
   const fetchComments = useCallback(async () => {
     const { data } = await supabase
-      .from('order_comments')
+      .from('k24_order_comments')
       .select('*')
       .eq('order_id', orderId)
       .order('created_at', { ascending: true })
@@ -30,7 +30,7 @@ export function OrderComments({ orderId }) {
   useEffect(() => {
     const channel = supabase
       .channel(`comments-${orderId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_comments', filter: `order_id=eq.${orderId}` }, () => fetchComments())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'k24_order_comments', filter: `order_id=eq.${orderId}` }, () => fetchComments())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [orderId, fetchComments])
@@ -41,7 +41,7 @@ export function OrderComments({ orderId }) {
 
     setSending(true)
     try {
-      const { error } = await supabase.from('order_comments').insert({
+      const { error } = await supabase.from('k24_order_comments').insert({
         order_id: orderId,
         author_id: profile.id,
         author_name: profile.display_name || profile.name,

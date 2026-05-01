@@ -9,11 +9,11 @@ export function useMaterials() {
     setLoading(true)
     const [{ data }, { data: reservations }] = await Promise.all([
       supabase
-        .from('materials')
+        .from('k24_materials')
         .select('*')
         .order('type', { ascending: true }),
       supabase
-        .from('material_transactions')
+        .from('k24_material_transactions')
         .select('material_id, delta')
         .eq('reservation_status', 'reserved'),
     ])
@@ -48,8 +48,8 @@ export function useMaterialTransactions(materialId) {
     async function fetch() {
       setLoading(true)
       const { data } = await supabase
-        .from('material_transactions')
-        .select('*, material:materials(name), created_by_profile:profiles!created_by(display_name)')
+        .from('k24_material_transactions')
+        .select('*, material:k24_materials(name), created_by_profile:k24_profiles!created_by(display_name)')
         .eq('material_id', materialId)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -66,7 +66,7 @@ export async function addMaterialTransaction({ materialId, delta, reason, orderI
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { error } = await supabase.from('material_transactions').insert({
+  const { error } = await supabase.from('k24_material_transactions').insert({
     material_id: materialId,
     delta,
     reason,
@@ -85,7 +85,7 @@ export async function addMaterialTransaction({ materialId, delta, reason, orderI
 
 export async function createMaterial({ type, name, unit, stockQty, minQty, pricePerUnit }) {
   const { data, error } = await supabase
-    .from('materials')
+    .from('k24_materials')
     .insert({
       type,
       name,

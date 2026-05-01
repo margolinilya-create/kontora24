@@ -14,7 +14,7 @@ export function OrderAttachments({ orderId }) {
 
   const fetchFiles = useCallback(async () => {
     const { data } = await supabase
-      .from('order_attachments')
+      .from('k24_order_attachments')
       .select('*')
       .eq('order_id', orderId)
       .order('created_at', { ascending: false })
@@ -38,7 +38,7 @@ export function OrderAttachments({ orderId }) {
         .upload(path, file)
       if (uploadError) throw uploadError
 
-      const { error: dbError } = await supabase.from('order_attachments').insert({
+      const { error: dbError } = await supabase.from('k24_order_attachments').insert({
         order_id: orderId,
         file_name: file.name,
         file_path: path,
@@ -62,7 +62,7 @@ export function OrderAttachments({ orderId }) {
     if (!confirm('Удалить файл?')) return
     try {
       await supabase.storage.from('order-files').remove([attachment.file_path])
-      await supabase.from('order_attachments').delete().eq('id', attachment.id)
+      await supabase.from('k24_order_attachments').delete().eq('id', attachment.id)
       toast.success('Файл удалён')
       fetchFiles()
     } catch (err) {

@@ -82,7 +82,7 @@ export default async function handler(req, res) {
 
     // Try to load settings from DB
     let overrides = {}
-    const { data: settingsRow } = await supabase.from('settings').select('value').eq('key', 'calculator').single()
+    const { data: settingsRow } = await supabase.from('k24_settings').select('value').eq('key', 'calculator').single()
     if (settingsRow?.value) overrides = settingsRow.value
 
     const is3D = order_type === 'sticker3D' || order_type === 'stickerpack3D'
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     let clientId = null
     if (body.client_name) {
       const { data: existing } = await supabase
-        .from('clients')
+        .from('k24_clients')
         .select('id')
         .eq('name', body.client_name)
         .limit(1)
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
         clientId = existing.id
       } else {
         const { data: newClient } = await supabase
-          .from('clients')
+          .from('k24_clients')
           .insert({ name: body.client_name, phone: body.client_phone || null, email: body.client_email || null })
           .select('id')
           .single()
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
 
     // Create order
     const { data: order, error } = await supabase
-      .from('orders')
+      .from('k24_orders')
       .insert({
         order_type,
         width_mm: Number(width_mm),
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
     if (error) throw error
 
     // Log status
-    await supabase.from('order_status_history').insert({
+    await supabase.from('k24_order_status_history').insert({
       order_id: order.id, from_status: null, to_status: 'new', changed_by: null,
     })
 

@@ -14,7 +14,7 @@ export function ProfileCard() {
     setSaving(true)
     try {
       const { error } = await supabase
-        .from('profiles')
+        .from('k24_profiles')
         .update({ display_name: name, name })
         .eq('id', profile.id)
       if (error) throw error

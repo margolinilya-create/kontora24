@@ -15,6 +15,7 @@ const PrintQueuePage = lazy(() => import('@/features/production/pages/PrintQueue
 const AssemblyQueuePage = lazy(() => import('@/features/production/pages/AssemblyQueuePage'))
 const ResinQueuePage = lazy(() => import('@/features/production/pages/ResinQueuePage'))
 const PostProcessingQueuePage = lazy(() => import('@/features/production/pages/PostProcessingQueuePage'))
+const DieCuttingQueuePage = lazy(() => import('@/features/production/pages/DieCuttingQueuePage'))
 const PackagingQueuePage = lazy(() => import('@/features/production/pages/PackagingQueuePage'))
 const WarehousePage = lazy(() => import('@/features/warehouse/pages/WarehousePage'))
 const ClientsPage = lazy(() => import('@/features/clients/pages/ClientsPage'))
@@ -42,8 +43,9 @@ export const routes = [
       { path: 'production/design', element: <AuthGuard roles={['admin', 'manager', 'designer']}><DesignQueuePage /></AuthGuard> },
       { path: 'production/print', element: <AuthGuard roles={['admin', 'manager', 'printer']}><PrintQueuePage /></AuthGuard> },
       { path: 'production/assembly', element: <AuthGuard roles={['admin', 'manager', 'assembler']}><AssemblyQueuePage /></AuthGuard> },
-      { path: 'production/resin', element: <AuthGuard roles={['admin', 'manager', 'assembler', 'resin_pourer']}><ResinQueuePage /></AuthGuard> },
       { path: 'production/post-processing', element: <AuthGuard roles={['admin', 'manager', 'printer']}><PostProcessingQueuePage /></AuthGuard> },
+      { path: 'production/die-cutting', element: <AuthGuard roles={['admin', 'manager', 'assembler']}><DieCuttingQueuePage /></AuthGuard> },
+      { path: 'production/resin', element: <AuthGuard roles={['admin', 'manager', 'resin_pourer']}><ResinQueuePage /></AuthGuard> },
       { path: 'production/packaging', element: <AuthGuard roles={['admin', 'manager', 'assembler']}><PackagingQueuePage /></AuthGuard> },
       { path: 'warehouse', element: <AuthGuard roles={['admin', 'manager']}><WarehousePage /></AuthGuard> },
       { path: 'clients', element: <AuthGuard roles={['admin', 'manager']}><ClientsPage /></AuthGuard> },

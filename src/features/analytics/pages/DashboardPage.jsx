@@ -179,7 +179,7 @@ export default function DashboardPage() {
     designer: ['design'],
     printer: ['print', 'post_processing'],
     resin_pourer: ['resin_pouring'],
-    assembler: ['assembly', 'packaging'],
+    assembler: ['die_cutting', 'assembly', 'packaging'],
   }
   const myQueueStatusList = queueStatuses[role] || []
   const myQueueOrders = myQueueStatusList.length > 0 ? data.orders.filter((o) => myQueueStatusList.includes(o.status)) : []

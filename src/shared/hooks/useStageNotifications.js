@@ -10,6 +10,7 @@ const NOTIFY_ROLES = {
   design: ['designer'],
   print: ['printer'],
   post_processing: ['printer'],
+  die_cutting: ['assembler'],
   resin_pouring: ['resin_pourer'],
   assembly: ['assembler'],
   packaging: ['assembler'],

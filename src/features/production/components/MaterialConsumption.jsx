@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { MATERIAL_TYPES } from '@/shared/constants'
@@ -15,7 +15,7 @@ export function MaterialConsumption({ order }) {
   const [formData, setFormData] = useState({ materialId: '', qty: '' })
   const [saving, setSaving] = useState(false)
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const [matRes, txRes] = await Promise.all([
       supabase.from('materials').select('*').order('name'),
       supabase.from('material_transactions')
@@ -26,11 +26,11 @@ export function MaterialConsumption({ order }) {
     ])
     setMaterials(matRes.data || [])
     setConsumed(txRes.data || [])
-  }
+  }, [order.id])
 
   useEffect(() => {
     loadData()
-  }, [order.id])
+  }, [loadData])
 
   async function handleSubmit(e) {
     e.preventDefault()

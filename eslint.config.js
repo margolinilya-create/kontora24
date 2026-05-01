@@ -24,6 +24,12 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/app/routes.jsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     files: ['api/**/*.js', 'vite.config.js'],
     languageOptions: {
       globals: { ...globals.node, process: 'readonly', __dirname: 'readonly' },

@@ -7,10 +7,8 @@ import { supabase } from '@/shared/lib/supabase'
  * @param {Function} onEvent - Callback: (payload) => void
  * @param {Object} [options] - { event: '*'|'INSERT'|'UPDATE'|'DELETE', filter: 'column=eq.value' }
  */
-export function useRealtime(table, onEvent, options = {}) {
+export function useRealtime(table, onEvent, { event = '*', filter } = {}) {
   useEffect(() => {
-    const { event = '*', filter } = options
-
     const channelConfig = {
       event,
       schema: 'public',
@@ -28,5 +26,5 @@ export function useRealtime(table, onEvent, options = {}) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [table, onEvent, options.event, options.filter])
+  }, [table, onEvent, event, filter])
 }

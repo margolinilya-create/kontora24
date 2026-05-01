@@ -1,33 +1,14 @@
 import { useState, useEffect } from 'react'
 import { ORDER_TYPES } from '@/shared/constants'
 import { formatPrice } from '@/shared/lib/utils'
-
-const STORAGE_KEY = 'kontora24-calc-history'
-const MAX_ITEMS = 10
-
-export function saveCalcToHistory(form, result) {
-  try {
-    const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-    const entry = {
-      id: Date.now(),
-      ...form,
-      priceFinal: result.priceFinal,
-      pricePerUnit: result.pricePerUnit,
-      timestamp: new Date().toISOString(),
-    }
-    history.unshift(entry)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, MAX_ITEMS)))
-  } catch { /* ignored */ }
-}
+import { loadCalcHistory, clearCalcHistory } from '../lib/calc-history'
 
 export function CalcHistory({ onRestore }) {
   const [history, setHistory] = useState([])
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    try {
-      setHistory(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'))
-    } catch { /* ignored */ }
+    setHistory(loadCalcHistory())
   }, [open])
 
   if (history.length === 0) return null
@@ -61,7 +42,7 @@ export function CalcHistory({ onRestore }) {
             </button>
           ))}
           <button
-            onClick={() => { localStorage.removeItem(STORAGE_KEY); setHistory([]) }}
+            onClick={() => { clearCalcHistory(); setHistory([]) }}
             className="text-xs text-text-muted hover:text-danger py-2 px-2"
           >
             Очистить историю

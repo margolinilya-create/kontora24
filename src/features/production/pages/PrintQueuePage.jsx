@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import QueuePage from './QueuePage'
 import { BatchView } from '../components/BatchView'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import Tabs from '@/shared/components/Tabs'

@@ -25,6 +25,46 @@ const COL_COLORS = {
   packaging: 'bg-teal-500',
 }
 
+const PHASES = [
+  { key: 'prep', label: 'Подготовка', cols: ['new', 'design'] },
+  { key: 'prod', label: 'Производство', cols: ['print', 'post_processing', 'die_cutting'] },
+  { key: 'finish', label: 'Финиш', cols: ['resin_pouring', 'assembly', 'packaging'] },
+]
+
+// --- Pipeline summary strip ---
+function PipelineSummary({ columns, scrollRef }) {
+  function scrollToColumn(status) {
+    const el = scrollRef.current?.querySelector(`[data-col="${status}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
+  }
+
+  const total = COLS.reduce((sum, s) => sum + (columns[s]?.length || 0), 0)
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap bg-surface rounded-xl border border-border px-4 py-2.5">
+      {COLS.map((status) => {
+        const count = columns[status]?.length || 0
+        if (status === 'resin_pouring' && count === 0) return null
+        return (
+          <button
+            key={status}
+            onClick={() => scrollToColumn(status)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs hover:bg-surface-dim transition-colors shrink-0"
+          >
+            <span className={`w-2 h-2 rounded-full shrink-0 ${COL_COLORS[status]}`} />
+            <span className="text-text-muted hidden sm:inline">{ORDER_STATUSES[status]?.label}</span>
+            <span className={`font-semibold ${count > 0 ? 'text-text' : 'text-text-muted/40'}`}>{count}</span>
+          </button>
+        )
+      })}
+      <span className="ml-auto text-xs text-text-muted shrink-0 pl-2 border-l border-border">
+        {total}
+      </span>
+    </div>
+  )
+}
+
+// --- Droppable column ---
 function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const label = ORDER_STATUSES[status]?.label || status
@@ -33,7 +73,9 @@ function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus
   return (
     <div
       ref={setNodeRef}
+      data-col={status}
       className={`rounded-xl transition-all duration-200 ease-out min-h-[200px]
+        w-[75vw] sm:w-[280px] shrink-0 snap-start
         ${isOver
           ? 'bg-accent/[0.06] ring-2 ring-accent/30'
           : canReceive
@@ -41,7 +83,6 @@ function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus
             : ''
         }`}
     >
-      {/* Column header */}
       <div className="flex items-center justify-between mb-3 px-1 py-2">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${COL_COLORS[status]}`} />
@@ -54,7 +95,6 @@ function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus
         </span>
       </div>
 
-      {/* Cards */}
       <SortableContext items={orders.map((o) => o.id)} strategy={verticalListSortingStrategy}>
         <div className="space-y-2 px-0.5">
           {orders.length === 0 ? (
@@ -83,8 +123,9 @@ export default function ProductionBoardPage() {
   const [sortBy, setSortBy] = useState('created')
   const [search, setSearch] = useState('')
   const [activeId, setActiveId] = useState(null)
-  const [pendingMove, setPendingMove] = useState(null) // optimistic: { orderId, targetStatus }
+  const [pendingMove, setPendingMove] = useState(null)
   const [todayDone, setTodayDone] = useState(0)
+  const scrollRef = useRef(null)
 
   const { orders: allFetchedOrders, refetch } = useOrders()
 
@@ -109,7 +150,6 @@ export default function ProductionBoardPage() {
 
   const allOrders = useMemo(() => {
     const orders = allFetchedOrders.filter((o) => PRODUCTION_STATUSES.has(o.status))
-    // Apply optimistic move
     if (pendingMove) {
       return orders.map((o) =>
         o.id === pendingMove.orderId ? { ...o, status: pendingMove.targetStatus } : o
@@ -127,8 +167,7 @@ export default function ProductionBoardPage() {
     filtered = [...filtered].sort((a, b) => {
       const pA = PRIORITIES[a.priority]?.sortOrder ?? 1
       const pB = PRIORITIES[b.priority]?.sortOrder ?? 1
-      if (pA !== pB) return pB - pA // urgent first
-      // Keep existing sort order for same priority
+      if (pA !== pB) return pB - pA
       if (sortBy === 'deadline') {
         if (!a.deadline) return 1
         if (!b.deadline) return -1
@@ -139,21 +178,17 @@ export default function ProductionBoardPage() {
     return filtered
   }, [showMine, profile, search, sortBy])
 
-  const columns = useMemo(() => ({
-    new: filterAndSort(allOrders.filter((o) => o.status === 'new')),
-    design: filterAndSort(allOrders.filter((o) => o.status === 'design')),
-    print: filterAndSort(allOrders.filter((o) => o.status === 'print')),
-    post_processing: filterAndSort(allOrders.filter((o) => o.status === 'post_processing')),
-    die_cutting: filterAndSort(allOrders.filter((o) => o.status === 'die_cutting')),
-    resin_pouring: filterAndSort(allOrders.filter((o) => o.status === 'resin_pouring')),
-    assembly: filterAndSort(allOrders.filter((o) => o.status === 'assembly')),
-    packaging: filterAndSort(allOrders.filter((o) => o.status === 'packaging')),
-  }), [allOrders, filterAndSort])
+  const columns = useMemo(() => {
+    const result = {}
+    for (const s of COLS) {
+      result[s] = filterAndSort(allOrders.filter((o) => o.status === s))
+    }
+    return result
+  }, [allOrders, filterAndSort])
 
   const activeOrder = activeId ? allFetchedOrders.find((o) => o.id === activeId) : null
   const total = allOrders.length
 
-  // Sound notification when new orders appear
   const prevCountRef = useRef(total)
   useEffect(() => {
     if (total > prevCountRef.current) {
@@ -174,7 +209,6 @@ export default function ProductionBoardPage() {
     const targetStatus = COLS.includes(over.id) ? over.id : over.data?.current?.status
     if (!targetStatus || targetStatus === order.status) return
 
-    // Optimistic: instantly move the card
     setPendingMove({ orderId, targetStatus })
 
     try {
@@ -185,7 +219,6 @@ export default function ProductionBoardPage() {
         let currentStatus = order.status
         for (let i = fromIdx; i < toIdx; i++) {
           const nextCol = COLS[i + 1]
-          // Skip resin_pouring for non-3D orders
           if (nextCol === 'resin_pouring' && !IS_3D_TYPE(order.order_type)) continue
 
           const intermediateMap = { design: 'design_done', print: 'print_done' }
@@ -218,15 +251,16 @@ export default function ProductionBoardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Производство</h1>
           <p className="text-text-muted text-sm">
-            {total} {total === 1 ? 'заказ' : total < 5 ? 'заказа' : 'заказов'} · перетаскивайте между колонками · Выполнено сегодня: {todayDone}
+            {total} {total === 1 ? 'заказ' : total < 5 ? 'заказа' : 'заказов'} · Выполнено сегодня: {todayDone}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Tabs
             items={[{ key: 'board', label: 'Доска' }, { key: 'calendar', label: 'Календарь' }]}
             active={viewMode}
@@ -264,30 +298,61 @@ export default function ProductionBoardPage() {
       </div>
 
       {viewMode === 'board' ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={(e) => setActiveId(e.active.id)}
-          onDragEnd={handleDragEnd}
-          onDragCancel={() => setActiveId(null)}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-8 gap-4">
-            {COLS.map((status) => (
-              <DroppableColumn
-                key={status}
-                status={status}
-                orders={columns[status]}
-                onUpdated={refetch}
-                isActive={!!activeId}
-                activeFromStatus={activeOrder?.status}
-              />
-            ))}
-          </div>
+        <>
+          {/* Pipeline summary strip */}
+          <PipelineSummary columns={columns} scrollRef={scrollRef} />
 
-          <DragOverlay dropAnimation={dropAnimation}>
-            {activeOrder && <DragOverlayCard order={activeOrder} />}
-          </DragOverlay>
-        </DndContext>
+          {/* Kanban board — horizontal scroll with phase groups */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={(e) => setActiveId(e.active.id)}
+            onDragEnd={handleDragEnd}
+            onDragCancel={() => setActiveId(null)}
+          >
+            <div
+              ref={scrollRef}
+              className="flex gap-6 overflow-x-auto pb-4 kanban-scroll scroll-smooth snap-x snap-mandatory sm:snap-none"
+            >
+              {PHASES.map((phase) => {
+                const phaseCols = phase.cols.filter(
+                  (s) => s !== 'resin_pouring' || columns.resin_pouring.length > 0
+                )
+                if (phaseCols.length === 0) return null
+
+                return (
+                  <div key={phase.key} className="flex flex-col gap-2 shrink-0">
+                    {/* Phase label */}
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/60">
+                        {phase.label}
+                      </span>
+                      <span className="flex-1 h-px bg-border" />
+                    </div>
+
+                    {/* Columns in this phase */}
+                    <div className="flex gap-3">
+                      {phaseCols.map((status) => (
+                        <DroppableColumn
+                          key={status}
+                          status={status}
+                          orders={columns[status]}
+                          onUpdated={refetch}
+                          isActive={!!activeId}
+                          activeFromStatus={activeOrder?.status}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <DragOverlay dropAnimation={dropAnimation}>
+              {activeOrder && <DragOverlayCard order={activeOrder} />}
+            </DragOverlay>
+          </DndContext>
+        </>
       ) : (
         <ProductionCalendar />
       )}

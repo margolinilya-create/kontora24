@@ -65,6 +65,18 @@ body {
   animation: card-enter 0.25s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
+/* Production board: thin scrollbar */
+.kanban-scroll::-webkit-scrollbar { height: 6px; }
+.kanban-scroll::-webkit-scrollbar-track { background: transparent; }
+.kanban-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+.kanban-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+.kanban-scroll { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

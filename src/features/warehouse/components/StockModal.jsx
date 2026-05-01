@@ -5,6 +5,7 @@ import { formatNumber, formatDateTime } from '@/shared/lib/utils'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
+import Spinner from '@/shared/components/Spinner'
 
 export function StockModal({ material, onClose, onDone }) {
   const [delta, setDelta] = useState('')
@@ -123,7 +124,7 @@ export function StockModal({ material, onClose, onDone }) {
         <div>
           {histLoading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-accent border-t-transparent" />
+              <Spinner size="sm" />
             </div>
           ) : transactions.length === 0 ? (
             <p className="text-text-muted text-sm text-center py-8">Нет операций</p>

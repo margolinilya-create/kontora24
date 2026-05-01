@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { QueueCard } from '../components/QueueCard'
 import { playNotificationSound } from '@/shared/lib/sound'
+import Spinner from '@/shared/components/Spinner'
 
 const QUEUE_CONFIG = {
   design: { title: 'Очередь дизайна', subtitle: 'Заказы со статусом «Дизайн»', status: 'design' },
@@ -39,7 +40,7 @@ export default function QueuePage({ queueType, hideHeader }) {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+          <Spinner />
         </div>
       ) : orders.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">

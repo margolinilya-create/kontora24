@@ -8,6 +8,7 @@ import { formatPrice } from '@/shared/lib/utils'
 import { subDays, subMonths, subWeeks, startOfWeek, format, differenceInHours, getISOWeek } from 'date-fns'
 import Tabs from '@/shared/components/Tabs'
 import Button from '@/shared/components/Button'
+import Spinner from '@/shared/components/Spinner'
 
 const COLORS = ['#e94560', '#1a1a2e', '#16213e', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6']
 const PERIODS = [
@@ -198,7 +199,7 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+        <Spinner />
       </div>
     )
   }

@@ -4,6 +4,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatDate, formatRelative } from '@/shared/lib/utils'
+import Spinner from '@/shared/components/Spinner'
 
 export default function ClientDetailPage() {
   const { id } = useParams()
@@ -26,7 +27,7 @@ export default function ClientDetailPage() {
   }, [id])
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" /></div>
+    return <div className="flex justify-center py-12"><Spinner /></div>
   }
 
   if (!client) {

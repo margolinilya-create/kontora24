@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/shared/lib/supabase'
 import { addDays, format, startOfDay, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import Spinner from '@/shared/components/Spinner'
 
 export function ProductionCalendar() {
   const [orders, setOrders] = useState([])
@@ -48,7 +49,7 @@ export function ProductionCalendar() {
   }, [orders])
 
   if (loading) {
-    return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" role="status" aria-label="Загрузка" /></div>
+    return <div className="flex justify-center py-8"><Spinner /></div>
   }
 
   const loadColors = {

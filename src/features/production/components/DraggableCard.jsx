@@ -7,7 +7,7 @@ import { TaskTimer } from './TaskTimer'
 import { DryingTimer } from './DryingTimer'
 import { OperationChecklist } from './OperationChecklist'
 import { TechCardPreview } from './TechCardPreview'
-import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
+import { ORDER_TYPES, PRIORITIES, MS_PER_DAY } from '@/shared/constants'
 import { supabase } from '@/shared/lib/supabase'
 import { differenceInHours, differenceInMinutes } from 'date-fns'
 
@@ -34,7 +34,7 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
   const timeInStatus = formatTimeInStatus(order.status_changed_at || order.updated_at)
   const isOverdue = order.deadline && new Date(order.deadline) < new Date()
   const isUrgentDeadline = order.deadline && !isOverdue &&
-    (new Date(order.deadline) - new Date()) < 24 * 60 * 60 * 1000
+    (new Date(order.deadline) - new Date()) < MS_PER_DAY
   const priority = PRIORITIES[order.priority]
   const showPriority = order.priority === 'urgent' || order.priority === 'high'
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useId } from 'react'
 import { supabase } from '@/shared/lib/supabase'
+import { MS_PER_DAY } from '@/shared/constants'
 
 async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
   for (let i = 0; i <= retries; i++) {
@@ -170,7 +171,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
 
   // Set drying timer when entering resin_pouring
   if (toStatus === 'resin_pouring') {
-    const dryUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const dryUntil = new Date(Date.now() + MS_PER_DAY).toISOString()
     await supabase.from('orders').update({ dry_until: dryUntil }).eq('id', orderId)
   }
 

@@ -4,6 +4,7 @@ import { useAuthStore } from '@/features/auth/store'
 import { useThemeStore } from '@/shared/stores/theme-store'
 import { Toaster } from '@/shared/components/Toaster'
 import { OfflineIndicator } from '@/shared/components/OfflineIndicator'
+import Spinner from '@/shared/components/Spinner'
 import { routes } from './routes'
 
 const AgentationComponent = lazy(() => import('agentation').then((m) => ({ default: m.Agentation })))
@@ -13,7 +14,7 @@ const router = createBrowserRouter(routes)
 function LoadingFallback() {
   return (
     <div className="flex items-center justify-center min-h-[50vh]" role="status" aria-label="Загрузка">
-      <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+      <Spinner />
     </div>
   )
 }

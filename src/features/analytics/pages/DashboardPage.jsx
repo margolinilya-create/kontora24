@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_STATUSES, ORDER_TYPES, ROLES, getNextStatus } from '@/shared/constants'
+import { ORDER_STATUSES, ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
 import { formatPrice, formatRelative } from '@/shared/lib/utils'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
@@ -12,6 +12,7 @@ import { DryingTimer } from '@/features/production/components/DryingTimer'
 import { TechCardPreview } from '@/features/production/components/TechCardPreview'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import Button from '@/shared/components/Button'
+import Spinner from '@/shared/components/Spinner'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { toast } from '@/shared/stores/toast-store'
 import { LineChart, Line, BarChart, Bar, ResponsiveContainer } from 'recharts'
@@ -103,7 +104,7 @@ export default function DashboardPage() {
 
     // Deadlines — orders with deadline in next 3 days
     const now = new Date()
-    const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+    const threeDays = new Date(now.getTime() + 3 * MS_PER_DAY)
     const deadlines = orders
       .filter((o) => o.deadline && o.status !== 'done' && o.status !== 'cancelled' && new Date(o.deadline) <= threeDays)
       .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
@@ -377,7 +378,7 @@ export default function DashboardPage() {
             </div>
             {loading ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-accent border-t-transparent" />
+                <Spinner size="sm" />
               </div>
             ) : data.orders.length === 0 ? (
               <p className="text-text-muted text-sm py-4">Нет заказов</p>

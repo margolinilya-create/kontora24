@@ -6,6 +6,7 @@ import { MaterialForm } from '../components/MaterialForm'
 import { ConsumptionChart } from '../components/ConsumptionChart'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import Button from '@/shared/components/Button'
+import Spinner from '@/shared/components/Spinner'
 
 export default function WarehousePage() {
   const { materials, loading, refetch } = useMaterials()
@@ -90,7 +91,7 @@ export default function WarehousePage() {
       {/* Material list */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+          <Spinner />
         </div>
       ) : materials.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">

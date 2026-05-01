@@ -12,6 +12,7 @@ import { OrderTimeline } from '../components/OrderTimeline'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { CommercialProposal } from '@/features/kp/components/CommercialProposal'
 import { MaterialConsumption } from '@/features/production/components/MaterialConsumption'
+import Spinner from '@/shared/components/Spinner'
 import { OperationChecklist } from '@/features/production/components/OperationChecklist'
 import { TaskTimer } from '@/features/production/components/TaskTimer'
 import { useTimer, formatTotalTime } from '@/features/production/hooks/useTimer'
@@ -88,7 +89,7 @@ export default function OrderDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+        <Spinner />
       </div>
     )
   }
@@ -176,7 +177,7 @@ export default function OrderDetailPage() {
                 aria-label="Пересчитать стоимость заказа"
                 className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-1.5 text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
-                {recalculating && <div className="animate-spin rounded-full h-3 w-3 border border-current border-t-transparent" />}
+                {recalculating && <Spinner size="xs" className="border-current" />}
                 Пересчитать
               </button>
             </div>

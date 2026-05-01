@@ -5,6 +5,7 @@ import { toast } from '@/shared/stores/toast-store'
 import { formatRelative } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
+import Spinner from '@/shared/components/Spinner'
 
 export function OrderComments({ orderId }) {
   const { profile } = useAuth()
@@ -65,7 +66,7 @@ export function OrderComments({ orderId }) {
       <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
         {loading ? (
           <div className="flex justify-center py-4">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-accent border-t-transparent" />
+            <Spinner size="sm" />
           </div>
         ) : comments.length === 0 ? (
           <p className="text-text-muted text-sm text-center py-4">Нет комментариев</p>

@@ -16,6 +16,7 @@ const SETTINGS_TABS = [
   { key: 'markups', label: 'Наценки' },
   { key: 'users', label: 'Пользователи' },
   { key: 'bitrix', label: 'Bitrix24' },
+  { key: 'logs', label: 'Логи' },
 ]
 
 export default function SettingsPage() {

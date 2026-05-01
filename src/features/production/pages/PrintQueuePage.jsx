@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BatchView } from '../components/BatchView'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import Tabs from '@/shared/components/Tabs'
+import Spinner from '@/shared/components/Spinner'
 
 export default function PrintQueuePage() {
   const [viewMode, setViewMode] = useState('list')
@@ -25,7 +26,7 @@ export default function PrintQueuePage() {
         <BatchView orders={orders} onUpdated={refetch} />
       ) : loading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+          <Spinner />
         </div>
       ) : orders.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">

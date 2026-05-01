@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { supabase } from '@/shared/lib/supabase'
 import { subDays, format } from 'date-fns'
 import { formatNumber } from '@/shared/lib/utils'
+import Spinner from '@/shared/components/Spinner'
 
 export function ConsumptionChart() {
   const [data, setData] = useState({ daily: [], forecast: [] })
@@ -50,7 +51,7 @@ export function ConsumptionChart() {
   }, [])
 
   if (loading) {
-    return <div className="flex justify-center py-8"><div role="status" aria-label="Загрузка" className="animate-spin rounded-full h-6 w-6 border-2 border-accent border-t-transparent" /></div>
+    return <div className="flex justify-center py-8"><Spinner size="sm" /></div>
   }
 
   return (

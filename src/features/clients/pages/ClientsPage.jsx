@@ -4,8 +4,10 @@ import { useClients } from '../hooks/useClients'
 import { ClientForm } from '../components/ClientForm'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { formatDate } from '@/shared/lib/utils'
+import { MS_PER_DAY } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import SearchInput from '@/shared/components/SearchInput'
+import Spinner from '@/shared/components/Spinner'
 
 export default function ClientsPage() {
   const [search, setSearch] = useState('')
@@ -37,7 +39,7 @@ export default function ClientsPage() {
       {/* List */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+          <Spinner />
         </div>
       ) : clients.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">
@@ -97,7 +99,7 @@ function LastOrderCell({ date }) {
   if (!date) {
     return <span className="text-text-muted">нет заказов</span>
   }
-  const days = Math.floor((new Date() - new Date(date)) / 86400000)
+  const days = Math.floor((new Date() - new Date(date)) / MS_PER_DAY)
   if (days > 90) {
     return (
       <span className="text-danger">

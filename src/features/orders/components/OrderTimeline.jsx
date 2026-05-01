@@ -1,9 +1,10 @@
-import { ORDER_STATUSES } from '@/shared/constants'
+import { ORDER_STATUSES, IS_3D_TYPE } from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
 
-const FLOW = ['new', 'design', 'design_done', 'print', 'print_done', 'assembly', 'done']
-
 export function OrderTimeline({ order, history }) {
+  const FLOW = IS_3D_TYPE(order?.order_type)
+    ? ['new', 'design', 'design_done', 'print', 'print_done', 'resin_pouring', 'assembly', 'done']
+    : ['new', 'design', 'design_done', 'print', 'print_done', 'assembly', 'done']
   if (!order) return null
 
   const currentIdx = FLOW.indexOf(order.status)
@@ -35,16 +36,24 @@ export function OrderTimeline({ order, history }) {
         </div>
       ) : (
         <div className="relative">
-          {/* Progress bar */}
-          <div className="absolute top-4 left-4 right-4 h-0.5 bg-border">
+          {/* Desktop progress bar (horizontal) */}
+          <div className="hidden sm:block absolute top-4 left-4 right-4 h-0.5 bg-border">
             <div
               className="h-full bg-accent transition-all duration-500"
               style={{ width: `${Math.max(0, (currentIdx / (FLOW.length - 1)) * 100)}%` }}
             />
           </div>
 
+          {/* Mobile progress bar (vertical) */}
+          <div className="sm:hidden absolute left-3.5 top-0 bottom-0 w-0.5 bg-border">
+            <div
+              className="w-full bg-accent transition-all duration-500"
+              style={{ height: `${Math.max(0, (currentIdx / (FLOW.length - 1)) * 100)}%` }}
+            />
+          </div>
+
           {/* Steps */}
-          <div className="relative flex justify-between">
+          <div className="relative flex flex-col sm:flex-row sm:justify-between gap-4 sm:gap-0">
             {FLOW.map((status, i) => {
               const isCompleted = i <= currentIdx
               const isCurrent = i === currentIdx
@@ -52,9 +61,13 @@ export function OrderTimeline({ order, history }) {
               const ts = timestamps[status]
 
               return (
-                <div key={status} className="flex flex-col items-center" style={{ width: `${100 / FLOW.length}%` }}>
+                <div
+                  key={status}
+                  className="flex flex-row sm:flex-col items-center sm:items-center gap-3 sm:gap-0"
+                  style={{ width: undefined }}
+                >
                   {/* Circle */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-colors ${
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold z-10 flex-shrink-0 transition-colors ${
                     isCurrent ? 'bg-accent text-white ring-4 ring-accent/20' :
                     isCompleted ? 'bg-accent text-white' :
                     'bg-surface border-2 border-border text-text-muted'
@@ -68,17 +81,17 @@ export function OrderTimeline({ order, history }) {
                     )}
                   </div>
 
-                  {/* Label */}
-                  <p className={`text-xs mt-2 text-center leading-tight ${isCurrent ? 'font-semibold text-accent' : isCompleted ? 'text-text' : 'text-text-muted'}`}>
-                    {s?.label || status}
-                  </p>
-
-                  {/* Timestamp */}
-                  {ts && (
-                    <p className="text-[10px] text-text-muted mt-0.5 text-center">
-                      {formatDateTime(ts)}
+                  {/* Label + timestamp */}
+                  <div className="sm:text-center">
+                    <p className={`text-xs sm:mt-2 leading-tight ${isCurrent ? 'font-semibold text-accent' : isCompleted ? 'text-text' : 'text-text-muted'}`}>
+                      {s?.label || status}
                     </p>
-                  )}
+                    {ts && (
+                      <p className="text-[10px] text-text-muted sm:mt-0.5">
+                        {formatDateTime(ts)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )
             })}

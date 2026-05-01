@@ -42,6 +42,16 @@ export default function ClientDetailPage() {
       <div className="flex items-center gap-3">
         <Link to="/clients" className="text-text-muted hover:text-text text-sm">← Клиенты</Link>
         <h1 className="text-2xl font-bold">{client.name}</h1>
+        {client.name && (
+          <a
+            href={`https://kontora24.bitrix24.ru/crm/contact/list/?FIND=${encodeURIComponent(client.name)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border border-border text-text-muted hover:text-text hover:bg-surface-dim font-medium rounded-lg px-2.5 py-1 text-xs transition-colors"
+          >
+            Bitrix24
+          </a>
+        )}
       </div>
 
       {/* Info + stats */}
@@ -84,6 +94,7 @@ export default function ClientDetailPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
+              <caption className="sr-only">Заказы клиента</caption>
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-2 font-medium text-text-muted">#</th>

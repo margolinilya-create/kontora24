@@ -1,10 +1,12 @@
-import { useEffect, Suspense } from 'react'
+import { useEffect, Suspense, lazy } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { useAuthStore } from '@/features/auth/store'
 import { useThemeStore } from '@/shared/stores/theme-store'
 import { Toaster } from '@/shared/components/Toaster'
 import { OfflineIndicator } from '@/shared/components/OfflineIndicator'
 import { routes } from './routes'
+
+const AgentationComponent = lazy(() => import('agentation').then((m) => ({ default: m.Agentation })))
 
 const router = createBrowserRouter(routes)
 
@@ -32,6 +34,9 @@ export function App() {
       </Suspense>
       <Toaster />
       <OfflineIndicator />
+      <Suspense fallback={null}>
+        <AgentationComponent />
+      </Suspense>
     </>
   )
 }

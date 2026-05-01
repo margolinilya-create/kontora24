@@ -1,4 +1,5 @@
 import { forwardRef } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { formatOrderType } from '../utils'
 import { formatDate, formatPrice } from '@/shared/lib/utils'
 
@@ -79,6 +80,9 @@ export const TechCard = forwardRef(function TechCard({ order }, ref) {
         </div>
       </div>
 
+      {/* Layout preview */}
+      <LayoutPreviewOnCard order={order} />
+
       {/* Notes */}
       {order.notes && (
         <div style={{ marginBottom: 20 }}>
@@ -113,14 +117,55 @@ export const TechCard = forwardRef(function TechCard({ order }, ref) {
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12, display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: 9 }}>
-        <span>Kontora24 · Тех карта #{order.number}</span>
-        <span>{new Date().toLocaleDateString('ru-RU')}</span>
+      {/* Footer with QR code */}
+      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ color: '#9ca3af', fontSize: 9 }}>
+          <div>Kontora24 · Тех карта #{order.number}</div>
+          <div style={{ marginTop: 2 }}>{new Date().toLocaleDateString('ru-RU')}</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <QRCodeSVG
+            value={`https://kontora24.vercel.app/orders/${order.id}`}
+            size={80}
+            level="M"
+            bgColor="#ffffff"
+            fgColor="#1a1a2e"
+          />
+          <div style={{ fontSize: 8, color: '#9ca3af', marginTop: 4 }}>Сканируйте для просмотра</div>
+        </div>
       </div>
     </div>
   )
 })
+
+function LayoutPreviewOnCard({ order }) {
+  const printWidth = 300
+  const gap = 2
+  const scale = printWidth / 1230
+  const itemW = Math.round(order.width_mm * scale)
+  const itemH = Math.round(order.height_mm * scale)
+  const itemsPerRow = Math.floor(printWidth / (itemW + gap))
+  const rows = Math.min(Math.ceil(order.qty / Math.max(itemsPerRow, 1)), 5)
+
+  if (itemW < 3 || itemH < 3) return null
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: '#1a1a2e', textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>
+        Раскладка на листе
+      </div>
+      <div style={{ width: printWidth, background: '#f0f0f0', padding: 4, borderRadius: 4 }}>
+        {Array.from({ length: rows }).map((_, row) => (
+          <div key={row} style={{ display: 'flex', gap, marginBottom: gap }}>
+            {Array.from({ length: itemsPerRow }).map((_, col) => (
+              <div key={col} style={{ width: itemW, height: itemH, background: '#e94560', borderRadius: 2, opacity: 0.7 }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function Field({ label, value }) {
   return (

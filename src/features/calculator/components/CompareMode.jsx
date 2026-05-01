@@ -30,12 +30,13 @@ export function CompareMode({ baseForm }) {
           value={compareQty}
           onChange={(e) => setCompareQty(Number(e.target.value) || 1)}
           min="1"
+          aria-label="Количество для сравнения"
           className="w-24 rounded-lg border border-border px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-accent/50"
         />
         <span className="text-sm text-text-muted">шт вместо {baseForm.qty}?</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 text-center">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
         <div>
           <p className="text-xs text-text-muted">Текущий ({baseForm.qty} шт)</p>
           <p className="text-lg font-bold">{formatPrice(baseResult.pricePerUnit)}</p>

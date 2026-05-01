@@ -5,21 +5,24 @@ import { StockModal } from '../components/StockModal'
 import { MaterialForm } from '../components/MaterialForm'
 import { ConsumptionChart } from '../components/ConsumptionChart'
 import { MATERIAL_TYPES } from '@/shared/constants'
+import Button from '@/shared/components/Button'
 
 export default function WarehousePage() {
   const { materials, loading, refetch } = useMaterials()
   const [selectedMaterial, setSelectedMaterial] = useState(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showLowOnly, setShowLowOnly] = useState(false)
+  const [showReservedOnly, setShowReservedOnly] = useState(false)
   const [tab, setTab] = useState('stock') // 'stock' | 'analytics'
 
   const lowStockCount = materials.filter(
     (m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty)
   ).length
+  const reservedCount = materials.filter((m) => m.reserved > 0).length
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap gap-4 items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Склад</h1>
           <p className="text-text-muted">
@@ -30,20 +33,27 @@ export default function WarehousePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {reservedCount > 0 && (
+            <Button
+              variant={showReservedOnly ? 'primary' : 'secondary'}
+              size="md"
+              onClick={() => { setShowReservedOnly(!showReservedOnly); if (!showReservedOnly) setShowLowOnly(false) }}
+            >
+              {showReservedOnly ? 'Все' : 'Зарезервированные'}
+            </Button>
+          )}
           {lowStockCount > 0 && (
-            <button
-              onClick={() => setShowLowOnly(!showLowOnly)}
-              className={`px-3 py-2 rounded-lg text-sm transition-colors ${showLowOnly ? 'bg-danger text-white' : 'border border-border text-text-muted hover:bg-surface-dim'}`}
+            <Button
+              variant={showLowOnly ? 'danger' : 'secondary'}
+              size="md"
+              onClick={() => { setShowLowOnly(!showLowOnly); if (!showLowOnly) setShowReservedOnly(false) }}
             >
               {showLowOnly ? 'Все' : 'Мало на складе'}
-            </button>
+            </Button>
           )}
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors"
-          >
+          <Button onClick={() => setShowCreateForm(true)}>
             + Материал
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -88,7 +98,11 @@ export default function WarehousePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {materials.filter((m) => !showLowOnly || (m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty))).map((m) => (
+          {materials.filter((m) => {
+            if (showLowOnly) return m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty)
+            if (showReservedOnly) return m.reserved > 0
+            return true
+          }).map((m) => (
             <MaterialCard
               key={m.id}
               material={m}

@@ -13,6 +13,10 @@
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+  --color-sidebar: #1a1a2e;
+  --color-chart-grid: #e5e7eb;
+  --color-chart-tooltip-bg: #ffffff;
+  --color-chart-tooltip-border: #e5e7eb;
 
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
@@ -25,7 +29,11 @@
   --color-surface-dim: #151521;
   --color-border: #2d2d44;
   --color-text: #e2e8f0;
-  --color-text-muted: #94a3b8;
+  --color-text-muted: #a8b5c4;
+  --color-sidebar: #151521;
+  --color-chart-grid: #374151;
+  --color-chart-tooltip-bg: #2a2a3e;
+  --color-chart-tooltip-border: #374151;
 }
 
 body {
@@ -46,4 +54,28 @@ body {
 
 .animate-slide-in {
   animation: slide-in 0.2s ease-out;
+}
+
+@keyframes card-enter {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-card-enter {
+  animation: card-enter 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

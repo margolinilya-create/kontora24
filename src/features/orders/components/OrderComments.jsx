@@ -3,6 +3,8 @@ import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { formatRelative } from '@/shared/lib/utils'
+import Button from '@/shared/components/Button'
+import Input from '@/shared/components/Input'
 
 export function OrderComments({ orderId }) {
   const { profile } = useAuth()
@@ -88,19 +90,21 @@ export function OrderComments({ orderId }) {
 
       {/* Input */}
       <form onSubmit={handleSend} className="flex gap-2">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Написать комментарий..."
-          className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
-        />
-        <button
+        <div className="flex-1">
+          <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Написать комментарий..."
+            ariaLabel="Написать комментарий"
+          />
+        </div>
+        <Button
           type="submit"
-          disabled={sending || !text.trim()}
-          className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!text.trim()}
+          loading={sending}
         >
-          {sending ? '...' : 'Отправить'}
-        </button>
+          Отправить
+        </Button>
       </form>
     </div>
   )

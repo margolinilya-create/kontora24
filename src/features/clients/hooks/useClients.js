@@ -9,7 +9,7 @@ export function useClients(search = '') {
     setLoading(true)
     let query = supabase
       .from('clients')
-      .select('*')
+      .select('*, orders(created_at)')
       .order('created_at', { ascending: false })
 
     if (search) {
@@ -18,7 +18,19 @@ export function useClients(search = '') {
     }
 
     const { data } = await query
-    setClients(data || [])
+    // Compute last_order_date from embedded orders
+    const enriched = (data || []).map((client) => {
+      const orders = client.orders || []
+      const lastOrderDate = orders.length > 0
+        ? orders.reduce((latest, o) => {
+            const d = new Date(o.created_at)
+            return d > latest ? d : latest
+          }, new Date(0)).toISOString()
+        : null
+      const { orders: _, ...rest } = client
+      return { ...rest, last_order_date: lastOrderDate }
+    })
+    setClients(enriched)
     setLoading(false)
   }, [search])
 

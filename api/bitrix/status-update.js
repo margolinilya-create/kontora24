@@ -2,17 +2,38 @@
 // This sends a webhook back to Bitrix24
 // POST /api/bitrix/status-update
 
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
-    const { order_id, order_number, status, price_final, cost_total, bitrix_deal_id, bitrix_webhook_url } = req.body
+    const { order_id, order_number, status, price_final, cost_total, bitrix_deal_id } = req.body
 
-    if (!bitrix_webhook_url || !bitrix_deal_id) {
-      return res.status(200).json({ skipped: true, reason: 'No Bitrix webhook configured' })
+    if (!bitrix_deal_id) {
+      return res.status(200).json({ skipped: true, reason: 'No Bitrix deal ID' })
     }
+
+    // Read Bitrix config from settings table
+    const { data: settingsRow } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'bitrix')
+      .single()
+
+    const bitrixConfig = settingsRow?.value
+    if (!bitrixConfig || !bitrixConfig.enabled || !bitrixConfig.webhookUrl) {
+      return res.status(200).json({ skipped: true, reason: 'Bitrix integration not configured or disabled' })
+    }
+
+    const bitrix_webhook_url = bitrixConfig.webhookUrl
 
     // Map Kontora status to Bitrix stage
     const STAGE_MAP = {

@@ -4,6 +4,8 @@ import { useClients } from '../hooks/useClients'
 import { ClientForm } from '../components/ClientForm'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { formatDate } from '@/shared/lib/utils'
+import Button from '@/shared/components/Button'
+import SearchInput from '@/shared/components/SearchInput'
 
 export default function ClientsPage() {
   const [search, setSearch] = useState('')
@@ -18,26 +20,19 @@ export default function ClientsPage() {
           <h1 className="text-2xl font-bold">Клиенты</h1>
           <p className="text-text-muted">{clients.length} клиентов</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
-        >
+        <Button onClick={() => setShowForm(true)}>
           + Новый клиент
-        </button>
+        </Button>
       </div>
 
       {/* Search */}
-      <div className="relative max-w-md">
-        <svg className="absolute left-3 top-2.5 w-4 h-4 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-        </svg>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по имени, телефону, email..."
-          className="w-full pl-9 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
-        />
-      </div>
+      <SearchInput
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Поиск по имени, телефону, email..."
+        ariaLabel="Поиск клиентов"
+        className="max-w-md"
+      />
 
       {/* List */}
       {loading ? (
@@ -49,14 +44,16 @@ export default function ClientsPage() {
           <p className="text-text-muted">{search ? 'Ничего не найдено' : 'Нет клиентов'}</p>
         </div>
       ) : (
-        <div className="bg-surface rounded-xl border border-border overflow-hidden">
+        <div className="bg-surface rounded-xl border border-border overflow-x-auto">
           <table className="w-full text-sm">
+            <caption className="sr-only">Список клиентов</caption>
             <thead>
               <tr className="border-b border-border bg-surface-dim">
                 <th className="text-left px-4 py-3 font-medium text-text-muted">Имя</th>
                 <th className="text-left px-4 py-3 font-medium text-text-muted">Телефон</th>
                 <th className="text-left px-4 py-3 font-medium text-text-muted">Email</th>
                 <th className="text-left px-4 py-3 font-medium text-text-muted">Теги</th>
+                <th className="text-left px-4 py-3 font-medium text-text-muted">Последний заказ</th>
                 <th className="text-right px-4 py-3 font-medium text-text-muted">Добавлен</th>
               </tr>
             </thead>
@@ -73,6 +70,7 @@ export default function ClientsPage() {
                       </div>
                     ) : <span className="text-text-muted">—</span>}
                   </td>
+                  <td className="px-4 py-3"><LastOrderCell date={client.last_order_date} /></td>
                   <td className="px-4 py-3 text-right text-text-muted">{formatDate(client.created_at)}</td>
                 </tr>
               ))}
@@ -93,4 +91,22 @@ export default function ClientsPage() {
       )}
     </div>
   )
+}
+
+function LastOrderCell({ date }) {
+  if (!date) {
+    return <span className="text-text-muted">нет заказов</span>
+  }
+  const days = Math.floor((new Date() - new Date(date)) / 86400000)
+  if (days > 90) {
+    return (
+      <span className="text-danger">
+        {days} дн назад <span className="text-[10px] font-medium ml-1 bg-danger/10 px-1.5 py-0.5 rounded-full">спящий</span>
+      </span>
+    )
+  }
+  if (days > 30) {
+    return <span className="text-warning">{days} дн назад</span>
+  }
+  return <span className="text-text-muted">{days} дн назад</span>
 }

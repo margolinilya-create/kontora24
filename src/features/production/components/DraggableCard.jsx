@@ -1,10 +1,148 @@
+import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
-import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
-import { ORDER_TYPES } from '@/shared/constants'
+import { TaskTimer } from './TaskTimer'
+import { DryingTimer } from './DryingTimer'
+import { OperationChecklist } from './OperationChecklist'
+import { TechCardPreview } from './TechCardPreview'
+import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
 import { differenceInHours, differenceInMinutes } from 'date-fns'
+
+const PRIORITY_BORDER = {
+  urgent: 'border-l-danger',
+  high: 'border-l-warning',
+}
+
+function formatTimeInStatus(timestamp) {
+  if (!timestamp) return null
+  const h = differenceInHours(new Date(), new Date(timestamp))
+  if (h < 1) return `${differenceInMinutes(new Date(), new Date(timestamp))} мин`
+  if (h < 24) return `${h} ч`
+  return `${Math.floor(h / 24)} дн`
+}
+
+function formatDeadline(deadline) {
+  if (!deadline) return null
+  return new Date(deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+}
+
+function CardContent({ order, onUpdated, isOverlay = false }) {
+  const [showTechCard, setShowTechCard] = useState(false)
+  const timeInStatus = formatTimeInStatus(order.status_changed_at || order.updated_at)
+  const isOverdue = order.deadline && new Date(order.deadline) < new Date()
+  const isUrgentDeadline = order.deadline && !isOverdue &&
+    (new Date(order.deadline) - new Date()) < 24 * 60 * 60 * 1000
+  const priority = PRIORITIES[order.priority]
+  const showPriority = order.priority === 'urgent' || order.priority === 'high'
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      {/* Header: number + claim */}
+      <div className="flex items-center justify-between">
+        {isOverlay ? (
+          <span className="font-bold text-accent">#{order.number}</span>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <Link
+              to={`/orders/${order.id}`}
+              className="font-bold text-accent hover:underline"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              #{order.number}
+            </Link>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowTechCard(true) }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="text-[11px] text-text-muted hover:text-accent transition-colors"
+            >
+              Тех карта
+            </button>
+          </div>
+        )}
+        {!isOverlay && <ClaimButton order={order} onClaimed={onUpdated} />}
+      </div>
+
+      {/* Type + specs */}
+      <div>
+        <p className="text-sm font-medium text-text leading-tight">
+          {ORDER_TYPES[order.order_type]?.label}
+        </p>
+        <p className="text-xs text-text-muted mt-0.5">
+          {order.width_mm} x {order.height_mm} мм · {order.qty} шт
+        </p>
+      </div>
+
+      {/* Attachment thumbnail */}
+      {!isOverlay && order.attachments?.length > 0 && (() => {
+        const img = order.attachments.find(a => /\.(png|jpg|jpeg|webp)$/i.test(a.file_name))
+        if (!img) return null
+        return (
+          <div className="mt-1 rounded-lg overflow-hidden h-16">
+            <img src={img.file_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+          </div>
+        )
+      })()}
+
+      {/* Client */}
+      {order.client?.name && (
+        <p className="text-xs text-text-muted truncate">{order.client.name}</p>
+      )}
+
+      {/* Drying timer */}
+      {order.status === 'resin_pouring' && order.dry_until && (
+        <DryingTimer dryUntil={order.dry_until} />
+      )}
+
+      {/* Timer */}
+      {!isOverlay && (
+        <TaskTimer orderId={order.id} orderStatus={order.status} compact />
+      )}
+
+      {/* Footer: meta row */}
+      <div className="flex items-center justify-between pt-2 border-t border-border">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {/* Deadline */}
+          {order.deadline && (
+            <span className={`text-[11px] shrink-0 ${
+              isOverdue
+                ? 'text-danger font-medium'
+                : isUrgentDeadline
+                  ? 'text-warning font-medium'
+                  : 'text-text-muted'
+            }`}>
+              {formatDeadline(order.deadline)}
+            </span>
+          )}
+          {/* Assignee */}
+          {order.assignee?.display_name && (
+            <span className="text-[11px] text-text-muted truncate">
+              · {order.assignee.display_name}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Priority badge */}
+          {showPriority && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${priority?.color}`}>
+              {priority?.label}
+            </span>
+          )}
+          {/* Operation checklist progress */}
+          <OperationChecklist order={order} compact />
+          {/* Time in status */}
+          {timeInStatus && (
+            <span className="text-[10px] text-text-muted">{timeInStatus}</span>
+          )}
+        </div>
+      </div>
+      {!isOverlay && <TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} />}
+    </div>
+  )
+}
 
 export function DraggableCard({ order, onUpdated }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -14,16 +152,20 @@ export function DraggableCard({ order, onUpdated }) {
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: transition || 'transform 200ms cubic-bezier(0.25, 1, 0.5, 1)',
   }
 
-  const timeInStatus = (() => {
-    const h = differenceInHours(new Date(), new Date(order.updated_at))
-    if (h < 1) return `${differenceInMinutes(new Date(), new Date(order.updated_at))} мин`
-    if (h < 24) return `${h} ч`
-    return `${Math.floor(h / 24)} дн`
-  })()
+  const priorityBorder = PRIORITY_BORDER[order.priority]
+
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="rounded-xl border-2 border-dashed border-accent/20 bg-accent/[0.03] h-[120px] transition-all duration-200"
+      />
+    )
+  }
 
   return (
     <div
@@ -31,33 +173,28 @@ export function DraggableCard({ order, onUpdated }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-surface rounded-xl border border-border p-4 hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing touch-none"
+      aria-roledescription="перетаскиваемый элемент"
+      className={`bg-surface rounded-xl border border-border p-3.5 cursor-grab active:cursor-grabbing touch-none
+        hover:shadow-md hover:border-accent/20
+        transition-all duration-200 ease-out
+        ${priorityBorder ? `border-l-[3px] ${priorityBorder}` : ''}`}
     >
-      <div className="flex items-center justify-between mb-2">
-        <Link
-          to={`/orders/${order.id}`}
-          className="font-semibold text-accent hover:underline"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          #{order.number}
-        </Link>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-text-muted">{timeInStatus}</span>
-          <ClaimButton order={order} onClaimed={onUpdated} />
-        </div>
-      </div>
-      <p className="text-sm text-text-muted mb-1">
-        {ORDER_TYPES[order.order_type]?.label} · {order.width_mm}×{order.height_mm} · {order.qty} шт
-      </p>
-      {order.deadline && (
-        <p className={`text-xs mb-1 ${new Date(order.deadline) < new Date() ? 'text-danger font-medium' : 'text-text-muted'}`}>
-          Дедлайн: {new Date(order.deadline).toLocaleDateString('ru-RU')}
-        </p>
-      )}
-      {order.assignee?.display_name && (
-        <p className="text-xs text-text-muted">→ {order.assignee.display_name}</p>
-      )}
+      <CardContent order={order} onUpdated={onUpdated} />
+    </div>
+  )
+}
+
+export function DragOverlayCard({ order }) {
+  const priorityBorder = PRIORITY_BORDER[order.priority]
+
+  return (
+    <div
+      className={`bg-surface rounded-xl border-2 border-accent shadow-2xl p-3.5 w-[272px]
+        rotate-[1.5deg] scale-[1.03] pointer-events-none
+        ${priorityBorder ? `border-l-[3px] ${priorityBorder}` : ''}`}
+      style={{ filter: 'drop-shadow(0 16px 24px rgba(0,0,0,0.12))' }}
+    >
+      <CardContent order={order} isOverlay />
     </div>
   )
 }

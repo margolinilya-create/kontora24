@@ -17,6 +17,7 @@ export function ClaimButton({ order, onClaimed }) {
   }
 
   async function handleClaim() {
+    if (isAssigned && !window.confirm(`Перенять заказ #${order.number}?`)) return
     setClaiming(true)
     try {
       await updateOrder(order.id, { assigned_to: profile.id })

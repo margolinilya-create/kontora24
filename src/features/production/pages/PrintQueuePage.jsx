@@ -1,32 +1,31 @@
+import { useState } from 'react'
+import QueuePage from './QueuePage'
+import { BatchView } from '../components/BatchView'
 import { useOrders } from '@/features/orders/hooks/useOrders'
-import { QueueCard } from '../components/QueueCard'
+import Tabs from '@/shared/components/Tabs'
 
 export default function PrintQueuePage() {
-  const { orders, loading, refetch } = useOrders({ status: 'print' })
+  const [viewMode, setViewMode] = useState('list') // 'list' | 'batch'
+  const { orders, refetch } = useOrders({ status: 'print' })
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Очередь печати</h1>
-        <p className="text-text-muted">
-          {orders.length > 0 ? `${orders.length} заказов в работе` : 'Заказы со статусом «Печать»'}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Очередь печати</h1>
+          <p className="text-text-muted">{orders.length} заказов в печати</p>
+        </div>
+        <Tabs
+          items={[{ key: 'list', label: 'Список' }, { key: 'batch', label: 'Группировка' }]}
+          active={viewMode}
+          onChange={setViewMode}
+        />
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
-        </div>
-      ) : orders.length === 0 ? (
-        <div className="bg-surface rounded-xl border border-border p-12 text-center">
-          <p className="text-text-muted">Нет заказов в очереди печати</p>
-        </div>
+      {viewMode === 'batch' ? (
+        <BatchView orders={orders} onUpdated={refetch} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {orders.map((order) => (
-            <QueueCard key={order.id} order={order} onUpdated={refetch} />
-          ))}
-        </div>
+        <QueuePage queueType="print" hideHeader />
       )}
     </div>
   )

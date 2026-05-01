@@ -13,7 +13,7 @@ export function MaterialCard({ material, onAddStock }) {
           <p className="text-xs text-text-muted">{typeInfo?.label || material.type}</p>
         </div>
         {isLow && (
-          <span className="bg-red-100 text-danger text-xs font-medium px-2 py-0.5 rounded-full">
+          <span className="bg-red-500/15 text-red-400 text-xs font-medium px-2 py-0.5 rounded-full">
             Мало
           </span>
         )}
@@ -23,6 +23,13 @@ export function MaterialCard({ material, onAddStock }) {
         {formatNumber(material.stock_qty, 1)}
         <span className="text-sm font-normal text-text-muted ml-1">{material.unit}</span>
       </div>
+
+      {material.reserved > 0 && (
+        <div className="text-xs text-text-muted mt-1 space-y-0.5">
+          <p>Зарезервировано: {formatNumber(material.reserved, 1)} {material.unit}</p>
+          <p>Доступно: {formatNumber(material.available, 1)} {material.unit}</p>
+        </div>
+      )}
 
       <div className="flex items-center justify-between text-xs text-text-muted mt-2">
         <span>Мин: {formatNumber(material.min_qty, 1)} {material.unit}</span>

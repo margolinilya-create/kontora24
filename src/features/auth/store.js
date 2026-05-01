@@ -36,6 +36,15 @@ export const useAuthStore = create((set, get) => ({
         set({ user: null, profile: null })
       }
     })
+
+    // If "remember me" was unchecked, sign out when the browser/tab closes
+    const rememberMe = localStorage.getItem('rememberMe')
+    if (rememberMe === 'false') {
+      window.addEventListener('beforeunload', () => {
+        supabase.auth.signOut()
+        localStorage.removeItem('rememberMe')
+      })
+    }
   },
 
   signIn: async (email, password) => {

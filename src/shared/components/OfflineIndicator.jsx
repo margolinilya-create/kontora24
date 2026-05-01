@@ -17,7 +17,7 @@ export function OfflineIndicator() {
   if (online) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-danger text-white text-sm text-center py-2 font-medium">
+    <div role="alert" className="fixed bottom-0 left-0 right-0 z-50 bg-danger text-white text-sm text-center py-2 font-medium">
       Нет соединения с интернетом
     </div>
   )

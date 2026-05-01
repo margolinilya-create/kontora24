@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { formatRelative } from '@/shared/lib/utils'
+import Button from '@/shared/components/Button'
 
 export function OrderAttachments({ orderId }) {
   const { profile } = useAuth()
@@ -92,7 +93,7 @@ export function OrderAttachments({ orderId }) {
             type="file"
             onChange={handleUpload}
             disabled={uploading}
-            className="hidden"
+            className="sr-only"
             accept="image/*,.pdf,.ai,.psd,.svg,.eps"
           />
         </label>
@@ -140,12 +141,15 @@ export function OrderAttachments({ orderId }) {
                 <p className="text-xs text-text-muted mt-0.5">
                   {formatSize(f.file_size)} · {formatRelative(f.created_at)}
                 </p>
-                <button
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={() => handleDelete(f)}
-                  className="text-xs text-danger hover:underline mt-1"
+                  aria-label={`Удалить файл ${f.file_name}`}
+                  className="mt-1 !px-2 !py-0.5 !text-xs"
                 >
                   Удалить
-                </button>
+                </Button>
               </div>
             </div>
           ))}

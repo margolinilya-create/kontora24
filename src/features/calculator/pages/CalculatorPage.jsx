@@ -2,12 +2,14 @@ import { useState, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { calculate, DEFAULTS, getVolumeDiscount } from '../lib/calculator'
 import { createOrder } from '@/features/orders/hooks/useOrders'
-import { ORDER_TYPES, VOLUME_DISCOUNTS } from '@/shared/constants'
+import { ORDER_TYPES, VOLUME_DISCOUNTS, PRIORITIES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { formatPrice, formatNumber } from '@/shared/lib/utils'
 import { LayoutPreview } from '../components/LayoutPreview'
 import { CompareMode } from '../components/CompareMode'
 import { CalcHistory, saveCalcToHistory } from '../components/CalcHistory'
+import Button from '@/shared/components/Button'
+import Input from '@/shared/components/Input'
 
 const INITIAL = {
   orderType: 'sticker_cut',
@@ -15,7 +17,12 @@ const INITIAL = {
   height: 50,
   qty: 100,
   needLam: false,
+  lamType: 'glossy',
   designVariants: 1,
+  clientName: '',
+  deadline: '',
+  notes: '',
+  priority: 'normal',
 }
 
 const PRESETS = [
@@ -76,8 +83,13 @@ export default function CalculatorPage() {
         price_final: result.priceFinal,
         price_per_unit: result.pricePerUnit,
         prod_days: result.prodDays,
+        client_name: form.clientName || null,
+        deadline: form.deadline || null,
+        notes: form.notes || null,
+        priority: form.priority || 'normal',
       })
       saveCalcToHistory(form, result)
+      toast.success('Заказ успешно создан')
       navigate(`/orders/${order.id}`)
     } catch (err) {
       toast.error('Ошибка создания заказа: ' + err.message)
@@ -101,8 +113,9 @@ export default function CalculatorPage() {
 
             {/* Order type */}
             <div>
-              <label className="block text-sm font-medium mb-1.5">Тип продукции</label>
+              <label htmlFor="calc-order-type" className="block text-sm font-medium mb-1.5">Тип продукции</label>
               <select
+                id="calc-order-type"
                 value={form.orderType}
                 onChange={(e) => update('orderType', e.target.value)}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
@@ -135,56 +148,43 @@ export default function CalculatorPage() {
 
             {/* Dimensions */}
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Ширина, мм</label>
-                <input
-                  type="number"
-                  value={form.width}
-                  onChange={(e) => update('width', e.target.value)}
-                  min="1"
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Высота, мм</label>
-                <input
-                  type="number"
-                  value={form.height}
-                  onChange={(e) => update('height', e.target.value)}
-                  min="1"
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
-                />
-              </div>
+              <Input
+                label="Ширина, мм"
+                id="calc-width"
+                type="number"
+                value={form.width}
+                onChange={(e) => update('width', e.target.value)}
+                min="1"
+              />
+              <Input
+                label="Высота, мм"
+                id="calc-height"
+                type="number"
+                value={form.height}
+                onChange={(e) => update('height', e.target.value)}
+                min="1"
+              />
             </div>
 
             {/* Quantity */}
-            <div>
-              <label className="block text-sm font-medium mb-1.5">
-                Тираж
-                {result.discount > 0 && (
-                  <span className="ml-2 text-success text-xs">−{(result.discount * 100).toFixed(0)}% скидка</span>
-                )}
-              </label>
-              <input
-                type="number"
-                value={form.qty}
-                onChange={(e) => update('qty', e.target.value)}
-                min="1"
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
-              />
-            </div>
+            <Input
+              label={<>Тираж{result.discount > 0 && <span className="ml-2 text-success text-xs">-{(result.discount * 100).toFixed(0)}% скидка</span>}</>}
+              id="calc-qty"
+              type="number"
+              value={form.qty}
+              onChange={(e) => update('qty', e.target.value)}
+              min="1"
+            />
 
             {/* Design variants */}
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Кол-во видов</label>
-              <input
-                type="number"
-                value={form.designVariants}
-                onChange={(e) => update('designVariants', e.target.value)}
-                min="1"
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
-              />
-            </div>
+            <Input
+              label="Кол-во видов"
+              id="calc-variants"
+              type="number"
+              value={form.designVariants}
+              onChange={(e) => update('designVariants', e.target.value)}
+              min="1"
+            />
 
             {/* Lamination */}
             <label className="flex items-center gap-3 cursor-pointer">
@@ -197,13 +197,76 @@ export default function CalculatorPage() {
               <span className="text-sm">Ламинация</span>
             </label>
 
-            <button
-              type="button"
+            {/* Lamination type */}
+            {form.needLam && (
+              <div>
+                <label htmlFor="calc-lam-type" className="block text-sm font-medium mb-1.5">Тип ламинации</label>
+                <select
+                  id="calc-lam-type"
+                  value={form.lamType}
+                  onChange={(e) => update('lamType', e.target.value)}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                >
+                  <option value="glossy">Глянцевая</option>
+                  <option value="matte">Матовая</option>
+                </select>
+              </div>
+            )}
+
+            {/* Client name */}
+            <Input
+              label="Клиент"
+              id="calc-client"
+              type="text"
+              value={form.clientName}
+              onChange={(e) => update('clientName', e.target.value)}
+              placeholder="Имя клиента..."
+            />
+
+            {/* Deadline */}
+            <Input
+              label="Дедлайн"
+              id="calc-deadline"
+              type="date"
+              value={form.deadline}
+              onChange={(e) => update('deadline', e.target.value)}
+            />
+
+            {/* Priority */}
+            <div>
+              <label htmlFor="calc-priority" className="block text-sm font-medium mb-1.5">Приоритет</label>
+              <select
+                id="calc-priority"
+                value={form.priority}
+                onChange={(e) => update('priority', e.target.value)}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+              >
+                {Object.entries(PRIORITIES).map(([key, p]) => (
+                  <option key={key} value={key}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label htmlFor="calc-notes" className="block text-sm font-medium mb-1.5">Заметки</label>
+              <textarea
+                id="calc-notes"
+                value={form.notes}
+                onChange={(e) => update('notes', e.target.value)}
+                placeholder="Пожелания клиента..."
+                rows={3}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
+              />
+            </div>
+
+            <Button
+              variant="secondary"
               onClick={() => setForm(INITIAL)}
-              className="w-full border border-border text-text-muted hover:bg-surface-dim font-medium rounded-lg py-2 text-sm transition-colors"
+              className="w-full"
             >
-              Сбросить
-            </button>
+              Сброс
+            </Button>
           </div>
 
           {/* Volume discount table */}
@@ -220,7 +283,7 @@ export default function CalculatorPage() {
                     }`}
                   >
                     <span>{d.max === Infinity ? `${d.min}+` : `${d.min}–${d.max}`} шт</span>
-                    <span>{d.discount === 0 ? '—' : `−${(d.discount * 100).toFixed(0)}%`}</span>
+                    <span>{d.discount === 0 ? '—' : `-${(d.discount * 100).toFixed(0)}%`}</span>
                   </div>
                 )
               })}
@@ -239,8 +302,8 @@ export default function CalculatorPage() {
 
         {/* Results */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Price card */}
-          <div className="bg-primary text-white rounded-xl p-6">
+          {/* Price card - sticky CTA */}
+          <div className="bg-primary text-white rounded-xl p-6 sticky bottom-4 z-10">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
               <div>
                 <p className="text-white/60 text-sm">Цена за тираж</p>
@@ -256,13 +319,14 @@ export default function CalculatorPage() {
               </div>
             </div>
 
-            <button
+            <Button
+              size="lg"
               onClick={handleCreateOrder}
-              disabled={creating}
-              className="mt-6 w-full bg-accent hover:bg-accent-hover text-white font-medium rounded-lg py-3 text-sm transition-colors disabled:opacity-50"
+              loading={creating}
+              className="mt-6 w-full"
             >
-              {creating ? 'Создание...' : 'Оформить заказ'}
-            </button>
+              Оформить заказ
+            </Button>
           </div>
 
           {/* Cost breakdown */}
@@ -301,11 +365,11 @@ export default function CalculatorPage() {
             <h3 className="font-semibold mb-3">Итог</h3>
             <div className="space-y-2 text-sm">
               <Row label="Себестоимость" value={formatPrice(result.costTotal)} />
-              <Row label={`Наценка ×${result.markup}`} value={formatPrice(result.costTotal * result.markup)} />
+              <Row label={`Наценка x${result.markup}`} value={formatPrice(result.costTotal * result.markup)} />
               {result.discount > 0 && (
                 <Row
-                  label={`Скидка −${(result.discount * 100).toFixed(0)}%`}
-                  value={`−${formatPrice(result.costTotal * result.markup * result.discount)}`}
+                  label={`Скидка -${(result.discount * 100).toFixed(0)}%`}
+                  value={`-${formatPrice(result.costTotal * result.markup * result.discount)}`}
                   className="text-success"
                 />
               )}

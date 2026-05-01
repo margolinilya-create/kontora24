@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { updateOrder, useProfiles } from '../hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
+import { PRIORITIES } from '@/shared/constants'
+import Button from '@/shared/components/Button'
+import Input from '@/shared/components/Input'
 
 export function OrderEditForm({ order, onSaved }) {
   const [editing, setEditing] = useState(false)
@@ -8,6 +11,7 @@ export function OrderEditForm({ order, onSaved }) {
     notes: order.notes || '',
     deadline: order.deadline ? order.deadline.split('T')[0] : '',
     assigned_to: order.assigned_to || '',
+    priority: order.priority || 'normal',
   })
   const [saving, setSaving] = useState(false)
 
@@ -25,6 +29,7 @@ export function OrderEditForm({ order, onSaved }) {
         notes: form.notes || null,
         deadline: form.deadline || null,
         assigned_to: form.assigned_to || null,
+        priority: form.priority || 'normal',
       })
       toast.success('Заказ обновлён')
       setEditing(false)
@@ -51,7 +56,7 @@ export function OrderEditForm({ order, onSaved }) {
     <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Редактирование</h3>
-        <button onClick={() => setEditing(false)} className="text-sm text-text-muted hover:text-text">Отмена</button>
+        <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Отмена</Button>
       </div>
 
       <div>
@@ -72,14 +77,30 @@ export function OrderEditForm({ order, onSaved }) {
       </div>
 
       <div>
-        <label htmlFor="edit-deadline" className="block text-sm font-medium mb-1.5">Дедлайн</label>
-        <input
+        <Input
+          label="Дедлайн"
           id="edit-deadline"
           type="date"
           value={form.deadline}
           onChange={(e) => update('deadline', e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
         />
+        {form.deadline && new Date(form.deadline) < new Date(new Date().toDateString()) && (
+          <p className="text-xs text-warning mt-1">Дедлайн в прошлом</p>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor="edit-priority" className="block text-sm font-medium mb-1.5">Приоритет</label>
+        <select
+          id="edit-priority"
+          value={form.priority || 'normal'}
+          onChange={(e) => update('priority', e.target.value)}
+          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+        >
+          {Object.entries(PRIORITIES).map(([key, p]) => (
+            <option key={key} value={key}>{p.label}</option>
+          ))}
+        </select>
       </div>
 
       <div>
@@ -93,13 +114,13 @@ export function OrderEditForm({ order, onSaved }) {
         />
       </div>
 
-      <button
+      <Button
         onClick={handleSave}
-        disabled={saving}
-        className="w-full bg-accent hover:bg-accent-hover text-white font-medium rounded-lg py-2.5 text-sm transition-colors disabled:opacity-50"
+        loading={saving}
+        className="w-full"
       >
-        {saving ? 'Сохранение...' : 'Сохранить'}
-      </button>
+        Сохранить
+      </Button>
     </div>
   )
 }

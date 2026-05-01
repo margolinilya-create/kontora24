@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { updateOrderStatus } from '../hooks/useOrders'
-import { STATUS_TRANSITIONS, CAN_CANCEL_ROLES, ORDER_STATUSES } from '@/shared/constants'
+import { STATUS_TRANSITIONS, CAN_CANCEL_ROLES, ORDER_STATUSES, getNextStatus } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 
 export function StatusSwitcher({ order, onUpdated }) {
@@ -14,7 +14,7 @@ export function StatusSwitcher({ order, onUpdated }) {
   const currentStatus = order.status
 
   // What's the next status this role can set?
-  const nextStatus = STATUS_TRANSITIONS[role]?.[currentStatus]
+  const nextStatus = getNextStatus(role, currentStatus, order)
   const canCancel = CAN_CANCEL_ROLES.includes(role) && currentStatus !== 'done' && currentStatus !== 'cancelled'
 
   if (!nextStatus && !canCancel) return null

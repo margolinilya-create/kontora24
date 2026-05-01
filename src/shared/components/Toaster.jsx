@@ -3,7 +3,7 @@ import { useToastStore } from '@/shared/stores/toast-store'
 const STYLES = {
   success: 'bg-success text-white',
   error: 'bg-danger text-white',
-  info: 'bg-primary text-white',
+  info: 'bg-blue-600 text-white',
 }
 
 export function Toaster() {

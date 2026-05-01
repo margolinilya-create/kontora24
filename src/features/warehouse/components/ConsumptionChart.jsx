@@ -50,7 +50,7 @@ export function ConsumptionChart() {
   }, [])
 
   if (loading) {
-    return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-2 border-accent border-t-transparent" /></div>
+    return <div className="flex justify-center py-8"><div role="status" aria-label="Загрузка" className="animate-spin rounded-full h-6 w-6 border-2 border-accent border-t-transparent" /></div>
   }
 
   return (
@@ -59,15 +59,17 @@ export function ConsumptionChart() {
       {data.daily.length > 0 && (
         <div className="bg-surface rounded-xl border border-border p-5">
           <h2 className="font-semibold mb-4">Расход за 30 дней</h2>
+          <figure role="img" aria-label="График расхода материалов за 30 дней">
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={data.daily}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" />
               <XAxis dataKey="day" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
-              <Bar dataKey="total" name="Расход" fill="#e94560" radius={[4, 4, 0, 0]} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid var(--color-chart-tooltip-border)', background: 'var(--color-chart-tooltip-bg)', color: 'var(--color-text)' }} />
+              <Bar dataKey="total" name="Расход" fill="var(--color-accent)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </figure>
         </div>
       )}
 
@@ -77,6 +79,7 @@ export function ConsumptionChart() {
           <h2 className="font-semibold mb-4">Прогноз остатков</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
+              <caption className="sr-only">Прогноз остатков материалов</caption>
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-2 font-medium text-text-muted">Материал</th>

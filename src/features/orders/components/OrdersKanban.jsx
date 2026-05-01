@@ -4,7 +4,7 @@ import { StatusSwitcher } from './StatusSwitcher'
 import { ORDER_STATUSES, ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatRelative } from '@/shared/lib/utils'
 
-const KANBAN_COLS = ['new', 'design', 'design_done', 'print', 'print_done', 'assembly', 'done']
+const KANBAN_COLS = ['new', 'design', 'design_done', 'print', 'print_done', 'resin_pouring', 'assembly', 'done']
 
 export function OrdersKanban({ orders, onUpdated }) {
   const columns = KANBAN_COLS.map((status) => ({

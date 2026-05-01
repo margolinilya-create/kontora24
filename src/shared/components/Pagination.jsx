@@ -1,10 +1,13 @@
 export function Pagination({ page, totalPages, totalCount, perPage, hasNext, hasPrev, nextPage, prevPage, changePerPage }) {
   if (totalCount <= 0) return null
 
+  const start = (page - 1) * perPage + 1
+  const end = Math.min(page * perPage, totalCount)
+
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
       <div className="text-sm text-text-muted">
-        Всего: {totalCount}
+        {start}–{end} из {totalCount}
         <select
           value={perPage}
           onChange={(e) => changePerPage(Number(e.target.value))}
@@ -21,6 +24,7 @@ export function Pagination({ page, totalPages, totalCount, perPage, hasNext, has
         <button
           onClick={prevPage}
           disabled={!hasPrev}
+          aria-label="Предыдущая страница"
           className="px-3 py-1.5 rounded-lg border border-border text-sm disabled:opacity-30 hover:bg-surface-dim transition-colors disabled:cursor-not-allowed"
         >
           ←
@@ -31,6 +35,7 @@ export function Pagination({ page, totalPages, totalCount, perPage, hasNext, has
         <button
           onClick={nextPage}
           disabled={!hasNext}
+          aria-label="Следующая страница"
           className="px-3 py-1.5 rounded-lg border border-border text-sm disabled:opacity-30 hover:bg-surface-dim transition-colors disabled:cursor-not-allowed"
         >
           →

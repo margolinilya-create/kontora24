@@ -62,7 +62,7 @@ export function CalcHistory({ onRestore }) {
           ))}
           <button
             onClick={() => { localStorage.removeItem(STORAGE_KEY); setHistory([]) }}
-            className="text-xs text-text-muted hover:text-danger"
+            className="text-xs text-text-muted hover:text-danger py-2 px-2"
           >
             Очистить историю
           </button>

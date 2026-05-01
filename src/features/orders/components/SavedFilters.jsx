@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from '@/shared/stores/toast-store'
+import Button from '@/shared/components/Button'
+import Input from '@/shared/components/Input'
 
 const STORAGE_KEY = 'kontora24-saved-filters'
 
@@ -43,7 +45,8 @@ export function SavedFilters({ currentFilter, onApply }) {
           </button>
           <button
             onClick={() => deleteFilter(f.id)}
-            className="px-1.5 py-1 text-xs text-text-muted hover:text-danger transition-colors"
+            aria-label="Удалить фильтр"
+            className="px-2.5 py-2 text-xs text-text-muted hover:text-danger transition-colors"
           >
             ×
           </button>
@@ -52,23 +55,25 @@ export function SavedFilters({ currentFilter, onApply }) {
 
       {showSave ? (
         <form onSubmit={saveFilter} className="flex items-center gap-1">
-          <input
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Название..."
             autoFocus
-            className="w-28 rounded-lg border border-border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent/50"
+            ariaLabel="Название фильтра"
+            className="!w-28 !px-2 !py-1 !text-xs"
           />
-          <button type="submit" className="text-xs text-accent font-medium">OK</button>
-          <button type="button" onClick={() => setShowSave(false)} className="text-xs text-text-muted">×</button>
+          <Button type="submit" variant="ghost" size="sm">OK</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setShowSave(false)}>×</Button>
         </form>
       ) : (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setShowSave(true)}
-          className="text-xs text-text-muted hover:text-accent transition-colors"
         >
           + Сохранить фильтр
-        </button>
+        </Button>
       )}
     </div>
   )

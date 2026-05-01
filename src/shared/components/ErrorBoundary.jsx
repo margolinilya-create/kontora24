@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { Sentry } from '@/shared/lib/sentry'
 
 export class ErrorBoundary extends Component {
   constructor(props) {
@@ -8,6 +9,10 @@ export class ErrorBoundary extends Component {
 
   static getDerivedStateFromError(error) {
     return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    Sentry.captureException(error, { extra: errorInfo })
   }
 
   render() {
@@ -21,14 +26,22 @@ export class ErrorBoundary extends Component {
           </div>
           <h2 className="text-xl font-semibold mb-2">Что-то пошло не так</h2>
           <p className="text-text-muted text-sm mb-4 max-w-md">
-            Произошла ошибка. Попробуйте обновить страницу.
+            Произошла ошибка. Попробуйте повторить или обновить страницу.
           </p>
-          <button
-            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload() }}
-            className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-5 py-2.5 text-sm transition-colors"
-          >
-            Обновить страницу
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-5 py-2.5 text-sm transition-colors"
+            >
+              Попробовать снова
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="border border-border text-text-muted hover:text-text hover:bg-surface-dim font-medium rounded-lg px-5 py-2.5 text-sm transition-colors"
+            >
+              Перезагрузить страницу
+            </button>
+          </div>
         </div>
       )
     }

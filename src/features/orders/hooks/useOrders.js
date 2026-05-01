@@ -1,6 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 
+async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(url, options)
+      if (res.ok) return res
+      if (i < retries) await new Promise(r => setTimeout(r, delays[i]))
+    } catch {
+      if (i < retries) await new Promise(r => setTimeout(r, delays[i]))
+    }
+  }
+}
+
 export function useOrders(filters = {}) {
   const [orders, setOrders] = useState([])
   const [totalCount, setTotalCount] = useState(0)
@@ -13,7 +25,7 @@ export function useOrders(filters = {}) {
     try {
       let query = supabase
         .from('orders')
-        .select('*, client:clients(name, phone), assignee:profiles!assigned_to(display_name, role)', { count: 'exact' })
+        .select('*, client:clients(name, phone), assignee:profiles!assigned_to(display_name, role), attachments:order_attachments(id, file_name, file_url)', { count: 'exact' })
 
       // Filters
       if (filters.status && filters.status !== 'all') {
@@ -133,6 +145,10 @@ export async function createOrder(orderData) {
   await supabase.from('order_status_history').insert({
     order_id: data.id, from_status: null, to_status: 'new', changed_by: user.id,
   })
+
+  // Reserve materials for the new order
+  await supabase.rpc('reserve_materials', { p_order_id: data.id, p_changed_by: user.id })
+
   return data
 }
 
@@ -150,19 +166,32 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
     order_id: orderId, from_status: fromStatus, to_status: toStatus, changed_by: user.id,
   })
 
+  // Set drying timer when entering resin_pouring
+  if (toStatus === 'resin_pouring') {
+    const dryUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    await supabase.from('orders').update({ dry_until: dryUntil }).eq('id', orderId)
+  }
+
   // Auto-deduct materials when entering "print"
   if (toStatus === 'print') {
     await supabase.rpc('auto_deduct_materials', {
       p_order_id: orderId,
       p_changed_by: user.id,
     })
+    // Convert reservations to consumed
+    await supabase.rpc('consume_reservations', { p_order_id: orderId, p_changed_by: user.id })
   }
 
-  // Notify Bitrix24 about status change (fire-and-forget)
+  // Release reservations when order is cancelled
+  if (toStatus === 'cancelled') {
+    await supabase.rpc('release_materials', { p_order_id: orderId, p_changed_by: user.id })
+  }
+
+  // Notify Bitrix24 about status change (non-blocking with retry)
   try {
     const { data: order } = await supabase.from('orders').select('number, bitrix_deal_id, price_final, cost_total').eq('id', orderId).single()
     if (order?.bitrix_deal_id) {
-      fetch('/api/bitrix/status-update', {
+      fetchWithRetry('/api/bitrix/status-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -172,9 +201,8 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
           price_final: order.price_final,
           cost_total: order.cost_total,
           bitrix_deal_id: order.bitrix_deal_id,
-          bitrix_webhook_url: localStorage.getItem('bitrix_webhook_url') || '',
         }),
-      }).catch(() => {}) // silent fail
+      }).catch(() => {}) // silent fail after all retries
     }
   } catch {} // non-critical
 }

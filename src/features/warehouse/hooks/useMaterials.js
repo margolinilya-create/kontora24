@@ -7,11 +7,30 @@ export function useMaterials() {
 
   const fetchMaterials = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('materials')
-      .select('*')
-      .order('type', { ascending: true })
-    setMaterials(data || [])
+    const [{ data }, { data: reservations }] = await Promise.all([
+      supabase
+        .from('materials')
+        .select('*')
+        .order('type', { ascending: true }),
+      supabase
+        .from('material_transactions')
+        .select('material_id, delta')
+        .eq('reservation_status', 'reserved'),
+    ])
+
+    // Sum reserved amounts per material
+    const reservedByMaterial = {}
+    ;(reservations || []).forEach(r => {
+      reservedByMaterial[r.material_id] = (reservedByMaterial[r.material_id] || 0) + Math.abs(Number(r.delta))
+    })
+
+    const materialsWithReservations = (data || []).map(m => ({
+      ...m,
+      reserved: reservedByMaterial[m.id] || 0,
+      available: Number(m.stock_qty) - (reservedByMaterial[m.id] || 0),
+    }))
+
+    setMaterials(materialsWithReservations)
     setLoading(false)
   }, [])
 

@@ -22,8 +22,8 @@ export function LayoutPreview({ width, height, itemsPerSheet, sheets }) {
         {itemsPerSheet} шт/лист × {sheets} листов = {itemsPerSheet * sheets} шт (макс)
       </p>
       <div
-        className="bg-white border border-border rounded relative mx-auto overflow-hidden"
-        style={{ width: SHEET_W, height: Math.max(sheetH, 40) }}
+        className="bg-white border border-border rounded relative mx-auto overflow-hidden w-full max-w-[300px]"
+        style={{ height: Math.max(sheetH, 40) }}
       >
         {Array.from({ length: Math.min(itemsPerSheet, 50) }).map((_, i) => (
           <div

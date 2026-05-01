@@ -46,8 +46,8 @@ export function getNextStatus(role, currentStatus, order) {
 
 // --- Order types ---
 export const ORDER_TYPES = {
-  sticker_cut: { label: 'Стикер (вырезка)', markup: 4.0 },
-  sticker_kiss: { label: 'Стикер (поцелуйка)', markup: 4.0 },
+  sticker_cut: { label: 'Стикер вырубной (die cut)', markup: 4.0 },
+  sticker_kiss: { label: 'Стикер на подложке (kiss cut)', markup: 4.0 },
   stickerpack: { label: 'Стикерпак', markup: 4.0 },
   sticker3D: { label: '3D стикер', markup: 4.5 },
   stickerpack3D: { label: '3D стикерпак', markup: 4.5 },

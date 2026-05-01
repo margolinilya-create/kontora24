@@ -53,6 +53,19 @@ export const useAuthStore = create((set, get) => ({
       password,
     })
     if (error) throw error
+
+    // Verify this user has a Kontora24 profile
+    const { data: profile } = await supabase
+      .from('k24_profiles')
+      .select('id')
+      .eq('id', data.user.id)
+      .single()
+
+    if (!profile) {
+      await supabase.auth.signOut()
+      throw new Error('Нет доступа к Kontora24')
+    }
+
     return data
   },
 

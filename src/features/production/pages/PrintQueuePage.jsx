@@ -1,15 +1,27 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { BatchView } from '../components/BatchView'
+import { QueueCard } from '../components/QueueCard'
+import { PipelineSummary, COLS } from '../components/PipelineSummary'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import Tabs from '@/shared/components/Tabs'
 import Spinner from '@/shared/components/Spinner'
 
 export default function PrintQueuePage() {
   const [viewMode, setViewMode] = useState('list')
-  const { orders, loading, refetch } = useOrders({ status: 'print' })
+  const { orders: allOrders, loading, refetch } = useOrders()
+
+  const orders = useMemo(() => allOrders.filter((o) => o.status === 'print'), [allOrders])
+
+  const pipelineColumns = useMemo(() => {
+    const result = {}
+    for (const s of COLS) {
+      result[s] = allOrders.filter((o) => o.status === s)
+    }
+    return result
+  }, [allOrders])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Очередь печати</h1>
@@ -21,6 +33,8 @@ export default function PrintQueuePage() {
           onChange={setViewMode}
         />
       </div>
+
+      <PipelineSummary columns={pipelineColumns} activeStatus="print" />
 
       {viewMode === 'batch' ? (
         <BatchView orders={orders} onUpdated={refetch} />
@@ -35,20 +49,10 @@ export default function PrintQueuePage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {orders.map((order) => (
-            <div key={order.id}>
-              {/* Using QueueCard directly instead of nesting QueuePage */}
-              <QueueCardWrapper order={order} onUpdated={refetch} />
-            </div>
+            <QueueCard key={order.id} order={order} onUpdated={refetch} />
           ))}
         </div>
       )}
     </div>
   )
-}
-
-// Import QueueCard to render directly
-import { QueueCard } from '../components/QueueCard'
-
-function QueueCardWrapper({ order, onUpdated }) {
-  return <QueueCard order={order} onUpdated={onUpdated} />
 }

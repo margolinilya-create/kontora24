@@ -1,6 +1,7 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { QueueCard } from '../components/QueueCard'
+import { PipelineSummary, COLS } from '../components/PipelineSummary'
 import { playNotificationSound } from '@/shared/lib/sound'
 import Spinner from '@/shared/components/Spinner'
 
@@ -16,7 +17,17 @@ const QUEUE_CONFIG = {
 
 export default function QueuePage({ queueType, hideHeader }) {
   const config = QUEUE_CONFIG[queueType]
-  const { orders, loading, refetch } = useOrders({ status: config.status })
+  const { orders: allOrders, loading, refetch } = useOrders()
+
+  const orders = useMemo(() => allOrders.filter((o) => o.status === config.status), [allOrders, config.status])
+
+  const pipelineColumns = useMemo(() => {
+    const result = {}
+    for (const s of COLS) {
+      result[s] = allOrders.filter((o) => o.status === s)
+    }
+    return result
+  }, [allOrders])
 
   // Sound notification when new orders appear in queue
   const prevCountRef = useRef(orders.length)
@@ -28,7 +39,7 @@ export default function QueuePage({ queueType, hideHeader }) {
   }, [orders.length])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {!hideHeader && (
         <div>
           <h1 className="text-2xl font-bold">{config.title}</h1>
@@ -37,6 +48,8 @@ export default function QueuePage({ queueType, hideHeader }) {
           </p>
         </div>
       )}
+
+      <PipelineSummary columns={pipelineColumns} activeStatus={config.status} />
 
       {loading ? (
         <div className="flex justify-center py-12">

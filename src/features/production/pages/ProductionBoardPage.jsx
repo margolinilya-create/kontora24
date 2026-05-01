@@ -5,64 +5,20 @@ import { useOrders, updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { DraggableCard, DragOverlayCard } from '../components/DraggableCard'
 import { ProductionCalendar } from '../components/ProductionCalendar'
+import { PipelineSummary, COLS, COL_COLORS } from '../components/PipelineSummary'
 import { ORDER_STATUSES, IS_3D_TYPE, PRIORITIES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
 import Tabs from '@/shared/components/Tabs'
 
-const COLS = ['new', 'design', 'print', 'post_processing', 'die_cutting', 'resin_pouring', 'assembly', 'packaging']
 const PRODUCTION_STATUSES = new Set(COLS)
-
-const COL_COLORS = {
-  new: 'bg-blue-500',
-  design: 'bg-purple-500',
-  print: 'bg-orange-500',
-  post_processing: 'bg-amber-500',
-  die_cutting: 'bg-rose-500',
-  resin_pouring: 'bg-cyan-500',
-  assembly: 'bg-yellow-500',
-  packaging: 'bg-teal-500',
-}
 
 const PHASES = [
   { key: 'prep', label: 'Подготовка', cols: ['new', 'design'] },
   { key: 'prod', label: 'Производство', cols: ['print', 'post_processing', 'die_cutting'] },
   { key: 'finish', label: 'Финиш', cols: ['resin_pouring', 'assembly', 'packaging'] },
 ]
-
-// --- Pipeline summary strip ---
-function PipelineSummary({ columns, scrollRef }) {
-  function scrollToColumn(status) {
-    const el = scrollRef.current?.querySelector(`[data-col="${status}"]`)
-    el?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
-  }
-
-  const total = COLS.reduce((sum, s) => sum + (columns[s]?.length || 0), 0)
-
-  return (
-    <div className="flex items-center gap-1 flex-wrap bg-surface rounded-xl border border-border px-4 py-2.5">
-      {COLS.map((status) => {
-        const count = columns[status]?.length || 0
-        if (status === 'resin_pouring' && count === 0) return null
-        return (
-          <button
-            key={status}
-            onClick={() => scrollToColumn(status)}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs hover:bg-surface-dim transition-colors shrink-0"
-          >
-            <span className={`w-2 h-2 rounded-full shrink-0 ${COL_COLORS[status]}`} />
-            <span className="text-text-muted hidden sm:inline">{ORDER_STATUSES[status]?.label}</span>
-            <span className={`font-semibold ${count > 0 ? 'text-text' : 'text-text-muted/40'}`}>{count}</span>
-          </button>
-        )
-      })}
-      <span className="ml-auto text-xs text-text-muted shrink-0 pl-2 border-l border-border">
-        {total}
-      </span>
-    </div>
-  )
-}
 
 // --- Droppable column ---
 function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus }) {

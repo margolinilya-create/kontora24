@@ -37,7 +37,7 @@ export default function SettingsPage() {
       {activeTab === 'users' && (
         <>
           <UserManagement />
-          <InviteUser />
+          <CreateUser />
         </>
       )}
       {activeTab === 'bitrix' && <BitrixSettings />}
@@ -219,53 +219,86 @@ function MarkupSettings() {
   )
 }
 
-function InviteUser() {
-  const [email, setEmail] = useState('')
-  const [sending, setSending] = useState(false)
+function CreateUser() {
+  const [form, setForm] = useState({ display_name: '', email: '', password: '', role: 'assembler' })
+  const [saving, setSaving] = useState(false)
 
-  async function handleInvite(e) {
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault()
-    if (!email) return
-    setSending(true)
+    if (!form.display_name || !form.email || !form.password) return
+    setSaving(true)
     try {
-      const { error } = await supabase.auth.admin.inviteUserByEmail(email)
-      if (error) throw error
-      toast.success(`Приглашение отправлено на ${email}`)
-      setEmail('')
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/users/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(form),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error)
+      toast.success(`Пользователь ${form.display_name} создан`)
+      setForm({ display_name: '', email: '', password: '', role: 'assembler' })
     } catch (err) {
-      // Fallback: try magic link if admin API not available
-      try {
-        const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
-        if (error) throw error
-        toast.success(`Ссылка для входа отправлена на ${email}`)
-        setEmail('')
-      } catch (err2) {
-        toast.error('Ошибка: ' + (err2.message || err.message))
-      }
+      toast.error(err.message)
     } finally {
-      setSending(false)
+      setSaving(false)
     }
   }
 
   return (
     <div className="bg-surface rounded-xl border border-border p-5">
-      <h2 className="font-semibold mb-4">Пригласить пользователя</h2>
-      <form onSubmit={handleInvite} className="flex gap-2">
-        <div className="flex-1">
+      <h2 className="font-semibold mb-4">Добавить пользователя</h2>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@example.com"
+            label="Имя"
+            value={form.display_name}
+            onChange={(e) => update('display_name', e.target.value)}
+            placeholder="Иван Петров"
             required
-            ariaLabel="Email для приглашения"
           />
+          <Input
+            label="Email"
+            type="email"
+            value={form.email}
+            onChange={(e) => update('email', e.target.value)}
+            placeholder="ivan@example.com"
+            required
+          />
+          <Input
+            label="Пароль"
+            type="password"
+            value={form.password}
+            onChange={(e) => update('password', e.target.value)}
+            placeholder="Минимум 6 символов"
+            minLength={6}
+            required
+          />
+          <div>
+            <label htmlFor="new-user-role" className="block text-sm font-medium text-text mb-1">Роль</label>
+            <select
+              id="new-user-role"
+              value={form.role}
+              onChange={(e) => update('role', e.target.value)}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
+            >
+              {Object.entries(ROLES).map(([key, r]) => (
+                <option key={key} value={key}>{r.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <Button type="submit" loading={sending}>
-          {sending ? '...' : 'Пригласить'}
+        <Button type="submit" loading={saving} className="w-full sm:w-auto">
+          Создать пользователя
         </Button>
       </form>
-      <p className="text-xs text-text-muted mt-2">Новый пользователь получит роль "Сборщик". Роль можно изменить выше.</p>
     </div>
   )
 }

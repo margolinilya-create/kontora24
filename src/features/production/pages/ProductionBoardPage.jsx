@@ -31,7 +31,7 @@ function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus
       ref={setNodeRef}
       data-col={status}
       className={`rounded-xl transition-all duration-200 ease-out min-h-[200px]
-        w-[75vw] sm:w-[280px] shrink-0 snap-start
+        w-[70vw] sm:w-[260px] shrink-0
         ${isOver
           ? 'bg-accent/[0.06] ring-2 ring-accent/30'
           : canReceive
@@ -268,7 +268,7 @@ export default function ProductionBoardPage() {
           >
             <div
               ref={scrollRef}
-              className="flex gap-6 overflow-x-auto pb-4 kanban-scroll scroll-smooth snap-x snap-mandatory sm:snap-none"
+              className="flex gap-3 overflow-x-auto pb-4 kanban-scroll scroll-smooth snap-x snap-mandatory sm:snap-none"
             >
               {PHASES.map((phase) => {
                 const phaseCols = phase.cols.filter(
@@ -276,18 +276,22 @@ export default function ProductionBoardPage() {
                 )
                 if (phaseCols.length === 0) return null
 
+                const phaseCount = phaseCols.reduce((sum, s) => sum + (columns[s]?.length || 0), 0)
+
                 return (
-                  <div key={phase.key} className="flex flex-col gap-2 shrink-0">
-                    {/* Phase label */}
-                    <div className="flex items-center gap-2 px-1">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/60">
+                  <div key={phase.key} className="shrink-0 bg-surface rounded-2xl border border-border p-4 snap-start">
+                    {/* Phase header */}
+                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
+                      <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
                         {phase.label}
                       </span>
-                      <span className="flex-1 h-px bg-border" />
+                      <span className="text-[11px] text-text-muted/50 font-medium">
+                        {phaseCount}
+                      </span>
                     </div>
 
                     {/* Columns in this phase */}
-                    <div className="flex gap-3">
+                    <div className="flex gap-4">
                       {phaseCols.map((status) => (
                         <DroppableColumn
                           key={status}

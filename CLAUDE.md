@@ -1,6 +1,6 @@
 # Kontora24 — MES/WMS для стикерного производства
 
-Система управления производством стикеров: заказы → расчёт → дизайн → печать → постобработка → выборка → [заливка] → сборка → упаковка → выдача.
+Система управления производством стикеров: заказы → расчёт → дизайн → печать → постобработка → [заливка] → сборка → упаковка → выдача.
 CRM — Bitrix24 (интеграция через webhooks). Аналитика — здесь и в Bitrix.
 
 **Планы:** `docs/kontora24-plan.md` · `docs/improvement-plan-final.md`
@@ -26,7 +26,7 @@ CRM — Bitrix24 (интеграция через webhooks). Аналитика 
 | Деплой | Vercel (auto) |
 | CI/CD | GitHub Actions |
 
-**Supabase project:** `pulzirakjqehsulmjhdj` (eu-west-1) — shared с pinhead, таблицы kontora24 без префикса.
+**Supabase project:** `pulzirakjqehsulmjhdj` (eu-west-1) — shared с PinheadOS, таблицы с префиксом `k24_`.
 
 ## Роли
 
@@ -45,7 +45,7 @@ CRM — Bitrix24 (интеграция через webhooks). Аналитика 
 npm run dev          # Dev server (Vite)
 npm run build        # Production build
 npm run preview      # Preview production build
-npx vitest run       # Run tests (40 тестов: калькулятор + таймер + константы)
+npx vitest run       # Run tests (39 тестов: калькулятор + таймер + константы)
 npm run lint         # ESLint
 npx vercel deploy --yes --prod --scope margolinilya-creates-projects  # Deploy
 ```
@@ -61,12 +61,13 @@ src/
                         #   OrderEditForm, OrderComments, OrderAttachments, OrderTimeline,
                         #   OrderPdfExport, ClaimButton, SavedFilters, OrdersKanban
     calculator/         # CalculatorPage, calculator.js (pure), LayoutPreview, CompareMode, CalcHistory
-    production/         # ProductionBoardPage (DnD bidirectional, optimistic, calendar view),
+    production/         # ProductionBoardPage (DnD, horizontal scroll, phase groups),
                         #   QueuePage (unified), DesignQueue, PrintQueue (batch view),
                         #   PostProcessingQueue, AssemblyQueue,
                         #   ResinQueue, PackagingQueue, DraggableCard, QueueCard,
-                        #   TaskTimer, DryingTimer, OperationChecklist, CompleteTaskModal,
-                        #   TechCardPreview, MaterialConsumption, BatchView, ProductionCalendar
+                        #   PipelineSummary, TaskTimer, DryingTimer, OperationChecklist,
+                        #   CompleteTaskModal, TechCardPreview, MaterialConsumption,
+                        #   BatchView, ProductionCalendar
                         #   hooks: useTimer
     warehouse/          # WarehousePage (tabs: stock/analytics), MaterialCard, StockModal,
                         #   MaterialForm, ConsumptionChart (forecast)
@@ -90,18 +91,27 @@ src/
 api/
   bitrix/incoming.js    # Webhook: Bitrix → create order + auto-calculate
   bitrix/status-update.js  # Webhook: order done → update Bitrix deal
+  users/create.js       # API: admin creates user (service_role key)
 supabase/
   migrations/           # SQL migrations
   seed.sql              # Initial materials + settings
 ```
 
-## Supabase таблицы
+## Supabase — SHARED DATABASE (2 проекта!)
 
-`profiles` · `clients` · `orders` · `order_status_history` · `order_comments` · `order_attachments` · `materials` · `material_transactions` · `settings` · `integration_log` · `time_entries` · `order_audit`
+**ВАЖНО:** Supabase проект `pulzirakjqehsulmjhdj` делят 2 приложения. НЕ ТРОГАТЬ чужие таблицы!
+
+| Проект | Префикс | Таблицы |
+|--------|---------|---------|
+| **Kontora24** | `k24_` | `k24_profiles`, `k24_orders`, `k24_clients`, `k24_materials`, `k24_material_transactions`, `k24_settings`, `k24_order_status_history`, `k24_order_comments`, `k24_order_attachments`, `k24_time_entries`, `k24_integration_log`, `k24_order_audit`, `k24_order_templates` |
+| **PinheadOS** | нет/`pinhead_` | `pinhead_users`, `catalog_config`, `app_config` |
+| **Общее** | — | `auth.users` (Supabase Auth, разделить нельзя) |
+
+**Изоляция auth:** При логине Kontora24 проверяет наличие записи в `k24_profiles`. Если нет — "Нет доступа к Kontora24". Триггер `handle_new_user` создаёт `k24_profiles` только для пользователей с `display_name` в метаданных (т.е. созданных через `api/users/create.js`).
 
 Storage bucket: `order-files`
 
-RPC: `update_stock(material_id, delta)` · `auto_deduct_materials(order_id, changed_by)` · `reserve_materials(order_id, changed_by)` · `release_materials(order_id, changed_by)` · `consume_reservations(order_id, changed_by)`
+RPC: `update_stock` · `auto_deduct_materials` · `reserve_materials` · `release_materials` · `consume_reservations` · `is_admin`
 
 ## Реализовано (112/112 пунктов плана + расширения)
 
@@ -117,10 +127,10 @@ RPC: `update_stock(material_id, delta)` · `auto_deduct_materials(order_id, chan
 - Warehouse: materials CRUD, stock modal with balance + history tab, auto-deduct on print, consumption chart (themed), forecast table, low stock filter, low-stock badge on sidebar, material reservation on creation, release on cancel
 - Clients: list with search + "дней без заказа", detail page (LTV, order history, tags, Bitrix link), create form
 - Analytics: 3 tabs (Финансы/Производство/Ресурсы), period filter, revenue by type, status pie, avg stage time, conversion, revenue trend, top clients, workload, material consumption, period comparison, throughput trend by week, PDF export
-- Settings: tabs (profile/calculator/markups/users/Bitrix24/logs), calculator params from DB, markup editor, user management (6 roles), profile, invite by email, Bitrix config UI, integration log
+- Settings: tabs (profile/calculator/markups/users/Bitrix24/logs), calculator params from DB, markup editor, user management (6 roles), profile, create user (name/email/password/role via API), Bitrix config UI, integration log
 - Tech card: A4 layout, PNG/PDF export, print CSS, layout preview, QR code, operation checklist
 - KP: 3 templates (standard/detailed/short)
-- Infra: error boundaries (retry + Sentry), Suspense fallback, pagination, toast system, skeleton loading, dark theme, PWA manifest + service worker (offline), offline indicator, 40 Vitest tests, GitHub Actions CI/CD, Sentry, Agentation
+- Infra: error boundaries (retry + Sentry), Suspense fallback, pagination, toast system, skeleton loading, dark theme, PWA manifest + service worker (offline), offline indicator, 39 Vitest tests, GitHub Actions CI/CD, Sentry, Agentation
 - Bitrix: incoming webhook (auto-create + auto-calc), outbound webhook (status sync, retry with backoff), settings UI, integration log
 - Shared UI Kit: Button, Input, Modal, Spinner, Tabs, SearchInput, ConfirmDialog, OnboardingTip
 - A11y: skip-to-content, aria-labels, keyboard DnD, table captions, focus-visible, prefers-reduced-motion, iOS safe areas

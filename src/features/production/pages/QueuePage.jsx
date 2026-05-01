@@ -8,6 +8,8 @@ const QUEUE_CONFIG = {
   print: { title: 'Очередь печати', subtitle: 'Заказы со статусом «Печать»', status: 'print' },
   resin_pouring: { title: 'Заливка смолой', subtitle: 'Заказы на заливке смолой', status: 'resin_pouring' },
   assembly: { title: 'Очередь сборки', subtitle: 'Заказы со статусом «Сборка»', status: 'assembly' },
+  post_processing: { title: 'Постпечатная обработка', subtitle: 'Резка, ламинация, подготовка', status: 'post_processing' },
+  packaging: { title: 'Упаковка', subtitle: 'Упаковка готовой продукции', status: 'packaging' },
 }
 
 export default function QueuePage({ queueType, hideHeader }) {

@@ -19,17 +19,19 @@ describe('getNextStatus', () => {
   it('returns next status for admin', () => {
     expect(getNextStatus('admin', 'new', { order_type: 'sticker_cut' })).toBe('design')
     expect(getNextStatus('admin', 'design', { order_type: 'sticker_cut' })).toBe('design_done')
-    expect(getNextStatus('admin', 'assembly', { order_type: 'sticker_cut' })).toBe('done')
+    expect(getNextStatus('admin', 'print_done', { order_type: 'sticker_cut' })).toBe('post_processing')
+    expect(getNextStatus('admin', 'assembly', { order_type: 'sticker_cut' })).toBe('packaging')
+    expect(getNextStatus('admin', 'packaging', { order_type: 'sticker_cut' })).toBe('done')
   })
 
-  it('routes 3D orders through resin_pouring', () => {
-    expect(getNextStatus('admin', 'print_done', { order_type: 'sticker3D' })).toBe('resin_pouring')
-    expect(getNextStatus('manager', 'print_done', { order_type: 'stickerpack3D' })).toBe('resin_pouring')
+  it('routes 3D orders through resin_pouring after post_processing', () => {
+    expect(getNextStatus('admin', 'post_processing', { order_type: 'sticker3D' })).toBe('resin_pouring')
+    expect(getNextStatus('manager', 'post_processing', { order_type: 'stickerpack3D' })).toBe('resin_pouring')
   })
 
-  it('skips resin for non-3D orders', () => {
-    expect(getNextStatus('admin', 'print_done', { order_type: 'sticker_cut' })).toBe('assembly')
-    expect(getNextStatus('admin', 'print_done', { order_type: 'stickerpack' })).toBe('assembly')
+  it('skips resin for non-3D orders (post_processing -> assembly)', () => {
+    expect(getNextStatus('admin', 'post_processing', { order_type: 'sticker_cut' })).toBe('assembly')
+    expect(getNextStatus('admin', 'post_processing', { order_type: 'stickerpack' })).toBe('assembly')
   })
 
   it('handles resin_pourer role', () => {

@@ -9,8 +9,10 @@ import { playNotificationSound } from '@/shared/lib/sound'
 const NOTIFY_ROLES = {
   design: ['designer'],
   print: ['printer'],
-  resin_pouring: ['resin_pourer', 'assembler'],
+  post_processing: ['printer'],
+  resin_pouring: ['resin_pourer'],
   assembly: ['assembler'],
+  packaging: ['assembler'],
 }
 
 export function useStageNotifications() {

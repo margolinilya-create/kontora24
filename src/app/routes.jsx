@@ -14,6 +14,8 @@ const DesignQueuePage = lazy(() => import('@/features/production/pages/DesignQue
 const PrintQueuePage = lazy(() => import('@/features/production/pages/PrintQueuePage'))
 const AssemblyQueuePage = lazy(() => import('@/features/production/pages/AssemblyQueuePage'))
 const ResinQueuePage = lazy(() => import('@/features/production/pages/ResinQueuePage'))
+const PostProcessingQueuePage = lazy(() => import('@/features/production/pages/PostProcessingQueuePage'))
+const PackagingQueuePage = lazy(() => import('@/features/production/pages/PackagingQueuePage'))
 const WarehousePage = lazy(() => import('@/features/warehouse/pages/WarehousePage'))
 const ClientsPage = lazy(() => import('@/features/clients/pages/ClientsPage'))
 const ClientDetailPage = lazy(() => import('@/features/clients/pages/ClientDetailPage'))
@@ -41,6 +43,8 @@ export const routes = [
       { path: 'production/print', element: <AuthGuard roles={['admin', 'manager', 'printer']}><PrintQueuePage /></AuthGuard> },
       { path: 'production/assembly', element: <AuthGuard roles={['admin', 'manager', 'assembler']}><AssemblyQueuePage /></AuthGuard> },
       { path: 'production/resin', element: <AuthGuard roles={['admin', 'manager', 'assembler', 'resin_pourer']}><ResinQueuePage /></AuthGuard> },
+      { path: 'production/post-processing', element: <AuthGuard roles={['admin', 'manager', 'printer']}><PostProcessingQueuePage /></AuthGuard> },
+      { path: 'production/packaging', element: <AuthGuard roles={['admin', 'manager', 'assembler']}><PackagingQueuePage /></AuthGuard> },
       { path: 'warehouse', element: <AuthGuard roles={['admin', 'manager']}><WarehousePage /></AuthGuard> },
       { path: 'clients', element: <AuthGuard roles={['admin', 'manager']}><ClientsPage /></AuthGuard> },
       { path: 'clients/:id', element: <AuthGuard roles={['admin', 'manager']}><ClientDetailPage /></AuthGuard> },

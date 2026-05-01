@@ -3,8 +3,8 @@ import { formatDateTime } from '@/shared/lib/utils'
 
 export function OrderTimeline({ order, history }) {
   const FLOW = IS_3D_TYPE(order?.order_type)
-    ? ['new', 'design', 'design_done', 'print', 'print_done', 'resin_pouring', 'assembly', 'done']
-    : ['new', 'design', 'design_done', 'print', 'print_done', 'assembly', 'done']
+    ? ['new', 'design', 'design_done', 'print', 'print_done', 'post_processing', 'resin_pouring', 'assembly', 'packaging', 'done']
+    : ['new', 'design', 'design_done', 'print', 'print_done', 'post_processing', 'assembly', 'packaging', 'done']
   if (!order) return null
 
   const currentIdx = FLOW.indexOf(order.status)

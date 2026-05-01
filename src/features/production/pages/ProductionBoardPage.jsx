@@ -11,15 +11,17 @@ import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
 import Tabs from '@/shared/components/Tabs'
 
-const COLS = ['new', 'design', 'print', 'resin_pouring', 'assembly']
+const COLS = ['new', 'design', 'print', 'post_processing', 'resin_pouring', 'assembly', 'packaging']
 const PRODUCTION_STATUSES = new Set(COLS)
 
 const COL_COLORS = {
   new: 'bg-blue-500',
   design: 'bg-purple-500',
   print: 'bg-orange-500',
+  post_processing: 'bg-amber-500',
   resin_pouring: 'bg-cyan-500',
-  assembly: 'bg-green-500',
+  assembly: 'bg-yellow-500',
+  packaging: 'bg-teal-500',
 }
 
 function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus }) {
@@ -140,8 +142,10 @@ export default function ProductionBoardPage() {
     new: filterAndSort(allOrders.filter((o) => o.status === 'new')),
     design: filterAndSort(allOrders.filter((o) => o.status === 'design')),
     print: filterAndSort(allOrders.filter((o) => o.status === 'print')),
+    post_processing: filterAndSort(allOrders.filter((o) => o.status === 'post_processing')),
     resin_pouring: filterAndSort(allOrders.filter((o) => o.status === 'resin_pouring')),
     assembly: filterAndSort(allOrders.filter((o) => o.status === 'assembly')),
+    packaging: filterAndSort(allOrders.filter((o) => o.status === 'packaging')),
   }), [allOrders, filterAndSort])
 
   const activeOrder = activeId ? allFetchedOrders.find((o) => o.id === activeId) : null
@@ -182,7 +186,7 @@ export default function ProductionBoardPage() {
           // Skip resin_pouring for non-3D orders
           if (nextCol === 'resin_pouring' && !IS_3D_TYPE(order.order_type)) continue
 
-          const intermediateMap = { design: 'design_done', print: 'print_done', assembly: 'done' }
+          const intermediateMap = { design: 'design_done', print: 'print_done' }
           const intermediate = intermediateMap[currentStatus]
           if (intermediate) {
             await updateOrderStatus(orderId, currentStatus, intermediate)
@@ -265,7 +269,7 @@ export default function ProductionBoardPage() {
           onDragEnd={handleDragEnd}
           onDragCancel={() => setActiveId(null)}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4">
             {COLS.map((status) => (
               <DroppableColumn
                 key={status}

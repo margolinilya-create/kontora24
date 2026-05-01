@@ -177,9 +177,9 @@ export default function DashboardPage() {
   // Role-specific queue status
   const queueStatuses = {
     designer: ['design'],
-    printer: ['print'],
-    assembler: ['resin_pouring', 'assembly'],
+    printer: ['print', 'post_processing'],
     resin_pourer: ['resin_pouring'],
+    assembler: ['assembly', 'packaging'],
   }
   const myQueueStatusList = queueStatuses[role] || []
   const myQueueOrders = myQueueStatusList.length > 0 ? data.orders.filter((o) => myQueueStatusList.includes(o.status)) : []

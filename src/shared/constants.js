@@ -10,21 +10,20 @@ export const ORDER_STATUSES = {
   print: { label: 'Печать', color: 'bg-orange-500/15 text-orange-400', order: 3 },
   print_done: { label: 'Напечатано', color: 'bg-orange-500/15 text-orange-400', order: 4 },
   post_processing: { label: 'Постпечатная обработка', color: 'bg-amber-500/15 text-amber-400', order: 5 },
-  die_cutting: { label: 'Выборка', color: 'bg-rose-500/15 text-rose-400', order: 6 },
-  resin_pouring: { label: 'Заливка смолой', color: 'bg-cyan-500/15 text-cyan-400', order: 7 },
-  assembly: { label: 'Сборка', color: 'bg-yellow-500/15 text-yellow-400', order: 8 },
-  packaging: { label: 'Упаковка', color: 'bg-teal-500/15 text-teal-400', order: 9 },
-  done: { label: 'Готово', color: 'bg-green-500/15 text-green-400', order: 10 },
-  cancelled: { label: 'Отменён', color: 'bg-red-500/15 text-red-400', order: 11 },
+  resin_pouring: { label: 'Заливка смолой', color: 'bg-cyan-500/15 text-cyan-400', order: 6 },
+  assembly: { label: 'Сборка', color: 'bg-yellow-500/15 text-yellow-400', order: 7 },
+  packaging: { label: 'Упаковка', color: 'bg-teal-500/15 text-teal-400', order: 8 },
+  done: { label: 'Готово', color: 'bg-green-500/15 text-green-400', order: 9 },
+  cancelled: { label: 'Отменён', color: 'bg-red-500/15 text-red-400', order: 10 },
 }
 
 // Status transitions per role
 export const STATUS_TRANSITIONS = {
-  admin: { new: 'design', design: 'design_done', design_done: 'print', print: 'print_done', print_done: 'post_processing', post_processing: 'die_cutting', die_cutting: 'assembly', resin_pouring: 'assembly', assembly: 'packaging', packaging: 'done' },
-  manager: { new: 'design', design_done: 'print', print_done: 'post_processing', post_processing: 'die_cutting', die_cutting: 'assembly', assembly: 'packaging', packaging: 'done' },
+  admin: { new: 'design', design: 'design_done', design_done: 'print', print: 'print_done', print_done: 'post_processing', post_processing: 'assembly', resin_pouring: 'assembly', assembly: 'packaging', packaging: 'done' },
+  manager: { new: 'design', design_done: 'print', print_done: 'post_processing', post_processing: 'assembly', assembly: 'packaging', packaging: 'done' },
   designer: { design: 'design_done' },
-  printer: { print: 'print_done', post_processing: 'die_cutting' },
-  assembler: { die_cutting: 'assembly', assembly: 'packaging', packaging: 'done' },
+  printer: { print: 'print_done', post_processing: 'assembly' },
+  assembler: { post_processing: 'assembly', assembly: 'packaging', packaging: 'done' },
   resin_pourer: { resin_pouring: 'assembly' },
 }
 
@@ -34,9 +33,9 @@ export const CAN_CANCEL_ROLES = ['admin', 'manager']
 export const IS_3D_TYPE = (orderType) => orderType === 'sticker3D' || orderType === 'stickerpack3D'
 
 export function getNextStatus(role, currentStatus, order) {
-  // 3D orders: die_cutting → resin_pouring instead of assembly
-  if (currentStatus === 'die_cutting' && IS_3D_TYPE(order?.order_type)) {
-    if (['admin', 'manager', 'assembler'].includes(role)) return 'resin_pouring'
+  // 3D orders: post_processing → resin_pouring instead of assembly
+  if (currentStatus === 'post_processing' && IS_3D_TYPE(order?.order_type)) {
+    if (['admin', 'manager', 'printer', 'assembler'].includes(role)) return 'resin_pouring'
   }
   // Resin pouring → assembly
   if (currentStatus === 'resin_pouring') {
@@ -114,8 +113,7 @@ export const NAV_ITEMS = [
   { path: '/production', label: 'Производство', icon: 'Palette', roles: ['admin', 'manager'] },
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'] },
   { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'] },
-  { path: '/production/post-processing', label: 'Постобработка', icon: 'Scissors', roles: ['admin', 'manager', 'printer'] },
-  { path: '/production/die-cutting', label: 'Выборка', icon: 'Crosshair', roles: ['admin', 'manager', 'assembler'] },
+  { path: '/production/post-processing', label: 'Постобработка', icon: 'Scissors', roles: ['admin', 'manager', 'printer', 'assembler'] },
   { path: '/production/resin', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'resin_pourer'] },
   { path: '/production/assembly', label: 'Сборка', icon: 'Hammer', roles: ['admin', 'manager', 'assembler'] },
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'assembler'] },

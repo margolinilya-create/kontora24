@@ -16,7 +16,7 @@ const PRODUCTION_STATUSES = new Set(COLS)
 
 const PHASES = [
   { key: 'prep', label: 'Подготовка', cols: ['new', 'design'] },
-  { key: 'prod', label: 'Производство', cols: ['print', 'post_processing', 'die_cutting'] },
+  { key: 'prod', label: 'Производство', cols: ['print', 'post_processing'] },
   { key: 'finish', label: 'Финиш', cols: ['resin_pouring', 'assembly', 'packaging'] },
 ]
 

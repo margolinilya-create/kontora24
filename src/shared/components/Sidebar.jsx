@@ -26,7 +26,7 @@ const ICONS = {
 // Nav groups
 const NAV_GROUPS = [
   { label: 'Управление', paths: ['/', '/orders', '/calculator'] },
-  { label: 'Производство', paths: ['/production', '/production/design', '/production/print', '/production/post-processing', '/production/die-cutting', '/production/resin', '/production/assembly', '/production/packaging'] },
+  { label: 'Производство', paths: ['/production', '/production/design', '/production/print', '/production/post-processing', '/production/resin', '/production/assembly', '/production/packaging'] },
   { label: 'Ресурсы', paths: ['/warehouse', '/clients', '/analytics'] },
   { label: 'Система', paths: ['/settings'] },
 ]
@@ -37,7 +37,6 @@ const COUNT_MAP = {
   '/production/design': 'design',
   '/production/print': 'print',
   '/production/post-processing': 'post_processing',
-  '/production/die-cutting': 'die_cutting',
   '/production/resin': 'resin_pouring',
   '/production/assembly': 'assembly',
   '/production/packaging': 'packaging',

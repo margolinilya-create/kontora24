@@ -9,7 +9,6 @@ const QUEUE_CONFIG = {
   design: { title: 'Очередь дизайна', subtitle: 'Заказы со статусом «Дизайн»', status: 'design' },
   print: { title: 'Очередь печати', subtitle: 'Заказы со статусом «Печать»', status: 'print' },
   post_processing: { title: 'Постпечатная обработка', subtitle: 'Резка, ламинация, подготовка', status: 'post_processing' },
-  die_cutting: { title: 'Выборка', subtitle: 'Выборка стикеров', status: 'die_cutting' },
   resin_pouring: { title: 'Заливка смолой', subtitle: 'Заказы на заливке смолой', status: 'resin_pouring' },
   assembly: { title: 'Очередь сборки', subtitle: 'Заказы со статусом «Сборка»', status: 'assembly' },
   packaging: { title: 'Упаковка', subtitle: 'Упаковка готовой продукции', status: 'packaging' },

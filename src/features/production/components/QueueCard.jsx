@@ -15,7 +15,7 @@ import { addProductionLogAndCheckAdvance } from '@/features/orders/hooks/useOrde
 import Button from '@/shared/components/Button'
 import Modal from '@/shared/components/Modal'
 import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
-import { formatRelative } from '@/shared/lib/utils'
+import { formatRelative, formatDate } from '@/shared/lib/utils'
 
 export function QueueCard({ order, onUpdated }) {
   const { profile } = useAuth()
@@ -25,6 +25,11 @@ export function QueueCard({ order, onUpdated }) {
   const isMine = profile && order.assigned_to === profile.id
 
   const progress = getStageProgress(order.status)
+
+  const deadlineDate = order.deadline ? new Date(order.deadline) : null
+  const now = new Date()
+  const isOverdue = deadlineDate && deadlineDate < now
+  const isUrgentDeadline = deadlineDate && !isOverdue && deadlineDate < new Date(now.getTime() + 86400000 * 2)
 
   async function handleLogSubmit(stage, logData) {
     await addProductionLogAndCheckAdvance(order.id, stage, logData, order)
@@ -65,6 +70,14 @@ export function QueueCard({ order, onUpdated }) {
           <span className="text-text-muted">Тираж: </span>
           {order.qty} шт
         </div>
+        {deadlineDate && (
+          <div>
+            <span className="text-text-muted">Сдача: </span>
+            <span className={isOverdue ? 'text-danger font-medium' : isUrgentDeadline ? 'text-warning font-medium' : ''}>
+              {formatDate(order.deadline)}
+            </span>
+          </div>
+        )}
       </div>
 
       {order.assignee?.display_name && (

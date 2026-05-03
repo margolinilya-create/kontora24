@@ -6,6 +6,7 @@ import { OrderComments } from './OrderComments'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { CommercialProposal } from '@/features/kp/components/CommercialProposal'
 import { OperationChecklist } from '@/features/production/components/OperationChecklist'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatDate, formatDateTime } from '@/shared/lib/utils'
 import Spinner from '@/shared/components/Spinner'
@@ -31,6 +32,8 @@ function PriceCard({ label, value, highlight }) {
 }
 
 export function OrderInfoTab({ order, onRecalculate, recalculating, onSaved }) {
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const [showKP, setShowKP] = useState(false)
 
   return (
@@ -51,31 +54,33 @@ export function OrderInfoTab({ order, onRecalculate, recalculating, onSaved }) {
           </div>
         </div>
 
-        {/* Pricing */}
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Стоимость</h2>
-            <button
-              onClick={onRecalculate}
-              disabled={recalculating}
-              className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-1.5 text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {recalculating && <Spinner size="xs" className="border-current" />}
-              Пересчитать
-            </button>
+        {/* Pricing — only for admin */}
+        {isAdmin && (
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold">Стоимость</h2>
+              <button
+                onClick={onRecalculate}
+                disabled={recalculating}
+                className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-1.5 text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {recalculating && <Spinner size="xs" className="border-current" />}
+                Пересчитать
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <PriceCard label="Материалы" value={order.cost_materials} />
+              <PriceCard label="Труд" value={order.cost_labor} />
+              <PriceCard label="Себестоимость" value={order.cost_total} />
+              <PriceCard label="Итого" value={order.price_final} highlight />
+            </div>
+            <div className="flex gap-6 mt-4 text-sm text-text-muted">
+              <span>Наценка: x{order.markup || '—'}</span>
+              <span>Скидка: {order.discount_pct ? `${(order.discount_pct * 100).toFixed(0)}%` : '—'}</span>
+              <span>За штуку: {formatPrice(order.price_per_unit)}</span>
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <PriceCard label="Материалы" value={order.cost_materials} />
-            <PriceCard label="Труд" value={order.cost_labor} />
-            <PriceCard label="Себестоимость" value={order.cost_total} />
-            <PriceCard label="Итого" value={order.price_final} highlight />
-          </div>
-          <div className="flex gap-6 mt-4 text-sm text-text-muted">
-            <span>Наценка: x{order.markup || '—'}</span>
-            <span>Скидка: {order.discount_pct ? `${(order.discount_pct * 100).toFixed(0)}%` : '—'}</span>
-            <span>За штуку: {formatPrice(order.price_per_unit)}</span>
-          </div>
-        </div>
+        )}
 
         {/* Tech Card */}
         <TechCardActions order={order} />

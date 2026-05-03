@@ -13,17 +13,18 @@ export const ORDER_STATUSES = {
   resin_pouring: { label: 'Заливка смолой', color: 'bg-cyan-500/15 text-cyan-400', order: 6 },
   assembly: { label: 'Сборка', color: 'bg-yellow-500/15 text-yellow-400', order: 7 },
   packaging: { label: 'Упаковка', color: 'bg-teal-500/15 text-teal-400', order: 8 },
-  done: { label: 'Готово', color: 'bg-green-500/15 text-green-400', order: 9 },
-  cancelled: { label: 'Отменён', color: 'bg-red-500/15 text-red-400', order: 10 },
+  otk: { label: 'ОТК / Выдача', color: 'bg-pink-500/15 text-pink-400', order: 9 },
+  done: { label: 'Готово', color: 'bg-green-500/15 text-green-400', order: 10 },
+  cancelled: { label: 'Отменён', color: 'bg-red-500/15 text-red-400', order: 11 },
 }
 
 // Status transitions per role
 export const STATUS_TRANSITIONS = {
-  admin: { new: 'design', design: 'design_done', design_done: 'print', print: 'print_done', print_done: 'post_processing', post_processing: 'assembly', resin_pouring: 'assembly', assembly: 'packaging', packaging: 'done' },
-  manager: { new: 'design', design_done: 'print', print_done: 'post_processing', post_processing: 'assembly', assembly: 'packaging', packaging: 'done' },
+  admin: { new: 'design', design: 'design_done', design_done: 'print', print: 'print_done', print_done: 'post_processing', post_processing: 'assembly', resin_pouring: 'assembly', assembly: 'packaging', packaging: 'otk', otk: 'done' },
+  manager: { new: 'design', design_done: 'print', print_done: 'post_processing', post_processing: 'assembly', assembly: 'packaging', packaging: 'otk' },
   designer: { design: 'design_done' },
   printer: { print: 'print_done', post_processing: 'assembly' },
-  assembler: { post_processing: 'assembly', assembly: 'packaging', packaging: 'done' },
+  assembler: { post_processing: 'assembly', assembly: 'packaging', packaging: 'otk' },
   resin_pourer: { resin_pouring: 'assembly' },
 }
 
@@ -117,10 +118,12 @@ export const NAV_ITEMS = [
   { path: '/production/resin', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'resin_pourer'] },
   { path: '/production/assembly', label: 'Сборка', icon: 'Hammer', roles: ['admin', 'manager', 'assembler'] },
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'assembler'] },
+  { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin'] },
   { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ['admin', 'manager', 'designer', 'printer', 'assembler', 'resin_pourer'] },
   { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: ['admin', 'manager'] },
   { path: '/clients', label: 'Клиенты', icon: 'Users', roles: ['admin', 'manager'] },
   { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: ['admin', 'manager'] },
   { path: '/reports', label: 'Отчёты', icon: 'FileText', roles: ['admin'] },
   { path: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'] },
+  { path: '/help', label: 'Справка', icon: 'HelpCircle', roles: ['admin', 'manager', 'designer', 'printer', 'assembler', 'resin_pourer'] },
 ]

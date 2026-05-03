@@ -1,6 +1,6 @@
 import { ORDER_STATUSES } from '@/shared/constants'
 
-const COLS = ['new', 'design', 'print', 'post_processing', 'resin_pouring', 'assembly', 'packaging']
+const COLS = ['new', 'design', 'print', 'post_processing', 'resin_pouring', 'assembly', 'packaging', 'otk']
 
 const COL_COLORS = {
   new: 'bg-blue-500',
@@ -10,6 +10,7 @@ const COL_COLORS = {
   resin_pouring: 'bg-cyan-500',
   assembly: 'bg-yellow-500',
   packaging: 'bg-teal-500',
+  otk: 'bg-pink-500',
 }
 
 /**

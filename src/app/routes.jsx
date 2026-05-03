@@ -16,6 +16,7 @@ const AssemblyQueuePage = lazy(() => import('@/features/production/pages/Assembl
 const ResinQueuePage = lazy(() => import('@/features/production/pages/ResinQueuePage'))
 const PostProcessingQueuePage = lazy(() => import('@/features/production/pages/PostProcessingQueuePage'))
 const PackagingQueuePage = lazy(() => import('@/features/production/pages/PackagingQueuePage'))
+const OtkQueuePage = lazy(() => import('@/features/production/pages/OtkQueuePage'))
 const WarehousePage = lazy(() => import('@/features/warehouse/pages/WarehousePage'))
 const ClientsPage = lazy(() => import('@/features/clients/pages/ClientsPage'))
 const ClientDetailPage = lazy(() => import('@/features/clients/pages/ClientDetailPage'))
@@ -23,6 +24,7 @@ const AnalyticsPage = lazy(() => import('@/features/analytics/pages/AnalyticsPag
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'))
 const CabinetPage = lazy(() => import('@/features/cabinet/pages/CabinetPage'))
 const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'))
+const HelpPage = lazy(() => import('@/features/help/pages/HelpPage'))
 
 export const routes = [
   {
@@ -47,6 +49,7 @@ export const routes = [
       { path: 'production/post-processing', element: <AuthGuard roles={['admin', 'manager', 'printer', 'assembler']}><PostProcessingQueuePage /></AuthGuard> },
       { path: 'production/resin', element: <AuthGuard roles={['admin', 'manager', 'resin_pourer']}><ResinQueuePage /></AuthGuard> },
       { path: 'production/packaging', element: <AuthGuard roles={['admin', 'manager', 'assembler']}><PackagingQueuePage /></AuthGuard> },
+      { path: 'production/otk', element: <AuthGuard roles={['admin']}><OtkQueuePage /></AuthGuard> },
       { path: 'warehouse', element: <AuthGuard roles={['admin', 'manager']}><WarehousePage /></AuthGuard> },
       { path: 'clients', element: <AuthGuard roles={['admin', 'manager']}><ClientsPage /></AuthGuard> },
       { path: 'clients/:id', element: <AuthGuard roles={['admin', 'manager']}><ClientDetailPage /></AuthGuard> },
@@ -54,6 +57,7 @@ export const routes = [
       { path: 'cabinet', element: <CabinetPage /> },
       { path: 'reports', element: <AuthGuard roles={['admin']}><ReportsPage /></AuthGuard> },
       { path: 'settings', element: <AuthGuard roles={['admin']}><SettingsPage /></AuthGuard> },
+      { path: 'help', element: <HelpPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

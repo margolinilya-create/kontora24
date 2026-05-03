@@ -21,7 +21,8 @@ describe('getNextStatus', () => {
     expect(getNextStatus('admin', 'design', { order_type: 'sticker_cut' })).toBe('design_done')
     expect(getNextStatus('admin', 'print_done', { order_type: 'sticker_cut' })).toBe('post_processing')
     expect(getNextStatus('admin', 'assembly', { order_type: 'sticker_cut' })).toBe('packaging')
-    expect(getNextStatus('admin', 'packaging', { order_type: 'sticker_cut' })).toBe('done')
+    expect(getNextStatus('admin', 'packaging', { order_type: 'sticker_cut' })).toBe('otk')
+    expect(getNextStatus('admin', 'otk', { order_type: 'sticker_cut' })).toBe('done')
   })
 
   it('routes post_processing to assembly for flat orders', () => {

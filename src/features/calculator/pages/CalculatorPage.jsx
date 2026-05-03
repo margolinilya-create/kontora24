@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { calculate } from '../lib/calculator'
 import { createOrder } from '@/features/orders/hooks/useOrders'
+import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, VOLUME_DISCOUNTS, PRIORITIES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { formatPrice, formatNumber } from '@/shared/lib/utils'
@@ -12,6 +13,14 @@ import { saveCalcToHistory } from '../lib/calc-history'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 
+const FILM_TYPES = [
+  { value: 'G', label: 'G (глянцевая)' },
+  { value: 'M', label: 'M (матовая)' },
+  { value: 'Holo', label: 'Holo (голографическая)' },
+  { value: 'Gold', label: 'Gold (золотая)' },
+  { value: 'Chrome', label: 'Chrome (хромированная)' },
+]
+
 const INITIAL = {
   orderType: 'sticker_cut',
   width: 50,
@@ -19,7 +28,9 @@ const INITIAL = {
   qty: 100,
   needLam: false,
   lamType: 'glossy',
+  filmType: 'G',
   designVariants: 1,
+  stickersPerPack: '',
   clientName: '',
   deadline: '',
   notes: '',
@@ -65,6 +76,23 @@ export default function CalculatorPage() {
   }
 
   const [creating, setCreating] = useState(false)
+  const [mockupFile, setMockupFile] = useState(null)
+  const fileInputRef = useRef(null)
+
+  async function uploadMockup(orderId, file) {
+    const ext = file.name.split('.').pop()
+    const path = `${orderId}/${Date.now()}.${ext}`
+    const { error: uploadError } = await supabase.storage.from('order-files').upload(path, file)
+    if (uploadError) throw uploadError
+    await supabase.from('k24_order_attachments').insert({
+      order_id: orderId,
+      file_name: file.name,
+      file_path: path,
+      file_size: file.size,
+      mime_type: file.type,
+      uploaded_by: (await supabase.auth.getUser()).data.user?.id,
+    })
+  }
 
   async function handleCreateOrder() {
     setCreating(true)
@@ -88,7 +116,16 @@ export default function CalculatorPage() {
         deadline: form.deadline || null,
         notes: form.notes || null,
         priority: form.priority || 'normal',
+        film_type: form.filmType || null,
+        stickers_per_pack: Number(form.stickersPerPack) || null,
       })
+      if (mockupFile) {
+        try {
+          await uploadMockup(order.id, mockupFile)
+        } catch {
+          toast.error('Заказ создан, но макет не загрузился')
+        }
+      }
       saveCalcToHistory(form, result)
       toast.success('Заказ успешно создан')
       navigate(`/orders/${order.id}`)
@@ -187,6 +224,19 @@ export default function CalculatorPage() {
               min="1"
             />
 
+            {/* Stickers per pack — only for stickerpack types */}
+            {(form.orderType === 'stickerpack' || form.orderType === 'stickerpack3D') && (
+              <Input
+                label="Видов стикеров в паке"
+                id="calc-stickers-per-pack"
+                type="number"
+                value={form.stickersPerPack}
+                onChange={(e) => update('stickersPerPack', e.target.value)}
+                min="1"
+                placeholder="Кол-во видов в одном паке"
+              />
+            )}
+
             {/* Lamination */}
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -213,6 +263,21 @@ export default function CalculatorPage() {
                 </select>
               </div>
             )}
+
+            {/* Film type */}
+            <div>
+              <label htmlFor="calc-film-type" className="block text-sm font-medium mb-1.5">Тип плёнки</label>
+              <select
+                id="calc-film-type"
+                value={form.filmType}
+                onChange={(e) => update('filmType', e.target.value)}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+              >
+                {FILM_TYPES.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
 
             {/* Client name */}
             <Input
@@ -261,9 +326,37 @@ export default function CalculatorPage() {
               />
             </div>
 
+            {/* Mockup upload */}
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Макет</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,.pdf,.ai,.psd,.svg,.eps"
+                onChange={(e) => setMockupFile(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full rounded-lg border border-dashed border-border px-3 py-3 text-sm text-text-muted hover:border-accent hover:text-accent transition-colors text-center"
+              >
+                {mockupFile ? mockupFile.name : 'Загрузить файл макета...'}
+              </button>
+              {mockupFile && (
+                <button
+                  type="button"
+                  onClick={() => { setMockupFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                  className="text-xs text-danger hover:underline mt-1"
+                >
+                  Удалить
+                </button>
+              )}
+            </div>
+
             <Button
               variant="secondary"
-              onClick={() => setForm(INITIAL)}
+              onClick={() => { setForm(INITIAL); setMockupFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
               className="w-full"
             >
               Сброс

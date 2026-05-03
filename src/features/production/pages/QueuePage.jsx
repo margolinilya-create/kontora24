@@ -12,6 +12,7 @@ const QUEUE_CONFIG = {
   resin_pouring: { title: 'Заливка смолой', subtitle: 'Заказы на заливке смолой', status: 'resin_pouring' },
   assembly: { title: 'Очередь сборки', subtitle: 'Заказы со статусом «Сборка»', status: 'assembly' },
   packaging: { title: 'Упаковка', subtitle: 'Упаковка готовой продукции', status: 'packaging' },
+  otk: { title: 'ОТК / Выдача', subtitle: 'Контроль качества и выдача заказа', status: 'otk' },
 }
 
 export default function QueuePage({ queueType, hideHeader }) {

@@ -57,9 +57,10 @@ src/
   app/                  # App.jsx, routes.jsx
   features/
     auth/               # LoginForm, AuthGuard, useAuth, store (Supabase Auth)
-    orders/             # OrdersPage (table+kanban), OrderDetailPage, StatusSwitcher,
-                        #   OrderEditForm, OrderComments, OrderAttachments, OrderTimeline,
-                        #   OrderPdfExport, ClaimButton, SavedFilters, OrdersKanban
+    orders/             # OrdersPage (table+kanban), OrderDetailPage (single-scroll),
+                        #   StatusSwitcher, DepartmentTimeline, DepartmentFilter,
+                        #   DateRangeFilter, OrderComments, OrderAttachments,
+                        #   OrderPdfExport, ClaimButton, OrdersKanban
     calculator/         # CalculatorPage, calculator.js (pure), LayoutPreview, CompareMode, CalcHistory
     production/         # ProductionBoardPage (DnD, horizontal scroll, phase groups),
                         #   QueuePage (unified), DesignQueue, PrintQueue (batch view),
@@ -72,9 +73,13 @@ src/
     warehouse/          # WarehousePage (tabs: stock/analytics), MaterialCard, StockModal,
                         #   MaterialForm, ConsumptionChart (forecast)
     clients/            # ClientsPage, ClientDetailPage (LTV, order history), ClientForm
-    analytics/          # DashboardPage (role-based), AnalyticsPage (period filter, charts,
-                        #   comparison, workload, material consumption, top clients)
-    techcard/           # TechCard (A4), TechCardActions (PNG/PDF/Print)
+    analytics/          # DashboardPage (worker cabinets + simplified manager: 3 metrics + stock),
+                        #   AnalyticsPage (period filter, charts, comparison, workload, top clients)
+    techcard/           # TechCard (A4 redesign: black header + 3 blocks),
+                        #   TechCardActions (PNG/PDF/Print),
+                        #   ProductionSticker (120x75mm "В производство"),
+                        #   DeliverySticker (120x75mm "На выдачу"),
+                        #   StickerActions (PNG/PDF/Print export)
     kp/                 # CommercialProposal (3 templates: standard/detailed/short)
     settings/           # SettingsPage (tabs: profile, calculator, markups, users, Bitrix24, logs)
   shared/
@@ -83,7 +88,8 @@ src/
                         #   ConfirmDialog, ErrorBoundary (Sentry), Toaster, Skeleton,
                         #   Pagination (range display), NotFoundPage, OfflineIndicator, OnboardingTip
     hooks/              # useDebounce, usePagination, useDeadlineAlerts, useStageNotifications
-    lib/                # supabase.js, utils.js, export.js (CSV), sentry.js, sound.js
+    lib/                # supabase.js, utils.js, export.js (CSV with format), sentry.js, sound.js,
+                        #   department-mapping.js (status→department mapping for TZ filters/timeline)
     stores/             # toast-store, theme-store, sidebar-store
     constants.js        # Statuses, roles, types, transitions, nav items, discounts
   styles/globals.css    # Tailwind + light/dark theme
@@ -116,9 +122,9 @@ RPC: `update_stock` · `auto_deduct_materials` · `reserve_materials` · `releas
 
 ### Готово
 - Auth: login, logout, role guard, password reset, Russian errors, show/hide password, "запомнить меня"
-- Dashboard: личные кабинеты работников (мои задачи + очередь + статистика), role-based (workers/managers), deadlines, activity feed, low stock, mini-charts (revenue + orders 7d), status cards → filtered links, batch complete, onboarding tips
-- Orders: table + kanban toggle, search, pagination, sort, status filters, saved filters, bulk actions, CSV export, client + deadline columns, keyboard-accessible sort, priority (low/normal/high/urgent)
-- Order detail: edit (notes/deadline/assignee/client/priority), comments (realtime), file attachments (Storage), responsive timeline, tech card (PNG/PDF/print + QR), КП (3 templates), PDF export, recalculate price, Bitrix link, client link, time tracking (start/stop), material consumption recording, operation checklist
+- Dashboard: личные кабинеты работников (мои задачи + очередь + статистика), role-based (workers/managers), упрощённый менеджерский дашборд (3 метрики + склад: закончились/заканчиваются), deadlines, batch complete, onboarding tips
+- Orders: table (5 столбцов: №/Заказчик/Тип/Этап/Срок) + kanban toggle, search, pagination, сортировка (по сроку сдачи / по номеру), фильтр по отделам (DepartmentFilter с чекбоксами), фильтр по дате сдачи (от-до), CSV export с format-функциями, priority (low/normal/high/urgent)
+- Order detail: единая прокручиваемая страница (без табов), шапка ORD-{номер} + клиент + менеджер + дата + статус, таймлайн по отделам (DepartmentTimeline с hover-подсказками), ссылка на файлы + копирование, редактируемые поля (напечатанные метры/смола/брак/напечатанные шт), comments (realtime), file attachments (Storage), tech card (PNG/PDF/print), КП (3 templates), стикеры "В производство" и "На выдачу" (120x75мм, PNG/PDF/Печать), recalculate price, client link, time tracking
 - Calculator: full formulas, presets, reset, layout preview (responsive), compare mode (responsive), history (localStorage), auto-calc from Bitrix webhook, client/deadline/notes/priority fields, lamination type, sticky CTA, toast on create
 - Production: unified board with bidirectional drag-and-drop (@dnd-kit + TouchSensor + KeyboardSensor), optimistic updates, drop animation, claim button (with confirm), time-in-status, sort by deadline/priority, "my orders" filter, search by number, 7 columns (Новый/Дизайн/Печать/Постобработка/Заливка/Сборка/Упаковка), conditional resin flow for 3D, throughput counter, sound notification, production calendar, batch printing view, tech card preview modal, stage notifications between roles, deadline alerts, pipeline summary strip, phase groups
 - Time tracking: start/stop timer per order, localStorage persistence, history in order detail, auto-stop on "Готово"
@@ -127,7 +133,9 @@ RPC: `update_stock` · `auto_deduct_materials` · `reserve_materials` · `releas
 - Clients: list with search + "дней без заказа", detail page (LTV, order history, tags, Bitrix link), create form
 - Analytics: 3 tabs (Финансы/Производство/Ресурсы), period filter, revenue by type, status pie, avg stage time, conversion, revenue trend, top clients, workload, material consumption, period comparison, throughput trend by week, PDF export
 - Settings: tabs (profile/calculator/markups/users/Bitrix24/logs), calculator params from DB, markup editor, user management (6 roles), profile, create user (name/email/password/role via API), Bitrix config UI, integration log
-- Tech card: A4 layout, PNG/PDF export, print CSS, layout preview, QR code, operation checklist
+- Tech card: A4 layout по ТЗ (чёрная заливка + Oswald Bold, 3 блока: инфо/производство/превью+комментарии), PNG/PDF export, print CSS
+- Стикеры: "В производство" (120x75мм, логотип + номер Bebas Neue + срок/заказчик/тираж) и "На выдачу" (производитель kontora.su вместо срока), PNG/PDF/Печать через StickerActions
+- Department mapping: маппинг DB-статусов на отделы из ТЗ (Отдел продаж/Допечатная/Печать/3D/ОСК/Выдан)
 - KP: 3 templates (standard/detailed/short)
 - Performance: React.memo on QueueCard/PipelineSummary/DraggableCard, useMemo on DashboardPage filtering, debounced realtime subscriptions (2s), timer tick 30s in compact mode (vs 1s)
 - Infra: error boundaries (retry + Sentry), Suspense fallback, pagination, toast system, skeleton loading, dark theme, PWA manifest + service worker (offline), offline indicator, 41 Vitest tests, GitHub Actions CI/CD, Sentry, Agentation

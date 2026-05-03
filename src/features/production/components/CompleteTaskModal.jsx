@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
-import { getNextStatus } from '@/shared/constants'
+import { getNextStatus, MS_PER_MINUTE } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
@@ -31,7 +31,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
     setSaving(true)
     try {
       // 1. Stop active timer (if any)
-      const TIMER_KEY = 'kontora24_active_timer'
+      const TIMER_KEY = profile?.id ? `kontora24_active_timer_${profile.id}` : 'kontora24_active_timer'
       const savedTimer = JSON.parse(localStorage.getItem(TIMER_KEY) || 'null')
       if (savedTimer && savedTimer.orderId === order.id && savedTimer.entryId) {
         const endedAt = new Date()
@@ -43,7 +43,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
           .is('ended_at', null)
           .single()
         if (timerEntry) {
-          const durationMinutes = Math.max(1, Math.round((endedAt - new Date(timerEntry.started_at)) / 60000))
+          const durationMinutes = Math.max(1, Math.round((endedAt - new Date(timerEntry.started_at)) / MS_PER_MINUTE))
           await supabase.from('k24_time_entries')
             .update({ ended_at: endedAt.toISOString(), duration_minutes: durationMinutes })
             .eq('id', savedTimer.entryId)
@@ -53,15 +53,16 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
 
       // 2. Record material consumption (if any)
       for (const item of consumption) {
-        if (!item.materialId || !item.qty) continue
+        const qty = Number(item.qty)
+        if (!item.materialId || !qty || qty <= 0) continue
         await supabase.from('k24_material_transactions').insert({
           material_id: item.materialId,
           order_id: order.id,
-          delta: -Math.abs(Number(item.qty)),
+          delta: -qty,
           reason: `Заказ #${order.number}`,
           created_by: profile.id,
         })
-        await supabase.rpc('update_stock', { p_material_id: item.materialId, p_delta: -Math.abs(Number(item.qty)) })
+        await supabase.rpc('update_stock', { p_material_id: item.materialId, p_delta: -qty })
       }
 
       // 3. Change status

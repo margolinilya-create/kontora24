@@ -1,11 +1,17 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { MS_PER_MINUTE } from '@/shared/constants'
 
-const ACTIVE_TIMER_KEY = 'kontora24_active_timer'
+const ACTIVE_TIMER_KEY_PREFIX = 'kontora24_active_timer'
+
+function getTimerKey(userId) {
+  return userId ? `${ACTIVE_TIMER_KEY_PREFIX}_${userId}` : ACTIVE_TIMER_KEY_PREFIX
+}
 
 export function useTimer(orderId, { tickInterval = 1000 } = {}) {
   const { profile } = useAuth()
+  const ACTIVE_TIMER_KEY = getTimerKey(profile?.id)
   const [entries, setEntries] = useState([])
   const [activeEntry, setActiveEntry] = useState(null)
   const [elapsed, setElapsed] = useState(0)
@@ -78,7 +84,7 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
   const stop = useCallback(async () => {
     if (!activeEntry) return
     const endedAt = new Date()
-    const durationMinutes = Math.round((endedAt - new Date(activeEntry.started_at)) / 60000)
+    const durationMinutes = Math.round((endedAt - new Date(activeEntry.started_at)) / MS_PER_MINUTE)
 
     const { error } = await supabase
       .from('k24_time_entries')

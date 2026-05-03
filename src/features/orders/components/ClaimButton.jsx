@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { updateOrder } from '../hooks/useOrders'
+import { claimOrder } from '../hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
@@ -30,7 +30,7 @@ export function ClaimButton({ order, onClaimed }) {
     setShowConfirm(false)
     setClaiming(true)
     try {
-      await updateOrder(order.id, { assigned_to: profile.id })
+      await claimOrder(order.id, profile.id, isAssigned ? order.assigned_to : null)
       toast.success(`Заказ #${order.number} взят в работу`)
       onClaimed?.()
     } catch (err) {

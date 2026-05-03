@@ -270,3 +270,28 @@ export async function updateOrder(orderId, updates) {
     .eq('id', orderId)
   if (error) throw error
 }
+
+/**
+ * Claim order with optimistic locking to prevent race conditions.
+ * Uses conditional update: only succeeds if assigned_to matches expected value.
+ */
+export async function claimOrder(orderId, newOwnerId, expectedCurrentOwner) {
+  let query = supabase
+    .from('k24_orders')
+    .update({ assigned_to: newOwnerId, updated_at: new Date().toISOString() })
+    .eq('id', orderId)
+
+  // Conditional check: if claiming unassigned order, verify it's still unassigned
+  if (expectedCurrentOwner === null) {
+    query = query.is('assigned_to', null)
+  } else {
+    query = query.eq('assigned_to', expectedCurrentOwner)
+  }
+
+  const { data, error, count } = await query.select()
+
+  if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('Заказ уже взят другим сотрудником')
+  }
+}

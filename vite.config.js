@@ -10,6 +10,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.js'],
+    css: false,
+    exclude: ['e2e/**', 'node_modules/**', 'load/**'],
+  },
   build: {
     rollupOptions: {
       output: {

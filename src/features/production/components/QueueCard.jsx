@@ -4,20 +4,33 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
-import { CompleteTaskModal } from './CompleteTaskModal'
 import { TechCardPreview } from './TechCardPreview'
 import { TaskTimer } from './TaskTimer'
 import { DryingTimer } from './DryingTimer'
 import { OperationChecklist } from './OperationChecklist'
+import { ProductionLogForm } from './logs/ProductionLogForm'
+import { StageProgressBar } from './logs/StageProgressBar'
+import { useProductionLogs } from '../hooks/useProductionLogs'
+import { addProductionLogAndCheckAdvance } from '@/features/orders/hooks/useOrders'
 import Button from '@/shared/components/Button'
+import Modal from '@/shared/components/Modal'
 import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
-import { formatPrice, formatRelative } from '@/shared/lib/utils'
+import { formatRelative } from '@/shared/lib/utils'
 
 export function QueueCard({ order, onUpdated }) {
   const { profile } = useAuth()
-  const [showComplete, setShowComplete] = useState(false)
+  const [showLogForm, setShowLogForm] = useState(false)
   const [showTechCard, setShowTechCard] = useState(false)
+  const { getStageProgress } = useProductionLogs(order.id, order.qty)
   const isMine = profile && order.assigned_to === profile.id
+
+  const progress = getStageProgress(order.status)
+
+  async function handleLogSubmit(stage, logData) {
+    await addProductionLogAndCheckAdvance(order.id, stage, logData, order)
+    setShowLogForm(false)
+    onUpdated?.()
+  }
 
   return (
     <div className={`bg-surface rounded-xl border border-border p-5 space-y-3${order.priority === 'urgent' ? ' border-l-4 border-l-danger' : order.priority === 'high' ? ' border-l-4 border-l-warning' : ''}`}>
@@ -46,15 +59,11 @@ export function QueueCard({ order, onUpdated }) {
         </div>
         <div>
           <span className="text-text-muted">Размер: </span>
-          {order.width_mm}×{order.height_mm} мм
+          {order.width_mm}x{order.height_mm} мм
         </div>
         <div>
           <span className="text-text-muted">Тираж: </span>
           {order.qty} шт
-        </div>
-        <div>
-          <span className="text-text-muted">Цена: </span>
-          {formatPrice(order.price_final)}
         </div>
       </div>
 
@@ -65,6 +74,9 @@ export function QueueCard({ order, onUpdated }) {
       {order.client?.name && (
         <p className="text-sm text-text-muted">Клиент: {order.client.name}</p>
       )}
+
+      {/* Progress bar */}
+      <StageProgressBar progress={progress} />
 
       {order.status === 'resin_pouring' && order.dry_until && (
         <DryingTimer dryUntil={order.dry_until} />
@@ -77,15 +89,25 @@ export function QueueCard({ order, onUpdated }) {
           <span className="text-xs text-text-muted">{formatRelative(order.created_at)}</span>
           <OperationChecklist order={order} compact />
         </div>
-        {isMine ? (
-          <>
-            <Button size="sm" onClick={() => setShowComplete(true)}>Готово</Button>
-            <CompleteTaskModal order={order} isOpen={showComplete} onClose={() => setShowComplete(false)} onCompleted={onUpdated} />
-          </>
-        ) : (
+        <div className="flex items-center gap-2">
+          {isMine && (
+            <Button size="sm" onClick={() => setShowLogForm(true)}>Записать</Button>
+          )}
           <StatusSwitcher order={order} onUpdated={onUpdated} aria-label={`Сменить статус заказа #${order.number}`} />
-        )}
+        </div>
       </div>
+
+      {/* Production log form modal */}
+      {showLogForm && (
+        <Modal isOpen onClose={() => setShowLogForm(false)} title="Записать результат" maxWidth="max-w-md">
+          <ProductionLogForm
+            stage={order.status}
+            progress={progress}
+            onSubmit={handleLogSubmit}
+          />
+        </Modal>
+      )}
+
       <TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} />
     </div>
   )

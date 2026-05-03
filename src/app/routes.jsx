@@ -22,6 +22,7 @@ const ClientDetailPage = lazy(() => import('@/features/clients/pages/ClientDetai
 const AnalyticsPage = lazy(() => import('@/features/analytics/pages/AnalyticsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'))
 const CabinetPage = lazy(() => import('@/features/cabinet/pages/CabinetPage'))
+const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'))
 
 export const routes = [
   {
@@ -51,6 +52,7 @@ export const routes = [
       { path: 'clients/:id', element: <AuthGuard roles={['admin', 'manager']}><ClientDetailPage /></AuthGuard> },
       { path: 'analytics', element: <AuthGuard roles={['admin', 'manager']}><AnalyticsPage /></AuthGuard> },
       { path: 'cabinet', element: <CabinetPage /> },
+      { path: 'reports', element: <AuthGuard roles={['admin']}><ReportsPage /></AuthGuard> },
       { path: 'settings', element: <AuthGuard roles={['admin']}><SettingsPage /></AuthGuard> },
       { path: '*', element: <NotFoundPage /> },
     ],

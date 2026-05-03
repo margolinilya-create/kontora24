@@ -121,5 +121,6 @@ export const NAV_ITEMS = [
   { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: ['admin', 'manager'] },
   { path: '/clients', label: 'Клиенты', icon: 'Users', roles: ['admin', 'manager'] },
   { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: ['admin', 'manager'] },
+  { path: '/reports', label: 'Отчёты', icon: 'FileText', roles: ['admin'] },
   { path: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'] },
 ]

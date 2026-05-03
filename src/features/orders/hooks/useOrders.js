@@ -210,6 +210,41 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
   } catch { /* ignored */ } // non-critical
 }
 
+/**
+ * Add a production log entry and auto-advance status if stage target is met.
+ * Core of the v2 quantity-based production tracking model.
+ */
+export async function addProductionLogAndCheckAdvance(orderId, stage, logData, order) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // 1. Insert production log
+  const { error } = await supabase.from('k24_production_logs').insert({
+    order_id: orderId,
+    stage,
+    worker_id: user.id,
+    ...logData,
+  })
+  if (error) throw error
+
+  // 2. Check if stage is complete
+  const { data: result } = await supabase.rpc('check_stage_completion', {
+    p_order_id: orderId,
+    p_stage: stage,
+  })
+
+  // 3. Auto-advance if complete
+  if (result?.is_complete && order) {
+    const { getNextStatus } = await import('@/shared/constants')
+    const nextStatus = getNextStatus('admin', order.status, order)
+    if (nextStatus) {
+      await updateOrderStatus(orderId, order.status, nextStatus)
+    }
+  }
+
+  return result
+}
+
 export async function updateOrder(orderId, updates) {
   const { error } = await supabase
     .from('k24_orders')

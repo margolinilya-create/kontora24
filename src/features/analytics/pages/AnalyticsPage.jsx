@@ -53,10 +53,10 @@ export default function AnalyticsPage() {
       const prevStart = new Date(startDate.getTime() - periodMs)
 
       const [ordersRes, historyRes, matTxRes, prevOrdersRes] = await Promise.all([
-        supabase.from('k24_orders').select('*, client:k24_clients(name), assignee:k24_profiles!assigned_to(display_name)').gte('created_at', startDate.toISOString()),
-        supabase.from('k24_order_status_history').select('*').gte('created_at', startDate.toISOString()),
-        supabase.from('k24_material_transactions').select('*, material:k24_materials(name, type, unit)').gte('created_at', startDate.toISOString()),
-        period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', startDate.toISOString()) : Promise.resolve({ data: [] }),
+        supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, deadline, created_at, client:k24_clients(name), assignee:k24_profiles!assigned_to(display_name)').gte('created_at', startDate.toISOString()).limit(1000),
+        supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', startDate.toISOString()).limit(5000),
+        supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', startDate.toISOString()).limit(5000),
+        period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', startDate.toISOString()).limit(1000) : Promise.resolve({ data: [] }),
       ])
 
       setData({

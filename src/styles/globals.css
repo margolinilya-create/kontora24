@@ -21,15 +21,15 @@
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
-/* Dark mode */
+/* Dark mode — contrast ratio 7:1+ for WCAG AA */
 .dark {
   --color-primary: #e2e8f0;
   --color-primary-light: #cbd5e1;
   --color-surface: #1e1e2e;
   --color-surface-dim: #151521;
-  --color-border: #2d2d44;
+  --color-border: #3a3a54;
   --color-text: #e2e8f0;
-  --color-text-muted: #a8b5c4;
+  --color-text-muted: #c0cfe6;
   --color-sidebar: #151521;
   --color-chart-grid: #374151;
   --color-chart-tooltip-bg: #2a2a3e;

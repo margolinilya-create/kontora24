@@ -4,19 +4,31 @@ import { supabase } from '@/shared/lib/supabase'
 export function useMaterials() {
   const [materials, setMaterials] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchMaterials = useCallback(async () => {
     setLoading(true)
-    const [{ data }, { data: reservations }] = await Promise.all([
-      supabase
-        .from('k24_materials')
-        .select('*')
-        .order('type', { ascending: true }),
-      supabase
-        .from('k24_material_transactions')
-        .select('material_id, delta')
-        .eq('reservation_status', 'reserved'),
-    ])
+    setError(null)
+    let data, reservations
+    try {
+      const results = await Promise.all([
+        supabase
+          .from('k24_materials')
+          .select('*')
+          .order('type', { ascending: true }),
+        supabase
+          .from('k24_material_transactions')
+          .select('material_id, delta')
+          .eq('reservation_status', 'reserved'),
+      ])
+      data = results[0].data
+      reservations = results[1].data
+      if (results[0].error) throw results[0].error
+    } catch (err) {
+      setError(err.message || 'Ошибка загрузки материалов')
+      setLoading(false)
+      return
+    }
 
     // Sum reserved amounts per material
     const reservedByMaterial = {}
@@ -36,7 +48,7 @@ export function useMaterials() {
 
   useEffect(() => { fetchMaterials() }, [fetchMaterials])
 
-  return { materials, loading, refetch: fetchMaterials }
+  return { materials, loading, error, refetch: fetchMaterials }
 }
 
 export function useMaterialTransactions(materialId) {

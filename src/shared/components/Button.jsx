@@ -16,11 +16,12 @@ export default function Button({ variant = 'primary', size = 'md', disabled, loa
     <button
       className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
     >
       {loading ? (
         <span className="flex items-center justify-center gap-2">
-          <span className="animate-spin rounded-full border-2 border-current border-t-transparent h-4 w-4" />
+          <span className="animate-spin rounded-full border-2 border-current border-t-transparent h-4 w-4" aria-hidden="true" />
           {children}
         </span>
       ) : (

@@ -77,7 +77,7 @@ export function Layout() {
 
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setMobileOpen(false)}>
-          <div className="absolute inset-0 bg-black/50" role="button" aria-label="Закрыть меню" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setMobileOpen(false)} />
+          <div className="absolute inset-0 bg-black/50" role="button" aria-label="Закрыть меню" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setMobileOpen(false))} />
           <div className="relative z-50 w-60" onClick={(e) => e.stopPropagation()}>
             <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
           </div>

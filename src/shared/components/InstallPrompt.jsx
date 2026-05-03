@@ -13,9 +13,13 @@ export function InstallPrompt() {
       e.preventDefault()
       setDeferredPrompt(e)
     }
+    function installed() { setDeferredPrompt(null) }
     window.addEventListener('beforeinstallprompt', handler)
-    window.addEventListener('appinstalled', () => setDeferredPrompt(null))
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', installed)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler)
+      window.removeEventListener('appinstalled', installed)
+    }
   }, [])
 
   if (!deferredPrompt || dismissed) return null

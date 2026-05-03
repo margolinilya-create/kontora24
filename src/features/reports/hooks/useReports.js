@@ -49,9 +49,9 @@ export function useOrdersCostReport(period = '30') {
       setLoading(true)
       const [ordersRes, logsRes] = await Promise.all([
         supabase.from('k24_orders').select('id, number, order_type, qty, price_final, cost_total, status, created_at')
-          .gte('created_at', getSince(period)).order('created_at', { ascending: false }),
+          .gte('created_at', getSince(period)).order('created_at', { ascending: false }).limit(500),
         supabase.from('k24_production_logs').select('order_id, film_meters, resin_grams')
-          .gte('created_at', getSince(period)),
+          .gte('created_at', getSince(period)).limit(5000),
       ])
 
       const logsByOrder = {}
@@ -87,7 +87,7 @@ export function useBonusReport(period = '30') {
       const [logsRes, ratesRes] = await Promise.all([
         supabase.from('k24_production_logs')
           .select('worker_id, stage, stickers_printed, stickers_good, packs_assembled, packs_packaged, packs_selected, worker:k24_profiles!worker_id(display_name)')
-          .gte('created_at', getSince(period)),
+          .gte('created_at', getSince(period)).limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
 
@@ -125,10 +125,10 @@ export function useQualityReport(period = '30') {
       setLoading(true)
       const [ordersRes, logsRes] = await Promise.all([
         supabase.from('k24_orders').select('id, number, qty, order_type')
-          .gte('created_at', getSince(period)).order('number'),
+          .gte('created_at', getSince(period)).order('number').limit(500),
         supabase.from('k24_production_logs')
           .select('order_id, stickers_printed, stickers_poured, stickers_good')
-          .gte('created_at', getSince(period)),
+          .gte('created_at', getSince(period)).limit(10000),
       ])
 
       const logsByOrder = {}

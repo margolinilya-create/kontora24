@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
@@ -15,8 +15,10 @@ import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { toast } from '@/shared/stores/toast-store'
-import { LineChart, Line, BarChart, Bar, ResponsiveContainer } from 'recharts'
 import { subDays, format, startOfDay } from 'date-fns'
+
+// Lazy load Recharts (295KB) — only managers see charts
+const MiniCharts = lazy(() => import('./MiniCharts'))
 
 function WorkerTaskCard({ order, isMine, onUpdated }) {
   const [showComplete, setShowComplete] = useState(false)
@@ -353,26 +355,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Mini charts — managers/admins */}
+      {/* Mini charts — managers/admins (lazy loaded) */}
       {isManager && chartData.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-surface rounded-xl border border-border p-4">
-            <p className="text-xs text-text-muted mb-2">Выручка за 7 дней</p>
-            <ResponsiveContainer width="100%" height={60}>
-              <LineChart data={chartData}>
-                <Line type="monotone" dataKey="revenue" stroke="var(--color-accent)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="bg-surface rounded-xl border border-border p-4">
-            <p className="text-xs text-text-muted mb-2">Заказы за 7 дней</p>
-            <ResponsiveContainer width="100%" height={60}>
-              <BarChart data={chartData}>
-                <Bar dataKey="count" fill="var(--color-accent)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <Suspense fallback={<div className="h-[92px]" />}>
+          <MiniCharts chartData={chartData} />
+        </Suspense>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

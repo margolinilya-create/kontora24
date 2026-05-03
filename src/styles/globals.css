@@ -85,6 +85,12 @@ body {
   }
 }
 
+/* Virtualize off-screen cards — browser skips rendering work for hidden cards */
+.kanban-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 180px;
+}
+
 @supports (padding: env(safe-area-inset-top)) {
   body {
     padding-top: env(safe-area-inset-top);

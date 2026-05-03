@@ -4,6 +4,7 @@ import { useAuthStore } from '@/features/auth/store'
 import { useThemeStore } from '@/shared/stores/theme-store'
 import { Toaster } from '@/shared/components/Toaster'
 import { OfflineIndicator } from '@/shared/components/OfflineIndicator'
+import { InstallPrompt } from '@/shared/components/InstallPrompt'
 import Spinner from '@/shared/components/Spinner'
 import { routes } from './routes'
 
@@ -35,6 +36,7 @@ export function App() {
       </Suspense>
       <Toaster />
       <OfflineIndicator />
+      <InstallPrompt />
       <Suspense fallback={null}>
         <AgentationComponent />
       </Suspense>

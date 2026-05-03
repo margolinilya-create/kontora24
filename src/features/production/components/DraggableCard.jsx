@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
@@ -147,7 +147,7 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
   )
 }
 
-export function DraggableCard({ order, onUpdated }) {
+export const DraggableCard = memo(function DraggableCard({ order, onUpdated }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: order.id,
     data: { status: order.status },
@@ -185,7 +185,7 @@ export function DraggableCard({ order, onUpdated }) {
       <CardContent order={order} onUpdated={onUpdated} />
     </div>
   )
-}
+})
 
 export function DragOverlayCard({ order }) {
   const priorityBorder = PRIORITY_BORDER[order.priority]

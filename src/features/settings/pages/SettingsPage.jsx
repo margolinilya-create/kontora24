@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSettings, useUsers } from '../hooks/useSettings'
 import { ProfileCard } from '../components/ProfileCard'
+import { SheetsImport } from '../components/SheetsImport'
 import { ROLES, ORDER_TYPES } from '@/shared/constants'
 import { DEFAULTS } from '@/features/calculator/lib/calculator'
 import { supabase } from '@/shared/lib/supabase'
@@ -17,6 +18,7 @@ const SETTINGS_TABS = [
   { key: 'users', label: 'Пользователи' },
   { key: 'bitrix', label: 'Bitrix24' },
   { key: 'logs', label: 'Логи' },
+  { key: 'import', label: 'Импорт' },
 ]
 
 export default function SettingsPage() {
@@ -42,6 +44,7 @@ export default function SettingsPage() {
       )}
       {activeTab === 'bitrix' && <BitrixSettings />}
       {activeTab === 'logs' && <IntegrationLog />}
+      {activeTab === 'import' && <SheetsImport />}
     </div>
   )
 }

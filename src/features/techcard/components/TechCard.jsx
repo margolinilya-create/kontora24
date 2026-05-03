@@ -1,177 +1,187 @@
 import { forwardRef } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import { formatOrderType } from '../utils'
-import { formatDate, formatPrice } from '@/shared/lib/utils'
+import { formatDate } from '@/shared/lib/utils'
+import { supabase } from '@/shared/lib/supabase'
+
+// A4 at 72dpi: 595×842px. 1mm = 595/210 = 2.833px
+const MM = 2.833
+const PAGE_W = 595
+const PAGE_H = 842
+const MARGIN = 5 * MM // 5mm side margins
+const CONTENT_W = PAGE_W - MARGIN * 2
+const HEADER_H = 20 * MM // 57px
+const BLOCK1_H = 64 * MM // 181px
+const BLOCK2_H = 42 * MM // 119px
+const RADIUS = 3 * MM // 8.5px
+
+const DAYS_RU = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
 
 /**
- * A4 Tech Card for print — 595×842px at 72dpi.
- * Rendered in a fixed container, captured by html2canvas or printed via CSS @media print.
+ * Redesigned A4 Tech Card per TZ spec.
+ * Black header bar, 3 blocks, two-column bottom section.
  */
 export const TechCard = forwardRef(function TechCard({ order }, ref) {
   if (!order) return null
 
   const is3D = order.order_type === 'sticker3D' || order.order_type === 'stickerpack3D'
+  const deadlineDate = order.deadline ? new Date(order.deadline) : null
+  const dayOfWeek = deadlineDate ? DAYS_RU[deadlineDate.getDay()] : ''
+
+  // Get preview image URL from attachments
+  const previewAttachment = order.attachments?.find(a => a.mime_type?.startsWith('image/'))
+  const previewUrl = previewAttachment
+    ? supabase.storage.from('order-files').getPublicUrl(previewAttachment.file_path).data?.publicUrl
+    : null
+
+  // Production info cells (9 numbered)
+  const prodCells = [
+    { n: 1, label: 'Тип', value: formatOrderType(order.order_type) },
+    { n: 2, label: 'Размер', value: `${order.width_mm} x ${order.height_mm} мм` },
+    { n: 3, label: 'Тираж', value: `${order.qty} шт` },
+    { n: 4, label: 'Ламинация', value: order.need_lam ? (order.lam_type || 'Да') : 'Нет' },
+    { n: 5, label: '3D', value: is3D ? 'Да' : 'Нет' },
+    { n: 6, label: 'БОПП пакет', value: order.bopp_bag ? 'Да' : 'Нет' },
+    { n: 7, label: 'Кол-во видов', value: order.design_variants || 1 },
+    { n: 8, label: 'Срочность', value: order.prod_days ? `${order.prod_days} дн.` : '—' },
+    { n: 9, label: 'Приоритет', value: order.priority || 'Обычный' },
+  ]
+
+  // Remaining height for block 3
+  const block3H = PAGE_H - HEADER_H - BLOCK1_H - BLOCK2_H - (4 * MM) // gaps
 
   return (
     <div
       ref={ref}
       className="bg-white text-black"
-      style={{ width: 595, minHeight: 842, fontFamily: 'Inter, sans-serif', fontSize: 11, padding: 32 }}
+      style={{ width: PAGE_W, height: PAGE_H, fontFamily: 'Inter, sans-serif', fontSize: 11, position: 'relative', overflow: 'hidden' }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderBottom: '2px solid #1a1a2e', paddingBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', letterSpacing: -0.5 }}>KONTORA24</div>
-          <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>Стикерное производство</div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>ТЕХ КАРТА</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#e94560' }}>#{order.number}</div>
-        </div>
+      {/* Black header bar — 210x20mm */}
+      <div style={{
+        width: PAGE_W,
+        height: HEADER_H,
+        backgroundColor: '#000000',
+        display: 'flex',
+        alignItems: 'center',
+        paddingLeft: 8 * MM,
+        borderRadius: `0 0 ${RADIUS}px ${RADIUS}px`,
+      }}>
+        <span style={{
+          color: '#ffffff',
+          fontFamily: "'Oswald', sans-serif",
+          fontWeight: 700,
+          fontSize: 34,
+          letterSpacing: 1,
+        }}>
+          ORD-{String(order.number).padStart(4, '0')}
+        </span>
       </div>
 
-      {/* Order info grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-        <Field label="Тип продукции" value={formatOrderType(order.order_type)} />
-        <Field label="Статус" value={order.status?.toUpperCase()} />
-        <Field label="Размер" value={`${order.width_mm} × ${order.height_mm} мм`} />
-        <Field label="Тираж" value={`${order.qty} шт`} />
-        <Field label="Кол-во видов" value={order.design_variants || 1} />
-        <Field label="Ламинация" value={order.need_lam ? (order.lam_type || 'Да') : 'Нет'} />
-        {order.deadline && <Field label="Дедлайн" value={formatDate(order.deadline)} />}
-        <Field label="Дата создания" value={formatDate(order.created_at)} />
-      </div>
-
-      {/* Client */}
-      {order.client && (
-        <div style={{ marginBottom: 20, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 6 }}>
-          <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase' }}>Клиент</div>
-          <div style={{ fontWeight: 600 }}>{order.client.name}</div>
-          {order.client.phone && <div style={{ color: '#6b7280' }}>{order.client.phone}</div>}
-        </div>
-      )}
-
-      {/* Production params */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: '#1a1a2e', textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>
-          Производственные данные
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <Field label="Материалы" value={formatPrice(order.cost_materials)} />
-          <Field label="Труд" value={formatPrice(order.cost_labor)} />
-          <Field label="Себестоимость" value={formatPrice(order.cost_total)} />
-          <Field label="Наценка" value={`×${order.markup || '—'}`} />
-          <Field label="Скидка" value={order.discount_pct ? `${(order.discount_pct * 100).toFixed(0)}%` : '—'} />
-          <Field label="Срок" value={`${order.prod_days || '—'} дн.`} />
-        </div>
-      </div>
-
-      {/* Price block */}
-      <div style={{ padding: 16, backgroundColor: '#1a1a2e', color: 'white', borderRadius: 8, marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 10, opacity: 0.7 }}>ИТОГО</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{formatPrice(order.price_final)}</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 10, opacity: 0.7 }}>ЗА ШТУКУ</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{formatPrice(order.price_per_unit)}</div>
+      {/* Block 1 — Main order info (64mm) */}
+      <div style={{
+        margin: `${MM}px ${MARGIN}px 0`,
+        height: BLOCK1_H,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        borderBottom: '1px solid #d1d5db',
+        paddingTop: 3 * MM,
+        paddingBottom: 2 * MM,
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12 }}>
+            <Field label="Клиент" value={order.client?.name || '—'} />
+            <Field label="Телефон" value={order.client?.phone || '—'} />
+            <Field label="Оформлен" value={formatDate(order.created_at)} />
+            <Field label="Менеджер" value={order.creator?.display_name || '—'} />
+            <Field label="Тип продукции" value={formatOrderType(order.order_type)} />
+            <Field label="Тираж" value={`${order.qty} шт`} />
+            <Field label="Размер" value={`${order.width_mm} x ${order.height_mm} мм`} />
+            <Field label="Ламинация" value={order.need_lam ? (order.lam_type || 'Да') : 'Нет'} />
           </div>
         </div>
+        <div style={{ textAlign: 'right', minWidth: 120, paddingLeft: 12 }}>
+          <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Дата сдачи</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#e94560', marginTop: 4 }}>
+            {deadlineDate ? deadlineDate.toLocaleDateString('ru-RU') : '—'}
+          </div>
+          {dayOfWeek && (
+            <div style={{ fontSize: 12, color: '#9ca3af', opacity: 0.6, marginTop: 2 }}>
+              {dayOfWeek}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Layout preview */}
-      <LayoutPreviewOnCard order={order} />
-
-      {/* Notes */}
-      {order.notes && (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 600 }}>ЗАМЕТКИ</div>
-          <div style={{ whiteSpace: 'pre-wrap', color: '#374151' }}>{order.notes}</div>
-        </div>
-      )}
-
-      {/* Production checklist */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: '#1a1a2e', textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>
-          Чек-лист
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          {[
-            'Дизайн подготовлен',
-            'Макет утверждён',
-            'Плёнка нарезана',
-            'Печать выполнена',
-            order.need_lam ? 'Ламинация выполнена' : null,
-            'Резка выполнена',
-            is3D ? 'Смола залита' : null,
-            is3D ? 'Смола высохла' : null,
-            'Сборка завершена',
-            'Контроль качества',
-          ].filter(Boolean).map((item) => (
-            <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 12, height: 12, border: '1.5px solid #d1d5db', borderRadius: 2 }} />
-              <span>{item}</span>
+      {/* Block 2 — Production info (42mm), 9 cells */}
+      <div style={{
+        margin: `0 ${MARGIN}px`,
+        height: BLOCK2_H,
+        borderBottom: '1px solid #d1d5db',
+        paddingTop: 2 * MM,
+        paddingBottom: 2 * MM,
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+          {prodCells.map((cell) => (
+            <div key={cell.n} style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: RADIUS,
+              padding: '4px 8px',
+              ...(cell.label === '3D' && is3D ? { border: '2px solid #e94560' } : {}),
+            }}>
+              <div style={{ fontSize: 8, color: '#9ca3af', fontWeight: 500 }}>{cell.n}. {cell.label}</div>
+              <div style={{ fontWeight: 600, fontSize: 11 }}>{cell.value}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Footer with QR code */}
-      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <div style={{ color: '#9ca3af', fontSize: 9 }}>
-          <div>Kontora24 · Тех карта #{order.number}</div>
-          <div style={{ marginTop: 2 }}>{new Date().toLocaleDateString('ru-RU')}</div>
+      {/* Block 3 — Preview + Comments (remaining space) */}
+      <div style={{
+        margin: `0 ${MARGIN}px`,
+        minHeight: block3H,
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 12,
+        paddingTop: 2 * MM,
+      }}>
+        {/* Left: preview */}
+        <div>
+          <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>
+            Превью макета
+          </div>
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Макет"
+              style={{ maxWidth: '100%', maxHeight: block3H - 30, objectFit: 'contain', borderRadius: RADIUS, border: '1px solid #e5e7eb' }}
+              crossOrigin="anonymous"
+            />
+          ) : (
+            <div style={{ height: 120, backgroundColor: '#f3f4f6', borderRadius: RADIUS, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 11 }}>
+              Нет макета
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <QRCodeSVG
-            value={`https://kontora24.vercel.app/orders/${order.id}`}
-            size={80}
-            level="M"
-            bgColor="#ffffff"
-            fgColor="#1a1a2e"
-          />
-          <div style={{ fontSize: 8, color: '#9ca3af', marginTop: 4 }}>Сканируйте для просмотра</div>
+
+        {/* Right: comments */}
+        <div>
+          <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>
+            Производственные комментарии
+          </div>
+          <div style={{ whiteSpace: 'pre-wrap', color: '#374151', fontSize: 10, lineHeight: 1.5 }}>
+            {order.notes || 'Нет комментариев'}
+          </div>
         </div>
       </div>
     </div>
   )
 })
 
-function LayoutPreviewOnCard({ order }) {
-  const printWidth = 300
-  const gap = 2
-  const scale = printWidth / 1230
-  const itemW = Math.round(order.width_mm * scale)
-  const itemH = Math.round(order.height_mm * scale)
-  const itemsPerRow = Math.floor(printWidth / (itemW + gap))
-  const rows = Math.min(Math.ceil(order.qty / Math.max(itemsPerRow, 1)), 5)
-
-  if (itemW < 3 || itemH < 3) return null
-
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: '#1a1a2e', textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>
-        Раскладка на листе
-      </div>
-      <div style={{ width: printWidth, background: '#f0f0f0', padding: 4, borderRadius: 4 }}>
-        {Array.from({ length: rows }).map((_, row) => (
-          <div key={row} style={{ display: 'flex', gap, marginBottom: gap }}>
-            {Array.from({ length: itemsPerRow }).map((_, col) => (
-              <div key={col} style={{ width: itemW, height: itemH, background: '#e94560', borderRadius: 2, opacity: 0.7 }} />
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function Field({ label, value }) {
   return (
-    <div>
+    <div style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500, textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ fontWeight: 600, marginTop: 1 }}>{value}</div>
+      <div style={{ fontWeight: 600, marginTop: 1, fontSize: 12 }}>{value}</div>
     </div>
   )
 }

@@ -30,11 +30,19 @@ export function useOrders(filters = {}) {
         .select('*, client:k24_clients(name, phone), assignee:k24_profiles!assigned_to(display_name, role), attachments:k24_order_attachments(id, file_name, file_path, mime_type)', { count: 'exact' })
 
       // Filters
-      if (filters.status && filters.status !== 'all') {
+      if (filters.statuses && filters.statuses.length > 0) {
+        query = query.in('status', filters.statuses)
+      } else if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status)
       }
       if (filters.orderType && filters.orderType !== 'all') {
         query = query.eq('order_type', filters.orderType)
+      }
+      if (filters.deadlineFrom) {
+        query = query.gte('deadline', filters.deadlineFrom)
+      }
+      if (filters.deadlineTo) {
+        query = query.lte('deadline', filters.deadlineTo)
       }
       if (filters.search) {
         const s = filters.search.replace(/[,()]/g, '')
@@ -65,7 +73,7 @@ export function useOrders(filters = {}) {
     } finally {
       setLoading(false)
     }
-  }, [filters.status, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to])
+  }, [filters.status, filters.statuses, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 

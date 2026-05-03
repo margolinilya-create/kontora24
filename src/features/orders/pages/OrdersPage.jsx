@@ -2,71 +2,46 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useOrders } from '../hooks/useOrders'
 import { StatusBadge } from '../components/StatusBadge'
-import { ORDER_STATUSES, ORDER_TYPES, PRIORITIES } from '@/shared/constants'
-import { formatPrice, formatRelative } from '@/shared/lib/utils'
+import { ORDER_TYPES } from '@/shared/constants'
 import { useDebounce } from '@/shared/hooks/useDebounce'
-import { updateOrderStatus } from '../hooks/useOrders'
 import { exportCSV } from '@/shared/lib/export'
-import { toast } from '@/shared/stores/toast-store'
+import { getDepartmentLabel } from '@/shared/lib/department-mapping'
 import { Pagination } from '@/shared/components/Pagination'
 import { TableSkeleton } from '@/shared/components/Skeleton'
 import { OrdersKanban } from '../components/OrdersKanban'
-import { SavedFilters } from '../components/SavedFilters'
+import { DepartmentFilter } from '../components/DepartmentFilter'
+import { DateRangeFilter } from '../components/DateRangeFilter'
 import Button from '@/shared/components/Button'
 import SearchInput from '@/shared/components/SearchInput'
 
-function SortHeader({ col, sortBy, sortAsc, onSort, children }) {
-  const isSorted = sortBy === col
-  const ariaSort = isSorted ? (sortAsc ? 'ascending' : 'descending') : 'none'
-
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onSort(col)
-    }
-  }
-
-  return (
-    <th
-      className="text-left px-4 py-3 font-medium text-text-muted cursor-pointer hover:text-text select-none"
-      onClick={() => onSort(col)}
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
-      role="button"
-      aria-sort={ariaSort}
-    >
-      {children}
-      {isSorted && <span className="ml-1">{sortAsc ? '↑' : '↓'}</span>}
-    </th>
-  )
-}
-
 export default function OrdersPage() {
-  const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [sortBy, setSortBy] = useState('created_at')
-  const [sortAsc, setSortAsc] = useState(false)
-  const [viewMode, setViewMode] = useState(() => window.innerWidth < 640 ? 'kanban' : 'table') // 'table' | 'kanban'
-  const [selected, setSelected] = useState(new Set())
-  const [bulkAction, setBulkAction] = useState('')
+  const [sortBy, setSortBy] = useState('deadline')
+  const [sortAsc, setSortAsc] = useState(true)
+  const [viewMode, setViewMode] = useState(() => window.innerWidth < 640 ? 'kanban' : 'table')
+  const [statusFilters, setStatusFilters] = useState([])
+  const [deadlineFrom, setDeadlineFrom] = useState(null)
+  const [deadlineTo, setDeadlineTo] = useState(null)
 
   const debouncedSearch = useDebounce(search, 300)
   const [pPage, setPPage] = useState(1)
   const [pPerPage, setPPerPage] = useState(25)
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPPage(1) }, [statusFilter, debouncedSearch, sortBy, sortAsc])
+  useEffect(() => { setPPage(1) }, [statusFilters, debouncedSearch, sortBy, sortAsc, deadlineFrom, deadlineTo])
 
   const from = (pPage - 1) * pPerPage
   const to = pPage * pPerPage - 1
 
   const { orders, totalCount, loading, error } = useOrders({
-    status: statusFilter,
+    statuses: statusFilters.length > 0 ? statusFilters : undefined,
     search: debouncedSearch,
     sortBy,
     sortAsc,
     from,
     to,
+    deadlineFrom,
+    deadlineTo,
   })
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pPerPage))
@@ -78,15 +53,19 @@ export default function OrdersPage() {
     changePerPage: (n) => { setPPerPage(n); setPPage(1) },
   }
 
-  function handleSort(col) {
-    if (sortBy === col) { setSortAsc(!sortAsc) }
-    else { setSortBy(col); setSortAsc(false) }
+  function handleSortChange(value) {
+    if (value === 'deadline') {
+      setSortBy('deadline')
+      setSortAsc(true)
+    } else {
+      setSortBy('number')
+      setSortAsc(false)
+    }
   }
 
   function isDeadlinePast(order) {
     if (!order.deadline) return false
-    const doneStatuses = ['done', 'cancelled']
-    if (doneStatuses.includes(order.status)) return false
+    if (['done', 'cancelled'].includes(order.status)) return false
     return new Date(order.deadline) < new Date()
   }
 
@@ -129,17 +108,19 @@ export default function OrdersPage() {
               variant="secondary"
               onClick={() => exportCSV(orders, [
                 { key: 'number', label: '№' },
-                { key: 'order_type', label: 'Тип' },
+                { key: 'order_type', label: 'Тип', format: (v) => ORDER_TYPES[v]?.label || v },
+                { key: 'client', label: 'Заказчик', format: (_, o) => o.client?.name || '' },
+                { key: 'status', label: 'Статус' },
+                { key: 'deadline', label: 'Дедлайн', format: (v) => v ? new Date(v).toLocaleDateString('ru-RU') : '' },
                 { key: 'width_mm', label: 'Ширина' },
                 { key: 'height_mm', label: 'Высота' },
                 { key: 'qty', label: 'Тираж' },
-                { key: 'status', label: 'Статус' },
                 { key: 'price_final', label: 'Цена' },
                 { key: 'cost_total', label: 'Себестоимость' },
                 { key: 'created_at', label: 'Создан' },
               ], 'orders.csv')}
             >
-              CSV
+              Выгрузить
             </Button>
           )}
           <Link
@@ -151,38 +132,42 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <SearchInput
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Поиск по номеру или заметкам..."
-        ariaLabel="Поиск заказов"
-        className="max-w-md"
-      />
-
-      {/* Status filters */}
-      <div className="flex flex-wrap gap-2">
-        <FilterBtn active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} label="Все" />
-        {Object.entries(ORDER_STATUSES).map(([key, s]) => (
-          <FilterBtn
-            key={key}
-            active={statusFilter === key}
-            onClick={() => setStatusFilter(key)}
-            label={s.label}
-            colorClass={statusFilter === key ? s.color : ''}
+      {/* Search + Sort + Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Поиск по номеру или заметкам..."
+          ariaLabel="Поиск заказов"
+          className="flex-1 max-w-md"
+        />
+        <div className="flex items-center gap-2">
+          <select
+            value={sortBy === 'deadline' ? 'deadline' : 'number'}
+            onChange={(e) => handleSortChange(e.target.value)}
+            className="rounded-lg border border-border px-3 py-2.5 text-sm bg-surface min-h-[44px]"
+            aria-label="Сортировка"
+          >
+            <option value="deadline">По сроку сдачи</option>
+            <option value="number">По номеру заказа</option>
+          </select>
+          <DepartmentFilter
+            selectedStatuses={statusFilters}
+            onChange={setStatusFilters}
           />
-        ))}
+        </div>
       </div>
 
-      {/* Saved filters */}
-      <SavedFilters
-        currentFilter={statusFilter}
-        onApply={(f) => setStatusFilter(f)}
+      {/* Date range filter */}
+      <DateRangeFilter
+        from={deadlineFrom}
+        to={deadlineTo}
+        onChange={({ from: f, to: t }) => { setDeadlineFrom(f); setDeadlineTo(t) }}
       />
 
-      {/* Table */}
+      {/* Table / Kanban */}
       {loading ? (
-        <TableSkeleton rows={6} cols={9} />
+        <TableSkeleton rows={6} cols={5} />
       ) : error ? (
         <div className="bg-danger/10 text-danger rounded-xl p-4 text-sm" role="alert">{error}</div>
       ) : orders.length === 0 ? (
@@ -196,130 +181,42 @@ export default function OrdersPage() {
           )}
         </div>
       ) : viewMode === 'kanban' ? (
-        <OrdersKanban orders={orders} onUpdated={() => { /* refetch handled by realtime */ }} />
+        <OrdersKanban orders={orders} onUpdated={() => {}} />
       ) : (
         <>
-          {/* Bulk actions bar */}
-          {selected.size > 0 && (
-            <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex flex-wrap items-center gap-3 mb-4">
-              <span className="text-sm font-medium">{selected.size} выбрано</span>
-              <select
-                value={bulkAction}
-                onChange={(e) => setBulkAction(e.target.value)}
-                aria-label="Массовое действие"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm"
-              >
-                <option value="">Действие...</option>
-                <option value="cancelled">Отменить</option>
-              </select>
-              <Button
-                size="sm"
-                onClick={async () => {
-                  if (!bulkAction) return
-                  let succeeded = 0
-                  let failed = 0
-                  for (const id of selected) {
-                    const order = orders.find((o) => o.id === id)
-                    if (order) {
-                      try {
-                        await updateOrderStatus(id, order.status, bulkAction)
-                        succeeded++
-                      } catch {
-                        failed++
-                      }
-                    }
-                  }
-                  if (failed > 0) {
-                    toast.error(`${failed} из ${selected.size} заказов не обновлены`)
-                  }
-                  if (succeeded > 0) {
-                    toast.success(`${succeeded} заказов обновлено`)
-                  }
-                  setSelected(new Set())
-                  setBulkAction('')
-                }}
-                disabled={!bulkAction}
-              >
-                Применить
-              </Button>
-              <button onClick={() => setSelected(new Set())} className="text-sm text-text-muted hover:text-text">
-                Снять выбор
-              </button>
-            </div>
-          )}
-
           <div className="bg-surface rounded-xl border border-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <caption className="sr-only">Список заказов</caption>
                 <thead>
                   <tr className="border-b border-border bg-surface-dim">
-                    <th className="px-3 py-3 w-8">
-                      <input
-                        type="checkbox"
-                        checked={selected.size === orders.length && orders.length > 0}
-                        onChange={(e) => setSelected(e.target.checked ? new Set(orders.map((o) => o.id)) : new Set())}
-                        aria-label="Выбрать все заказы"
-                        className="w-4 h-4 rounded border-border"
-                      />
-                    </th>
-                    <SortHeader col="number" sortBy={sortBy} sortAsc={sortAsc} onSort={handleSort}>#</SortHeader>
+                    <th className="text-left px-4 py-3 font-medium text-text-muted">№</th>
+                    <th className="text-left px-4 py-3 font-medium text-text-muted">Заказчик</th>
                     <th className="text-left px-4 py-3 font-medium text-text-muted">Тип</th>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Размер</th>
-                    <SortHeader col="qty" sortBy={sortBy} sortAsc={sortAsc} onSort={handleSort}>Тираж</SortHeader>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Статус</th>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Исполнитель</th>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Клиент</th>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Дедлайн</th>
-                    <SortHeader col="price_final" sortBy={sortBy} sortAsc={sortAsc} onSort={handleSort}>Цена</SortHeader>
-                    <SortHeader col="created_at" sortBy={sortBy} sortAsc={sortAsc} onSort={handleSort}>Создан</SortHeader>
+                    <th className="text-left px-4 py-3 font-medium text-text-muted">Этап</th>
+                    <th className="text-left px-4 py-3 font-medium text-text-muted">Срок сдачи</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr key={order.id} className={`border-b border-border last:border-0 hover:bg-surface-dim/50 transition-colors ${selected.has(order.id) ? 'bg-accent/5' : ''}`}>
-                      <td className="px-3 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(order.id)}
-                          onChange={(e) => {
-                            const next = new Set(selected)
-                            e.target.checked ? next.add(order.id) : next.delete(order.id)
-                            setSelected(next)
-                          }}
-                          aria-label={`Выбрать заказ #${order.number}`}
-                          className="w-4 h-4 rounded border-border"
-                        />
-                      </td>
+                    <tr key={order.id} className="border-b border-border last:border-0 hover:bg-surface-dim/50 transition-colors cursor-pointer" onClick={() => window.location.href = `/orders/${order.id}`}>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {(order.priority === 'urgent' || order.priority === 'high') && (
-                            <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${order.priority === 'urgent' ? 'bg-red-500' : 'bg-orange-500'}`} title={PRIORITIES[order.priority]?.label} />
-                          )}
-                          <Link to={`/orders/${order.id}`} className="font-medium text-accent hover:underline">
-                            {order.number}
-                          </Link>
-                        </div>
+                        <Link to={`/orders/${order.id}`} className="font-medium text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
+                          {order.number}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-text-muted">
+                        {order.client?.name || '—'}
                       </td>
                       <td className="px-4 py-3 text-text-muted">
                         {ORDER_TYPES[order.order_type]?.label || order.order_type}
                       </td>
-                      <td className="px-4 py-3 text-text-muted">
-                        {order.width_mm}x{order.height_mm}
-                      </td>
-                      <td className="px-4 py-3">{order.qty}</td>
-                      <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
-                      <td className="px-4 py-3 text-text-muted">
-                        {order.assignee?.display_name || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-text-muted">
-                        {order.client_name || order.clients?.name || '—'}
+                      <td className="px-4 py-3">
+                        <StatusBadge status={order.status} />
                       </td>
                       <td className={`px-4 py-3 ${isDeadlinePast(order) ? 'text-danger font-medium' : 'text-text-muted'}`}>
                         {formatDeadline(order.deadline)}
                       </td>
-                      <td className="px-4 py-3 text-right font-medium">{formatPrice(order.price_final)}</td>
-                      <td className="px-4 py-3 text-right text-text-muted">{formatRelative(order.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -330,19 +227,5 @@ export default function OrdersPage() {
         </>
       )}
     </div>
-  )
-}
-
-function FilterBtn({ active, onClick, label, colorClass = '' }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={`px-3 py-2.5 min-h-[44px] rounded-lg text-sm transition-colors ${
-        active ? colorClass || 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
-      } ${active && colorClass ? 'font-medium' : ''}`}
-    >
-      {label}
-    </button>
   )
 }

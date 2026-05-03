@@ -9,7 +9,7 @@ export function exportCSV(data, columns, filename = 'export.csv') {
   const header = columns.map((c) => `"${c.label}"`).join(',')
   const rows = data.map((row) =>
     columns.map((c) => {
-      const val = row[c.key]
+      const val = c.format ? c.format(row[c.key], row) : row[c.key]
       if (val == null) return '""'
       const str = String(val).replace(/"/g, '""')
       return `"${str}"`

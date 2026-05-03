@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_STATUSES, ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
-import { formatPrice, formatRelative } from '@/shared/lib/utils'
+import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
+import { formatRelative } from '@/shared/lib/utils'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { CompleteTaskModal } from '@/features/production/components/CompleteTaskModal'
@@ -15,10 +15,7 @@ import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { toast } from '@/shared/stores/toast-store'
-import { subDays, format, startOfDay } from 'date-fns'
-
-// Lazy load Recharts (295KB) — only managers see charts
-const MiniCharts = lazy(() => import('./MiniCharts'))
+import { subDays, startOfDay } from 'date-fns'
 
 const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }) {
   const [showComplete, setShowComplete] = useState(false)
@@ -82,7 +79,7 @@ export default function DashboardPage() {
   const isWorker = hasRole(['designer', 'printer', 'assembler', 'resin_pourer'])
   const role = profile?.role
 
-  const [data, setData] = useState({ orders: [], statusCounts: {}, lowStock: [], myOrders: [], deadlines: [], activity: [] })
+  const [data, setData] = useState({ orders: [], statusCounts: {}, lowStock: [], allMaterials: [], myOrders: [], deadlines: [], activity: [] })
   const [loading, setLoading] = useState(true)
   const [workerStats, setWorkerStats] = useState({ todayDone: 0, weekDone: 0 })
   const [batchCompleting, setBatchCompleting] = useState(false)
@@ -111,7 +108,7 @@ export default function DashboardPage() {
       .filter((o) => o.deadline && o.status !== 'done' && o.status !== 'cancelled' && new Date(o.deadline) <= threeDays)
       .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
 
-    setData({ orders, statusCounts, lowStock, myOrders, deadlines, activity: activityRes.data || [] })
+    setData({ orders, statusCounts, lowStock, allMaterials: materials, myOrders, deadlines, activity: activityRes.data || [] })
     setLoading(false)
   }, [profile])
 
@@ -158,30 +155,6 @@ export default function DashboardPage() {
     return () => { supabase.removeChannel(channel); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [fetchData, fetchWorkerStats])
 
-  // Mini chart data for managers
-  const [chartData, setChartData] = useState([])
-  useEffect(() => {
-    if (!isManager) return
-    async function fetchChartData() {
-      const since = subDays(new Date(), 7).toISOString()
-      const { data } = await supabase
-        .from('k24_orders')
-        .select('price_final, created_at')
-        .gte('created_at', since)
-        .neq('status', 'cancelled')
-
-      const byDay = {}
-      ;(data || []).forEach((o) => {
-        const day = format(new Date(o.created_at), 'dd.MM')
-        if (!byDay[day]) byDay[day] = { day, revenue: 0, count: 0 }
-        byDay[day].revenue += Number(o.price_final || 0)
-        byDay[day].count += 1
-      })
-      setChartData(Object.values(byDay))
-    }
-    fetchChartData()
-  }, [isManager])
-
   // Role-specific queue status (memoized)
   const { myTasks, queueTasks } = useMemo(() => {
     const queueStatuses = {
@@ -224,6 +197,21 @@ export default function DashboardPage() {
       setBatchCompleting(false)
     }
   }
+
+  // Manager dashboard computed values
+  const workStatuses = ['design', 'design_done', 'print', 'print_done', 'post_processing', 'resin_pouring', 'assembly', 'packaging', 'otk']
+  const ordersInWork = useMemo(() => data.orders.filter(o => workStatuses.includes(o.status)), [data.orders])
+  const ordersDueToday = useMemo(() => {
+    const today = startOfDay(new Date())
+    const tomorrow = new Date(today.getTime() + MS_PER_DAY)
+    return data.orders.filter(o => {
+      if (!o.deadline || o.status === 'done' || o.status === 'cancelled') return false
+      const d = new Date(o.deadline)
+      return d >= today && d < tomorrow
+    })
+  }, [data.orders])
+  const outOfStock = useMemo(() => data.allMaterials.filter(m => m.min_qty > 0 && Number(m.stock_qty) === 0), [data.allMaterials])
+  const lowStockOnly = useMemo(() => data.allMaterials.filter(m => m.min_qty > 0 && Number(m.stock_qty) > 0 && Number(m.stock_qty) <= Number(m.min_qty)), [data.allMaterials])
 
   return (
     <div className="space-y-6">
@@ -308,180 +296,81 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* Manager dashboard header */}
+      {/* Manager dashboard */}
       {isManager && (
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-text-muted">
-            {profile ? `${profile.display_name}` : ''}
-          </p>
-        </div>
-      )}
+        <>
+          <h1 className="text-2xl font-bold">{profile?.display_name || 'Dashboard'}</h1>
 
-      {/* My assigned orders (managers only) */}
-      {data.myOrders.length > 0 && isManager && (
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h2 className="font-semibold mb-3">Мои заказы ({data.myOrders.length})</h2>
-          <div className="space-y-2">
-            {data.myOrders.slice(0, 5).map((order) => (
-              <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-dim transition-colors">
-                <div className="flex items-center gap-3">
-                  <span className="font-medium text-sm">#{order.number}</span>
-                  <StatusBadge status={order.status} />
-                </div>
-                <span className="text-sm text-text-muted">{formatRelative(order.created_at)}</span>
-              </Link>
-            ))}
-          </div>
-          {data.myOrders.length > 5 && (
-            <Link to="/orders?assignee=me" className="block text-sm text-accent hover:underline mt-3">
-              Показать все
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* Status cards — managers/admins */}
-      {isManager && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {Object.entries(ORDER_STATUSES)
-            .filter(([key]) => key !== 'cancelled')
-            .map(([key, s]) => (
-              <Link key={key} to={`/orders?status=${key}`} className="bg-surface rounded-xl border border-border p-4 hover:shadow-sm transition-shadow">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.color}`}>{s.label}</span>
-                <p className="text-2xl font-bold mt-2">{data.statusCounts[key] || 0}</p>
-              </Link>
-            ))}
-        </div>
-      )}
-
-      {/* Mini charts — managers/admins (lazy loaded) */}
-      {isManager && chartData.length > 0 && (
-        <Suspense fallback={<div className="h-[92px]" />}>
-          <MiniCharts chartData={chartData} />
-        </Suspense>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent orders — managers */}
-        {isManager && (
-          <div className="lg:col-span-2 bg-surface rounded-xl border border-border p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold">Последние заказы</h2>
-              <Link to="/orders" className="text-sm text-accent hover:underline">Все</Link>
+          {/* Top metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-surface rounded-xl border border-border p-5">
+              <p className="text-text-muted text-sm">Заказов в работе</p>
+              <p className="text-3xl font-bold mt-1">{ordersInWork.length}</p>
             </div>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Spinner size="sm" />
-              </div>
-            ) : data.orders.length === 0 ? (
-              <p className="text-text-muted text-sm py-4">Нет заказов</p>
-            ) : (
+            <div className="bg-surface rounded-xl border border-border p-5">
+              <p className="text-text-muted text-sm">К сдаче сегодня</p>
+              <p className="text-3xl font-bold mt-1">{ordersDueToday.length}</p>
+            </div>
+          </div>
+
+          {/* Orders due today list */}
+          {ordersDueToday.length > 0 && (
+            <div className="bg-surface rounded-xl border border-border p-5">
+              <h2 className="font-semibold mb-3">Сдача сегодня</h2>
               <div className="space-y-1">
-                {data.orders.slice(0, 10).map((order) => (
+                {ordersDueToday.map((order) => (
                   <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-surface-dim transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="font-medium text-sm">#{order.number}</span>
                       <span className="text-sm text-text-muted truncate">
-                        {ORDER_TYPES[order.order_type]?.label} · {order.qty} шт
+                        {order.client?.name || ''}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <StatusBadge status={order.status} />
-                      {isManager && <span className="text-sm font-medium">{formatPrice(order.price_final)}</span>}
-                    </div>
+                    <StatusBadge status={order.status} />
                   </Link>
                 ))}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Sidebar */}
-        {isManager && (
-          <div className="space-y-4">
-            {/* Low stock */}
-            <div className="bg-surface rounded-xl border border-border p-5">
-              <h2 className="font-semibold mb-3">Склад</h2>
-              {data.lowStock.length === 0 ? (
-                <p className="text-text-muted text-sm">Все материалы в норме</p>
+          {/* Warehouse block */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Out of stock */}
+            <div className="bg-surface rounded-xl border border-danger/30 p-5">
+              <h2 className="font-semibold mb-3 text-danger">Закончились</h2>
+              {outOfStock.length === 0 ? (
+                <p className="text-text-muted text-sm">Все в наличии</p>
               ) : (
                 <div className="space-y-2">
-                  {data.lowStock.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between text-sm">
+                  {outOfStock.map((m) => (
+                    <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-1 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
                       <span className="text-danger font-medium">{m.name}</span>
-                      <span className="text-text-muted">{Number(m.stock_qty).toFixed(1)} / {Number(m.min_qty).toFixed(1)} {m.unit}</span>
-                    </div>
+                      <span className="text-text-muted">{m.unit}</span>
+                    </Link>
                   ))}
-                  <Link to="/warehouse" className="block text-sm text-accent hover:underline mt-2">Склад</Link>
                 </div>
               )}
             </div>
 
-            {/* Deadlines */}
-            {data.deadlines.length > 0 && (
-              <div className="bg-surface rounded-xl border border-danger/30 p-5">
-                <h2 className="font-semibold mb-3 text-danger">Дедлайны ({data.deadlines.length})</h2>
+            {/* Low stock */}
+            <div className="bg-surface rounded-xl border border-warning/30 p-5">
+              <h2 className="font-semibold mb-3 text-warning">Заканчиваются</h2>
+              {lowStockOnly.length === 0 ? (
+                <p className="text-text-muted text-sm">Все в норме</p>
+              ) : (
                 <div className="space-y-2">
-                  {data.deadlines.map((o) => {
-                    const overdue = new Date(o.deadline) < new Date()
-                    return (
-                      <Link key={o.id} to={`/orders/${o.id}`} className="flex items-center justify-between text-sm py-1.5 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
-                        <span className="font-medium">#{o.number}</span>
-                        <span className={overdue ? 'text-danger font-semibold' : 'text-warning'}>
-                          {overdue ? 'Просрочен!' : new Date(o.deadline).toLocaleDateString('ru-RU')}
-                        </span>
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Activity feed */}
-            {data.activity.length > 0 && (
-              <div className="bg-surface rounded-xl border border-border p-5">
-                <h2 className="font-semibold mb-3">Активность</h2>
-                <div className="space-y-2">
-                  {data.activity.slice(0, 8).map((a) => (
-                    <div key={a.id} className="flex items-start gap-2 text-xs">
-                      <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 flex-shrink-0" />
-                      <div>
-                        <span className="font-medium">{a.changed_by_profile?.display_name || 'Система'}</span>
-                        {' '}
-                        {a.order_id && (
-                          <Link to={`/orders/${a.order_id}`} className="text-accent hover:underline">
-                            #{a.order?.number || '...'}
-                          </Link>
-                        )}
-                        {' '}
-                        <span className="text-text-muted">
-                          {a.from_status ? `${ORDER_STATUSES[a.from_status]?.label} -> ` : ''}
-                          {ORDER_STATUSES[a.to_status]?.label || a.to_status}
-                        </span>
-                        <span className="text-text-muted ml-1">· {formatRelative(a.created_at)}</span>
-                      </div>
-                    </div>
+                  {lowStockOnly.map((m) => (
+                    <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-1 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
+                      <span className="text-warning font-medium">{m.name}</span>
+                      <span className="text-text-muted">{Number(m.stock_qty).toFixed(1)} / {Number(m.min_qty).toFixed(1)} {m.unit}</span>
+                    </Link>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Quick actions */}
-            <div className="bg-surface rounded-xl border border-border p-5">
-              <h2 className="font-semibold mb-3">Быстрые действия</h2>
-              <div className="space-y-2">
-                <Link to="/calculator" className="block w-full bg-accent hover:bg-accent-hover text-white font-medium rounded-lg py-2.5 text-sm text-center transition-colors">
-                  Новый заказ
-                </Link>
-                <Link to="/analytics" className="block w-full border border-border text-text hover:bg-surface-dim font-medium rounded-lg py-2.5 text-sm text-center transition-colors">
-                  Экспорт отчёта
-                </Link>
-              </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   )
 }

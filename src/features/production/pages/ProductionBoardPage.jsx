@@ -103,9 +103,37 @@ export default function ProductionBoardPage() {
   }, [])
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
   const keyboardSensor = useSensor(KeyboardSensor)
   const sensors = useSensors(pointerSensor, touchSensor, keyboardSensor)
+
+  // Track scroll position for fade indicators
+  const [scrollState, setScrollState] = useState({ start: true, end: false })
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    function onScroll() {
+      setScrollState({
+        start: el.scrollLeft < 10,
+        end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 10,
+      })
+    }
+    onScroll()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [viewMode])
+
+  // Auto-scroll to worker's relevant column on mount (mobile only)
+  useEffect(() => {
+    if (!profile || !scrollRef.current || window.innerWidth > 640) return
+    const roleColMap = { designer: 'design', printer: 'print', resin_pourer: 'resin_pouring', assembler: 'assembly' }
+    const targetCol = roleColMap[profile.role]
+    if (!targetCol) return
+    const colEl = scrollRef.current.querySelector(`[data-col="${targetCol}"]`)
+    if (colEl) {
+      setTimeout(() => colEl.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }), 300)
+    }
+  }, [profile, viewMode])
 
   const allOrders = useMemo(() => {
     const orders = allFetchedOrders.filter((o) => PRODUCTION_STATUSES.has(o.status))
@@ -277,6 +305,14 @@ export default function ProductionBoardPage() {
             onDragEnd={handleDragEnd}
             onDragCancel={() => setActiveId(null)}
           >
+            <div className="relative">
+              {/* Scroll fade indicators */}
+              {!scrollState.start && (
+                <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-surface-dim to-transparent z-10 pointer-events-none sm:hidden" />
+              )}
+              {!scrollState.end && (
+                <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-surface-dim to-transparent z-10 pointer-events-none sm:hidden" />
+              )}
             <div
               ref={scrollRef}
               className="flex gap-3 overflow-x-auto pb-4 kanban-scroll scroll-smooth snap-x snap-mandatory sm:snap-none"
@@ -317,6 +353,7 @@ export default function ProductionBoardPage() {
                   </div>
                 )
               })}
+            </div>
             </div>
 
             <DragOverlay dropAnimation={dropAnimation}>

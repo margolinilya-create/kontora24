@@ -32,6 +32,7 @@ function formatDeadline(deadline) {
 
 const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = false }) {
   const [showTechCard, setShowTechCard] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const now = Date.now()
   const timeInStatus = formatTimeInStatus(order.status_changed_at || order.updated_at)
   const deadlineTime = order.deadline ? new Date(order.deadline).getTime() : null
@@ -78,22 +79,27 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
         </p>
       </div>
 
-      {/* Attachment thumbnail */}
-      {!isOverlay && <AttachmentThumbnail attachments={order.attachments} />}
-
-      {/* Client */}
-      {order.client?.name && (
-        <p className="text-xs text-text-muted truncate">{order.client.name}</p>
-      )}
-
-      {/* Drying timer */}
-      {order.status === 'resin_pouring' && order.dry_until && (
-        <DryingTimer dryUntil={order.dry_until} />
-      )}
-
-      {/* Timer */}
+      {/* Secondary details — always visible on desktop, expandable on mobile */}
       {!isOverlay && (
-        <TaskTimer orderId={order.id} orderStatus={order.status} compact />
+        <div className={`flex flex-col gap-2.5 ${expanded ? '' : 'hidden sm:flex'}`}>
+          <AttachmentThumbnail attachments={order.attachments} />
+          {order.client?.name && (
+            <p className="text-xs text-text-muted truncate">{order.client.name}</p>
+          )}
+          {order.status === 'resin_pouring' && order.dry_until && (
+            <DryingTimer dryUntil={order.dry_until} />
+          )}
+          <TaskTimer orderId={order.id} orderStatus={order.status} compact />
+        </div>
+      )}
+      {!isOverlay && !expanded && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="text-xs text-accent/70 hover:text-accent transition-colors py-1 min-h-[44px] sm:hidden"
+        >
+          Подробнее...
+        </button>
       )}
 
       {/* Footer: meta row */}

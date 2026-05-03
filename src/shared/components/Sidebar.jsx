@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useThemeStore } from '@/shared/stores/theme-store'
 import { useSidebarStore } from '@/shared/stores/sidebar-store'
 import { NAV_ITEMS } from '@/shared/constants'
 import { cn } from '@/shared/lib/utils'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
 const ICONS = {
   LayoutDashboard: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>,
@@ -50,11 +51,12 @@ export function Sidebar({ collapsed }) {
   const counts = useSidebarStore((s) => s.counts)
   const lowStockCount = useSidebarStore((s) => s.lowStockCount)
   const fetchCounts = useSidebarStore((s) => s.fetchCounts)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const role = profile?.role || 'viewer'
 
   useEffect(() => {
     fetchCounts()
-    const interval = setInterval(fetchCounts, 30000)
+    const interval = setInterval(fetchCounts, 60000) // Reduced from 30s to 60s
     return () => clearInterval(interval)
   }, [fetchCounts])
 
@@ -84,7 +86,7 @@ export function Sidebar({ collapsed }) {
         {groupedNav.map((group) => (
           <div key={group.label} className="mb-2">
             {!collapsed && (
-              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/60">
+              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80">
                 {group.label}
               </p>
             )}
@@ -107,7 +109,7 @@ export function Sidebar({ collapsed }) {
                   <span className="relative">
                     <Icon />
                     {hasAlert && (
-                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" aria-label="Низкий остаток материалов" />
+                      <span role="img" className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" aria-label="Низкий остаток материалов" />
                     )}
                   </span>
                   {!collapsed && (
@@ -153,7 +155,7 @@ export function Sidebar({ collapsed }) {
           {!collapsed && <span>{theme === 'light' ? 'Тёмная' : 'Светлая'}</span>}
         </button>
         <button
-          onClick={() => { if (window.confirm('Вы уверены, что хотите выйти?')) signOut() }}
+          onClick={() => setShowLogoutConfirm(true)}
           className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-white/75 hover:bg-white/10 hover:text-white transition-colors"
           aria-label="Выйти"
         >
@@ -161,6 +163,15 @@ export function Sidebar({ collapsed }) {
           {!collapsed && <span>Выйти</span>}
         </button>
       </div>
+
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={() => { setShowLogoutConfirm(false); signOut() }}
+        title="Выйти из системы?"
+        message="Вы уверены, что хотите выйти?"
+        confirmText="Выйти"
+      />
     </aside>
   )
 }

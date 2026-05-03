@@ -86,6 +86,7 @@ export default async function handler(req, res) {
       user: { id: authData.user.id, email, display_name, role },
     })
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Ошибка создания пользователя' })
+    console.error('User creation error:', err)
+    return res.status(500).json({ error: 'Ошибка создания пользователя' })
   }
 }

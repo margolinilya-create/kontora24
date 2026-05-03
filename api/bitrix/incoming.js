@@ -71,6 +71,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Verify shared secret
+  const secret = req.headers['x-bitrix-secret'] || req.query?.token
+  if (!secret || secret !== process.env.BITRIX_WEBHOOK_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+
   try {
     const body = req.body
 
@@ -147,6 +153,6 @@ export default async function handler(req, res) {
     })
   } catch (err) {
     console.error('Bitrix webhook error:', err)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

@@ -33,12 +33,21 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
       // 1. Stop active timer (if any)
       const TIMER_KEY = 'kontora24_active_timer'
       const savedTimer = JSON.parse(localStorage.getItem(TIMER_KEY) || 'null')
-      if (savedTimer && savedTimer.orderId === order.id) {
+      if (savedTimer && savedTimer.orderId === order.id && savedTimer.entryId) {
         const endedAt = new Date()
-        await supabase.from('k24_time_entries')
-          .update({ ended_at: endedAt.toISOString(), duration_minutes: Math.round((endedAt - new Date(savedTimer.startedAt || endedAt)) / 60000) })
+        // Fetch started_at from DB since localStorage only stores orderId + entryId
+        const { data: timerEntry } = await supabase
+          .from('k24_time_entries')
+          .select('started_at')
           .eq('id', savedTimer.entryId)
           .is('ended_at', null)
+          .single()
+        if (timerEntry) {
+          const durationMinutes = Math.max(1, Math.round((endedAt - new Date(timerEntry.started_at)) / 60000))
+          await supabase.from('k24_time_entries')
+            .update({ ended_at: endedAt.toISOString(), duration_minutes: durationMinutes })
+            .eq('id', savedTimer.entryId)
+        }
         localStorage.removeItem(TIMER_KEY)
       }
 
@@ -111,6 +120,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
                 <select
                   value={item.materialId}
                   onChange={(e) => updateConsumptionRow(i, 'materialId', e.target.value)}
+                  aria-label="Выбор материала"
                   className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text"
                 >
                   <option value="">Материал</option>
@@ -121,14 +131,16 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
               </div>
               <input
                 type="number"
+                inputMode="decimal"
                 value={item.qty}
                 onChange={(e) => updateConsumptionRow(i, 'qty', e.target.value)}
                 placeholder="Кол-во"
+                aria-label="Количество"
                 className="w-24 rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text"
                 min="0"
                 step="any"
               />
-              <button onClick={() => removeConsumptionRow(i)} className="text-text-muted hover:text-danger text-lg px-1">&times;</button>
+              <button onClick={() => removeConsumptionRow(i)} aria-label="Удалить строку расхода" className="text-text-muted hover:text-danger text-lg px-2 min-w-[44px] min-h-[44px] flex items-center justify-center">&times;</button>
             </div>
           ))}
 

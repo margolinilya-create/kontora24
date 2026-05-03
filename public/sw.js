@@ -1,6 +1,7 @@
-const CACHE_VERSION = 'v2'
+const CACHE_VERSION = 'v3'
 const STATIC_CACHE = `kontora24-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `kontora24-dynamic-${CACHE_VERSION}`
+const MAX_DYNAMIC_CACHE_SIZE = 50
 
 // App shell — pre-cached on install
 const APP_SHELL = [
@@ -80,6 +81,7 @@ async function networkFirst(request) {
     if (response.ok) {
       const cache = await caches.open(DYNAMIC_CACHE)
       cache.put(request, response.clone())
+      trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE_SIZE)
     }
     return response
   } catch {
@@ -94,9 +96,22 @@ async function staleWhileRevalidate(request) {
   const cached = await cache.match(request)
   const fetchPromise = fetch(request)
     .then((response) => {
-      if (response.ok) cache.put(request, response.clone())
+      if (response.ok) {
+        cache.put(request, response.clone())
+        trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE_SIZE)
+      }
       return response
     })
     .catch(() => cached)
   return cached || fetchPromise
+}
+
+// Limit cache size to prevent unbounded growth on worker phones
+async function trimCache(cacheName, maxItems) {
+  const cache = await caches.open(cacheName)
+  const keys = await cache.keys()
+  if (keys.length > maxItems) {
+    await cache.delete(keys[0])
+    trimCache(cacheName, maxItems)
+  }
 }

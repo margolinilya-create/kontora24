@@ -22,7 +22,7 @@ export function Toaster() {
           <span>{t.message}</span>
           <button
             onClick={() => removeToast(t.id)}
-            className="opacity-70 hover:opacity-100 text-lg leading-none"
+            className="opacity-70 hover:opacity-100 text-lg leading-none p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
             aria-label="Закрыть"
           >
             &times;

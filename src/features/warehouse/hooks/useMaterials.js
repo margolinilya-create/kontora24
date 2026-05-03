@@ -39,7 +39,7 @@ export function useMaterials() {
     const materialsWithReservations = (data || []).map(m => ({
       ...m,
       reserved: reservedByMaterial[m.id] || 0,
-      available: Number(m.stock_qty) - (reservedByMaterial[m.id] || 0),
+      available: Math.max(0, Number(m.stock_qty) - (reservedByMaterial[m.id] || 0)),
     }))
 
     setMaterials(materialsWithReservations)

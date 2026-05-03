@@ -1,4 +1,4 @@
-import { useState, memo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
@@ -9,7 +9,7 @@ import { OperationChecklist } from './OperationChecklist'
 import { TechCardPreview } from './TechCardPreview'
 import { ORDER_TYPES, PRIORITIES, MS_PER_DAY } from '@/shared/constants'
 import { supabase } from '@/shared/lib/supabase'
-import { differenceInHours, differenceInMinutes } from 'date-fns'
+// Use simple arithmetic instead of date-fns to avoid pulling it into production board chunk
 
 const PRIORITY_BORDER = {
   urgent: 'border-l-danger',
@@ -18,8 +18,9 @@ const PRIORITY_BORDER = {
 
 function formatTimeInStatus(timestamp) {
   if (!timestamp) return null
-  const h = differenceInHours(new Date(), new Date(timestamp))
-  if (h < 1) return `${differenceInMinutes(new Date(), new Date(timestamp))} мин`
+  const ms = Date.now() - new Date(timestamp).getTime()
+  const h = Math.floor(ms / 3600000)
+  if (h < 1) return `${Math.floor(ms / 60000)} мин`
   if (h < 24) return `${h} ч`
   return `${Math.floor(h / 24)} дн`
 }
@@ -29,12 +30,13 @@ function formatDeadline(deadline) {
   return new Date(deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
 }
 
-function CardContent({ order, onUpdated, isOverlay = false }) {
+const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = false }) {
   const [showTechCard, setShowTechCard] = useState(false)
+  const now = Date.now()
   const timeInStatus = formatTimeInStatus(order.status_changed_at || order.updated_at)
-  const isOverdue = order.deadline && new Date(order.deadline) < new Date()
-  const isUrgentDeadline = order.deadline && !isOverdue &&
-    (new Date(order.deadline) - new Date()) < MS_PER_DAY
+  const deadlineTime = order.deadline ? new Date(order.deadline).getTime() : null
+  const isOverdue = deadlineTime && deadlineTime < now
+  const isUrgentDeadline = deadlineTime && !isOverdue && (deadlineTime - now) < MS_PER_DAY
   const priority = PRIORITIES[order.priority]
   const showPriority = order.priority === 'urgent' || order.priority === 'high'
 
@@ -57,7 +59,7 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
             <button
               onClick={(e) => { e.stopPropagation(); setShowTechCard(true) }}
               onPointerDown={(e) => e.stopPropagation()}
-              className="text-[11px] text-text-muted hover:text-accent transition-colors"
+              className="text-xs text-text-muted hover:text-accent transition-colors min-h-[44px] px-1"
             >
               Тех карта
             </button>
@@ -77,17 +79,7 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
       </div>
 
       {/* Attachment thumbnail */}
-      {!isOverlay && order.attachments?.length > 0 && (() => {
-        const img = order.attachments.find(a => a.mime_type?.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(a.file_name))
-        if (!img?.file_path) return null
-        const { data } = supabase.storage.from('order-files').getPublicUrl(img.file_path)
-        if (!data?.publicUrl) return null
-        return (
-          <div className="rounded-lg overflow-hidden h-16">
-            <img src={data.publicUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-          </div>
-        )
-      })()}
+      {!isOverlay && <AttachmentThumbnail attachments={order.attachments} />}
 
       {/* Client */}
       {order.client?.name && (
@@ -109,7 +101,7 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
         <div className="flex items-center gap-1.5 min-w-0">
           {/* Deadline */}
           {order.deadline && (
-            <span className={`text-[11px] shrink-0 ${
+            <span className={`text-xs shrink-0 ${
               isOverdue
                 ? 'text-danger font-medium'
                 : isUrgentDeadline
@@ -121,7 +113,7 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
           )}
           {/* Assignee */}
           {order.assignee?.display_name && (
-            <span className="text-[11px] text-text-muted truncate">
+            <span className="text-xs text-text-muted truncate">
               · {order.assignee.display_name}
             </span>
           )}
@@ -130,7 +122,7 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Priority badge */}
           {showPriority && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${priority?.color}`}>
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${priority?.color}`}>
               {priority?.label}
             </span>
           )}
@@ -138,11 +130,31 @@ function CardContent({ order, onUpdated, isOverlay = false }) {
           <OperationChecklist order={order} compact />
           {/* Time in status */}
           {timeInStatus && (
-            <span className="text-[10px] text-text-muted">{timeInStatus}</span>
+            <span className="text-xs text-text-muted">{timeInStatus}</span>
           )}
         </div>
       </div>
       {!isOverlay && <TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} />}
+    </div>
+  )
+})
+
+function AttachmentThumbnail({ attachments }) {
+  const imgAttachment = useMemo(() => {
+    if (!attachments?.length) return null
+    return attachments.find(a => a.mime_type?.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(a.file_name))
+  }, [attachments])
+
+  const publicUrl = useMemo(() => {
+    if (!imgAttachment?.file_path) return null
+    const { data } = supabase.storage.from('order-files').getPublicUrl(imgAttachment.file_path)
+    return data?.publicUrl || null
+  }, [imgAttachment?.file_path])
+
+  if (!publicUrl) return null
+  return (
+    <div className="rounded-lg overflow-hidden h-16">
+      <img src={publicUrl} alt="" width={260} height={64} className="w-full h-full object-cover" loading="lazy" />
     </div>
   )
 }

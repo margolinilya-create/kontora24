@@ -14,6 +14,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Verify shared secret
+  const secret = req.headers['x-bitrix-secret'] || req.query?.token
+  if (!secret || secret !== process.env.BITRIX_WEBHOOK_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+
   try {
     const { order_number, status, price_final, cost_total, bitrix_deal_id } = req.body
 
@@ -34,6 +40,19 @@ export default async function handler(req, res) {
     }
 
     const bitrix_webhook_url = bitrixConfig.webhookUrl
+
+    // Validate Bitrix webhook URL (prevent SSRF)
+    try {
+      const parsed = new URL(bitrix_webhook_url)
+      if (!parsed.hostname.endsWith('bitrix24.ru') && !parsed.hostname.endsWith('bitrix24.com')) {
+        return res.status(400).json({ error: 'Invalid Bitrix webhook URL' })
+      }
+      if (parsed.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Bitrix webhook URL must use HTTPS' })
+      }
+    } catch {
+      return res.status(400).json({ error: 'Invalid Bitrix webhook URL format' })
+    }
 
     // Map Kontora status to Bitrix stage
     const STAGE_MAP = {
@@ -71,6 +90,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, bitrix_response: result })
   } catch (err) {
     console.error('Bitrix status update error:', err)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

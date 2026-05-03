@@ -18,7 +18,7 @@ export function OperationChecklist({ order, compact = false }) {
 
   if (compact) {
     return (
-      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
         completedCount === operations.length
           ? 'bg-green-500/15 text-green-500'
           : 'bg-surface-dim text-text-muted'

@@ -2,6 +2,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { Outlet, useLocation, Link } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { ErrorBoundary } from './ErrorBoundary'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import Spinner from '@/shared/components/Spinner'
 import { useSidebarStore } from '@/shared/stores/sidebar-store'
 import { cn } from '@/shared/lib/utils'
@@ -40,6 +41,8 @@ export function Layout() {
   const basePath = '/' + (location.pathname.split('/').filter(Boolean).slice(0, 2).join('/') || '')
   const pageTitle = PAGE_TITLES[location.pathname] || PAGE_TITLES[basePath] || PAGE_TITLES['/' + location.pathname.split('/')[1]] || ''
 
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
   // Simplified layout for worker roles
   const isWorker = profile && ['designer', 'printer', 'assembler', 'resin_pourer'].includes(profile.role)
 
@@ -51,7 +54,7 @@ export function Layout() {
             <span className="font-semibold">{ROLES[profile.role]?.label}</span>
             <span className="text-white/60 ml-2 text-sm">{profile.display_name}</span>
           </div>
-          <button onClick={() => { if (window.confirm('Выйти?')) signOut() }} className="text-white/60 hover:text-white text-sm">
+          <button onClick={() => setShowLogoutConfirm(true)} className="text-white/60 hover:text-white text-sm min-h-[44px]">
             Выход
           </button>
         </header>
@@ -62,6 +65,14 @@ export function Layout() {
             </Suspense>
           </ErrorBoundary>
         </main>
+        <ConfirmDialog
+          isOpen={showLogoutConfirm}
+          onClose={() => setShowLogoutConfirm(false)}
+          onConfirm={() => { setShowLogoutConfirm(false); signOut() }}
+          title="Выйти?"
+          message="Вы уверены, что хотите выйти?"
+          confirmText="Выйти"
+        />
       </div>
     )
   }

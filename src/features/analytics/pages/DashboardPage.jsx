@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, memo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
@@ -20,7 +20,7 @@ import { subDays, format, startOfDay } from 'date-fns'
 // Lazy load Recharts (295KB) — only managers see charts
 const MiniCharts = lazy(() => import('./MiniCharts'))
 
-function WorkerTaskCard({ order, isMine, onUpdated }) {
+const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }) {
   const [showComplete, setShowComplete] = useState(false)
   const [showTechCard, setShowTechCard] = useState(false)
 
@@ -29,7 +29,7 @@ function WorkerTaskCard({ order, isMine, onUpdated }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Link to={`/orders/${order.id}`} className="font-bold text-accent hover:underline">#{order.number}</Link>
-          <button onClick={() => setShowTechCard(true)} className="text-[11px] text-text-muted hover:text-accent transition-colors">Тех карта</button>
+          <button onClick={() => setShowTechCard(true)} className="text-xs text-text-muted hover:text-accent transition-colors min-h-[44px]">Тех карта</button>
         </div>
         <div className="flex items-center gap-2">
           {isMine ? (
@@ -57,7 +57,7 @@ function WorkerTaskCard({ order, isMine, onUpdated }) {
       <TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} />
     </div>
   )
-}
+})
 
 function StatCard({ label, value }) {
   return (

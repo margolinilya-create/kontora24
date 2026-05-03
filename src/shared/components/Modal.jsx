@@ -22,6 +22,10 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
 
     previousFocusRef.current = document.activeElement
 
+    // Prevent body scroll while modal is open
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
     const dialog = dialogRef.current
     if (dialog) {
       const first = dialog.querySelector(FOCUSABLE)
@@ -29,6 +33,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
     }
 
     return () => {
+      document.body.style.overflow = originalOverflow
       previousFocusRef.current?.focus()
     }
   }, [isOpen])

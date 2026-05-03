@@ -50,7 +50,7 @@ export function OrderComments({ orderId }) {
       })
       if (error) throw error
       setText('')
-      fetchComments()
+      // Don't call fetchComments() — realtime subscription handles it
     } catch (err) {
       toast.error('Ошибка: ' + err.message)
     } finally {

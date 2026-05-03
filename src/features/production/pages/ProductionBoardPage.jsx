@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react'
 import { DndContext, DragOverlay, useDroppable, closestCorners, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useOrders, updateOrderStatus } from '@/features/orders/hooks/useOrders'
@@ -22,7 +22,7 @@ const PHASES = [
 ]
 
 // --- Droppable column ---
-function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus }) {
+const DroppableColumn = memo(function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const label = ORDER_STATUSES[status]?.label || status
   const canReceive = isActive && activeFromStatus !== status
@@ -31,6 +31,8 @@ function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus
     <div
       ref={setNodeRef}
       data-col={status}
+      role="region"
+      aria-label={label}
       className={`rounded-xl transition-all duration-200 ease-out min-h-[200px]
         w-[70vw] sm:w-[260px] shrink-0
         ${isOver
@@ -45,7 +47,7 @@ function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus
           <span className={`w-2 h-2 rounded-full ${COL_COLORS[status]}`} />
           <h3 className="font-semibold text-sm">{label}</h3>
         </div>
-        <span className={`text-[11px] font-medium min-w-[24px] text-center py-0.5 px-2 rounded-full transition-colors
+        <span className={`text-xs font-medium min-w-[24px] text-center py-0.5 px-2 rounded-full transition-colors
           ${isOver ? 'bg-accent text-white' : 'text-text-muted bg-surface-dim'}`}
         >
           {orders.length}
@@ -71,7 +73,7 @@ function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus
       </SortableContext>
     </div>
   )
-}
+})
 
 export default function ProductionBoardPage() {
   const { profile } = useAuth()
@@ -180,13 +182,18 @@ export default function ProductionBoardPage() {
 
           const intermediateMap = { design: 'design_done', print: 'print_done' }
           const intermediate = intermediateMap[currentStatus]
-          if (intermediate) {
-            await updateOrderStatus(orderId, currentStatus, intermediate)
-            currentStatus = intermediate
-          }
-          if (currentStatus !== nextCol) {
-            await updateOrderStatus(orderId, currentStatus, nextCol)
-            currentStatus = nextCol
+          try {
+            if (intermediate) {
+              await updateOrderStatus(orderId, currentStatus, intermediate)
+              currentStatus = intermediate
+            }
+            if (currentStatus !== nextCol) {
+              await updateOrderStatus(orderId, currentStatus, nextCol)
+              currentStatus = nextCol
+            }
+          } catch (stepErr) {
+            toast.error(`Заказ #${order.number} остановлен на "${ORDER_STATUSES[currentStatus]?.label || currentStatus}": ${stepErr.message}`)
+            return
           }
         }
       } else {
@@ -289,7 +296,7 @@ export default function ProductionBoardPage() {
                       <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
                         {phase.label}
                       </span>
-                      <span className="text-[11px] text-text-muted/50 font-medium">
+                      <span className="text-xs text-text-muted/50 font-medium">
                         {phaseCount}
                       </span>
                     </div>

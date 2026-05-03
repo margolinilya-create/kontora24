@@ -172,7 +172,7 @@ export default function CalculatorPage() {
                   <button
                     key={p.label}
                     type="button"
-                    onClick={() => { update('width', p.width); update('height', p.height) }}
+                    onClick={() => setForm(prev => ({ ...prev, width: p.width, height: p.height }))}
                     className={`px-2.5 py-1 rounded text-xs transition-colors ${
                       Number(form.width) === p.width && Number(form.height) === p.height
                         ? 'bg-accent text-white' : 'bg-surface-dim text-text-muted hover:bg-border'

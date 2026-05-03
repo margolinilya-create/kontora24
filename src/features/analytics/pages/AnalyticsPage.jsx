@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { jsPDF } from 'jspdf'
+// jsPDF loaded dynamically on export click (~295KB)
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
@@ -217,8 +217,9 @@ export default function AnalyticsPage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => {
+            onClick={async () => {
               try {
+                const { jsPDF } = await import('jspdf')
                 const doc = new jsPDF('p', 'mm', 'a4')
                 doc.setFontSize(16); doc.setFont('helvetica', 'bold')
                 doc.text('Kontora24 — Аналитика', 15, 20)

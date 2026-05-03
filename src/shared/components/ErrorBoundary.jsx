@@ -31,13 +31,13 @@ export class ErrorBoundary extends Component {
           <div className="flex items-center gap-3">
             <button
               onClick={() => this.setState({ hasError: false, error: null })}
-              className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-5 py-2.5 text-sm transition-colors"
+              className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-5 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
             >
               Попробовать снова
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="border border-border text-text-muted hover:text-text hover:bg-surface-dim font-medium rounded-lg px-5 py-2.5 text-sm transition-colors"
+              className="border border-border text-text-muted hover:text-text hover:bg-surface-dim font-medium rounded-lg px-5 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
             >
               Перезагрузить страницу
             </button>

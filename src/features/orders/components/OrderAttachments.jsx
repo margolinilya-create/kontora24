@@ -1,16 +1,18 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { formatRelative } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
 export function OrderAttachments({ orderId }) {
   const { profile } = useAuth()
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const fetchFiles = useCallback(async () => {
     const { data } = await supabase
@@ -24,9 +26,17 @@ export function OrderAttachments({ orderId }) {
 
   useEffect(() => { fetchFiles() }, [fetchFiles])
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB
+
   async function handleUpload(e) {
     const file = e.target.files?.[0]
     if (!file || !profile) return
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('Файл слишком большой. Максимум 50 МБ.')
+      e.target.value = ''
+      return
+    }
 
     setUploading(true)
     try {
@@ -59,7 +69,6 @@ export function OrderAttachments({ orderId }) {
   }
 
   async function handleDelete(attachment) {
-    if (!confirm('Удалить файл?')) return
     try {
       await supabase.storage.from('order-files').remove([attachment.file_path])
       await supabase.from('k24_order_attachments').delete().eq('id', attachment.id)
@@ -67,13 +76,20 @@ export function OrderAttachments({ orderId }) {
       fetchFiles()
     } catch (err) {
       toast.error('Ошибка: ' + err.message)
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
-  function getFileUrl(path) {
-    const { data } = supabase.storage.from('order-files').getPublicUrl(path)
-    return data?.publicUrl
-  }
+  // Memoize file URLs to avoid recalculating on each render
+  const fileUrls = useMemo(() => {
+    const urls = {}
+    files.forEach(f => {
+      const { data } = supabase.storage.from('order-files').getPublicUrl(f.file_path)
+      urls[f.id] = data?.publicUrl
+    })
+    return urls
+  }, [files])
 
   function formatSize(bytes) {
     if (!bytes) return ''
@@ -114,10 +130,12 @@ export function OrderAttachments({ orderId }) {
             <div key={f.id} className="border border-border rounded-lg p-3 flex gap-3">
               {/* Preview */}
               {isImage(f.mime_type) ? (
-                <a href={getFileUrl(f.file_path)} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                <a href={fileUrls[f.id]} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
                   <img
-                    src={getFileUrl(f.file_path)}
+                    src={fileUrls[f.id]}
                     alt={f.file_name}
+                    width={64}
+                    height={64}
                     className="w-16 h-16 rounded-lg object-cover border border-border"
                   />
                 </a>
@@ -132,7 +150,7 @@ export function OrderAttachments({ orderId }) {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <a
-                  href={getFileUrl(f.file_path)}
+                  href={fileUrls[f.id]}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm font-medium text-accent hover:underline truncate block"
@@ -145,7 +163,7 @@ export function OrderAttachments({ orderId }) {
                 <Button
                   variant="danger"
                   size="sm"
-                  onClick={() => handleDelete(f)}
+                  onClick={() => setDeleteTarget(f)}
                   aria-label={`Удалить файл ${f.file_name}`}
                   className="mt-1 !px-2 !py-0.5 !text-xs"
                 >
@@ -156,6 +174,15 @@ export function OrderAttachments({ orderId }) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => handleDelete(deleteTarget)}
+        title="Удалить файл?"
+        message={`Файл «${deleteTarget?.file_name}» будет удалён без возможности восстановления.`}
+        confirmText="Удалить"
+      />
     </div>
   )
 }

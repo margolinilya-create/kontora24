@@ -23,8 +23,8 @@ export const useAuthStore = create((set, get) => ({
       set({ user: null, profile: null, loading: false })
     }
 
-    // Listen for auth changes
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    // Listen for auth changes (store subscription for cleanup)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const { data: profile } = await supabase
           .from('k24_profiles')
@@ -36,14 +36,13 @@ export const useAuthStore = create((set, get) => ({
         set({ user: null, profile: null })
       }
     })
+    set({ _authSubscription: subscription })
 
-    // If "remember me" was unchecked, sign out when the browser/tab closes
+    // If "remember me" was unchecked, clear session on next load
     const rememberMe = localStorage.getItem('rememberMe')
     if (rememberMe === 'false') {
-      window.addEventListener('beforeunload', () => {
-        supabase.auth.signOut()
-        localStorage.removeItem('rememberMe')
-      })
+      localStorage.removeItem('rememberMe')
+      supabase.auth.signOut()
     }
   },
 

@@ -41,7 +41,8 @@ export const PipelineSummary = memo(function PipelineSummary({ columns, activeSt
           <button
             key={status}
             onClick={() => handleClick(status)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors shrink-0
+            aria-label={`${ORDER_STATUSES[status]?.label}: ${count}`}
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs transition-colors shrink-0 min-h-[44px]
               ${isActive
                 ? 'bg-accent/10 ring-1 ring-accent/30'
                 : 'hover:bg-surface-dim'

@@ -21,7 +21,8 @@ export function TaskTimer({ orderId, orderStatus, compact = false }) {
         <button
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleToggle() }}
           onPointerDown={(e) => e.stopPropagation()}
-          className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors ${
+          aria-label={isRunning ? 'Остановить таймер' : 'Запустить таймер'}
+          className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[44px] min-w-[44px] ${
             isRunning
               ? 'bg-danger/15 text-danger hover:bg-danger/25'
               : 'bg-accent/15 text-accent hover:bg-accent/25'
@@ -30,7 +31,7 @@ export function TaskTimer({ orderId, orderStatus, compact = false }) {
           {isRunning ? 'Стоп' : 'Старт'}
         </button>
         {totalMinutes > 0 && !isRunning && (
-          <span className="text-[10px] text-text-muted">{formatTotalTime(totalMinutes)}</span>
+          <span className="text-xs text-text-muted">{formatTotalTime(totalMinutes)}</span>
         )}
       </div>
     )

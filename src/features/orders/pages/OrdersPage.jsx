@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useOrders } from '../hooks/useOrders'
 import { StatusBadge } from '../components/StatusBadge'
@@ -53,6 +53,9 @@ export default function OrdersPage() {
   const debouncedSearch = useDebounce(search, 300)
   const [pPage, setPPage] = useState(1)
   const [pPerPage, setPPerPage] = useState(25)
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setPPage(1) }, [statusFilter, debouncedSearch, sortBy, sortAsc])
 
   const from = (pPage - 1) * pPerPage
   const to = pPage * pPerPage - 1
@@ -213,11 +216,25 @@ export default function OrdersPage() {
                 size="sm"
                 onClick={async () => {
                   if (!bulkAction) return
+                  let succeeded = 0
+                  let failed = 0
                   for (const id of selected) {
                     const order = orders.find((o) => o.id === id)
-                    if (order) await updateOrderStatus(id, order.status, bulkAction).catch(() => {})
+                    if (order) {
+                      try {
+                        await updateOrderStatus(id, order.status, bulkAction)
+                        succeeded++
+                      } catch {
+                        failed++
+                      }
+                    }
                   }
-                  toast.success(`${selected.size} заказов обновлено`)
+                  if (failed > 0) {
+                    toast.error(`${failed} из ${selected.size} заказов не обновлены`)
+                  }
+                  if (succeeded > 0) {
+                    toast.success(`${succeeded} заказов обновлено`)
+                  }
                   setSelected(new Set())
                   setBulkAction('')
                 }}
@@ -321,7 +338,7 @@ function FilterBtn({ active, onClick, label, colorClass = '' }) {
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+      className={`px-3 py-2.5 min-h-[44px] rounded-lg text-sm transition-colors ${
         active ? colorClass || 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
       } ${active && colorClass ? 'font-medium' : ''}`}
     >

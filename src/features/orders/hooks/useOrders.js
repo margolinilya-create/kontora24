@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useId } from 'react'
+import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { MS_PER_DAY } from '@/shared/constants'
 
@@ -69,15 +69,25 @@ export function useOrders(filters = {}) {
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
-  // Realtime
+  // Realtime — stable subscription (doesn't re-subscribe on filter change)
+  const fetchRef = useRef(fetchOrders)
+  useEffect(() => { fetchRef.current = fetchOrders }, [fetchOrders])
+
+  const debounceRef = useRef(null)
   useEffect(() => {
     const channelName = `orders-${hookId.replace(/:/g, '')}`
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'k24_orders' }, () => fetchOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'k24_orders' }, () => {
+        clearTimeout(debounceRef.current)
+        debounceRef.current = setTimeout(() => fetchRef.current(), 500)
+      })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [fetchOrders, hookId])
+    return () => {
+      clearTimeout(debounceRef.current)
+      supabase.removeChannel(channel)
+    }
+  }, [hookId])
 
   return { orders, totalCount, loading, error, refetch: fetchOrders }
 }

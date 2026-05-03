@@ -11,6 +11,7 @@ export function Pagination({ page, totalPages, totalCount, perPage, hasNext, has
         <select
           value={perPage}
           onChange={(e) => changePerPage(Number(e.target.value))}
+          aria-label="Записей на странице"
           className="ml-2 rounded border border-border px-2 py-1 text-xs"
         >
           <option value={25}>25</option>

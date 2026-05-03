@@ -44,11 +44,11 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
           <Link to={`/orders/${order.id}`} className="text-lg font-semibold text-accent hover:underline" aria-label={`Открыть заказ #${order.number}`}>
             #{order.number}
           </Link>
-          <button onClick={() => setShowTechCard(true)} className="text-[11px] text-text-muted hover:text-accent transition-colors">Тех карта</button>
+          <button onClick={() => setShowTechCard(true)} className="text-xs text-text-muted hover:text-accent transition-colors min-h-[44px]">Тех карта</button>
         </div>
         <div className="flex items-center gap-2">
           {(order.priority === 'urgent' || order.priority === 'high') && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
               {PRIORITIES[order.priority]?.label}
             </span>
           )}

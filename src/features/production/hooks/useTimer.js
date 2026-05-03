@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 
@@ -98,7 +98,7 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
     setEntries(data || [])
   }, [activeEntry])
 
-  const totalMinutes = entries.reduce((sum, e) => sum + (e.duration_minutes || 0), 0)
+  const totalMinutes = useMemo(() => entries.reduce((sum, e) => sum + (e.duration_minutes || 0), 0), [entries])
 
   return {
     isRunning: !!activeEntry,

@@ -86,7 +86,7 @@ export default function ProductionBoardPage() {
   const [todayDone, setTodayDone] = useState(0)
   const scrollRef = useRef(null)
 
-  const { orders: allFetchedOrders, refetch } = useOrders()
+  const { orders: allFetchedOrders, loading, refetch } = useOrders()
 
   useEffect(() => {
     async function fetchTodayDone() {
@@ -297,8 +297,22 @@ export default function ProductionBoardPage() {
           {/* Pipeline summary strip */}
           <PipelineSummary columns={columns} scrollRef={scrollRef} />
 
+          {/* Skeleton while loading */}
+          {loading && (
+            <div className="flex gap-3 overflow-hidden pb-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="shrink-0 bg-surface rounded-2xl border border-border p-4 w-[70vw] sm:w-[260px]">
+                  <div className="h-4 bg-surface-dim rounded w-24 mb-4 animate-pulse" />
+                  {[1, 2, 3].map((j) => (
+                    <div key={j} className="bg-surface-dim rounded-xl h-28 mb-2 animate-pulse" />
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Kanban board — horizontal scroll with phase groups */}
-          <DndContext
+          {!loading && <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={(e) => setActiveId(e.active.id)}
@@ -359,7 +373,7 @@ export default function ProductionBoardPage() {
             <DragOverlay dropAnimation={dropAnimation}>
               {activeOrder && <DragOverlayCard order={activeOrder} />}
             </DragOverlay>
-          </DndContext>
+          </DndContext>}
         </>
       ) : (
         <ProductionCalendar />

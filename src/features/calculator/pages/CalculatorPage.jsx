@@ -146,8 +146,12 @@ export default function CalculatorPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Input form */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
+          <div className="bg-surface rounded-xl border border-border p-5 space-y-5">
             <h2 className="font-semibold">Параметры</h2>
+
+            {/* === Section 1: Product === */}
+            <fieldset className="space-y-4">
+              <legend className="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">Продукция</legend>
 
             {/* Order type */}
             <div>
@@ -237,6 +241,12 @@ export default function CalculatorPage() {
               />
             )}
 
+            </fieldset>
+
+            {/* === Section 2: Options === */}
+            <fieldset className="space-y-4 pt-4 border-t border-border">
+              <legend className="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">Опции</legend>
+
             {/* Lamination */}
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -278,6 +288,12 @@ export default function CalculatorPage() {
                 ))}
               </select>
             </div>
+
+            </fieldset>
+
+            {/* === Section 3: Order details === */}
+            <fieldset className="space-y-4 pt-4 border-t border-border">
+              <legend className="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">Заказ</legend>
 
             {/* Client name */}
             <Input
@@ -353,6 +369,8 @@ export default function CalculatorPage() {
                 </button>
               )}
             </div>
+
+            </fieldset>
 
             <Button
               variant="secondary"

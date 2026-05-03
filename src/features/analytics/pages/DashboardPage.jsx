@@ -25,10 +25,10 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
   const [showTechCard, setShowTechCard] = useState(false)
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-4 mb-2">
-      <div className="flex items-center justify-between mb-2">
+    <div className="bg-surface rounded-xl border border-border p-5 mb-3">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Link to={`/orders/${order.id}`} className="font-bold text-accent hover:underline">#{order.number}</Link>
+          <Link to={`/orders/${order.id}`} className="text-base font-bold text-accent hover:underline">#{order.number}</Link>
           <button onClick={() => setShowTechCard(true)} className="text-xs text-text-muted hover:text-accent transition-colors min-h-[44px]">Тех карта</button>
         </div>
         <div className="flex items-center gap-2">
@@ -43,7 +43,7 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
         </div>
       </div>
       <p className="text-sm font-medium">{ORDER_TYPES[order.order_type]?.label}</p>
-      <p className="text-xs text-text-muted">{order.width_mm} x {order.height_mm} мм · {order.qty} шт</p>
+      <p className="text-sm text-text-muted">{order.width_mm} x {order.height_mm} мм · {order.qty} шт</p>
       {order.deadline && (
         <p className={`text-xs mt-1 ${new Date(order.deadline) < new Date() ? 'text-danger font-medium' : 'text-text-muted'}`}>
           Дедлайн: {new Date(order.deadline).toLocaleDateString('ru-RU')}

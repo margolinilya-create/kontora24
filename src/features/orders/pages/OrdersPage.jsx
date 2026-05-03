@@ -46,7 +46,7 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
-  const [viewMode, setViewMode] = useState('table') // 'table' | 'kanban'
+  const [viewMode, setViewMode] = useState(() => window.innerWidth < 640 ? 'kanban' : 'table') // 'table' | 'kanban'
   const [selected, setSelected] = useState(new Set())
   const [bulkAction, setBulkAction] = useState('')
 
@@ -106,7 +106,7 @@ export default function OrdersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-border overflow-hidden">
+          <div className="hidden sm:flex rounded-lg border border-border overflow-hidden">
             <button
               onClick={() => setViewMode('table')}
               className={`px-2.5 py-2 text-sm ${viewMode === 'table' ? 'bg-primary text-white' : 'text-text-muted hover:bg-surface-dim'}`}

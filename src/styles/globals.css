@@ -89,6 +89,14 @@ a, button, [role="button"], input, select, textarea, label {
 }
 .kanban-scroll { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
 
+/* Slightly heavier font weight on small screens for readability in workshop */
+@media (max-width: 640px) {
+  body {
+    font-weight: 450;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

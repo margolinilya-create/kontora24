@@ -67,6 +67,8 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
       // 3. Change status
       await updateOrderStatus(order.id, order.status, nextStatus)
 
+      // Haptic feedback on successful completion
+      if (navigator.vibrate) navigator.vibrate(10)
       toast.success(`Заказ #${order.number} — ${nextStatus === 'done' ? 'готово' : 'передан дальше'}`)
       onCompleted?.()
       onClose()

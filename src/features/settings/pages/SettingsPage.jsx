@@ -10,6 +10,7 @@ import { formatDateTime } from '@/shared/lib/utils'
 import Tabs from '@/shared/components/Tabs'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
+import Modal from '@/shared/components/Modal'
 
 const SETTINGS_TABS = [
   { key: 'profile', label: 'Профиль' },
@@ -121,7 +122,8 @@ function CalculatorSettings() {
 }
 
 function UserManagement() {
-  const { users, loading, updateUserRole } = useUsers()
+  const { users, loading, updateUser } = useUsers()
+  const [editingUser, setEditingUser] = useState(null)
 
   return (
     <div className="bg-surface rounded-xl border border-border p-5">
@@ -142,7 +144,9 @@ function UserManagement() {
                 <th className="text-left py-2 font-medium text-text-muted">Имя</th>
                 <th className="text-left py-2 font-medium text-text-muted">Email</th>
                 <th className="text-left py-2 font-medium text-text-muted">Роль</th>
+                <th className="text-left py-2 font-medium text-text-muted">Статус</th>
                 <th className="text-right py-2 font-medium text-text-muted">Добавлен</th>
+                <th className="text-right py-2 font-medium text-text-muted sr-only">Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -151,25 +155,150 @@ function UserManagement() {
                   <td className="py-3 font-medium">{user.display_name || user.name}</td>
                   <td className="py-3 text-text-muted">{user.email || '—'}</td>
                   <td className="py-3">
-                    <select
-                      value={user.role}
-                      onChange={(e) => updateUserRole(user.id, e.target.value)}
-                      aria-label={`Роль пользователя ${user.display_name || user.email}`}
-                      className="rounded border border-border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-accent/50"
-                    >
-                      {Object.entries(ROLES).map(([key, r]) => (
-                        <option key={key} value={key}>{r.label}</option>
-                      ))}
-                    </select>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLES[user.role]?.color || 'bg-gray-100 text-gray-800'}`}>
+                      {ROLES[user.role]?.label || user.role}
+                    </span>
+                  </td>
+                  <td className="py-3">
+                    {user.approved === false ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                        Деактивирован
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        Активен
+                      </span>
+                    )}
                   </td>
                   <td className="py-3 text-right text-text-muted text-xs">{formatDateTime(user.created_at)}</td>
+                  <td className="py-3 text-right">
+                    <button
+                      onClick={() => setEditingUser(user)}
+                      aria-label={`Редактировать ${user.display_name || user.email}`}
+                      className="text-text-muted hover:text-accent transition-colors rounded-lg p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSave={updateUser}
+        />
+      )}
     </div>
+  )
+}
+
+function EditUserModal({ user, onClose, onSave }) {
+  const [form, setForm] = useState({
+    display_name: user.display_name || '',
+    email: user.email || '',
+    role: user.role,
+    approved: user.approved !== false,
+  })
+  const [password, setPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.display_name.trim()) return
+
+    setSaving(true)
+    try {
+      const updates = {}
+      if (form.display_name !== user.display_name) updates.display_name = form.display_name
+      if (form.email !== user.email) updates.email = form.email
+      if (form.role !== user.role) updates.role = form.role
+      if (form.approved !== (user.approved !== false)) updates.approved = form.approved
+      if (password) updates.password = password
+
+      if (Object.keys(updates).length === 0) {
+        onClose()
+        return
+      }
+
+      await onSave(user.id, updates)
+      onClose()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal isOpen onClose={onClose} title="Редактировать пользователя" maxWidth="max-w-lg">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Имя"
+          value={form.display_name}
+          onChange={(e) => update('display_name', e.target.value)}
+          required
+        />
+        <Input
+          label="Email"
+          type="email"
+          value={form.email}
+          onChange={(e) => update('email', e.target.value)}
+        />
+        <div>
+          <label htmlFor="edit-user-role" className="block text-sm font-medium text-text mb-1">Роль</label>
+          <select
+            id="edit-user-role"
+            value={form.role}
+            onChange={(e) => update('role', e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
+          >
+            {Object.entries(ROLES).map(([key, r]) => (
+              <option key={key} value={key}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            id="edit-user-approved"
+            type="checkbox"
+            checked={form.approved}
+            onChange={(e) => update('approved', e.target.checked)}
+            className="rounded border-border text-accent focus:ring-accent/50"
+          />
+          <label htmlFor="edit-user-approved" className="text-sm">
+            Активен (может входить в систему)
+          </label>
+        </div>
+        <div className="border-t border-border pt-4">
+          <Input
+            label="Новый пароль (оставьте пустым, чтобы не менять)"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Минимум 6 символов"
+            minLength={6}
+          />
+        </div>
+        <div className="flex gap-2 pt-2">
+          <Button type="submit" loading={saving}>
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </Button>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Отмена
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 

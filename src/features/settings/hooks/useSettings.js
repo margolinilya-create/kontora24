@@ -53,5 +53,21 @@ export function useUsers() {
     fetchUsers()
   }
 
-  return { users, loading, updateUserRole, refetch: fetchUsers }
+  async function updateUser(userId, updates) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/users/update', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ userId, ...updates }),
+    })
+    const result = await res.json()
+    if (!res.ok) throw new Error(result.error)
+    toast.success('Пользователь обновлён')
+    fetchUsers()
+  }
+
+  return { users, loading, updateUserRole, updateUser, refetch: fetchUsers }
 }

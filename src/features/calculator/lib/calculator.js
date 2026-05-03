@@ -1,140 +1,198 @@
 /**
- * Sticker production cost calculator — pure functions, no React.
- * Source of truth: docs/kontora24-plan.md §7
+ * Sticker production cost calculator — kontorasales model.
+ * Cost per cm² → logarithmic markup curve → options multipliers.
  */
 
-import { ORDER_TYPES, VOLUME_DISCOUNTS } from '@/shared/constants'
-
-// Default constants (can be overridden via settings)
+// Default cost components per cm² (configurable via settings)
 export const DEFAULTS = {
-  printWidth: 1230,        // mm — width of print block
-  heightMargin: 30,        // mm — tech margin per sheet
-  gap: 6,                  // mm — gap between items
-  cutSpeed: 200,           // mm/s
-  lamSpeed: 200,           // mm/s
-  resinPerCm2: 0.1444,    // g/cm²
-  resinPourTime: 1200,     // sec per sheet
-  laborCostPerHour: 500,   // ₽/hour
-  filmPricePerM2: 180,     // ₽/m²
-  inkPricePerM2: 120,      // ₽/m²
-  resinPricePerG: 1.2,     // ₽/g
-  lamPricePerM2: 120,      // ₽/m²
-}
-
-export function getVolumeDiscount(qty) {
-  if (qty <= 0) return 0
-  const tier = VOLUME_DISCOUNTS.find((d) => qty >= d.min && qty <= d.max)
-  return tier ? tier.discount : 0
-}
-
-export function getMarkup(orderType) {
-  return ORDER_TYPES[orderType]?.markup ?? 4.0
+  // Film costs per cm²
+  filmWhite: 0.10,           // White / transparent film
+  filmHolographic: 0.11,     // Holographic film
+  filmMetallic: 0.15,        // Gold / chrome film
+  ink: 0.03,                 // Ink per cm²
+  laborPrint: 0.02,          // Print labor per cm²
+  rent: 0.01,                // Rent + electricity per cm²
+  tax: 0.005,                // Tax (USN) per cm²
+  lamination: 0.03,          // Lamination per cm²
+  // 3D resin extras per cm²
+  resinPerCm2: 0.05,         // Resin cost per cm²
+  laborResin: 0.03,          // Resin labor per cm² (sticker x0.5, pack x1.0)
+  resinRent: 0.01,           // Rent for resin workspace
+  resinTax: 0.005,           // Tax for resin
+  // Markup curves: [max_markup_at_20, min_markup_at_3000+]
+  markupVinylSticker: [4.0, 1.5],
+  markupVinylPack: [3.0, 1.6],
+  markup3DSticker: [5.0, 2.5],
+  markup3DPack: [3.0, 1.8],
+  // Qty range for markup curve
+  qtyMin: 20,
+  qtyMax: 3000,
+  // Fixed costs
+  designPrice: 5000,         // Full design from scratch
+  editPrice: 3000,           // Design edit/revision
+  extraVariantPrice: 1000,   // Per extra variant/design beyond first
+  montageFilmPricePerCm2: 0.03, // Montage film per cm²
+  packagingPrice: 3,         // Per unit individual packaging
+  // Option multipliers
+  urgentMult: 0.30,          // +30% for urgent
+  partnerDiscount: 0.25,     // -25% for partner
+  individualCutMult: 0.15,   // +15% for individual cutting
 }
 
 /**
- * Main calculation
+ * Get logarithmic markup based on quantity.
+ * Formula: markup = max × (min / max)^t
+ * where t = log(qty / qtyMin) / log(qtyMax / qtyMin)
+ */
+export function getMarkup(qty, markupRange, qtyMin = 20, qtyMax = 3000) {
+  const [max, min] = markupRange
+  if (qty <= qtyMin) return max
+  if (qty >= qtyMax) return min
+  const t = Math.log(qty / qtyMin) / Math.log(qtyMax / qtyMin)
+  return max * Math.pow(min / max, t)
+}
+
+/**
+ * Get the right markup curve based on order type.
+ */
+function getMarkupCurve(orderType, is3D, C) {
+  if (is3D) {
+    return orderType === 'stickerpack3D' || orderType === 'stickerpack'
+      ? C.markup3DPack : C.markup3DSticker
+  }
+  return orderType === 'stickerpack' || orderType === 'sticker_kiss'
+    ? C.markupVinylPack : C.markupVinylSticker
+}
+
+/**
+ * Main calculation.
  * @param {Object} input
- * @param {number} input.width       - item width in mm
- * @param {number} input.height      - item height in mm
+ * @param {number} input.width       - width in mm
+ * @param {number} input.height      - height in mm
  * @param {number} input.qty         - quantity
  * @param {string} input.orderType   - order type key
+ * @param {string} input.filmType    - white/holographic/metallic
  * @param {boolean} input.needLam    - needs lamination
- * @param {boolean} input.is3D       - needs resin (3D)
+ * @param {boolean} input.is3D       - 3D resin
+ * @param {boolean} input.isUrgent   - urgent surcharge
+ * @param {boolean} input.isPartner  - partner discount
+ * @param {boolean} input.needsMontageFilm - montage film
+ * @param {boolean} input.needsIndividualCut - individual cutting
+ * @param {boolean} input.needsDesign  - design from scratch
+ * @param {boolean} input.needsEdit    - design edit
+ * @param {boolean} input.needsPackaging - individual packaging
+ * @param {number}  input.designVariants - number of design variants
  * @param {Object}  [input.overrides] - override DEFAULTS
- * @returns {Object} calculation result
  */
 export function calculate(input) {
-  const { orderType, needLam = false, is3D = false, overrides = {} } = input
-  const width = Math.max(0, Number(input.width) || 0)
-  const height = Math.max(0, Number(input.height) || 0)
-  const qty = Math.max(0, Math.floor(Number(input.qty) || 0))
+  const {
+    orderType = 'sticker_cut', filmType = 'white',
+    needLam = false, is3D = false,
+    isUrgent = false, isPartner = false,
+    needsMontageFilm = false, needsIndividualCut = false,
+    needsDesign = false, needsEdit = false, needsPackaging = false,
+    designVariants = 1, overrides = {},
+  } = input
+  const width = Math.max(1, Number(input.width) || 0)
+  const height = Math.max(1, Number(input.height) || 0)
+  const qty = Math.max(1, Math.floor(Number(input.qty) || 1))
   const C = { ...DEFAULTS, ...overrides }
 
-  // 1. Layout
-  const itemsPerSheet = Math.floor(C.printWidth / (width + C.gap))
-  const sheets = Math.ceil(qty / Math.max(itemsPerSheet, 1))
+  // 1. Area
+  const areaCm2 = (width * height) / 100  // mm² → cm²
+  const areaM2 = areaCm2 / 10000
 
-  // 2. Film area (full sheet area)
-  const sheetAreaM2 = (C.printWidth * (height + C.heightMargin)) / 1_000_000
-  const filmM2 = sheets * sheetAreaM2
+  // 2. Cost per cm² (base)
+  const filmCostPerCm2 = filmType === 'metallic' ? C.filmMetallic
+    : filmType === 'holographic' ? C.filmHolographic : C.filmWhite
+  let costPerCm2 = filmCostPerCm2 + C.ink + C.laborPrint + C.rent + C.tax
+  if (needLam) costPerCm2 += C.lamination
 
-  // 3. Ink area (actual items only)
-  const inkM2 = (qty * width * height) / 1_000_000
+  // 3. 3D extras
+  if (is3D) {
+    const resinLaborMult = orderType.includes('pack') ? 1.0 : 0.5
+    costPerCm2 += C.resinPerCm2 + (C.laborResin * resinLaborMult) + C.resinRent + C.resinTax
+  }
 
-  // 4. Lamination (same as film if needed)
-  const lamM2 = needLam ? filmM2 : 0
+  // 4. Cost per unit
+  const costPerUnit = costPerCm2 * areaCm2
 
-  // 5. Cutting time
-  const perimeter = 2 * (width + height) // mm
-  const cutTimeHours = (perimeter * qty) / (C.cutSpeed * 1000) / 3.6 // convert mm/s to hours
+  // 5. Markup (logarithmic curve)
+  const markupCurve = getMarkupCurve(orderType, is3D, C)
+  const markup = getMarkup(qty, markupCurve, C.qtyMin, C.qtyMax)
 
-  // 6. Lamination time
-  const lamTimeHours = needLam ? (filmM2 * 1_000_000) / (C.lamSpeed * C.printWidth) / 3600 : 0
+  // 6. Base price per unit
+  let pricePerUnit = costPerUnit * markup
 
-  // 7. Resin (3D only)
-  const itemAreaCm2 = (width * height) / 100 // mm² to cm²
-  const resinG = is3D ? itemAreaCm2 * C.resinPerCm2 * qty : 0
-  const resinTimeHours = is3D ? (sheets * C.resinPourTime) / 3600 : 0
+  // 7. Multiplicative options
+  if (isUrgent) pricePerUnit *= (1 + C.urgentMult)
+  if (isPartner) pricePerUnit *= (1 - C.partnerDiscount)
+  if (needsIndividualCut) pricePerUnit *= (1 + C.individualCutMult)
 
-  // 8. Material costs
-  const costFilm = filmM2 * C.filmPricePerM2
-  const costInk = inkM2 * C.inkPricePerM2
-  const costLam = lamM2 * C.lamPricePerM2
-  const costResin = resinG * C.resinPricePerG
-  const costMaterials = costFilm + costInk + costLam + costResin
+  // 8. Additive per-unit options
+  if (needsPackaging) pricePerUnit += C.packagingPrice
+  if (needsMontageFilm) pricePerUnit += C.montageFilmPricePerCm2 * areaCm2
 
-  // 9. Labor cost
-  const totalHours = cutTimeHours + lamTimeHours + resinTimeHours + 0.5 // +0.5h for setup/handling
-  const costLabor = totalHours * C.laborCostPerHour
+  // 9. Total price
+  let priceTotal = pricePerUnit * qty
 
-  // 10. Totals
-  const costTotal = costMaterials + costLabor
-  const markup = getMarkup(orderType)
-  const discount = getVolumeDiscount(qty)
-  const priceFinal = costTotal * markup * (1 - discount)
-  const pricePerUnit = qty > 0 ? priceFinal / qty : 0
-  const margin = priceFinal - costTotal
+  // 10. Fixed costs
+  const extraVariants = Math.max(0, designVariants - 1)
+  const fixedCosts = (needsDesign ? C.designPrice : 0)
+    + (needsEdit ? C.editPrice : 0)
+    + (extraVariants * C.extraVariantPrice)
+  priceTotal += fixedCosts
 
-  // 11. Production estimate (rough)
-  const prodDays = Math.max(1, Math.ceil(totalHours / 8))
+  // 11. Cost totals
+  const costMaterials = costPerUnit * qty
+  const costTotal = costMaterials
+  const margin = priceTotal - costTotal
+  const prodDays = Math.max(1, Math.ceil(qty / 500))
 
   return {
-    // Layout
-    itemsPerSheet,
-    sheets,
-
-    // Areas
-    filmM2: round(filmM2, 3),
-    inkM2: round(inkM2, 3),
-    lamM2: round(lamM2, 3),
-    resinG: round(resinG, 1),
-
-    // Time
-    cutTimeHours: round(cutTimeHours, 2),
-    lamTimeHours: round(lamTimeHours, 2),
-    resinTimeHours: round(resinTimeHours, 2),
-    totalHours: round(totalHours, 2),
+    // Area
+    areaCm2: round(areaCm2, 2),
+    areaM2: round(areaM2 * qty, 3),
 
     // Costs
-    costFilm: round(costFilm),
-    costInk: round(costInk),
-    costLam: round(costLam),
-    costResin: round(costResin),
+    costPerCm2: round(costPerCm2, 4),
+    costPerUnit: round(costPerUnit, 2),
     costMaterials: round(costMaterials),
-    costLabor: round(costLabor),
     costTotal: round(costTotal),
 
     // Pricing
-    markup,
-    discount,
-    priceFinal: round(priceFinal),
+    markup: round(markup, 2),
     pricePerUnit: round(pricePerUnit),
+    priceFinal: round(priceTotal),
+    fixedCosts: round(fixedCosts),
     margin: round(margin),
-    marginPct: priceFinal > 0 ? round((margin / priceFinal) * 100, 1) : 0,
+    marginPct: priceTotal > 0 ? round((margin / priceTotal) * 100, 1) : 0,
 
     // Production
     prodDays,
+
+    // For display
+    filmType,
+    discount: 0,
+    costLabor: 0,
   }
+}
+
+/**
+ * Generate price tiers table for different quantities.
+ */
+export function calculatePriceTiers(input) {
+  const tiers = [20, 50, 100, 200, 300, 500, 1000, 2000, 3000, 5000]
+  return tiers.map((qty) => {
+    const result = calculate({ ...input, qty })
+    return {
+      qty,
+      pricePerUnit: result.pricePerUnit,
+      priceTotal: result.priceFinal,
+      markup: result.markup,
+      costPerUnit: result.costPerUnit,
+    }
+  })
 }
 
 function round(n, decimals = 0) {

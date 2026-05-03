@@ -1,118 +1,124 @@
 import { describe, it, expect } from 'vitest'
-import { calculate, getVolumeDiscount, getMarkup } from './calculator'
+import { calculate, getMarkup, calculatePriceTiers, DEFAULTS } from './calculator'
 
-describe('getVolumeDiscount', () => {
-  it('returns 0 for qty 1-9', () => {
-    expect(getVolumeDiscount(1)).toBe(0)
-    expect(getVolumeDiscount(9)).toBe(0)
+describe('getMarkup (logarithmic curve)', () => {
+  it('returns max markup at minimum qty', () => {
+    expect(getMarkup(20, [4.0, 1.5])).toBe(4.0)
   })
 
-  it('returns 5% for qty 10-24', () => {
-    expect(getVolumeDiscount(10)).toBe(0.05)
-    expect(getVolumeDiscount(24)).toBe(0.05)
+  it('returns min markup at maximum qty', () => {
+    expect(getMarkup(3000, [4.0, 1.5])).toBe(1.5)
   })
 
-  it('returns 30% for qty 500+', () => {
-    expect(getVolumeDiscount(500)).toBe(0.30)
-    expect(getVolumeDiscount(10000)).toBe(0.30)
+  it('returns between max and min for middle qty', () => {
+    const markup = getMarkup(200, [4.0, 1.5])
+    expect(markup).toBeGreaterThan(1.5)
+    expect(markup).toBeLessThan(4.0)
   })
 
-  it('returns 0 for qty 0 or negative', () => {
-    expect(getVolumeDiscount(0)).toBe(0)
-    expect(getVolumeDiscount(-5)).toBe(0)
-  })
-})
-
-describe('getMarkup', () => {
-  it('returns 4.0 for regular stickers', () => {
-    expect(getMarkup('sticker_cut')).toBe(4.0)
-    expect(getMarkup('stickerpack')).toBe(4.0)
+  it('returns max for qty below minimum', () => {
+    expect(getMarkup(5, [4.0, 1.5])).toBe(4.0)
   })
 
-  it('returns 4.5 for 3D stickers', () => {
-    expect(getMarkup('sticker3D')).toBe(4.5)
-    expect(getMarkup('stickerpack3D')).toBe(4.5)
+  it('returns min for qty above maximum', () => {
+    expect(getMarkup(10000, [4.0, 1.5])).toBe(1.5)
   })
 
-  it('returns 4.0 for unknown types', () => {
-    expect(getMarkup('nonexistent')).toBe(4.0)
+  it('decreases monotonically with qty', () => {
+    const qtys = [20, 50, 100, 200, 500, 1000, 3000]
+    const markups = qtys.map((q) => getMarkup(q, [4.0, 1.5]))
+    for (let i = 1; i < markups.length; i++) {
+      expect(markups[i]).toBeLessThanOrEqual(markups[i - 1])
+    }
   })
 })
 
 describe('calculate', () => {
   const base = { width: 50, height: 50, qty: 100, orderType: 'sticker_cut' }
 
-  it('calculates items per sheet correctly', () => {
+  it('calculates area correctly', () => {
     const result = calculate(base)
-    // floor(1230 / (50 + 6)) = floor(21.96) = 21
-    expect(result.itemsPerSheet).toBe(21)
+    // 50mm × 50mm / 100 = 25 cm²
+    expect(result.areaCm2).toBe(25)
   })
 
-  it('calculates sheets correctly', () => {
+  it('cost per unit is positive', () => {
     const result = calculate(base)
-    // ceil(100 / 21) = 5
-    expect(result.sheets).toBe(5)
+    expect(result.costPerUnit).toBeGreaterThan(0)
   })
 
-  it('calculates film area correctly', () => {
+  it('applies logarithmic markup for vinyl sticker', () => {
     const result = calculate(base)
-    // 5 * (1230 * (50 + 30)) / 1_000_000 = 5 * 0.0984 = 0.492
-    expect(result.filmM2).toBe(0.492)
+    // At qty=100, markup should be between 4.0 (at 20) and 1.5 (at 3000)
+    expect(result.markup).toBeGreaterThan(1.5)
+    expect(result.markup).toBeLessThan(4.0)
   })
 
-  it('calculates ink area correctly', () => {
-    const result = calculate(base)
-    // 100 * (50 * 50) / 1_000_000 = 0.25
-    expect(result.inkM2).toBe(0.25)
+  it('3D sticker uses higher markup curve', () => {
+    const vinyl = calculate(base)
+    const threeD = calculate({ ...base, orderType: 'sticker3D', is3D: true })
+    expect(threeD.markup).toBeGreaterThan(vinyl.markup)
   })
 
-  it('applies correct markup', () => {
-    const result = calculate(base)
-    expect(result.markup).toBe(4.0)
+  it('3D sticker costs more due to resin', () => {
+    const vinyl = calculate(base)
+    const threeD = calculate({ ...base, orderType: 'sticker3D', is3D: true })
+    expect(threeD.costPerUnit).toBeGreaterThan(vinyl.costPerUnit)
   })
 
-  it('applies volume discount for 100 units', () => {
-    const result = calculate(base)
-    expect(result.discount).toBe(0.20)
+  it('holographic film costs more than white', () => {
+    const white = calculate({ ...base, filmType: 'white' })
+    const holo = calculate({ ...base, filmType: 'holographic' })
+    expect(holo.costPerUnit).toBeGreaterThan(white.costPerUnit)
   })
 
-  it('final price applies markup and discount', () => {
-    const result = calculate(base)
-    // Allow small rounding diff due to intermediate rounding
-    const expected = result.costTotal * 4.0 * (1 - 0.20)
-    expect(Math.abs(result.priceFinal - Math.round(expected))).toBeLessThanOrEqual(5)
+  it('metallic film is most expensive', () => {
+    const white = calculate({ ...base, filmType: 'white' })
+    const metal = calculate({ ...base, filmType: 'metallic' })
+    expect(metal.costPerUnit).toBeGreaterThan(white.costPerUnit)
   })
 
-  it('price per unit is positive', () => {
-    const result = calculate(base)
-    expect(result.pricePerUnit).toBeGreaterThan(0)
+  it('urgent adds 30% to price', () => {
+    const normal = calculate(base)
+    const urgent = calculate({ ...base, isUrgent: true })
+    const ratio = urgent.pricePerUnit / normal.pricePerUnit
+    expect(ratio).toBeCloseTo(1.30, 1)
   })
 
-  it('handles qty=0 without division by zero', () => {
-    const result = calculate({ ...base, qty: 0 })
-    expect(result.pricePerUnit).toBe(0)
-    expect(Number.isFinite(result.priceFinal)).toBe(true)
-    expect(Number.isFinite(result.marginPct)).toBe(true)
+  it('partner discount reduces price by 25%', () => {
+    const normal = calculate(base)
+    const partner = calculate({ ...base, isPartner: true })
+    const ratio = partner.pricePerUnit / normal.pricePerUnit
+    expect(ratio).toBeCloseTo(0.75, 1)
   })
 
-  it('handles negative dimensions gracefully', () => {
-    const result = calculate({ ...base, width: -10, height: -10 })
-    expect(result.filmM2).toBeGreaterThanOrEqual(0)
-    expect(Number.isFinite(result.priceFinal)).toBe(true)
-  })
-
-  it('includes lamination costs when needLam is true', () => {
+  it('lamination increases cost', () => {
     const without = calculate(base)
     const withLam = calculate({ ...base, needLam: true })
-    expect(withLam.costLam).toBeGreaterThan(0)
-    expect(withLam.costMaterials).toBeGreaterThan(without.costMaterials)
+    expect(withLam.costPerUnit).toBeGreaterThan(without.costPerUnit)
   })
 
-  it('includes resin costs for 3D stickers', () => {
-    const result = calculate({ ...base, orderType: 'sticker3D', is3D: true })
-    expect(result.resinG).toBeGreaterThan(0)
-    expect(result.costResin).toBeGreaterThan(0)
-    expect(result.markup).toBe(4.5)
+  it('design adds fixed cost', () => {
+    const without = calculate(base)
+    const withDesign = calculate({ ...base, needsDesign: true })
+    expect(withDesign.priceFinal - without.priceFinal).toBe(DEFAULTS.designPrice)
+  })
+
+  it('extra variants add fixed costs', () => {
+    const one = calculate({ ...base, designVariants: 1 })
+    const three = calculate({ ...base, designVariants: 3 })
+    expect(three.priceFinal - one.priceFinal).toBe(2 * DEFAULTS.extraVariantPrice)
+  })
+
+  it('handles qty=1 without errors', () => {
+    const result = calculate({ ...base, qty: 1 })
+    expect(result.pricePerUnit).toBeGreaterThan(0)
+    expect(Number.isFinite(result.priceFinal)).toBe(true)
+  })
+
+  it('margin is priceFinal minus costTotal', () => {
+    const result = calculate(base)
+    expect(Math.abs(result.margin - (result.priceFinal - result.costTotal))).toBeLessThanOrEqual(1)
   })
 
   it('prod days is at least 1', () => {
@@ -120,14 +126,26 @@ describe('calculate', () => {
     expect(result.prodDays).toBeGreaterThanOrEqual(1)
   })
 
-  it('margin is close to priceFinal minus costTotal', () => {
-    const result = calculate(base)
-    expect(Math.abs(result.margin - (result.priceFinal - result.costTotal))).toBeLessThanOrEqual(1)
+  it('accepts overrides', () => {
+    const result = calculate({ ...base, overrides: { filmWhite: 0.50 } })
+    const normal = calculate(base)
+    expect(result.costPerUnit).toBeGreaterThan(normal.costPerUnit)
+  })
+})
+
+describe('calculatePriceTiers', () => {
+  it('returns tiers with decreasing price per unit', () => {
+    const tiers = calculatePriceTiers({ width: 50, height: 50, orderType: 'sticker_cut' })
+    expect(tiers.length).toBeGreaterThan(5)
+    for (let i = 1; i < tiers.length; i++) {
+      expect(tiers[i].pricePerUnit).toBeLessThanOrEqual(tiers[i - 1].pricePerUnit)
+    }
   })
 
-  it('accepts overrides for defaults', () => {
-    const result = calculate({ ...base, overrides: { laborCostPerHour: 1000 } })
-    const normal = calculate(base)
-    expect(result.costLabor).toBeGreaterThan(normal.costLabor)
+  it('returns increasing total price with qty', () => {
+    const tiers = calculatePriceTiers({ width: 50, height: 50, orderType: 'sticker_cut' })
+    for (let i = 1; i < tiers.length; i++) {
+      expect(tiers[i].priceTotal).toBeGreaterThan(tiers[i - 1].priceTotal)
+    }
   })
 })

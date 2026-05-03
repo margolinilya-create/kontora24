@@ -117,6 +117,7 @@ export const NAV_ITEMS = [
   { path: '/production/resin', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'resin_pourer'] },
   { path: '/production/assembly', label: 'Сборка', icon: 'Hammer', roles: ['admin', 'manager', 'assembler'] },
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'assembler'] },
+  { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ['admin', 'manager', 'designer', 'printer', 'assembler', 'resin_pourer'] },
   { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: ['admin', 'manager'] },
   { path: '/clients', label: 'Клиенты', icon: 'Users', roles: ['admin', 'manager'] },
   { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: ['admin', 'manager'] },

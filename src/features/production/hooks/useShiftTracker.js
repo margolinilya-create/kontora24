@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { MS_PER_MINUTE } from '@/shared/constants'
 
 /**
  * Hook for worker shift clock-in / clock-out.
@@ -56,7 +57,7 @@ export function useShiftTracker() {
     if (!profile || !activeShift) return
     const now = new Date()
     const started = new Date(activeShift.started_at)
-    const durationMinutes = Math.round((now - started) / 60000)
+    const durationMinutes = Math.round((now - started) / MS_PER_MINUTE)
 
     const { error } = await supabase
       .from('k24_shift_entries')

@@ -1,35 +1,25 @@
 import { useRef, useState } from 'react'
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
-import { ProductionSticker } from './ProductionSticker'
-import { DeliverySticker } from './DeliverySticker'
+import { Sticker } from './Sticker'
 import { toast } from '@/shared/stores/toast-store'
 import Button from '@/shared/components/Button'
+import { exportAsPNG, exportAsPDF, printElement } from '@/shared/lib/html-export'
 
 /**
  * Renders a sticker with export buttons (PNG, PDF, Print).
- * @param {Object} props
- * @param {'production'|'delivery'} props.type - Which sticker to render
- * @param {Object} props.order - Order data
+ * @param {'production'|'delivery'} props.type
+ * @param {Object} props.order
  */
 export function StickerActions({ type, order }) {
   const stickerRef = useRef(null)
   const [exporting, setExporting] = useState(false)
 
-  const StickerComponent = type === 'production' ? ProductionSticker : DeliverySticker
-  const filename = type === 'production'
-    ? `sticker-production-${order.number}`
-    : `sticker-delivery-${order.number}`
+  const filename = `sticker-${type}-${order.number}`
 
-  async function exportPNG() {
+  async function handlePNG() {
     if (!stickerRef.current) return
     setExporting(true)
     try {
-      const canvas = await html2canvas(stickerRef.current, { scale: 3, useCORS: true, backgroundColor: '#ffffff' })
-      const link = document.createElement('a')
-      link.download = `${filename}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
+      await exportAsPNG(stickerRef.current, filename, { scale: 3 })
       toast.success('PNG скачан')
     } catch {
       toast.error('Ошибка экспорта PNG')
@@ -38,16 +28,11 @@ export function StickerActions({ type, order }) {
     }
   }
 
-  async function exportPDF() {
+  async function handlePDF() {
     if (!stickerRef.current) return
     setExporting(true)
     try {
-      const canvas = await html2canvas(stickerRef.current, { scale: 3, useCORS: true, backgroundColor: '#ffffff' })
-      const imgData = canvas.toDataURL('image/png')
-      // 120x75mm sticker
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [75, 120] })
-      doc.addImage(imgData, 'PNG', 0, 0, 120, 75)
-      doc.save(`${filename}.pdf`)
+      await exportAsPDF(stickerRef.current, filename, { scale: 3, orientation: 'l', format: [75, 120], width: 120, height: 75 })
       toast.success('PDF скачан')
     } catch {
       toast.error('Ошибка экспорта PDF')
@@ -56,33 +41,23 @@ export function StickerActions({ type, order }) {
     }
   }
 
-  function handlePrint() {
+  async function handlePrint() {
     if (!stickerRef.current) return
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) { toast.error('Попап заблокирован'); return }
-
-    html2canvas(stickerRef.current, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
-      const imgData = canvas.toDataURL('image/png')
-      printWindow.document.write(`
-        <html><head><title>${filename}</title>
-        <style>@page { size: 120mm 75mm; margin: 0; } body { margin: 0; } img { width: 120mm; height: 75mm; }</style>
-        </head><body><img src="${imgData}" /><script>setTimeout(() => { window.print(); window.close(); }, 300)</script></body></html>
-      `)
-      printWindow.document.close()
-    })
+    try {
+      await printElement(stickerRef.current, { scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm' })
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   return (
     <div>
-      {/* Sticker preview */}
       <div className="overflow-x-auto mb-4">
-        <StickerComponent ref={stickerRef} order={order} />
+        <Sticker ref={stickerRef} order={order} type={type} />
       </div>
-
-      {/* Export buttons */}
       <div className="flex gap-2">
-        <Button variant="secondary" size="sm" onClick={exportPNG} loading={exporting}>PNG</Button>
-        <Button variant="secondary" size="sm" onClick={exportPDF} loading={exporting}>PDF</Button>
+        <Button variant="secondary" size="sm" onClick={handlePNG} loading={exporting}>PNG</Button>
+        <Button variant="secondary" size="sm" onClick={handlePDF} loading={exporting}>PDF</Button>
         <Button variant="secondary" size="sm" onClick={handlePrint}>Печать</Button>
       </div>
     </div>

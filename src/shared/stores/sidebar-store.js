@@ -13,25 +13,29 @@ export const useSidebarStore = create((set) => ({
   }),
 
   fetchCounts: async () => {
-    const [ordersRes, materialsRes] = await Promise.all([
-      supabase
-        .from('k24_orders')
-        .select('status')
-        .in('status', ['new', 'design', 'print', 'post_processing', 'resin_pouring', 'assembly', 'packaging']),
-      supabase
-        .from('k24_materials')
-        .select('stock_qty, min_qty'),
-    ])
+    try {
+      const [ordersRes, materialsRes] = await Promise.all([
+        supabase
+          .from('k24_orders')
+          .select('status')
+          .in('status', ['new', 'design', 'print', 'post_processing', 'resin_pouring', 'assembly', 'packaging']),
+        supabase
+          .from('k24_materials')
+          .select('stock_qty, min_qty'),
+      ])
 
-    const counts = {}
-    if (ordersRes.data) {
-      ordersRes.data.forEach((o) => { counts[o.status] = (counts[o.status] || 0) + 1 })
+      const counts = {}
+      if (ordersRes.data) {
+        ordersRes.data.forEach((o) => { counts[o.status] = (counts[o.status] || 0) + 1 })
+      }
+
+      const lowStockCount = (materialsRes.data || []).filter(
+        (m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty)
+      ).length
+
+      set({ counts, lowStockCount })
+    } catch (err) {
+      console.error('Failed to fetch sidebar counts:', err)
     }
-
-    const lowStockCount = (materialsRes.data || []).filter(
-      (m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty)
-    ).length
-
-    set({ counts, lowStockCount })
   },
 }))

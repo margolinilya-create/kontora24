@@ -1,6 +1,7 @@
 // --- Time constants (ms) ---
 export const MS_PER_DAY = 86_400_000
 export const MS_PER_HOUR = 3_600_000
+export const MS_PER_MINUTE = 60_000
 
 // --- Order statuses ---
 export const ORDER_STATUSES = {
@@ -105,6 +106,16 @@ export const VOLUME_DISCOUNTS = [
   { min: 200, max: 499, discount: 0.25 },
   { min: 500, max: Infinity, discount: 0.30 },
 ]
+
+// --- Stage notification roles: when order enters status, notify these roles ---
+export const NOTIFY_ROLES = {
+  design: ['designer'],
+  print: ['printer'],
+  post_processing: ['printer', 'assembler'],
+  resin_pouring: ['resin_pourer'],
+  assembly: ['assembler'],
+  packaging: ['assembler'],
+}
 
 // --- Navigation ---
 export const NAV_ITEMS = [

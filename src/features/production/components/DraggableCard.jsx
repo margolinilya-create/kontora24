@@ -7,7 +7,7 @@ import { TaskTimer } from './TaskTimer'
 import { DryingTimer } from './DryingTimer'
 import { OperationChecklist } from './OperationChecklist'
 import { TechCardPreview } from './TechCardPreview'
-import { ORDER_TYPES, PRIORITIES, MS_PER_DAY } from '@/shared/constants'
+import { ORDER_TYPES, PRIORITIES, MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
 import { supabase } from '@/shared/lib/supabase'
 // Use simple arithmetic instead of date-fns to avoid pulling it into production board chunk
 
@@ -19,8 +19,8 @@ const PRIORITY_BORDER = {
 function formatTimeInStatus(timestamp) {
   if (!timestamp) return null
   const ms = Date.now() - new Date(timestamp).getTime()
-  const h = Math.floor(ms / 3600000)
-  if (h < 1) return `${Math.floor(ms / 60000)} мин`
+  const h = Math.floor(ms / MS_PER_HOUR)
+  if (h < 1) return `${Math.floor(ms / MS_PER_MINUTE)} мин`
   if (h < 24) return `${h} ч`
   return `${Math.floor(h / 24)} дн`
 }

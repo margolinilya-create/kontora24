@@ -178,10 +178,9 @@ function MarkupSettings() {
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  const defaultMarkups = {
-    sticker_cut: 4.0, sticker_kiss: 4.0, stickerpack: 4.0,
-    sticker3D: 4.5, stickerpack3D: 4.5, rect: 4.0, big: 4.0,
-  }
+  const defaultMarkups = Object.fromEntries(
+    Object.entries(ORDER_TYPES).map(([k, v]) => [k, v.markup])
+  )
 
   useEffect(() => {
     if (markups && !form) {

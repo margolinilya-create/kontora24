@@ -1,19 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { ORDER_STATUSES } from '@/shared/constants'
+import { ORDER_STATUSES, NOTIFY_ROLES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { playNotificationSound } from '@/shared/lib/sound'
-
-// Map: when an order enters THIS status, notify THESE roles
-const NOTIFY_ROLES = {
-  design: ['designer'],
-  print: ['printer'],
-  post_processing: ['printer', 'assembler'],
-  resin_pouring: ['resin_pourer'],
-  assembly: ['assembler'],
-  packaging: ['assembler'],
-}
 
 export function useStageNotifications() {
   const { profile } = useAuth()
@@ -36,6 +26,7 @@ export function useStageNotifications() {
 
         // Don't process the same event twice
         if (processedRef.current.has(payload.new.id)) return
+        if (processedRef.current.size > 1000) processedRef.current.clear()
         processedRef.current.add(payload.new.id)
 
         // Check if my role should be notified for this status

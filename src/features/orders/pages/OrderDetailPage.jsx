@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail, updateOrder } from '../hooks/useOrders'
+import { InfoField } from '../components/InfoField'
+import { EditableField } from '../components/EditableField'
 import { StatusSwitcher } from '../components/StatusSwitcher'
 import { DepartmentTimeline } from '../components/DepartmentTimeline'
 import { OrderComments } from '../components/OrderComments'
@@ -340,56 +342,6 @@ export default function OrderDetailPage() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-function InfoField({ label, value }) {
-  return (
-    <div>
-      <p className="text-xs text-text-muted uppercase">{label}</p>
-      <p className="font-medium">{value}</p>
-    </div>
-  )
-}
-
-function EditableField({ label, field, order, onSaved }) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(order[field] || '')
-
-  async function save() {
-    try {
-      await updateOrder(order.id, { [field]: value || null })
-      setEditing(false)
-      onSaved()
-    } catch {
-      toast.error('Ошибка сохранения')
-    }
-  }
-
-  if (editing) {
-    return (
-      <div>
-        <p className="text-xs text-text-muted uppercase mb-1">{label}</p>
-        <div className="flex gap-1">
-          <input
-            type="number"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            className="border border-border rounded px-2 py-1 text-sm w-full bg-surface"
-            autoFocus
-            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
-          />
-          <button onClick={save} className="text-accent text-sm font-medium">OK</button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="cursor-pointer" onClick={() => setEditing(true)} title="Нажмите для редактирования">
-      <p className="text-xs text-text-muted uppercase">{label}</p>
-      <p className="font-medium">{order[field] || '—'}</p>
     </div>
   )
 }

@@ -23,6 +23,10 @@ export const useAuthStore = create((set, get) => ({
       set({ user: null, profile: null, loading: false })
     }
 
+    // Unsubscribe existing listener if initialize() is called again
+    const existing = get()._authSubscription
+    if (existing) existing.unsubscribe()
+
     // Listen for auth changes (store subscription for cleanup)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {

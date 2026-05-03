@@ -1,27 +1,18 @@
 import { useRef, useState } from 'react'
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
 import { TechCard } from './TechCard'
 import { toast } from '@/shared/stores/toast-store'
+import { exportAsPNG, exportAsPDF } from '@/shared/lib/html-export'
 
 export function TechCardActions({ order }) {
   const cardRef = useRef(null)
   const [showPreview, setShowPreview] = useState(false)
   const [exporting, setExporting] = useState(false)
 
-  async function exportPNG() {
+  async function handlePNG() {
     if (!cardRef.current) return
     setExporting(true)
     try {
-      const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-      })
-      const link = document.createElement('a')
-      link.download = `techcard-${order.number}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
+      await exportAsPNG(cardRef.current, `techcard-${order.number}`, { scale: 2 })
     } catch (err) {
       toast.error('Ошибка экспорта: ' + err.message)
     } finally {
@@ -29,15 +20,11 @@ export function TechCardActions({ order }) {
     }
   }
 
-  async function exportPDF() {
+  async function handlePDF() {
     if (!cardRef.current) return
     setExporting(true)
     try {
-      const canvas = await html2canvas(cardRef.current, { scale: 2, backgroundColor: '#ffffff' })
-      const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297)
-      pdf.save(`techcard-${order.number}.pdf`)
+      await exportAsPDF(cardRef.current, `techcard-${order.number}`, { scale: 2, orientation: 'p', format: 'a4', width: 210, height: 297 })
     } catch (err) {
       toast.error('Ошибка PDF: ' + err.message)
     } finally {
@@ -62,14 +49,14 @@ export function TechCardActions({ order }) {
         {showPreview && (
           <>
             <button
-              onClick={exportPNG}
+              onClick={handlePNG}
               disabled={exporting}
               className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50"
             >
               {exporting ? '...' : 'PNG'}
             </button>
             <button
-              onClick={exportPDF}
+              onClick={handlePDF}
               disabled={exporting}
               className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50"
             >

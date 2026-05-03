@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
 
 export function DryingTimer({ dryUntil }) {
   const [remaining, setRemaining] = useState('')
@@ -14,14 +15,14 @@ export function DryingTimer({ dryUntil }) {
         setIsDry(true)
         return
       }
-      const hours = Math.floor(diff / 3600000)
-      const minutes = Math.floor((diff % 3600000) / 60000)
+      const hours = Math.floor(diff / MS_PER_HOUR)
+      const minutes = Math.floor((diff % MS_PER_HOUR) / MS_PER_MINUTE)
       setRemaining(`${hours}ч ${minutes}мин`)
       setIsDry(false)
     }
 
     update()
-    const interval = setInterval(update, 60000)
+    const interval = setInterval(update, MS_PER_MINUTE)
     return () => clearInterval(interval)
   }, [dryUntil])
 

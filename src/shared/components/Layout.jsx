@@ -9,21 +9,9 @@ import { cn } from '@/shared/lib/utils'
 import { useDeadlineAlerts } from '@/shared/hooks/useDeadlineAlerts'
 import { useStageNotifications } from '@/shared/hooks/useStageNotifications'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { ROLES } from '@/shared/constants'
+import { ROLES, NAV_ITEMS } from '@/shared/constants'
 
-const PAGE_TITLES = {
-  '/': 'Dashboard',
-  '/orders': 'Заказы',
-  '/calculator': 'Калькулятор',
-  '/production': 'Производство',
-  '/production/design': 'Дизайн',
-  '/production/print': 'Печать',
-  '/production/assembly': 'Сборка',
-  '/warehouse': 'Склад',
-  '/clients': 'Клиенты',
-  '/analytics': 'Аналитика',
-  '/settings': 'Настройки',
-}
+const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map(item => [item.path, item.label]))
 
 export function Layout() {
   const collapsed = useSidebarStore((s) => s.collapsed)

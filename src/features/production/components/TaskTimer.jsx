@@ -2,7 +2,7 @@ import { useTimer, formatElapsed, formatTotalTime } from '../hooks/useTimer'
 import Button from '@/shared/components/Button'
 
 export function TaskTimer({ orderId, orderStatus, compact = false }) {
-  const { isRunning, elapsed, totalMinutes, start, stop } = useTimer(orderId)
+  const { isRunning, elapsed, totalMinutes, start, stop } = useTimer(orderId, { tickInterval: compact ? 30000 : 1000 })
 
   async function handleToggle() {
     if (isRunning) {

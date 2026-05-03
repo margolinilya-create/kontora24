@@ -1,5 +1,5 @@
 import { useState, useEffect, Suspense } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, Link } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { ErrorBoundary } from './ErrorBoundary'
 import Spinner from '@/shared/components/Spinner'
@@ -46,7 +46,7 @@ export function Layout() {
   if (isWorker) {
     return (
       <div className="min-h-screen bg-surface-dim">
-        <header className="sticky top-0 z-40 bg-sidebar text-white px-4 py-3 flex items-center justify-between">
+        <header className="sticky top-0 z-40 bg-sidebar text-white px-4 py-3 flex items-center justify-between safe-area-top">
           <div>
             <span className="font-semibold">{ROLES[profile.role]?.label}</span>
             <span className="text-white/60 ml-2 text-sm">{profile.display_name}</span>
@@ -91,7 +91,7 @@ export function Layout() {
               if (window.innerWidth < 768) setMobileOpen(!mobileOpen)
               else toggleCollapsed()
             }}
-            className="p-2.5 rounded-lg hover:bg-surface-dim transition-colors"
+            className="p-3 rounded-lg hover:bg-surface-dim transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
             aria-label="Меню"
           >
             <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -99,6 +99,9 @@ export function Layout() {
             </svg>
           </button>
           {pageTitle && <h2 className="text-sm font-medium text-text-muted">{pageTitle}</h2>}
+          <Link to="/help" className="ml-auto p-2.5 rounded-lg hover:bg-surface-dim transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Справка">
+            <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </Link>
         </header>
 
         <main id="main-content" className="p-4 sm:p-6">

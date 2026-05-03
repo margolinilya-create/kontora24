@@ -11,6 +11,7 @@ import { toast } from '@/shared/stores/toast-store'
 import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
 import Tabs from '@/shared/components/Tabs'
+import { OnboardingTip } from '@/shared/components/OnboardingTip'
 
 const PRODUCTION_STATUSES = new Set(COLS)
 
@@ -210,11 +211,14 @@ export default function ProductionBoardPage() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+        <div className="relative">
           <h1 className="text-2xl font-bold">Производство</h1>
           <p className="text-text-muted text-sm">
             {total} {total === 1 ? 'заказ' : total < 5 ? 'заказа' : 'заказов'} · Выполнено сегодня: {todayDone}
           </p>
+          <OnboardingTip id="production-board-intro">
+            Перетаскивайте карточки между колонками для смены статуса. Используйте фильтр «Мои» чтобы видеть только свои заказы.
+          </OnboardingTip>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Tabs
@@ -228,12 +232,12 @@ export default function ProductionBoardPage() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Поиск по №..."
             aria-label="Поиск по номеру заказа"
-            className="rounded-lg border border-border px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50 w-36"
+            className="rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50 w-full sm:w-36 min-h-[44px]"
           />
           <button
             onClick={() => setShowMine(!showMine)}
             aria-pressed={showMine}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 min-h-[44px] ${
               showMine
                 ? 'bg-accent text-white shadow-sm shadow-accent/25'
                 : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
@@ -245,7 +249,7 @@ export default function ProductionBoardPage() {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             aria-label="Сортировка"
-            className="rounded-lg border border-border px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+            className="rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50 min-h-[44px]"
           >
             <option value="created">По дате</option>
             <option value="deadline">По дедлайну</option>

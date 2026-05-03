@@ -3,7 +3,7 @@
 Система управления производством стикеров: заказы → расчёт → дизайн → печать → постобработка → [заливка] → сборка → упаковка → выдача.
 CRM — Bitrix24 (интеграция через webhooks). Аналитика — здесь и в Bitrix.
 
-**Планы:** `docs/kontora24-plan.md` · `docs/improvement-plan-final.md`
+**Планы:** `docs/project-overview.md` · `docs/improvement-plan-final.md` · `docs/kontora24-plan.md`
 **Production:** https://kontora24.vercel.app
 **Login:** mib@pnhd.ru / Kontora24!
 
@@ -78,14 +78,13 @@ src/
     kp/                 # CommercialProposal (3 templates: standard/detailed/short)
     settings/           # SettingsPage (tabs: profile, calculator, markups, users, Bitrix24, logs)
   shared/
-    components/         # Layout (skip-to-content, Suspense), Sidebar (counters, low-stock badge),
-                        #   Button, Input, Modal (focus trap), Spinner, Tabs, SearchInput,
+    components/         # Layout (skip-to-content, Suspense, help button), Sidebar (counters, low-stock badge),
+                        #   Button (min-h-44px touch targets), Input, Modal (focus trap), Spinner, Tabs, SearchInput,
                         #   ConfirmDialog, ErrorBoundary (Sentry), Toaster, Skeleton,
-                        #   Pagination (range display), Breadcrumbs, NotFoundPage, OfflineIndicator
-    hooks/              # useDebounce, useRealtime, usePagination, useDeadlineAlerts, useStageNotifications
+                        #   Pagination (range display), NotFoundPage, OfflineIndicator, OnboardingTip
+    hooks/              # useDebounce, usePagination, useDeadlineAlerts, useStageNotifications
     lib/                # supabase.js, utils.js, export.js (CSV), sentry.js, sound.js
-    stores/             # toast-store, theme-store, sidebar-store, notification-store
-    components/         # + OnboardingTip
+    stores/             # toast-store, theme-store, sidebar-store
     constants.js        # Statuses, roles, types, transitions, nav items, discounts
   styles/globals.css    # Tailwind + light/dark theme
 api/
@@ -130,10 +129,13 @@ RPC: `update_stock` · `auto_deduct_materials` · `reserve_materials` · `releas
 - Settings: tabs (profile/calculator/markups/users/Bitrix24/logs), calculator params from DB, markup editor, user management (6 roles), profile, create user (name/email/password/role via API), Bitrix config UI, integration log
 - Tech card: A4 layout, PNG/PDF export, print CSS, layout preview, QR code, operation checklist
 - KP: 3 templates (standard/detailed/short)
-- Infra: error boundaries (retry + Sentry), Suspense fallback, pagination, toast system, skeleton loading, dark theme, PWA manifest + service worker (offline), offline indicator, 39 Vitest tests, GitHub Actions CI/CD, Sentry, Agentation
+- Performance: React.memo on QueueCard/PipelineSummary/DraggableCard, useMemo on DashboardPage filtering, debounced realtime subscriptions (2s), timer tick 30s in compact mode (vs 1s)
+- Infra: error boundaries (retry + Sentry), Suspense fallback, pagination, toast system, skeleton loading, dark theme, PWA manifest + service worker (offline), offline indicator, 41 Vitest tests, GitHub Actions CI/CD, Sentry, Agentation
 - Bitrix: incoming webhook (auto-create + auto-calc), outbound webhook (status sync, retry with backoff), settings UI, integration log
 - Shared UI Kit: Button, Input, Modal, Spinner, Tabs, SearchInput, ConfirmDialog, OnboardingTip
-- A11y: skip-to-content, aria-labels, keyboard DnD, table captions, focus-visible, prefers-reduced-motion, iOS safe areas
+- A11y: skip-to-content, aria-labels, keyboard DnD, table captions, focus-visible, prefers-reduced-motion, iOS safe areas, min 44px touch targets
+- Mobile: responsive search/controls on Production Board, safe-area-inset on fixed sidebar/header, 44px tap targets on buttons/nav, full-width inputs on small screens
+- Help: HelpPage (5 tabs: Обзор/Этапы/Роли/Отчёты/Вопросы), contextual OnboardingTips on Dashboard/Queues/Board, header help button (?)
 - Worker UX: simplified layout (no sidebar), unified "Готово" action, onboarding tips, drying timer for resin, design preview thumbnails
 
 ## Контекст производства

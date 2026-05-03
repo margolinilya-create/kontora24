@@ -4,6 +4,7 @@ import { QueueCard } from '../components/QueueCard'
 import { PipelineSummary, COLS } from '../components/PipelineSummary'
 import { playNotificationSound } from '@/shared/lib/sound'
 import Spinner from '@/shared/components/Spinner'
+import { OnboardingTip } from '@/shared/components/OnboardingTip'
 
 const QUEUE_CONFIG = {
   design: { title: 'Очередь дизайна', subtitle: 'Заказы со статусом «Дизайн»', status: 'design' },
@@ -41,11 +42,14 @@ export default function QueuePage({ queueType, hideHeader }) {
   return (
     <div className="space-y-4">
       {!hideHeader && (
-        <div>
+        <div className="relative">
           <h1 className="text-2xl font-bold">{config.title}</h1>
           <p className="text-text-muted">
             {orders.length > 0 ? `${orders.length} заказов в работе` : config.subtitle}
           </p>
+          <OnboardingTip id={`queue-${queueType}-intro`}>
+            Нажмите «Взять» чтобы назначить заказ на себя. Кнопка «Записать» — для внесения отчёта о проделанной работе.
+          </OnboardingTip>
         </div>
       )}
 

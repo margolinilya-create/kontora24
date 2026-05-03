@@ -4,7 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 
 const ACTIVE_TIMER_KEY = 'kontora24_active_timer'
 
-export function useTimer(orderId) {
+export function useTimer(orderId, { tickInterval = 1000 } = {}) {
   const { profile } = useAuth()
   const [entries, setEntries] = useState([])
   const [activeEntry, setActiveEntry] = useState(null)
@@ -41,7 +41,7 @@ export function useTimer(orderId) {
     load()
   }, [orderId])
 
-  // Tick every second when timer is active
+  // Tick at configured interval when timer is active
   useEffect(() => {
     if (activeEntry) {
       const tick = () => {
@@ -49,13 +49,13 @@ export function useTimer(orderId) {
         setElapsed(seconds)
       }
       tick()
-      intervalRef.current = setInterval(tick, 1000)
+      intervalRef.current = setInterval(tick, tickInterval)
       return () => clearInterval(intervalRef.current)
     } else {
       setElapsed(0)
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [activeEntry])
+  }, [activeEntry, tickInterval])
 
   const start = useCallback(async (status) => {
     if (!profile || !orderId) return

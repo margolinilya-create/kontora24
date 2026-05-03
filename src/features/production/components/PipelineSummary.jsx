@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { ORDER_STATUSES } from '@/shared/constants'
 
 const COLS = ['new', 'design', 'print', 'post_processing', 'resin_pouring', 'assembly', 'packaging', 'otk']
@@ -19,7 +20,7 @@ const COL_COLORS = {
  * @param {string} [activeStatus] - highlight current stage (for queue pages)
  * @param {React.RefObject} [scrollRef] - scroll container ref (for board page click-to-scroll)
  */
-export function PipelineSummary({ columns, activeStatus, scrollRef }) {
+export const PipelineSummary = memo(function PipelineSummary({ columns, activeStatus, scrollRef }) {
   function handleClick(status) {
     if (scrollRef) {
       const el = scrollRef.current?.querySelector(`[data-col="${status}"]`)
@@ -59,6 +60,6 @@ export function PipelineSummary({ columns, activeStatus, scrollRef }) {
       </span>
     </div>
   )
-}
+})
 
 export { COLS, COL_COLORS }

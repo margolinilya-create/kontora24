@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
@@ -143,12 +143,17 @@ export default function DashboardPage() {
   useEffect(() => { fetchData() }, [fetchData])
   useEffect(() => { fetchWorkerStats() }, [fetchWorkerStats])
 
+  // Debounced realtime — avoid cascading refetches on rapid changes
+  const debounceRef = useRef(null)
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'k24_orders' }, () => { fetchData(); fetchWorkerStats() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'k24_orders' }, () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        debounceRef.current = setTimeout(() => { fetchData(); fetchWorkerStats() }, 2000)
+      })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { supabase.removeChannel(channel); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [fetchData, fetchWorkerStats])
 
   // Mini chart data for managers
@@ -175,19 +180,21 @@ export default function DashboardPage() {
     fetchChartData()
   }, [isManager])
 
-  // Role-specific queue status
-  const queueStatuses = {
-    designer: ['design'],
-    printer: ['print', 'post_processing'],
-    resin_pourer: ['resin_pouring'],
-    assembler: ['post_processing', 'assembly', 'packaging'],
-  }
-  const myQueueStatusList = queueStatuses[role] || []
-  const myQueueOrders = myQueueStatusList.length > 0 ? data.orders.filter((o) => myQueueStatusList.includes(o.status)) : []
-
-  // Split worker orders: mine vs queue
-  const myTasks = profile ? myQueueOrders.filter((o) => o.assigned_to === profile.id) : []
-  const queueTasks = profile ? myQueueOrders.filter((o) => o.assigned_to !== profile.id) : []
+  // Role-specific queue status (memoized)
+  const { myTasks, queueTasks } = useMemo(() => {
+    const queueStatuses = {
+      designer: ['design'],
+      printer: ['print', 'post_processing'],
+      resin_pourer: ['resin_pouring'],
+      assembler: ['post_processing', 'assembly', 'packaging'],
+    }
+    const myQueueStatusList = queueStatuses[role] || []
+    const myQueueOrders = myQueueStatusList.length > 0 ? data.orders.filter((o) => myQueueStatusList.includes(o.status)) : []
+    return {
+      myTasks: profile ? myQueueOrders.filter((o) => o.assigned_to === profile.id) : [],
+      queueTasks: profile ? myQueueOrders.filter((o) => o.assigned_to !== profile.id) : [],
+    }
+  }, [data.orders, role, profile])
 
   const handleWorkerUpdated = () => {
     fetchData()

@@ -68,7 +68,7 @@ export function Sidebar({ collapsed }) {
 
   return (
     <aside aria-label="Боковая навигация" className={cn(
-      'fixed left-0 top-0 h-screen bg-sidebar text-white flex flex-col transition-all duration-200 z-40',
+      'fixed left-0 top-0 h-screen bg-sidebar text-white flex flex-col transition-all duration-200 z-40 safe-area-top safe-area-left',
       collapsed ? 'w-16' : 'w-60'
     )}>
       {/* Logo */}
@@ -98,7 +98,7 @@ export function Sidebar({ collapsed }) {
                   to={item.path}
                   end={item.path === '/'}
                   className={({ isActive }) => cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
                     isActive
                       ? 'bg-white/15 text-white font-medium'
                       : 'text-white/70 hover:bg-white/10 hover:text-white'

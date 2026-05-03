@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
@@ -17,7 +17,7 @@ import Modal from '@/shared/components/Modal'
 import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
 import { formatRelative, formatDate } from '@/shared/lib/utils'
 
-export function QueueCard({ order, onUpdated }) {
+export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
   const { profile } = useAuth()
   const [showLogForm, setShowLogForm] = useState(false)
   const [showTechCard, setShowTechCard] = useState(false)
@@ -31,11 +31,11 @@ export function QueueCard({ order, onUpdated }) {
   const isOverdue = deadlineDate && deadlineDate < now
   const isUrgentDeadline = deadlineDate && !isOverdue && deadlineDate < new Date(now.getTime() + 86400000 * 2)
 
-  async function handleLogSubmit(stage, logData) {
+  const handleLogSubmit = useCallback(async (stage, logData) => {
     await addProductionLogAndCheckAdvance(order.id, stage, logData, order)
     setShowLogForm(false)
     onUpdated?.()
-  }
+  }, [order, onUpdated])
 
   return (
     <div className={`bg-surface rounded-xl border border-border p-5 space-y-3${order.priority === 'urgent' ? ' border-l-4 border-l-danger' : order.priority === 'high' ? ' border-l-4 border-l-warning' : ''}`}>
@@ -124,4 +124,4 @@ export function QueueCard({ order, onUpdated }) {
       <TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} />
     </div>
   )
-}
+})

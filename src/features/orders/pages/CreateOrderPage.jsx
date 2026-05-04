@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -52,6 +52,63 @@ function FieldError({ error }) {
   return <p className="text-danger text-xs mt-1 font-medium">{error.message}</p>
 }
 
+function OrderTypeSelector({ value, onChange, error }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-2">Тип продукции <span className="text-danger">*</span></label>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {Object.entries(ORDER_TYPES).map(([key, { label }]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            className={`text-left px-3 py-3 rounded-xl border-2 text-sm font-medium transition-all min-h-[56px] ${
+              value === key
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-border bg-surface hover:border-accent/30 text-text'
+            } ${error && !value ? 'border-danger/50' : ''}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <FieldError error={error} />
+    </div>
+  )
+}
+
+function SizePresetPicker({ activePreset, onSelect }) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {Object.entries(SIZE_PRESETS).map(([key, { label, width, height }]) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onSelect(key)}
+          className={`px-3 py-2 text-xs rounded-lg font-medium transition-all min-h-[40px] ${
+            activePreset === key
+              ? 'bg-accent text-white'
+              : 'border border-border bg-surface hover:bg-surface-dim text-text-muted'
+          }`}
+        >
+          {label} ({width}x{height})
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={() => onSelect(null)}
+        className={`px-3 py-2 text-xs rounded-lg font-medium transition-all min-h-[40px] ${
+          activePreset === null
+            ? 'bg-accent text-white'
+            : 'border border-border bg-surface hover:bg-surface-dim text-text-muted'
+        }`}
+      >
+        Свой
+      </button>
+    </div>
+  )
+}
+
 const schema = z.object({
   // Deal info
   deal_name: z.string().optional(),
@@ -89,6 +146,7 @@ export default function CreateOrderPage() {
   const navigate = useNavigate()
   const { hasRole } = useAuth()
   const [submitting, setSubmitting] = useState(false)
+  const [activePreset, setActivePreset] = useState(null)
   const canSeeFinance = hasRole(['admin', 'manager'])
 
   const formRef = useRef(null)
@@ -103,8 +161,9 @@ export default function CreateOrderPage() {
   })
 
   const errorCount = Object.keys(errors).length
+  const coreErrors = ['order_type', 'qty', 'width_mm', 'height_mm'].some(k => errors[k])
+  const extraErrors = ['film_type', 'lam_type', 'design_variants', 'design_status', 'mockup_path', 'stickers_per_pack', 'notes'].some(k => errors[k])
   const dealErrors = ['deal_name', 'bitrix_deal_id', 'price_final', 'is_partner', 'source', 'source_referrer', 'payment_status'].some(k => errors[k])
-  const orderErrors = ['order_type', 'qty', 'width_mm', 'height_mm', 'film_type', 'lam_type', 'design_variants', 'design_status', 'mockup_path', 'stickers_per_pack', 'client_name', 'deadline', 'priority', 'notes'].some(k => errors[k])
   const deliveryErrors = ['delivery_type', 'delivery_city', 'delivery_address', 'delivery_notes'].some(k => errors[k])
 
   const scrollToFirstError = useCallback(() => {
@@ -124,11 +183,23 @@ export default function CreateOrderPage() {
   const deliveryType = watch('delivery_type')
   const isStickerpack = orderType === 'stickerpack' || orderType === 'stickerpack3D'
 
+  // Smart defaults for 3D types
+  useEffect(() => {
+    if (orderType === 'sticker3D' || orderType === 'stickerpack3D') {
+      setValue('film_type', 'G')
+    }
+  }, [orderType, setValue])
+
   function applyPreset(key) {
+    if (key === null) {
+      setActivePreset(null)
+      return
+    }
     const preset = SIZE_PRESETS[key]
     if (!preset) return
     setValue('width_mm', preset.width)
     setValue('height_mm', preset.height)
+    setActivePreset(key)
   }
 
   async function onSubmit(values) {
@@ -212,74 +283,72 @@ export default function CreateOrderPage() {
 
       <form ref={formRef} onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="space-y-4">
 
-        {/* === Заказ (основная, всегда открыта) === */}
-        <CollapsibleSection title="Заказ" defaultOpen hasError={orderErrors}>
-          <div>
-            <label className="block text-sm font-medium mb-1">Тип продукции <span className="text-danger">*</span></label>
-            <select {...register('order_type')} aria-invalid={!!errors.order_type} className={`${SELECT_CLASS} ${errors.order_type ? 'border-danger ring-1 ring-danger/30' : ''}`}>
-              <option value="">Выберите тип</option>
-              {Object.entries(ORDER_TYPES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-            <FieldError error={errors.order_type} />
-          </div>
+        {/* === Основное (always open) === */}
+        <CollapsibleSection title="Основное" defaultOpen hasError={coreErrors}>
+          {/* Order type — visual cards */}
+          <OrderTypeSelector
+            value={orderType}
+            onChange={(val) => setValue('order_type', val, { shouldValidate: true })}
+            error={errors.order_type}
+          />
 
+          {/* Size: presets + inputs */}
           <div>
-            <label className="block text-sm font-medium mb-1">Материал (плёнка)</label>
-            <select {...register('film_type')} className={SELECT_CLASS}>
-              {Object.entries(FILM_TYPES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Размер, мм <span className="text-danger">*</span></label>
-            <div className="flex gap-2 mb-2 flex-wrap">
-              {Object.entries(SIZE_PRESETS).map(([key, { label }]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => applyPreset(key)}
-                  className="px-3 py-2 text-xs rounded-lg border border-border bg-surface hover:bg-surface-dim transition-colors min-h-[36px]"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            <label className="block text-sm font-medium mb-2">Размер, мм <span className="text-danger">*</span></label>
+            <SizePresetPicker activePreset={activePreset} onSelect={applyPreset} />
+            <div className="grid grid-cols-2 gap-4 mt-2">
               <div>
-                <Input type="number" placeholder="Ширина" aria-invalid={!!errors.width_mm} className={errors.width_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('width_mm')} />
+                <Input type="number" placeholder="Ширина" inputMode="numeric" aria-invalid={!!errors.width_mm} className={errors.width_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('width_mm', { onChange: () => setActivePreset(null) })} />
                 <FieldError error={errors.width_mm} />
               </div>
               <div>
-                <Input type="number" placeholder="Высота" aria-invalid={!!errors.height_mm} className={errors.height_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('height_mm')} />
+                <Input type="number" placeholder="Высота" inputMode="numeric" aria-invalid={!!errors.height_mm} className={errors.height_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('height_mm', { onChange: () => setActivePreset(null) })} />
                 <FieldError error={errors.height_mm} />
               </div>
             </div>
           </div>
 
+          {/* Qty + Deadline */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Тираж, шт <span className="text-danger">*</span></label>
-              <Input type="number" aria-invalid={!!errors.qty} className={errors.qty ? 'border-danger ring-1 ring-danger/30' : ''} {...register('qty')} />
+              <Input type="number" inputMode="numeric" aria-invalid={!!errors.qty} className={errors.qty ? 'border-danger ring-1 ring-danger/30' : ''} {...register('qty')} />
               <FieldError error={errors.qty} />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Видов дизайна</label>
-              <Input type="number" min="1" {...register('design_variants')} />
+              <label className="block text-sm font-medium mb-1">Срок сдачи</label>
+              <Input type="date" {...register('deadline')} />
             </div>
           </div>
 
-          {isStickerpack && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Стикеров в паке</label>
-              <Input type="number" min="1" {...register('stickers_per_pack')} />
-            </div>
-          )}
-
+          {/* Client + Priority */}
           <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Заказчик</label>
+              <Input type="text" placeholder="Имя клиента" {...register('client_name')} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Приоритет</label>
+              <select {...register('priority')} className={SELECT_CLASS}>
+                {Object.entries(PRIORITIES).map(([key, { label }]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </CollapsibleSection>
+
+        {/* === Дополнительно (collapsed) === */}
+        <CollapsibleSection title="Дополнительно" hasError={extraErrors}>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Материал (плёнка)</label>
+              <select {...register('film_type')} className={SELECT_CLASS}>
+                {Object.entries(FILM_TYPES).map(([key, { label }]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium mb-1">Ламинация</label>
               <select {...register('lam_type')} className={SELECT_CLASS}>
@@ -288,6 +357,13 @@ export default function CreateOrderPage() {
                   <option key={key} value={key}>{label}</option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Видов дизайна</label>
+              <Input type="number" inputMode="numeric" min="1" {...register('design_variants')} />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Дизайн макета</label>
@@ -304,27 +380,12 @@ export default function CreateOrderPage() {
             <Input type="text" placeholder="Путь к файлу на сервере" {...register('mockup_path')} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {isStickerpack && (
             <div>
-              <label className="block text-sm font-medium mb-1">Заказчик</label>
-              <Input type="text" placeholder="Имя клиента" {...register('client_name')} />
+              <label className="block text-sm font-medium mb-1">Стикеров в паке</label>
+              <Input type="number" inputMode="numeric" min="1" {...register('stickers_per_pack')} />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Срок сдачи</label>
-              <Input type="date" {...register('deadline')} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Приоритет</label>
-              <select {...register('priority')} className={SELECT_CLASS}>
-                {Object.entries(PRIORITIES).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Комментарий</label>
@@ -337,7 +398,7 @@ export default function CreateOrderPage() {
           </div>
         </CollapsibleSection>
 
-        {/* === Сделка (свёрнута по умолчанию) === */}
+        {/* === Сделка (collapsed) === */}
         <CollapsibleSection title="Сделка" hasError={dealErrors}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -392,7 +453,7 @@ export default function CreateOrderPage() {
           </div>
         </CollapsibleSection>
 
-        {/* === Отгрузка (свёрнута по умолчанию) === */}
+        {/* === Отгрузка (collapsed) === */}
         <CollapsibleSection title="Отгрузка" hasError={deliveryErrors}>
           <div>
             <label className="block text-sm font-medium mb-1">Получение</label>
@@ -428,7 +489,7 @@ export default function CreateOrderPage() {
           )}
         </CollapsibleSection>
 
-        {/* Submit */}
+        {/* Submit — sticky on mobile */}
         <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface-dim/80 backdrop-blur-sm py-4 -mx-4 px-4 sm:static sm:bg-transparent sm:backdrop-blur-none sm:py-0 sm:mx-0 sm:px-0">
           <Button type="submit" loading={submitting} className="flex-1 sm:flex-none">Создать заказ</Button>
           <Button type="button" variant="secondary" onClick={() => navigate('/orders')} className="flex-1 sm:flex-none">Отмена</Button>

@@ -5,7 +5,7 @@ import { InfoField } from '../components/InfoField'
 import { EditableField } from '../components/EditableField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
 import { StatusSwitcher } from '../components/StatusSwitcher'
-import { DepartmentTimeline } from '../components/DepartmentTimeline'
+import { OrderTimeline } from '../components/OrderTimeline'
 import { OrderComments } from '../components/OrderComments'
 import { OrderStageInput } from '../components/OrderStageInput'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
@@ -135,8 +135,8 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Department timeline */}
-      <DepartmentTimeline order={order} />
+      {/* Order progress timeline */}
+      <OrderTimeline order={order} history={history} />
 
       {/* Admin edit mode */}
       {editing && isAdmin && (

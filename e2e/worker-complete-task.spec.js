@@ -14,7 +14,7 @@ async function emulateRole(page, roleName) {
 }
 
 test.describe('Worker Complete Task — Mobile', () => {
-  test.use({ ...test.info().project.use, viewport: { width: 390, height: 844 } })
+  test.use({ viewport: { width: 390, height: 844 } })
 
   test.beforeEach(async ({ page }) => {
     await login(page)

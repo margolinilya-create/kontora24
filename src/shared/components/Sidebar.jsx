@@ -31,15 +31,26 @@ const ICONS = {
   HelpCircle: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
 }
 
-// Nav groups — production queues are collapsible
+// Nav groups — all collapsible, collapsed by default
 const PRODUCTION_QUEUE_PATHS = ['/production/design', '/production/prepress', '/production/print', '/production/lamination', '/production/cutting', '/production/pouring', '/production/selection', '/production/assembly3d', '/production/packaging', '/production/otk']
 
 const NAV_GROUPS = [
-  { label: 'Управление', paths: ['/', '/orders'] },
-  { label: 'Производство', paths: ['/production', ...PRODUCTION_QUEUE_PATHS], collapsible: true, headerPath: '/production', queuePaths: PRODUCTION_QUEUE_PATHS },
-  { label: 'Ресурсы', paths: ['/warehouse', '/clients', '/analytics'] },
-  { label: 'Система', paths: ['/cabinet', '/reports', '/settings', '/help'] },
+  { id: 'manage', label: 'Управление', paths: ['/', '/orders'] },
+  { id: 'production', label: 'Производство', paths: ['/production', ...PRODUCTION_QUEUE_PATHS], headerPath: '/production' },
+  { id: 'resources', label: 'Ресурсы', paths: ['/warehouse', '/clients', '/analytics'] },
+  { id: 'system', label: 'Система', paths: ['/cabinet', '/reports', '/settings', '/help'] },
 ]
+
+const STORAGE_KEY = 'sidebar-groups'
+
+function loadOpenGroups() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
+    if (stored && typeof stored === 'object') return stored
+  } catch {}
+  // All collapsed by default
+  return {}
+}
 
 // Map path to count key
 const COUNT_MAP = {
@@ -63,13 +74,13 @@ export function Sidebar({ collapsed }) {
   const lowStockCount = useSidebarStore((s) => s.lowStockCount)
   const fetchCounts = useSidebarStore((s) => s.fetchCounts)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-  const [queuesOpen, setQueuesOpen] = useState(() => localStorage.getItem('sidebar-queues-open') !== 'false')
+  const [openGroups, setOpenGroups] = useState(loadOpenGroups)
   const role = profile?.role || 'viewer'
 
-  const toggleQueues = useCallback(() => {
-    setQueuesOpen((prev) => {
-      const next = !prev
-      localStorage.setItem('sidebar-queues-open', next)
+  const toggleGroup = useCallback((id) => {
+    setOpenGroups((prev) => {
+      const next = { ...prev, [id]: !prev[id] }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
       return next
     })
   }, [])
@@ -109,90 +120,60 @@ export function Sidebar({ collapsed }) {
 
       {/* Nav */}
       <nav aria-label="Основная навигация" className="flex-1 overflow-y-auto py-2 px-2">
-        {groupedNav.map((group) => (
-          <div key={group.label} className="mb-2">
-            {!collapsed && !group.collapsible && (
-              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80">
-                {group.label}
-              </p>
-            )}
-            {group.collapsible ? (
-              <>
-                {/* Group label as toggle button */}
-                {!collapsed && (
-                  <button
-                    onClick={toggleQueues}
-                    className="flex items-center w-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80 hover:text-white transition-colors"
+        {groupedNav.map((group) => {
+          const isOpen = !!openGroups[group.id]
+          const hasHeader = !!group.headerPath
+          const childItems = hasHeader
+            ? group.items.filter((item) => item.path !== group.headerPath)
+            : group.items
+
+          return (
+            <div key={group.id} className="mb-1">
+              {/* Group header — toggle */}
+              {!collapsed && (
+                <button
+                  onClick={() => toggleGroup(group.id)}
+                  className="flex items-center w-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80 hover:text-white transition-colors"
+                >
+                  <span className="flex-1 text-left">{group.label}</span>
+                  <svg
+                    className={cn('w-3 h-3 transition-transform', isOpen && 'rotate-180')}
+                    fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
                   >
-                    <span className="flex-1 text-left">{group.label}</span>
-                    <svg
-                      className={cn('w-3 h-3 transition-transform', queuesOpen && 'rotate-180')}
-                      fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                    </svg>
-                  </button>
-                )}
-                {/* Header item (Производство board) — always visible */}
-                {group.items.filter((item) => item.path === group.headerPath).map((item) => {
-                  const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
-                  return (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      className={({ isActive }) => cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
-                        isActive ? 'bg-white/15 text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'
-                      )}
-                    >
-                      <Icon />
-                      {!collapsed && (
-                        <>
-                          <span className="flex-1">{item.label}</span>
-                          {!queuesOpen && totalQueueCount > 0 && (
-                            <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center">
-                              {totalQueueCount > 99 ? '99+' : totalQueueCount}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </NavLink>
-                  )
-                })}
-                {/* Queue items — collapsible */}
-                {(collapsed || queuesOpen) && group.items
-                  .filter((item) => item.path !== group.headerPath)
-                  .map((item) => {
-                    const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
-                    const count = COUNT_MAP[item.path] ? counts[COUNT_MAP[item.path]] : null
-                    return (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        className={({ isActive }) => cn(
-                          'flex items-center gap-3 rounded-lg text-sm transition-colors min-h-[44px]',
-                          collapsed ? 'px-3 py-2.5' : 'pl-6 pr-3 py-1.5',
-                          isActive ? 'bg-white/15 text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Pinned header item (e.g. Производство board) — always visible */}
+              {hasHeader && group.items.filter((item) => item.path === group.headerPath).map((item) => {
+                const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
+                      isActive ? 'bg-white/15 text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    )}
+                  >
+                    <Icon />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1">{item.label}</span>
+                        {!isOpen && totalQueueCount > 0 && (
+                          <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center">
+                            {totalQueueCount > 99 ? '99+' : totalQueueCount}
+                          </span>
                         )}
-                      >
-                        <Icon />
-                        {!collapsed && (
-                          <>
-                            <span className="flex-1">{item.label}</span>
-                            {count > 0 && (
-                              <span className="bg-accent text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                                {count > 99 ? '99+' : count}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </NavLink>
-                    )
-                  })}
-              </>
-            ) : (
-              /* Regular non-collapsible group */
-              group.items.map((item) => {
+                      </>
+                    )}
+                  </NavLink>
+                )
+              })}
+
+              {/* Child items — shown when open (or always in collapsed sidebar) */}
+              {(collapsed || isOpen) && childItems.map((item) => {
                 const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
                 const count = COUNT_MAP[item.path] ? counts[COUNT_MAP[item.path]] : null
                 const hasAlert = item.path === '/warehouse' && lowStockCount > 0
@@ -202,7 +183,8 @@ export function Sidebar({ collapsed }) {
                     to={item.path}
                     end={item.path === '/'}
                     className={({ isActive }) => cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
+                      'flex items-center gap-3 rounded-lg text-sm transition-colors min-h-[44px]',
+                      collapsed ? 'px-3 py-2.5' : hasHeader ? 'pl-6 pr-3 py-1.5' : 'px-3 py-2.5',
                       isActive ? 'bg-white/15 text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'
                     )}
                   >
@@ -224,10 +206,10 @@ export function Sidebar({ collapsed }) {
                     )}
                   </NavLink>
                 )
-              })
-            )}
-          </div>
-        ))}
+              })}
+            </div>
+          )
+        })}
       </nav>
 
       {/* Footer */}

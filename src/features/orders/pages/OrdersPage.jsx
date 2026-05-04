@@ -5,7 +5,6 @@ import { StatusBadge } from '../components/StatusBadge'
 import { ORDER_TYPES } from '@/shared/constants'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { exportCSV } from '@/shared/lib/export'
-import { getDepartmentLabel } from '@/shared/lib/department-mapping'
 import { Pagination } from '@/shared/components/Pagination'
 import { TableSkeleton } from '@/shared/components/Skeleton'
 import { OrdersKanban } from '../components/OrdersKanban'
@@ -165,7 +164,7 @@ export default function OrdersPage() {
         onChange={({ from: f, to: t }) => { setDeadlineFrom(f); setDeadlineTo(t) }}
       />
 
-      {/* Table / Kanban */}
+      {/* Table / Kanban / Mobile Cards */}
       {loading ? (
         <TableSkeleton rows={6} cols={5} />
       ) : error ? (
@@ -184,7 +183,32 @@ export default function OrdersPage() {
         <OrdersKanban orders={orders} onUpdated={() => {}} />
       ) : (
         <>
-          <div className="bg-surface rounded-xl border border-border overflow-hidden">
+          {/* Mobile card view */}
+          <div className="sm:hidden space-y-3">
+            {orders.map((order) => (
+              <Link
+                key={order.id}
+                to={`/orders/${order.id}`}
+                className="block bg-surface rounded-xl border border-border p-4 hover:border-accent/30 transition-colors active:bg-surface-dim"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-accent">#{order.number}</span>
+                  <StatusBadge status={order.status} />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-text truncate mr-2">{order.client?.name || '—'}</span>
+                  <span className="text-text-muted shrink-0">{ORDER_TYPES[order.order_type]?.label || order.order_type}</span>
+                </div>
+                {order.deadline && (
+                  <div className={`text-xs mt-2 ${isDeadlinePast(order) ? 'text-danger font-medium' : 'text-text-muted'}`}>
+                    Сдача: {formatDeadline(order.deadline)}
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block bg-surface rounded-xl border border-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <caption className="sr-only">Список заказов</caption>

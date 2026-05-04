@@ -30,19 +30,19 @@
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
-/* Dark mode — contrast ratio 7:1+ for WCAG AA */
+/* Dark mode — bumped contrast for WCAG AA (4.5:1+ on #1e1e2e bg) */
 .dark {
-  --color-primary: #e2e8f0;
-  --color-primary-light: #cbd5e1;
+  --color-primary: #e8ecf2;
+  --color-primary-light: #d1d9e4;
   --color-surface: #1e1e2e;
-  --color-surface-dim: #151521;
-  --color-border: #3a3a54;
-  --color-text: #e2e8f0;
-  --color-text-muted: #c0cfe6;
-  --color-sidebar: #151521;
-  --color-chart-grid: #374151;
+  --color-surface-dim: #161622;
+  --color-border: #404060;
+  --color-text: #edf0f5;
+  --color-text-muted: #a8b8d0;
+  --color-sidebar: #161622;
+  --color-chart-grid: #404060;
   --color-chart-tooltip-bg: #2a2a3e;
-  --color-chart-tooltip-border: #374151;
+  --color-chart-tooltip-border: #404060;
 }
 
 body {

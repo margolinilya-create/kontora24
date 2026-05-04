@@ -1,5 +1,6 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { QueueCard } from '../components/QueueCard'
 import { PipelineSummary, COLS } from '../components/PipelineSummary'
 import { playNotificationSound } from '@/shared/lib/sound'
@@ -19,11 +20,61 @@ const QUEUE_CONFIG = {
   otk: { title: 'ОТК / Выдача', subtitle: 'Контроль качества и выдача заказа', status: 'otk' },
 }
 
+const SORT_OPTIONS = [
+  { key: 'deadline', label: 'По дедлайну' },
+  { key: 'priority', label: 'По приоритету' },
+  { key: 'created', label: 'По дате' },
+]
+
+const PRIORITY_WEIGHT = { urgent: 0, high: 1, normal: 2, low: 3 }
+
+function sortOrders(orders, sortBy) {
+  return [...orders].sort((a, b) => {
+    if (sortBy === 'priority') {
+      const pa = PRIORITY_WEIGHT[a.priority] ?? 2
+      const pb = PRIORITY_WEIGHT[b.priority] ?? 2
+      if (pa !== pb) return pa - pb
+      // Same priority — sort by deadline
+      if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline)
+      if (a.deadline) return -1
+      if (b.deadline) return 1
+      return 0
+    }
+    if (sortBy === 'deadline') {
+      if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline)
+      if (a.deadline) return -1
+      if (b.deadline) return 1
+      return 0
+    }
+    // created — newest first
+    return new Date(b.created_at) - new Date(a.created_at)
+  })
+}
+
 export default function QueuePage({ queueType, hideHeader }) {
   const config = QUEUE_CONFIG[queueType]
+  const { profile } = useAuth()
   const { orders: allOrders, loading, refetch } = useOrders()
+  const [showMine, setShowMine] = useState(false)
+  const [sortBy, setSortBy] = useState('deadline')
 
-  const orders = useMemo(() => allOrders.filter((o) => o.status === config.status), [allOrders, config.status])
+  const orders = useMemo(() => {
+    let filtered = allOrders.filter((o) => o.status === config.status)
+    if (showMine && profile) {
+      filtered = filtered.filter((o) => o.assigned_to === profile.id)
+    }
+    return sortOrders(filtered, sortBy)
+  }, [allOrders, config.status, showMine, profile, sortBy])
+
+  const totalInQueue = useMemo(
+    () => allOrders.filter((o) => o.status === config.status).length,
+    [allOrders, config.status]
+  )
+
+  const myCount = useMemo(
+    () => profile ? allOrders.filter((o) => o.status === config.status && o.assigned_to === profile.id).length : 0,
+    [allOrders, config.status, profile]
+  )
 
   const pipelineColumns = useMemo(() => {
     const result = {}
@@ -34,25 +85,52 @@ export default function QueuePage({ queueType, hideHeader }) {
   }, [allOrders])
 
   // Sound notification when new orders appear in queue
-  const prevCountRef = useRef(orders.length)
+  const prevCountRef = useRef(totalInQueue)
   useEffect(() => {
-    if (orders.length > prevCountRef.current) {
+    if (totalInQueue > prevCountRef.current) {
       playNotificationSound()
     }
-    prevCountRef.current = orders.length
-  }, [orders.length])
+    prevCountRef.current = totalInQueue
+  }, [totalInQueue])
 
   return (
     <div className="space-y-4">
       {!hideHeader && (
-        <div className="relative">
-          <h1 className="text-2xl font-bold">{config.title}</h1>
-          <p className="text-text-muted">
-            {orders.length > 0 ? `${orders.length} заказов в работе` : config.subtitle}
-          </p>
-          <OnboardingTip id={`queue-${queueType}-intro`}>
-            Нажмите «Взять» чтобы назначить заказ на себя. Кнопка «Записать» — для внесения отчёта о проделанной работе.
-          </OnboardingTip>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="relative">
+            <h1 className="text-2xl font-bold">{config.title}</h1>
+            <p className="text-text-muted text-sm">
+              {totalInQueue > 0
+                ? `${totalInQueue} в очереди${myCount > 0 ? ` · ${myCount} моих` : ''}`
+                : config.subtitle}
+            </p>
+            <OnboardingTip id={`queue-${queueType}-intro`}>
+              Нажмите «Взять» чтобы назначить заказ на себя. Кнопка «Записать» — для внесения отчёта о проделанной работе.
+            </OnboardingTip>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowMine(!showMine)}
+              aria-pressed={showMine}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px] ${
+                showMine
+                  ? 'bg-accent text-white shadow-sm shadow-accent/25'
+                  : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
+              }`}
+            >
+              {showMine ? `Мои (${myCount})` : 'Все'}
+            </button>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Сортировка"
+              className="rounded-lg border border-border px-3 py-2.5 text-sm bg-surface min-h-[44px]"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.key} value={opt.key}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
@@ -64,7 +142,25 @@ export default function QueuePage({ queueType, hideHeader }) {
         </div>
       ) : orders.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">
-          <p className="text-text-muted">Нет заказов в очереди</p>
+          <div className="text-4xl mb-3 text-text-muted/30" aria-hidden="true">
+            {showMine ? '📋' : '✓'}
+          </div>
+          <h3 className="text-lg font-semibold mb-1">
+            {showMine ? 'Нет ваших заказов' : 'Очередь пуста'}
+          </h3>
+          <p className="text-text-muted text-sm">
+            {showMine
+              ? 'Нажмите «Все» чтобы увидеть все заказы в очереди'
+              : 'Новые заказы появятся автоматически'}
+          </p>
+          {showMine && totalInQueue > 0 && (
+            <button
+              onClick={() => setShowMine(false)}
+              className="mt-4 text-accent hover:text-accent-hover text-sm font-medium transition-colors min-h-[44px]"
+            >
+              Показать все ({totalInQueue})
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

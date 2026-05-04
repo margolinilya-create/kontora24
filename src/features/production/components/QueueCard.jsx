@@ -1,7 +1,6 @@
 import { useState, memo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { TechCardPreview } from './TechCardPreview'
@@ -37,42 +36,47 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
   }, [order, onUpdated])
 
   return (
-    <div className={`bg-surface rounded-xl border border-border p-5 space-y-3${order.priority === 'urgent' ? ' border-l-4 border-l-danger' : order.priority === 'high' ? ' border-l-4 border-l-warning' : ''}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link to={`/orders/${order.id}`} className="text-lg font-semibold text-accent hover:underline" aria-label={`Открыть заказ #${order.number}`}>
+    <div className={`bg-surface rounded-xl border border-border p-4 sm:p-5 space-y-3${
+      isMine ? ' ring-2 ring-accent/20' : ''
+    }${order.priority === 'urgent' ? ' border-l-4 border-l-danger' : order.priority === 'high' ? ' border-l-4 border-l-warning' : ''}`}>
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Link to={`/orders/${order.id}`} className="text-lg font-semibold text-accent hover:underline shrink-0" aria-label={`Открыть заказ #${order.number}`}>
             #{order.number}
           </Link>
-          <button onClick={() => setShowTechCard(true)} className="text-xs text-text-muted hover:text-accent transition-colors min-h-[44px]">Тех карта</button>
+          {order.client?.name && (
+            <span className="text-sm text-text-muted truncate">{order.client.name}</span>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {(order.priority === 'urgent' || order.priority === 'high') && (
             <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
               {PRIORITIES[order.priority]?.label}
             </span>
           )}
           <ClaimButton order={order} onClaimed={onUpdated} />
-          <StatusBadge status={order.status} />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-sm">
+      {/* Key info — compact 2-column grid */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         <div>
           <span className="text-text-muted">Тип: </span>
-          {ORDER_TYPES[order.order_type]?.label || order.order_type}
-        </div>
-        <div>
-          <span className="text-text-muted">Размер: </span>
-          {order.width_mm}x{order.height_mm} мм
+          <span className="font-medium">{ORDER_TYPES[order.order_type]?.label || order.order_type}</span>
         </div>
         <div>
           <span className="text-text-muted">Тираж: </span>
-          {order.qty} шт
+          <span className="font-medium">{order.qty} шт</span>
+        </div>
+        <div>
+          <span className="text-text-muted">Размер: </span>
+          {order.width_mm}x{order.height_mm}
         </div>
         {deadlineDate && (
           <div>
             <span className="text-text-muted">Сдача: </span>
-            <span className={isOverdue ? 'text-danger font-medium' : isUrgentDeadline ? 'text-warning font-medium' : ''}>
+            <span className={isOverdue ? 'text-danger font-semibold' : isUrgentDeadline ? 'text-warning font-semibold' : ''}>
               {formatDate(order.deadline)}
             </span>
           </div>
@@ -83,25 +87,27 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
         <p className="text-xs text-text-muted">Исполнитель: {order.assignee.display_name}</p>
       )}
 
-      {order.client?.name && (
-        <p className="text-sm text-text-muted">Клиент: {order.client.name}</p>
-      )}
-
       {/* Progress bar */}
       <StageProgressBar progress={progress} />
 
       <TaskTimer orderId={order.id} orderStatus={order.status} compact />
 
-      <div className="flex items-center justify-between pt-2 border-t border-border">
+      {/* Actions — full-width on mobile for easy tapping */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-border">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">{formatRelative(order.created_at)}</span>
+          <button onClick={() => setShowTechCard(true)} className="text-xs text-text-muted hover:text-accent transition-colors min-h-[44px] px-2">
+            Тех карта
+          </button>
           <OperationChecklist order={order} compact />
+          <span className="text-xs text-text-muted">{formatRelative(order.created_at)}</span>
         </div>
         <div className="flex items-center gap-2">
           {isMine && (
-            <Button size="sm" onClick={() => setShowLogForm(true)}>Записать</Button>
+            <Button size="sm" onClick={() => setShowLogForm(true)} className="flex-1 sm:flex-none">
+              Записать
+            </Button>
           )}
-          <StatusSwitcher order={order} onUpdated={onUpdated} aria-label={`Сменить статус заказа #${order.number}`} />
+          <StatusSwitcher order={order} onUpdated={onUpdated} />
         </div>
       </div>
 

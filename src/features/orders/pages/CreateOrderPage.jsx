@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -14,7 +14,43 @@ import { toast } from '@/shared/stores/toast-store'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 
-const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm'
+const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
+
+function CollapsibleSection({ title, defaultOpen = false, hasError = false, children }) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <fieldset className={`border border-border rounded-xl overflow-hidden transition-colors ${hasError ? 'border-danger/50' : ''}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-surface-dim hover:bg-surface-dim/80 transition-colors min-h-[48px]"
+        aria-expanded={open}
+      >
+        <span className="text-sm font-semibold uppercase tracking-wide flex items-center gap-2">
+          {title}
+          {hasError && <span className="w-2 h-2 rounded-full bg-danger" aria-label="Есть ошибки" />}
+        </span>
+        <svg
+          className={`w-4 h-4 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="p-4 space-y-4">
+          {children}
+        </div>
+      )}
+    </fieldset>
+  )
+}
+
+function FieldError({ error }) {
+  if (!error) return null
+  return <p className="text-danger text-xs mt-1 font-medium">{error.message}</p>
+}
 
 const schema = z.object({
   // Deal info
@@ -55,6 +91,7 @@ export default function CreateOrderPage() {
   const [submitting, setSubmitting] = useState(false)
   const canSeeFinance = hasRole(['admin', 'manager'])
 
+  const formRef = useRef(null)
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -64,6 +101,21 @@ export default function CreateOrderPage() {
       design_status: 'provided', delivery_type: 'pickup',
     },
   })
+
+  const errorCount = Object.keys(errors).length
+  const dealErrors = ['deal_name', 'bitrix_deal_id', 'price_final', 'is_partner', 'source', 'source_referrer', 'payment_status'].some(k => errors[k])
+  const orderErrors = ['order_type', 'qty', 'width_mm', 'height_mm', 'film_type', 'lam_type', 'design_variants', 'design_status', 'mockup_path', 'stickers_per_pack', 'client_name', 'deadline', 'priority', 'notes'].some(k => errors[k])
+  const deliveryErrors = ['delivery_type', 'delivery_city', 'delivery_address', 'delivery_notes'].some(k => errors[k])
+
+  const scrollToFirstError = useCallback(() => {
+    setTimeout(() => {
+      const firstError = formRef.current?.querySelector('[aria-invalid="true"], .border-danger')
+      if (firstError) {
+        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        firstError.focus?.()
+      }
+    }, 100)
+  }, [])
 
   const lamType = watch('lam_type')
   const needLam = lamType === 'matte' || lamType === 'glossy'
@@ -146,13 +198,148 @@ export default function CreateOrderPage() {
     <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Новый заказ</h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Error summary */}
+      {errorCount > 0 && (
+        <div className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-4 text-sm mb-6" role="alert">
+          <p className="font-medium">Заполните обязательные поля ({errorCount})</p>
+          <ul className="mt-1 list-disc list-inside text-xs">
+            {Object.entries(errors).map(([key, err]) => (
+              <li key={key}>{err.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-        {/* === По сделке === */}
-        <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold text-text-muted uppercase tracking-wide">Сделка</legend>
+      <form ref={formRef} onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="space-y-4">
+
+        {/* === Заказ (основная, всегда открыта) === */}
+        <CollapsibleSection title="Заказ" defaultOpen hasError={orderErrors}>
+          <div>
+            <label className="block text-sm font-medium mb-1">Тип продукции <span className="text-danger">*</span></label>
+            <select {...register('order_type')} aria-invalid={!!errors.order_type} className={`${SELECT_CLASS} ${errors.order_type ? 'border-danger ring-1 ring-danger/30' : ''}`}>
+              <option value="">Выберите тип</option>
+              {Object.entries(ORDER_TYPES).map(([key, { label }]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <FieldError error={errors.order_type} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Материал (плёнка)</label>
+            <select {...register('film_type')} className={SELECT_CLASS}>
+              {Object.entries(FILM_TYPES).map(([key, { label }]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Размер, мм <span className="text-danger">*</span></label>
+            <div className="flex gap-2 mb-2 flex-wrap">
+              {Object.entries(SIZE_PRESETS).map(([key, { label }]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => applyPreset(key)}
+                  className="px-3 py-2 text-xs rounded-lg border border-border bg-surface hover:bg-surface-dim transition-colors min-h-[36px]"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Input type="number" placeholder="Ширина" aria-invalid={!!errors.width_mm} className={errors.width_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('width_mm')} />
+                <FieldError error={errors.width_mm} />
+              </div>
+              <div>
+                <Input type="number" placeholder="Высота" aria-invalid={!!errors.height_mm} className={errors.height_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('height_mm')} />
+                <FieldError error={errors.height_mm} />
+              </div>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Тираж, шт <span className="text-danger">*</span></label>
+              <Input type="number" aria-invalid={!!errors.qty} className={errors.qty ? 'border-danger ring-1 ring-danger/30' : ''} {...register('qty')} />
+              <FieldError error={errors.qty} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Видов дизайна</label>
+              <Input type="number" min="1" {...register('design_variants')} />
+            </div>
+          </div>
+
+          {isStickerpack && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Стикеров в паке</label>
+              <Input type="number" min="1" {...register('stickers_per_pack')} />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Ламинация</label>
+              <select {...register('lam_type')} className={SELECT_CLASS}>
+                <option value="">Без ламинации</option>
+                {Object.entries(LAMINATION_TYPES).map(([key, { label }]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Дизайн макета</label>
+              <select {...register('design_status')} className={SELECT_CLASS}>
+                {Object.entries(DESIGN_STATUSES).map(([key, { label }]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Ссылка на макет</label>
+            <Input type="text" placeholder="Путь к файлу на сервере" {...register('mockup_path')} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Заказчик</label>
+              <Input type="text" placeholder="Имя клиента" {...register('client_name')} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Срок сдачи</label>
+              <Input type="date" {...register('deadline')} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Приоритет</label>
+              <select {...register('priority')} className={SELECT_CLASS}>
+                {Object.entries(PRIORITIES).map(([key, { label }]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Комментарий</label>
+            <textarea
+              {...register('notes')}
+              rows={3}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm resize-none"
+              placeholder="Особенности заказа, доп. услуги..."
+            />
+          </div>
+        </CollapsibleSection>
+
+        {/* === Сделка (свёрнута по умолчанию) === */}
+        <CollapsibleSection title="Сделка" hasError={dealErrors}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Название сделки</label>
               <Input type="text" placeholder="Название заказа" {...register('deal_name')} />
@@ -170,20 +357,17 @@ export default function CreateOrderPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Тип заказа</label>
-              <div className="flex items-center gap-3 h-[42px]">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" {...register('is_partner')} className="w-4 h-4 rounded border-border text-accent focus:ring-accent" />
-                  <span className="text-sm">Партнёрский (-35%)</span>
-                </label>
-              </div>
+              <label className="flex items-center gap-2 cursor-pointer min-h-[44px]">
+                <input type="checkbox" {...register('is_partner')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
+                <span className="text-sm">Партнёрский (-35%)</span>
+              </label>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Источник</label>
               <select {...register('source')} className={SELECT_CLASS}>
-                <option value="">— Не указан —</option>
+                <option value="">-- Не указан --</option>
                 {Object.entries(ORDER_SOURCES).map(([key, { label }]) => (
                   <option key={key} value={key}>{label}</option>
                 ))}
@@ -206,151 +390,10 @@ export default function CreateOrderPage() {
               ))}
             </select>
           </div>
-        </fieldset>
+        </CollapsibleSection>
 
-        <hr className="border-border" />
-
-        {/* === По заказу === */}
-        <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold text-text-muted uppercase tracking-wide">Заказ</legend>
-
-          {/* Order type */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Тип продукции *</label>
-            <select {...register('order_type')} className={SELECT_CLASS}>
-              <option value="">Выберите тип</option>
-              {Object.entries(ORDER_TYPES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-            {errors.order_type && <p className="text-red-400 text-xs mt-1">{errors.order_type.message}</p>}
-          </div>
-
-          {/* Film type */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Материал (плёнка)</label>
-            <select {...register('film_type')} className={SELECT_CLASS}>
-              {Object.entries(FILM_TYPES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Dimensions + quick sizes */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Размер, мм *</label>
-            <div className="flex gap-2 mb-2">
-              {Object.entries(SIZE_PRESETS).map(([key, { label }]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => applyPreset(key)}
-                  className="px-3 py-1 text-xs rounded-md border border-border bg-surface hover:bg-hover transition-colors"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Input type="number" placeholder="Ширина" {...register('width_mm')} />
-                {errors.width_mm && <p className="text-red-400 text-xs mt-1">{errors.width_mm.message}</p>}
-              </div>
-              <div>
-                <Input type="number" placeholder="Высота" {...register('height_mm')} />
-                {errors.height_mm && <p className="text-red-400 text-xs mt-1">{errors.height_mm.message}</p>}
-              </div>
-            </div>
-          </div>
-
-          {/* Qty */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Тираж, шт *</label>
-            <Input type="number" {...register('qty')} />
-            {errors.qty && <p className="text-red-400 text-xs mt-1">{errors.qty.message}</p>}
-          </div>
-
-          {/* Stickers per pack (conditional) */}
-          {isStickerpack && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Стикеров в паке</label>
-              <Input type="number" min="1" {...register('stickers_per_pack')} />
-            </div>
-          )}
-
-          {/* Design variants */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Видов дизайна</label>
-            <Input type="number" min="1" {...register('design_variants')} />
-          </div>
-
-          {/* Lamination */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Ламинация</label>
-            <select {...register('lam_type')} className={SELECT_CLASS}>
-              <option value="">Без ламинации</option>
-              {Object.entries(LAMINATION_TYPES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Design status */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Дизайн макета</label>
-            <select {...register('design_status')} className={SELECT_CLASS}>
-              {Object.entries(DESIGN_STATUSES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Mockup link */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Ссылка на макет</label>
-            <Input type="text" placeholder="Путь к файлу на сервере" {...register('mockup_path')} />
-          </div>
-
-          {/* Client */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Заказчик</label>
-            <Input type="text" placeholder="Имя клиента" {...register('client_name')} />
-          </div>
-
-          {/* Deadline */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Срок сдачи</label>
-            <Input type="date" {...register('deadline')} />
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Приоритет</label>
-            <select {...register('priority')} className={SELECT_CLASS}>
-              {Object.entries(PRIORITIES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Комментарий</label>
-            <textarea
-              {...register('notes')}
-              rows={3}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm resize-none"
-              placeholder="Особенности заказа, доп. услуги..."
-            />
-          </div>
-        </fieldset>
-
-        <hr className="border-border" />
-
-        {/* === Отгрузка === */}
-        <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold text-text-muted uppercase tracking-wide">Отгрузка</legend>
-
+        {/* === Отгрузка (свёрнута по умолчанию) === */}
+        <CollapsibleSection title="Отгрузка" hasError={deliveryErrors}>
           <div>
             <label className="block text-sm font-medium mb-1">Получение</label>
             <select {...register('delivery_type')} className={SELECT_CLASS}>
@@ -362,7 +405,7 @@ export default function CreateOrderPage() {
 
           {deliveryType === 'delivery' && (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Город</label>
                   <Input type="text" placeholder="Город отгрузки" {...register('delivery_city')} />
@@ -383,12 +426,12 @@ export default function CreateOrderPage() {
               </div>
             </>
           )}
-        </fieldset>
+        </CollapsibleSection>
 
         {/* Submit */}
-        <div className="flex gap-3 pt-2">
-          <Button type="submit" loading={submitting}>Создать заказ</Button>
-          <Button type="button" variant="secondary" onClick={() => navigate('/orders')}>Отмена</Button>
+        <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface-dim/80 backdrop-blur-sm py-4 -mx-4 px-4 sm:static sm:bg-transparent sm:backdrop-blur-none sm:py-0 sm:mx-0 sm:px-0">
+          <Button type="submit" loading={submitting} className="flex-1 sm:flex-none">Создать заказ</Button>
+          <Button type="button" variant="secondary" onClick={() => navigate('/orders')} className="flex-1 sm:flex-none">Отмена</Button>
         </div>
       </form>
     </div>

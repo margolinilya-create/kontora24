@@ -43,42 +43,74 @@ export default function ClientsPage() {
         </div>
       ) : clients.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">
-          <p className="text-text-muted">{search ? 'Ничего не найдено' : 'Нет клиентов'}</p>
+          <h3 className="text-lg font-semibold mb-1">{search ? 'Ничего не найдено' : 'Нет клиентов'}</h3>
+          <p className="text-text-muted text-sm mb-4">{search ? 'Попробуйте другой запрос' : 'Добавьте первого клиента'}</p>
+          {!search && (
+            <Button onClick={() => setShowForm(true)}>+ Новый клиент</Button>
+          )}
         </div>
       ) : (
-        <div className="bg-surface rounded-xl border border-border overflow-x-auto">
-          <table className="w-full text-sm">
-            <caption className="sr-only">Список клиентов</caption>
-            <thead>
-              <tr className="border-b border-border bg-surface-dim">
-                <th className="text-left px-4 py-3 font-medium text-text-muted">Имя</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">Телефон</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">Теги</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">Последний заказ</th>
-                <th className="text-right px-4 py-3 font-medium text-text-muted">Добавлен</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map((client) => (
-                <tr key={client.id} className="border-b border-border last:border-0 hover:bg-surface-dim/50">
-                  <td className="px-4 py-3 font-medium"><Link to={`/clients/${client.id}`} className="text-accent hover:underline">{client.name}</Link></td>
-                  <td className="px-4 py-3 text-text-muted">{client.phone || '—'}</td>
-                  <td className="px-4 py-3 text-text-muted">{client.email || '—'}</td>
-                  <td className="px-4 py-3">
-                    {client.tags?.length > 0 ? (
-                      <div className="flex gap-1 flex-wrap">
-                        {client.tags.map((t) => <span key={t} className="bg-accent/10 text-accent text-[10px] px-1.5 py-0.5 rounded-full">{t}</span>)}
-                      </div>
-                    ) : <span className="text-text-muted">—</span>}
-                  </td>
-                  <td className="px-4 py-3"><LastOrderCell date={client.last_order_date} /></td>
-                  <td className="px-4 py-3 text-right text-text-muted">{formatDate(client.created_at)}</td>
+        <>
+          {/* Mobile card view */}
+          <div className="sm:hidden space-y-3">
+            {clients.map((client) => (
+              <Link
+                key={client.id}
+                to={`/clients/${client.id}`}
+                className="block bg-surface rounded-xl border border-border p-4 hover:border-accent/30 transition-colors active:bg-surface-dim"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-accent">{client.name}</span>
+                  <LastOrderCell date={client.last_order_date} />
+                </div>
+                {(client.phone || client.email) && (
+                  <p className="text-sm text-text-muted truncate">
+                    {[client.phone, client.email].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+                {client.tags?.length > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-2">
+                    {client.tags.map((t) => <span key={t} className="bg-accent/10 text-accent text-[10px] px-1.5 py-0.5 rounded-full">{t}</span>)}
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block bg-surface rounded-xl border border-border overflow-x-auto">
+            <table className="w-full text-sm">
+              <caption className="sr-only">Список клиентов</caption>
+              <thead>
+                <tr className="border-b border-border bg-surface-dim">
+                  <th className="text-left px-4 py-3 font-medium text-text-muted">Имя</th>
+                  <th className="text-left px-4 py-3 font-medium text-text-muted">Телефон</th>
+                  <th className="text-left px-4 py-3 font-medium text-text-muted">Email</th>
+                  <th className="text-left px-4 py-3 font-medium text-text-muted">Теги</th>
+                  <th className="text-left px-4 py-3 font-medium text-text-muted">Последний заказ</th>
+                  <th className="text-right px-4 py-3 font-medium text-text-muted">Добавлен</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {clients.map((client) => (
+                  <tr key={client.id} className="border-b border-border last:border-0 hover:bg-surface-dim/50">
+                    <td className="px-4 py-3 font-medium"><Link to={`/clients/${client.id}`} className="text-accent hover:underline">{client.name}</Link></td>
+                    <td className="px-4 py-3 text-text-muted">{client.phone || '—'}</td>
+                    <td className="px-4 py-3 text-text-muted">{client.email || '—'}</td>
+                    <td className="px-4 py-3">
+                      {client.tags?.length > 0 ? (
+                        <div className="flex gap-1 flex-wrap">
+                          {client.tags.map((t) => <span key={t} className="bg-accent/10 text-accent text-[10px] px-1.5 py-0.5 rounded-full">{t}</span>)}
+                        </div>
+                      ) : <span className="text-text-muted">—</span>}
+                    </td>
+                    <td className="px-4 py-3"><LastOrderCell date={client.last_order_date} /></td>
+                    <td className="px-4 py-3 text-right text-text-muted">{formatDate(client.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* New client form */}

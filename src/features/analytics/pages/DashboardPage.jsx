@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
-import { formatRelative } from '@/shared/lib/utils'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { CompleteTaskModal } from '@/features/production/components/CompleteTaskModal'
@@ -11,7 +10,7 @@ import { TaskTimer } from '@/features/production/components/TaskTimer'
 import { TechCardPreview } from '@/features/production/components/TechCardPreview'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import Button from '@/shared/components/Button'
-import Spinner from '@/shared/components/Spinner'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { ProductionJournalTab } from '../components/ProductionJournalTab'
@@ -63,10 +62,11 @@ function StatCard({ label, value }) {
   )
 }
 
-function EmptyState({ text }) {
+function EmptyState({ text, hint }) {
   return (
-    <div className="bg-surface rounded-xl border border-border p-6 text-center text-text-muted text-sm">
-      {text}
+    <div className="bg-surface rounded-xl border border-border p-6 text-center">
+      <p className="text-text-muted text-sm">{text}</p>
+      {hint && <p className="text-text-muted/60 text-xs mt-1">{hint}</p>}
     </div>
   )
 }
@@ -81,6 +81,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [workerStats, setWorkerStats] = useState({ todayDone: 0, weekDone: 0 })
   const [batchCompleting, setBatchCompleting] = useState(false)
+  const [showBatchConfirm, setShowBatchConfirm] = useState(false)
   const [managerTab, setManagerTab] = useState('overview')
 
   const fetchData = useCallback(async () => {
@@ -175,7 +176,7 @@ export default function DashboardPage() {
   }
 
   async function handleBatchComplete() {
-    if (!window.confirm(`Завершить все ${myTasks.length} задач?`)) return
+    setShowBatchConfirm(false)
     setBatchCompleting(true)
     try {
       let completed = 0
@@ -220,18 +221,18 @@ export default function DashboardPage() {
           <div className="bg-surface rounded-xl border border-border p-5">
             <h1 className="text-xl font-bold">Привет, {profile?.display_name}!</h1>
             <p className="text-text-muted text-sm mt-1">{ROLES[profile?.role]?.label}</p>
-            <div className="flex gap-6 mt-3">
-              <div>
-                <span className="text-2xl font-bold">{workerStats.todayDone}</span>{' '}
-                <span className="text-sm text-text-muted">выполнено сегодня</span>
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              <div className="bg-surface-dim rounded-lg p-2.5 text-center">
+                <span className="text-2xl font-bold block">{workerStats.todayDone}</span>
+                <span className="text-xs text-text-muted">сегодня</span>
               </div>
-              <div>
-                <span className="text-2xl font-bold">{myTasks.length}</span>{' '}
-                <span className="text-sm text-text-muted">в работе</span>
+              <div className="bg-surface-dim rounded-lg p-2.5 text-center">
+                <span className="text-2xl font-bold block">{myTasks.length}</span>
+                <span className="text-xs text-text-muted">в работе</span>
               </div>
-              <div>
-                <span className="text-2xl font-bold">{queueTasks.length}</span>{' '}
-                <span className="text-sm text-text-muted">в очереди</span>
+              <div className="bg-surface-dim rounded-lg p-2.5 text-center">
+                <span className="text-2xl font-bold block">{queueTasks.length}</span>
+                <span className="text-xs text-text-muted">в очереди</span>
               </div>
             </div>
           </div>
@@ -245,9 +246,20 @@ export default function DashboardPage() {
                   Здесь ваши назначенные заказы. Нажмите "Старт" чтобы начать работу.
                 </OnboardingTip>
                 {myTasks.length > 1 && (
-                  <Button variant="secondary" size="sm" onClick={handleBatchComplete} loading={batchCompleting}>
-                    Завершить все ({myTasks.length})
-                  </Button>
+                  <>
+                    <Button variant="secondary" size="sm" onClick={() => setShowBatchConfirm(true)} loading={batchCompleting}>
+                      Завершить все ({myTasks.length})
+                    </Button>
+                    <ConfirmDialog
+                      isOpen={showBatchConfirm}
+                      onClose={() => setShowBatchConfirm(false)}
+                      onConfirm={handleBatchComplete}
+                      title="Завершить все задачи?"
+                      message={`Переместить ${myTasks.length} заказов на следующий этап?`}
+                      confirmText="Завершить все"
+                      variant="primary"
+                    />
+                  </>
                 )}
               </div>
               {myTasks.length > 0 ? (
@@ -262,7 +274,7 @@ export default function DashboardPage() {
                   </div>
                 ))
               ) : (
-                <EmptyState text="Нет задач. Возьмите заказ из очереди." />
+                <EmptyState text="Нет задач" hint="Возьмите заказ из очереди справа" />
               )}
             </div>
 
@@ -278,7 +290,7 @@ export default function DashboardPage() {
                   <WorkerTaskCard key={order.id} order={order} isMine={false} onUpdated={handleWorkerUpdated} />
                 ))
               ) : (
-                <EmptyState text="Очередь пуста" />
+                <EmptyState text="Очередь пуста" hint="Новые заказы появятся автоматически" />
               )}
             </div>
           </div>

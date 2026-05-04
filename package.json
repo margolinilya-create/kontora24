@@ -23,6 +23,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@sentry/react": "^10.51.0",
     "@supabase/supabase-js": "^2.105.1",
+    "@tanstack/react-virtual": "^3.13.24",
     "agentation": "^3.0.2",
     "date-fns": "^4.1.0",
     "html2canvas": "^1.4.1",

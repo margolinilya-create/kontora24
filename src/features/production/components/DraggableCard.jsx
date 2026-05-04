@@ -193,6 +193,7 @@ export const DraggableCard = memo(function DraggableCard({ order, onUpdated }) {
       aria-roledescription="перетаскиваемый элемент"
       className={`kanban-card bg-surface rounded-xl border border-border p-3.5 cursor-grab active:cursor-grabbing touch-none
         hover:shadow-md hover:border-accent/20
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:border-accent/30
         transition-all duration-200 ease-out
         ${priorityBorder ? `border-l-[3px] ${priorityBorder}` : ''}`}
     >

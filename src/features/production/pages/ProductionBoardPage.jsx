@@ -1,6 +1,7 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { DndContext, DragOverlay, useDroppable, closestCorners, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { DraggableCard, DragOverlayCard } from '../components/DraggableCard'
 import { ProductionCalendar } from '../components/ProductionCalendar'
 import { PipelineSummary, COL_COLORS } from '../components/PipelineSummary'
@@ -16,10 +17,51 @@ const PHASES = [
   { key: 'finish', label: 'Финиш', cols: ['packaging', 'otk'] },
 ]
 
+const VIRTUAL_THRESHOLD = 15
+const ESTIMATED_CARD_HEIGHT = 148
+
+function VirtualizedCardList({ orders, onUpdated }) {
+  const parentRef = useRef(null)
+  const virtualizer = useVirtualizer({
+    count: orders.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_CARD_HEIGHT,
+    gap: 8,
+    overscan: 3,
+  })
+
+  return (
+    <div ref={parentRef} className="overflow-y-auto max-h-[60vh] px-0.5 scrollbar-thin">
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const order = orders[virtualItem.index]
+          return (
+            <div
+              key={order.id}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <DraggableCard order={order} onUpdated={onUpdated} />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const DroppableColumn = memo(function DroppableColumn({ status, orders, onUpdated, isActive, activeFromStatus }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const label = ORDER_STATUSES[status]?.label || status
   const canReceive = isActive && activeFromStatus !== status
+  const useVirtual = orders.length > VIRTUAL_THRESHOLD
 
   return (
     <div
@@ -49,8 +91,8 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, onUpdate
       </div>
 
       <SortableContext items={orders.map((o) => o.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2 px-0.5">
-          {orders.length === 0 ? (
+        {orders.length === 0 ? (
+          <div className="px-0.5">
             <div className={`border border-dashed rounded-xl py-10 text-center transition-all duration-200
               ${isOver ? 'border-accent/30 bg-accent/[0.03]' : 'border-border/60'}`}
             >
@@ -58,12 +100,16 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, onUpdate
                 {isOver ? 'Отпустите здесь' : 'Нет заказов'}
               </p>
             </div>
-          ) : (
-            orders.map((order) => (
+          </div>
+        ) : useVirtual ? (
+          <VirtualizedCardList orders={orders} onUpdated={onUpdated} />
+        ) : (
+          <div className="space-y-2 px-0.5">
+            {orders.map((order) => (
               <DraggableCard key={order.id} order={order} onUpdated={onUpdated} />
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </SortableContext>
     </div>
   )

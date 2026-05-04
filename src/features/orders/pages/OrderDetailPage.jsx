@@ -10,7 +10,7 @@ import { OrderComments } from '../components/OrderComments'
 import { OrderAttachments } from '../components/OrderAttachments'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { StickerActions } from '@/features/techcard/components/StickerActions'
-import Spinner from '@/shared/components/Spinner'
+import { Skeleton } from '@/shared/components/Skeleton'
 import Button from '@/shared/components/Button'
 import { ORDER_TYPES } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -63,7 +63,25 @@ export default function OrderDetailPage() {
   }
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Spinner /></div>
+    return (
+      <div className="space-y-6 animate-in fade-in">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-6 w-24" />
+        </div>
+        <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-5 w-28" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <Skeleton className="h-24 w-full" />
+      </div>
+    )
   }
 
   if (!order) {

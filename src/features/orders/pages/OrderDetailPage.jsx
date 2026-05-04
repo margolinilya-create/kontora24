@@ -1,13 +1,12 @@
 import { useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useOrderDetail, updateOrder } from '../hooks/useOrders'
+import { useOrderDetail } from '../hooks/useOrders'
 import { InfoField } from '../components/InfoField'
 import { EditableField } from '../components/EditableField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
 import { StatusSwitcher } from '../components/StatusSwitcher'
 import { DepartmentTimeline } from '../components/DepartmentTimeline'
 import { OrderComments } from '../components/OrderComments'
-import { OrderAttachments } from '../components/OrderAttachments'
 import { OrderStageInput } from '../components/OrderStageInput'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { StickerActions } from '@/features/techcard/components/StickerActions'
@@ -20,7 +19,6 @@ import {
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { formatPrice } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
-import { supabase } from '@/shared/lib/supabase'
 
 export default function OrderDetailPage() {
   const { id } = useParams()
@@ -45,23 +43,10 @@ export default function OrderDetailPage() {
 
 
   function copySourceLink() {
-    const attachment = order.attachments?.[0]
-    if (attachment?.file_path) {
-      const url = supabase.storage.from('order-files').getPublicUrl(attachment.file_path).data?.publicUrl
-      if (url) {
-        navigator.clipboard.writeText(url)
-        toast.success('Ссылка скопирована')
-        return
-      }
-    }
-    if (order.notes) {
-      // Try to extract URL from notes
-      const urlMatch = order.notes.match(/https?:\/\/\S+/)
-      if (urlMatch) {
-        navigator.clipboard.writeText(urlMatch[0])
-        toast.success('Ссылка скопирована')
-        return
-      }
+    if (order.mockup_path) {
+      navigator.clipboard.writeText(order.mockup_path)
+      toast.success('Ссылка скопирована')
+      return
     }
     toast.error('Нет ссылки на файлы')
   }
@@ -162,20 +147,20 @@ export default function OrderDetailPage() {
         />
       )}
 
-      {/* Source files link */}
+      {/* Source files link (internal disk) */}
       <div className="bg-surface rounded-xl border border-border p-4 flex items-center gap-3">
-        <span className="text-sm text-text-muted">Исходные файлы заказчика:</span>
-        {order.attachments?.length > 0 ? (
+        <span className="text-sm text-text-muted">Исходные файлы:</span>
+        {order.mockup_path ? (
           <a
-            href={supabase.storage.from('order-files').getPublicUrl(order.attachments[0].file_path).data?.publicUrl}
+            href={order.mockup_path}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-accent hover:underline truncate flex-1"
           >
-            {order.attachments[0].file_name}
+            {order.mockup_path}
           </a>
         ) : (
-          <span className="text-sm text-text-muted flex-1">Нет файлов</span>
+          <span className="text-sm text-text-muted flex-1">Нет ссылки</span>
         )}
         <Button variant="secondary" size="sm" onClick={copySourceLink}>
           Копировать
@@ -197,14 +182,6 @@ export default function OrderDetailPage() {
           )}
           <InfoField label="Дизайн" value={DESIGN_STATUSES[order.design_status]?.label || '—'} />
           <InfoField label="Срок сдачи" value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'} />
-          {order.mockup_path && (
-            <div>
-              <p className="text-xs text-text-muted uppercase">Макет</p>
-              <a href={order.mockup_path} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline truncate block">
-                Открыть
-              </a>
-            </div>
-          )}
         </div>
 
         {/* Flags */}
@@ -313,26 +290,6 @@ export default function OrderDetailPage() {
           </div>
         </div>
       )}
-
-      {/* Client preview (first image attachment) */}
-      {order.attachments?.some(a => a.mime_type?.startsWith('image/')) && (
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h2 className="font-semibold mb-3">Макет заказчика</h2>
-          <div className="flex flex-wrap gap-3">
-            {order.attachments.filter(a => a.mime_type?.startsWith('image/')).map(a => (
-              <img
-                key={a.id}
-                src={supabase.storage.from('order-files').getPublicUrl(a.file_path).data?.publicUrl}
-                alt={a.file_name}
-                className="max-h-64 rounded-lg border border-border object-contain"
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Attachments */}
-      <OrderAttachments orderId={order.id} />
 
       {/* Comments */}
       <OrderComments orderId={order.id} />

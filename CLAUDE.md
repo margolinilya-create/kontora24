@@ -72,46 +72,52 @@ npx vercel deploy --yes --prod --scope margolinilya-creates-projects  # Deploy
 
 **Ламинация:** matte (матовая), glossy (глянцевая), null (без ламинации) — задаётся при создании заказа.
 
+**Плёнка (film_type):** G (глянцевая), M (матовая), Holo (голографическая), Gold (золотая), Chrome (хром) — default 'G'.
+
 ## Структура заказа (входящие данные)
 
 Данные приходят из Bitrix24 через webhook (read-only в Kontora24) или вводятся вручную при создании заказа.
+Форма создания заказа (`CreateOrderPage`) разделена на 3 секции: Сделка / Заказ / Отгрузка.
 
 ### По сделке
 
-| Поле | Тип | Детали |
-|------|-----|--------|
-| Название сделки | текст, вручную | НЕ название компании (иначе половина заказов «Пинхед») |
-| Номер сделки | bitrix_deal_id + внутренний number | Оба номера |
-| Стоимость (бюджет) | число | Видна только admin + manager |
-| Дедлайн | дата+время | «Не позднее чем», время по умолчанию 16:00 |
-| Дата приёма заказа | дата | Автоматически = сегодня |
-| Тип заказа | выбор | Партнёрский (-35%) / Клиентский |
-| Источник | выбор+текст | Референт (указать имя) / Авито / Сайт / Сарафан / Повторный заказ / Другой |
-| Оплата | выбор | Не оплачено / СБП (Точка) / ИП Чикризов (ВТБ) / Пинхед Фабрика / Авента / Пинхед студия / Нал / Бартер |
+| Поле | Код | Тип | Детали |
+|------|-----|-----|--------|
+| Название сделки | `deal_name` | текст | НЕ название компании (иначе половина заказов «Пинхед») |
+| Номер сделки | `bitrix_deal_id` | текст | ID сделки в Bitrix24, + внутренний `number` (автоинкремент) |
+| Стоимость (бюджет) | `price_final` | число | Видна только admin + manager |
+| Дедлайн | `deadline` | дата | «Не позднее чем» |
+| Дата приёма заказа | `created_at` | дата | Автоматически = сегодня |
+| Партнёрский | `is_partner` | bool | Партнёрский (-35%) / Клиентский |
+| Источник | `source` | выбор | `referrer` / `avito` / `website` / `word_of_mouth` / `repeat` / `other` |
+| Имя референта | `source_referrer` | текст | Показывается только при source=referrer |
+| Оплата | `payment_status` | выбор | `not_paid` / `sbp_tochka` / `ip_chikrizov_vtb` / `pinhead_fabrika` / `aventa` / `pinhead_studio` / `cash` / `barter` |
 
 ### По заказу
 
-| Поле | Тип | Варианты |
-|------|-----|----------|
-| Продукт | выбор | Стикерпак / Стикер |
-| Тип | выбор | 3D / Винил |
-| Вид | выбор | Поштучно (die_cut, рез насквозь) / На листе (kiss_cut, надсечка) |
-| Материал (плёнка) | выбор | G (глянцевая) / M (матовая) / Holo (голографическая) / Gold (золотая) / Chrome (хром) |
-| Ламинация | выбор | G (glossy) / M (matte) / Нет |
-| Размер | мм, вручную | + быстрые варианты А6, А5 |
-| Тираж | число | Количество единиц |
-| Дизайн макета | выбор | Предоставлен заказчиком / Требуется разработка |
-| Макет | файл | Загрузка файла/документов |
-| Комментарий | текст | Свободное поле (сюда же доп. услуги, особые пожелания) |
+| Поле | Код | Тип | Варианты / детали |
+|------|-----|-----|----------|
+| Тип продукции | `order_type` | выбор | `sticker_cut` / `sticker_kiss` / `stickerpack` / `sticker3D` / `stickerpack3D` / `rect` / `big` |
+| Материал (плёнка) | `film_type` | выбор | `G` (глянцевая) / `M` (матовая) / `Holo` (голографическая) / `Gold` (золотая) / `Chrome` (хром) |
+| Ламинация | `lam_type` | выбор | `matte` (матовая) / `glossy` (глянцевая) / пусто (без ламинации) |
+| Размер | `width_mm` / `height_mm` | мм | + быстрые пресеты: A7 (74x105), A6 (105x148), A5 (148x210) |
+| Тираж | `qty` | число | Количество единиц, минимум 1 |
+| Стикеров в паке | `stickers_per_pack` | число | Показывается только для stickerpack / stickerpack3D |
+| Видов дизайна | `design_variants` | число | Минимум 1, по умолчанию 1 |
+| Дизайн макета | `design_status` | выбор | `provided` (предоставлен заказчиком) / `needs_development` (требуется разработка) |
+| Ссылка на макет | `mockup_path` | текст | Путь к файлу на внутреннем сервере |
+| Заказчик | `client_name` → `client_id` | текст | Автопоиск/создание клиента в `k24_clients` |
+| Приоритет | `priority` | выбор | `low` / `normal` / `high` / `urgent` |
+| Комментарий | `notes` | текст | Особенности заказа, доп. услуги |
 
 ### Отгрузка
 
-| Поле | Тип | Варианты |
-|------|-----|----------|
-| Получение | выбор | Самовывоз / Доставка |
-| Город отгрузки | текст | — |
-| Адрес отгрузки | текст | — |
-| Комментарий | текст | — |
+| Поле | Код | Тип | Варианты |
+|------|-----|-----|----------|
+| Получение | `delivery_type` | выбор | `pickup` (самовывоз) / `delivery` (доставка) |
+| Город отгрузки | `delivery_city` | текст | Показывается при delivery_type=delivery |
+| Адрес отгрузки | `delivery_address` | текст | Показывается при delivery_type=delivery |
+| Комментарий к доставке | `delivery_notes` | текст | Показывается при delivery_type=delivery |
 
 ### Детали каждого этапа
 
@@ -163,7 +169,9 @@ src/
       components/         # OrderEditForm, OrdersKanban, OrderTimeline, DepartmentTimeline,
                           #   OrderInfoTab, OrderProgressTab, OrderReportsTab,
                           #   OrderAttachments, OrderComments, OrderPdfExport,
-                          #   AdminOrderEditor, StatusSwitcher, StatusBadge, ClaimButton,
+                          #   AdminOrderEditor (editor/: OrderBasicFields, OrderStatusFields,
+                          #     OrderProductionFields, OrderFinanceFields),
+                          #   StatusSwitcher, StatusBadge, ClaimButton,
                           #   DateRangeFilter, DepartmentFilter, SavedFilters,
                           #   EditableField, InfoField
       hooks/useOrders.js
@@ -209,6 +217,8 @@ src/
     constants.js          # ORDER_STATUSES, ORDER_ROUTES, ORDER_TYPES, ROLES,
                           #   getNextStatus(), getOrderRoute(), isDualTrack(),
                           #   NOTIFY_ROLES, NAV_ITEMS, PRIORITIES, LAMINATION_TYPES,
+                          #   FILM_TYPES, ORDER_SOURCES, PAYMENT_STATUSES,
+                          #   DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
                           #   MATERIAL_TYPES, OPERATION_CHECKLISTS, ROLE_STAGE_PERMISSIONS
     components/           # Layout, Sidebar, Button, Input, Modal, Spinner, Tabs,
                           #   SearchInput, ConfirmDialog, ErrorBoundary, Toaster,
@@ -230,7 +240,7 @@ api/
     create.js             # API: admin создаёт пользователя (service_role key)
     update.js             # API: admin обновляет пользователя
 supabase/
-  migrations/             # SQL миграции (001-008 + integration_log + security hardening)
+  migrations/             # SQL миграции (001-009 + integration_log + security hardening)
   seed.sql                # Начальные материалы + настройки
 ```
 
@@ -252,7 +262,19 @@ RPC: `update_stock` · `auto_deduct_materials` · `reserve_materials` · `releas
 
 ### Ключевые поля k24_orders
 
-`order_type` (TEXT), `status` (TEXT, default 'new'), `qty` (INT), `width_mm`/`height_mm` (NUMERIC), `need_lam` (BOOL), `lam_type` (TEXT: 'matte'/'glossy'/NULL), `design_variants` (INT), `client_id` (UUID FK), `assigned_to` (UUID FK), `deadline` (DATE), `priority` (TEXT), `notes` (TEXT), `bitrix_deal_id` (TEXT), `bitrix_url` (TEXT), `film_type` (TEXT, default 'white'), `stickers_per_pack` (INT), `is_3d` (BOOL), `mockup_path` (TEXT), `is_urgent` (BOOL), `is_partner` (BOOL), `needs_montage_film` (BOOL), `needs_individual_cut` (BOOL), `cost_materials`/`cost_labor`/`cost_total`/`markup`/`discount_pct`/`price_final`/`price_per_unit` (NUMERIC), `printed_meters`/`resin_used` (NUMERIC), `printed_qty`/`rejected_qty` (INT), `checklist` (JSONB)
+**Основные:** `order_type` (TEXT), `status` (TEXT, default 'new'), `qty` (INT), `width_mm`/`height_mm` (NUMERIC), `need_lam` (BOOL), `lam_type` (TEXT: 'matte'/'glossy'/NULL), `film_type` (TEXT, default 'G': G/M/Holo/Gold/Chrome), `design_variants` (INT), `stickers_per_pack` (INT), `design_status` (TEXT, default 'provided': provided/needs_development), `mockup_path` (TEXT)
+
+**Сделка:** `deal_name` (TEXT), `bitrix_deal_id` (TEXT), `bitrix_url` (TEXT), `is_partner` (BOOL), `source` (TEXT: referrer/avito/website/word_of_mouth/repeat/other), `source_referrer` (TEXT), `payment_status` (TEXT, default 'not_paid': not_paid/sbp_tochka/ip_chikrizov_vtb/pinhead_fabrika/aventa/pinhead_studio/cash/barter)
+
+**Отгрузка:** `delivery_type` (TEXT, default 'pickup': pickup/delivery), `delivery_city` (TEXT), `delivery_address` (TEXT), `delivery_notes` (TEXT)
+
+**Связи:** `client_id` (UUID FK), `assigned_to` (UUID FK), `deadline` (DATE), `priority` (TEXT), `notes` (TEXT)
+
+**Флаги:** `is_3d` (BOOL), `is_urgent` (BOOL), `needs_montage_film` (BOOL), `needs_individual_cut` (BOOL), `bopp_bag` (BOOL)
+
+**Финансы:** `cost_materials`/`cost_labor`/`cost_total`/`markup`/`discount_pct`/`price_final`/`price_per_unit` (NUMERIC)
+
+**Производство:** `printed_meters`/`resin_used` (NUMERIC), `printed_qty`/`rejected_qty` (INT), `checklist` (JSONB)
 
 ### Ключевые поля k24_production_logs
 

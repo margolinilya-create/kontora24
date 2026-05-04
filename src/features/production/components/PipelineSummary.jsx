@@ -53,10 +53,11 @@ export const PipelineSummary = memo(function PipelineSummary({ columns, activeSt
                 : 'hover:bg-surface-dim'
               }`}
           >
-            <span className={`w-2 h-2 rounded-full shrink-0 ${COL_COLORS[status]}`} />
+            <span className={`w-2 h-2 rounded-full shrink-0 ${COL_COLORS[status]}`} aria-hidden="true" />
             <span className={`hidden sm:inline ${isActive ? 'text-text font-medium' : 'text-text-muted'}`}>
               {ORDER_STATUSES[status]?.label}
             </span>
+            <span className="sr-only sm:hidden">{ORDER_STATUSES[status]?.label}</span>
             <span className={`font-semibold ${count > 0 ? 'text-text' : 'text-text-muted/40'}`}>{count}</span>
           </button>
         )

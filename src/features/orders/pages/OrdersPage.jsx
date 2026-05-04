@@ -124,7 +124,7 @@ export default function OrdersPage() {
             </Button>
           )}
           <Link
-            to="/calculator"
+            to="/orders/create"
             className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
           >
             + Новый заказ
@@ -173,10 +173,10 @@ export default function OrdersPage() {
       ) : orders.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">
           <h3 className="text-lg font-semibold mb-1">{search ? 'Ничего не найдено' : 'Нет заказов'}</h3>
-          <p className="text-text-muted text-sm mb-4">{search ? 'Попробуйте другой запрос' : 'Создайте первый заказ через калькулятор'}</p>
+          <p className="text-text-muted text-sm mb-4">{search ? 'Попробуйте другой запрос' : 'Создайте первый заказ'}</p>
           {!search && (
-            <Link to="/calculator" className="inline-flex bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors">
-              Калькулятор
+            <Link to="/orders/create" className="inline-flex bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors">
+              Создать заказ
             </Link>
           )}
         </div>

@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react'
 import { updateOrder } from '../hooks/useOrders'
-import { ORDER_TYPES, ORDER_STATUSES, PRIORITIES } from '@/shared/constants'
+import { OrderBasicFields } from './editor/OrderBasicFields'
+import { OrderStatusFields } from './editor/OrderStatusFields'
+import { OrderProductionFields } from './editor/OrderProductionFields'
+import { OrderFinanceFields } from './editor/OrderFinanceFields'
 import { supabase } from '@/shared/lib/supabase'
 import Button from '@/shared/components/Button'
 import { toast } from '@/shared/stores/toast-store'
+
+const INPUT_CLASS = 'w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50'
+const LABEL_CLASS = 'block text-xs text-text-muted uppercase mb-1'
 
 export function AdminOrderEditor({ order, onSaved, onCancel }) {
   const [form, setForm] = useState({})
@@ -99,9 +105,6 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
     }
   }
 
-  const inputClass = 'w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50'
-  const labelClass = 'block text-xs text-text-muted uppercase mb-1'
-
   return (
     <div className="bg-surface rounded-xl border-2 border-accent/30 p-5 space-y-6">
       <div className="flex items-center justify-between">
@@ -112,322 +115,30 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
           Режим редактирования
         </h2>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={onCancel}>
-            Отмена
-          </Button>
-          <Button size="sm" onClick={handleSave} loading={saving}>
-            Сохранить
-          </Button>
+          <Button variant="secondary" size="sm" onClick={onCancel}>Отмена</Button>
+          <Button size="sm" onClick={handleSave} loading={saving}>Сохранить</Button>
         </div>
       </div>
 
-      {/* Basic info */}
-      <div>
-        <h3 className="font-medium text-sm mb-3 text-text-muted">Основная информация</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div>
-            <label className={labelClass}>Тип заказа</label>
-            <select
-              value={form.order_type}
-              onChange={(e) => update('order_type', e.target.value)}
-              className={inputClass}
-            >
-              <option value="">—</option>
-              {Object.entries(ORDER_TYPES).map(([key, t]) => (
-                <option key={key} value={key}>{t.label}</option>
-              ))}
-            </select>
-          </div>
+      <OrderBasicFields form={form} update={update} inputClass={INPUT_CLASS} labelClass={LABEL_CLASS} />
+      <OrderStatusFields form={form} update={update} clients={clients} profiles={profiles} inputClass={INPUT_CLASS} labelClass={LABEL_CLASS} />
+      <OrderProductionFields form={form} update={update} inputClass={INPUT_CLASS} labelClass={LABEL_CLASS} />
+      <OrderFinanceFields form={form} update={update} inputClass={INPUT_CLASS} labelClass={LABEL_CLASS} />
 
-          <div>
-            <label className={labelClass}>Ширина (мм)</label>
-            <input
-              type="number"
-              value={form.width_mm}
-              onChange={(e) => update('width_mm', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Высота (мм)</label>
-            <input
-              type="number"
-              value={form.height_mm}
-              onChange={(e) => update('height_mm', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Тираж (шт)</label>
-            <input
-              type="number"
-              value={form.qty}
-              onChange={(e) => update('qty', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Кол-во видов</label>
-            <input
-              type="number"
-              value={form.design_variants}
-              onChange={(e) => update('design_variants', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Ламинация</label>
-            <div className="flex items-center gap-3 h-[38px]">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.need_lam}
-                  onChange={(e) => update('need_lam', e.target.checked)}
-                  className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
-                />
-                <span className="text-sm">Да</span>
-              </label>
-              {form.need_lam && (
-                <select
-                  value={form.lam_type}
-                  onChange={(e) => update('lam_type', e.target.value)}
-                  className="border border-border rounded px-2 py-1 text-sm bg-surface"
-                >
-                  <option value="glossy">Глянцевая</option>
-                  <option value="matte">Матовая</option>
-                </select>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>БОПП пакет</label>
-            <label className="flex items-center gap-2 cursor-pointer h-[38px]">
-              <input
-                type="checkbox"
-                checked={form.bopp_bag}
-                onChange={(e) => update('bopp_bag', e.target.checked)}
-                className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
-              />
-              <span className="text-sm">Да</span>
-            </label>
-          </div>
-
-          <div>
-            <label className={labelClass}>Срок сдачи</label>
-            <input
-              type="date"
-              value={form.deadline}
-              onChange={(e) => update('deadline', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Assignment & Status */}
-      <div>
-        <h3 className="font-medium text-sm mb-3 text-text-muted">Статус и назначение</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div>
-            <label className={labelClass}>Статус</label>
-            <select
-              value={form.status}
-              onChange={(e) => update('status', e.target.value)}
-              className={inputClass}
-            >
-              {Object.entries(ORDER_STATUSES).map(([key, s]) => (
-                <option key={key} value={key}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelClass}>Приоритет</label>
-            <select
-              value={form.priority}
-              onChange={(e) => update('priority', e.target.value)}
-              className={inputClass}
-            >
-              {Object.entries(PRIORITIES).map(([key, p]) => (
-                <option key={key} value={key}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelClass}>Клиент</label>
-            <select
-              value={form.client_id}
-              onChange={(e) => update('client_id', e.target.value)}
-              className={inputClass}
-            >
-              <option value="">— Не выбран —</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelClass}>Исполнитель</label>
-            <select
-              value={form.assigned_to}
-              onChange={(e) => update('assigned_to', e.target.value)}
-              className={inputClass}
-            >
-              <option value="">— Не назначен —</option>
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>{p.display_name} ({p.role})</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Production data */}
-      <div>
-        <h3 className="font-medium text-sm mb-3 text-text-muted">Производственные данные</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div>
-            <label className={labelClass}>Напечатано (м)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={form.printed_meters}
-              onChange={(e) => update('printed_meters', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Потрачено смеси</label>
-            <input
-              type="number"
-              step="0.01"
-              value={form.resin_used}
-              onChange={(e) => update('resin_used', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Брак (шт)</label>
-            <input
-              type="number"
-              value={form.rejected_qty}
-              onChange={(e) => update('rejected_qty', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Напечатано (шт)</label>
-            <input
-              type="number"
-              value={form.printed_qty}
-              onChange={(e) => update('printed_qty', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Finance */}
-      <div>
-        <h3 className="font-medium text-sm mb-3 text-text-muted">Финансы</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div>
-            <label className={labelClass}>Итого (руб)</label>
-            <input
-              type="number"
-              value={form.price_final}
-              onChange={(e) => update('price_final', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Материалы</label>
-            <input
-              type="number"
-              value={form.cost_materials}
-              onChange={(e) => update('cost_materials', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Труд</label>
-            <input
-              type="number"
-              value={form.cost_labor}
-              onChange={(e) => update('cost_labor', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Себестоимость</label>
-            <input
-              type="number"
-              value={form.cost_total}
-              onChange={(e) => update('cost_total', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>За штуку</label>
-            <input
-              type="number"
-              value={form.price_per_unit}
-              onChange={(e) => update('price_per_unit', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Наценка (x)</label>
-            <input
-              type="number"
-              step="0.1"
-              value={form.markup}
-              onChange={(e) => update('markup', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Скидка (0-1)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              value={form.discount_pct}
-              onChange={(e) => update('discount_pct', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Notes */}
       <div>
         <h3 className="font-medium text-sm mb-3 text-text-muted">Примечания</h3>
         <textarea
           value={form.notes}
           onChange={(e) => update('notes', e.target.value)}
           rows={3}
-          className={inputClass + ' resize-y'}
+          className={INPUT_CLASS + ' resize-y'}
           placeholder="Заметки к заказу..."
         />
       </div>
 
-      {/* Save bar */}
       <div className="flex justify-end gap-2 pt-2 border-t border-border">
-        <Button variant="secondary" onClick={onCancel}>
-          Отмена
-        </Button>
-        <Button onClick={handleSave} loading={saving}>
-          Сохранить изменения
-        </Button>
+        <Button variant="secondary" onClick={onCancel}>Отмена</Button>
+        <Button onClick={handleSave} loading={saving}>Сохранить изменения</Button>
       </div>
     </div>
   )

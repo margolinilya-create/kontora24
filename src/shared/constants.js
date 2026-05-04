@@ -104,6 +104,56 @@ export const LAMINATION_TYPES = {
   glossy: { label: 'Глянцевая' },
 }
 
+// --- Film types ---
+export const FILM_TYPES = {
+  G: { label: 'Глянцевая (G)' },
+  M: { label: 'Матовая (M)' },
+  Holo: { label: 'Голографическая' },
+  Gold: { label: 'Золотая' },
+  Chrome: { label: 'Хром' },
+}
+
+// --- Order sources ---
+export const ORDER_SOURCES = {
+  referrer: { label: 'Референт' },
+  avito: { label: 'Авито' },
+  website: { label: 'Сайт' },
+  word_of_mouth: { label: 'Сарафан' },
+  repeat: { label: 'Повторный заказ' },
+  other: { label: 'Другой' },
+}
+
+// --- Payment statuses ---
+export const PAYMENT_STATUSES = {
+  not_paid: { label: 'Не оплачено' },
+  sbp_tochka: { label: 'СБП (Точка)' },
+  ip_chikrizov_vtb: { label: 'ИП Чикризов (ВТБ)' },
+  pinhead_fabrika: { label: 'Пинхед Фабрика' },
+  aventa: { label: 'Авента' },
+  pinhead_studio: { label: 'Пинхед студия' },
+  cash: { label: 'Нал' },
+  barter: { label: 'Бартер' },
+}
+
+// --- Delivery types ---
+export const DELIVERY_TYPES = {
+  pickup: { label: 'Самовывоз' },
+  delivery: { label: 'Доставка' },
+}
+
+// --- Design statuses ---
+export const DESIGN_STATUSES = {
+  provided: { label: 'Предоставлен заказчиком' },
+  needs_development: { label: 'Требуется разработка' },
+}
+
+// --- Quick size presets ---
+export const SIZE_PRESETS = {
+  A7: { width: 74, height: 105, label: 'A7' },
+  A6: { width: 105, height: 148, label: 'A6' },
+  A5: { width: 148, height: 210, label: 'A5' },
+}
+
 // --- Priorities ---
 export const PRIORITIES = {
   low: { label: 'Низкий', color: 'bg-gray-500/15 text-gray-400', sortOrder: 0 },

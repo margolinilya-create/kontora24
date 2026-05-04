@@ -1,17 +1,14 @@
-import * as Sentry from '@sentry/react'
+let SentryModule = null
 
-export function initSentry() {
-  if (import.meta.env.PROD) {
-    Sentry.init({
-      dsn: import.meta.env.VITE_SENTRY_DSN || '',
+export async function initSentry() {
+  if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
+    SentryModule = await import('@sentry/react')
+    SentryModule.init({
+      dsn: import.meta.env.VITE_SENTRY_DSN,
       environment: import.meta.env.MODE,
       tracesSampleRate: 0.1,
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0.1,
-      beforeSend(event) {
-        if (!import.meta.env.VITE_SENTRY_DSN) return null
-        return event
-      },
     })
   }
 }
@@ -21,6 +18,12 @@ export function initSentry() {
  * Use instead of raw console.error in catch blocks.
  */
 export function captureError(error, context = {}) {
+  if (import.meta.env.DEV) {
+    console.error('[captureError]', error, context)
+    return
+  }
+  if (!SentryModule) return
+
   const enriched = {
     tags: {
       route: window.location.pathname,
@@ -29,13 +32,13 @@ export function captureError(error, context = {}) {
     extra: context.extra,
   }
   if (error instanceof Error) {
-    Sentry.captureException(error, enriched)
+    SentryModule.captureException(error, enriched)
   } else {
-    Sentry.captureMessage(String(error), { level: 'error', ...enriched })
-  }
-  if (import.meta.env.DEV) {
-    console.error('[captureError]', error, context)
+    SentryModule.captureMessage(String(error), { level: 'error', ...enriched })
   }
 }
 
-export { Sentry }
+/** Get Sentry module (may be null if not loaded) */
+export function getSentry() {
+  return SentryModule
+}

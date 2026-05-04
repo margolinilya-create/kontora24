@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { jsPDF } from 'jspdf'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
 import { formatPrice, formatDate } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
@@ -10,6 +9,7 @@ export function OrderPdfExport({ order }) {
   async function handleExport() {
     setExporting(true)
     try {
+      const { jsPDF } = await import('jspdf')
       const doc = new jsPDF('p', 'mm', 'a4')
       const W = 210
       let y = 20

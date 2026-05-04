@@ -1,24 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { BatchView } from '../components/BatchView'
 import { QueueCard } from '../components/QueueCard'
-import { PipelineSummary, COLS } from '../components/PipelineSummary'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import Tabs from '@/shared/components/Tabs'
 import Spinner from '@/shared/components/Spinner'
 
 export default function PrintQueuePage() {
   const [viewMode, setViewMode] = useState('list')
-  const { orders: allOrders, loading, refetch } = useOrders()
-
-  const orders = useMemo(() => allOrders.filter((o) => o.status === 'print'), [allOrders])
-
-  const pipelineColumns = useMemo(() => {
-    const result = {}
-    for (const s of COLS) {
-      result[s] = allOrders.filter((o) => o.status === s)
-    }
-    return result
-  }, [allOrders])
+  const { orders, loading, refetch } = useOrders({ statuses: ['print'] })
 
   return (
     <div className="space-y-4">
@@ -33,8 +22,6 @@ export default function PrintQueuePage() {
           onChange={setViewMode}
         />
       </div>
-
-      <PipelineSummary columns={pipelineColumns} activeStatus="print" />
 
       {viewMode === 'batch' ? (
         <BatchView orders={orders} onUpdated={refetch} />

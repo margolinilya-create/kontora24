@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import * as Sentry from '@sentry/react'
+import { captureError } from '@/shared/lib/sentry'
 
 let toastId = 0
 
@@ -9,7 +9,7 @@ export const useToastStore = create((set) => ({
   addToast: (message, type = 'info', duration = 4000) => {
     const id = ++toastId
     if (type === 'error') {
-      Sentry.captureMessage(message, { level: 'error', tags: { source: 'toast' } })
+      captureError(message, { tags: { source: 'toast' } })
     }
     set((s) => ({ toasts: [...s.toasts, { id, message, type }] }))
     if (duration > 0) {

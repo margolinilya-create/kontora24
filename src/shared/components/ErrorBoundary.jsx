@@ -1,5 +1,5 @@
 import { Component } from 'react'
-import { Sentry } from '@/shared/lib/sentry'
+import { captureError } from '@/shared/lib/sentry'
 
 export class ErrorBoundary extends Component {
   constructor(props) {
@@ -12,7 +12,7 @@ export class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    Sentry.captureException(error, { extra: errorInfo })
+    captureError(error, { extra: errorInfo })
   }
 
   render() {

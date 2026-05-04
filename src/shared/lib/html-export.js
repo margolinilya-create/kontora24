@@ -1,6 +1,3 @@
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
-
 /**
  * Export a DOM element as PNG and trigger download.
  * @param {HTMLElement} element
@@ -8,6 +5,7 @@ import { jsPDF } from 'jspdf'
  * @param {{ scale?: number }} options
  */
 export async function exportAsPNG(element, filename, { scale = 2 } = {}) {
+  const { default: html2canvas } = await import('html2canvas')
   const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff' })
   const link = document.createElement('a')
   link.download = `${filename}.png`
@@ -22,6 +20,10 @@ export async function exportAsPNG(element, filename, { scale = 2 } = {}) {
  * @param {{ scale?: number, orientation?: string, format?: string|number[], width?: number, height?: number }} options
  */
 export async function exportAsPDF(element, filename, { scale = 2, orientation = 'p', format = 'a4', width = 210, height = 297 } = {}) {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ])
   const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff' })
   const imgData = canvas.toDataURL('image/png')
   const pdf = new jsPDF({ orientation, unit: 'mm', format })
@@ -35,6 +37,7 @@ export async function exportAsPDF(element, filename, { scale = 2, orientation = 
  * @param {{ scale?: number, pageSize?: string, width?: string, height?: string }} options
  */
 export async function printElement(element, { scale = 3, pageSize = '120mm 75mm', width = '120mm', height = '75mm' } = {}) {
+  const { default: html2canvas } = await import('html2canvas')
   const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff' })
   const imgData = canvas.toDataURL('image/png')
   const printWindow = window.open('', '_blank')

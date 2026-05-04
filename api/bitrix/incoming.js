@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   // Verify shared secret
-  const secret = req.headers['x-bitrix-secret'] || req.query?.token
+  const secret = req.headers['x-bitrix-secret']
   if (!secret || secret !== process.env.BITRIX_WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' })
   }

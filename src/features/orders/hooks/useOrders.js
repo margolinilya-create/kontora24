@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
+import { isDualTrack, getNextStatus } from '@/shared/constants'
 
 async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
   for (let i = 0; i <= retries; i++) {
@@ -243,7 +244,6 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
   if (error) throw error
 
   // 2. Check if stage is complete
-  const { isDualTrack, getNextStatus } = await import('@/shared/constants')
 
   // Get worker's actual role for permission check
   const { data: workerProfile } = await supabase

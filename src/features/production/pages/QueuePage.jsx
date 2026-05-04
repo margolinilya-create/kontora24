@@ -54,17 +54,17 @@ function sortOrders(orders, sortBy) {
 export default function QueuePage({ queueType, hideHeader }) {
   const config = QUEUE_CONFIG[queueType]
   const { profile } = useAuth()
-  const { orders: allOrders, loading, refetch } = useOrders()
+  const { orders: allOrders, loading, refetch } = useOrders({ statuses: [config.status] })
   const [showMine, setShowMine] = useState(false)
   const [sortBy, setSortBy] = useState('deadline')
 
   const orders = useMemo(() => {
-    let filtered = allOrders.filter((o) => o.status === config.status)
+    let filtered = allOrders
     if (showMine && profile) {
       filtered = filtered.filter((o) => o.assigned_to === profile.id)
     }
     return sortOrders(filtered, sortBy)
-  }, [allOrders, config.status, showMine, profile, sortBy])
+  }, [allOrders, showMine, profile, sortBy])
 
   const totalInQueue = useMemo(
     () => allOrders.filter((o) => o.status === config.status).length,

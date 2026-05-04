@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
-import { CompleteTaskModal } from '@/features/production/components/CompleteTaskModal'
 import { TaskTimer } from '@/features/production/components/TaskTimer'
-import { TechCardPreview } from '@/features/production/components/TechCardPreview'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
+
+const CompleteTaskModal = lazy(() => import('@/features/production/components/CompleteTaskModal').then(m => ({ default: m.CompleteTaskModal })))
+const TechCardPreview = lazy(() => import('@/features/production/components/TechCardPreview').then(m => ({ default: m.TechCardPreview })))
 import Button from '@/shared/components/Button'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import Tabs from '@/shared/components/Tabs'
@@ -32,7 +33,7 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
           {isMine ? (
             <>
               <Button size="sm" onClick={() => setShowComplete(true)}>Готово</Button>
-              <CompleteTaskModal order={order} isOpen={showComplete} onClose={() => setShowComplete(false)} onCompleted={onUpdated} />
+              <Suspense fallback={null}><CompleteTaskModal order={order} isOpen={showComplete} onClose={() => setShowComplete(false)} onCompleted={onUpdated} /></Suspense>
             </>
           ) : (
             <ClaimButton order={order} onClaimed={onUpdated} />
@@ -48,7 +49,7 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
       )}
       {order.client?.name && <p className="text-xs text-text-muted mt-1">{order.client.name}</p>}
       <TaskTimer orderId={order.id} orderStatus={order.status} compact />
-      <TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} />
+      <Suspense fallback={null}><TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} /></Suspense>
     </div>
   )
 })

@@ -74,7 +74,8 @@ export function useOrders(filters = {}) {
     } finally {
       setLoading(false)
     }
-  }, [filters.status, filters.statuses, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- statuses serialized to avoid array reference loops
+  }, [filters.status, filters.statuses?.join(','), filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 

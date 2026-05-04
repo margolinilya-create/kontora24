@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { QueueCard } from '../components/QueueCard'
-import { PipelineSummary, COLS } from '../components/PipelineSummary'
 import { playNotificationSound } from '@/shared/lib/sound'
 import Spinner from '@/shared/components/Spinner'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
@@ -66,23 +65,12 @@ export default function QueuePage({ queueType, hideHeader }) {
     return sortOrders(filtered, sortBy)
   }, [allOrders, showMine, profile, sortBy])
 
-  const totalInQueue = useMemo(
-    () => allOrders.filter((o) => o.status === config.status).length,
-    [allOrders, config.status]
-  )
+  const totalInQueue = allOrders.length
 
   const myCount = useMemo(
-    () => profile ? allOrders.filter((o) => o.status === config.status && o.assigned_to === profile.id).length : 0,
-    [allOrders, config.status, profile]
+    () => profile ? allOrders.filter((o) => o.assigned_to === profile.id).length : 0,
+    [allOrders, profile]
   )
-
-  const pipelineColumns = useMemo(() => {
-    const result = {}
-    for (const s of COLS) {
-      result[s] = allOrders.filter((o) => o.status === s)
-    }
-    return result
-  }, [allOrders])
 
   // Sound notification when new orders appear in queue
   const prevCountRef = useRef(totalInQueue)
@@ -133,8 +121,6 @@ export default function QueuePage({ queueType, hideHeader }) {
           </div>
         </div>
       )}
-
-      <PipelineSummary columns={pipelineColumns} activeStatus={config.status} />
 
       {loading ? (
         <div className="flex justify-center py-12">

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_TYPES, ORDER_STATUSES, FILM_TYPES } from '@/shared/constants'
+import { ORDER_TYPES } from '@/shared/constants'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import Spinner from '@/shared/components/Spinner'
 
 const STAGE_FILTERS = [
@@ -63,10 +64,27 @@ function aggregateLogs(logs) {
   }
 }
 
+function defectColor(pct) {
+  if (pct > 25) return 'text-danger'
+  if (pct > 10) return 'text-warning'
+  return 'text-success'
+}
+
+function calcCost(agg, prices) {
+  const filmCost = agg.filmMeters * (prices.film || 0)
+  const lamCost = agg.lamMeters * (prices.lam_film || 0)
+  const resinCost = agg.resinGrams * (prices.resin || 0)
+  return { filmCost, lamCost, resinCost, totalCost: filmCost + lamCost + resinCost }
+}
+
 export function ProductionJournalTab() {
+  const { hasRole } = useAuth()
+  const isFinanceVisible = hasRole(['admin', 'manager'])
+
   const [orders, setOrders] = useState([])
   const [logs, setLogs] = useState([])
   const [profiles, setProfiles] = useState([])
+  const [materialPrices, setMaterialPrices] = useState({})
   const [loading, setLoading] = useState(true)
 
   // Filters
@@ -78,7 +96,7 @@ export function ProductionJournalTab() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [ordersRes, logsRes, profilesRes] = await Promise.all([
+    const queries = [
       supabase
         .from('k24_orders')
         .select('id, number, order_type, status, qty, width_mm, height_mm, film_type, lam_type, client:k24_clients(name), deadline, created_at')
@@ -92,12 +110,30 @@ export function ProductionJournalTab() {
         .from('k24_profiles')
         .select('id, display_name, role')
         .in('role', ['designer', 'printer', 'post_printer']),
-    ])
-    setOrders(ordersRes.data || [])
-    setLogs(logsRes.data || [])
-    setProfiles(profilesRes.data || [])
+    ]
+    if (isFinanceVisible) {
+      queries.push(
+        supabase
+          .from('k24_materials')
+          .select('type, price_per_unit')
+          .in('type', ['film', 'lam_film', 'resin'])
+      )
+    }
+    const results = await Promise.all(queries)
+    setOrders(results[0].data || [])
+    setLogs(results[1].data || [])
+    setProfiles(results[2].data || [])
+    if (isFinanceVisible && results[3]) {
+      const prices = {}
+      for (const m of results[3].data || []) {
+        if (!prices[m.type] || m.price_per_unit > 0) {
+          prices[m.type] = Number(m.price_per_unit) || 0
+        }
+      }
+      setMaterialPrices(prices)
+    }
     setLoading(false)
-  }, [])
+  }, [isFinanceVisible])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -135,15 +171,21 @@ export function ProductionJournalTab() {
   // Totals
   const totals = useMemo(() => {
     let filmMeters = 0, lamMeters = 0, resinGrams = 0, defects = 0
+    let totalPrinted = 0, totalCost = 0
     for (const order of filteredOrders) {
       const agg = aggregateLogs(logsByOrder[order.id] || [])
       filmMeters += agg.filmMeters
       lamMeters += agg.lamMeters
       resinGrams += agg.resinGrams
       defects += agg.defects
+      totalPrinted += agg.stickersPrinted
+      if (isFinanceVisible) {
+        totalCost += calcCost(agg, materialPrices).totalCost
+      }
     }
-    return { filmMeters, lamMeters, resinGrams, defects }
-  }, [filteredOrders, logsByOrder])
+    const avgDefectPct = totalPrinted > 0 ? (defects / totalPrinted) * 100 : 0
+    return { filmMeters, lamMeters, resinGrams, defects, totalPrinted, avgDefectPct, totalCost }
+  }, [filteredOrders, logsByOrder, isFinanceVisible, materialPrices])
 
   if (loading) {
     return <div className="flex justify-center py-12"><Spinner /></div>
@@ -190,7 +232,7 @@ export function ProductionJournalTab() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-2 gap-3 ${isFinanceVisible ? 'sm:grid-cols-3 lg:grid-cols-6' : 'sm:grid-cols-5'}`}>
         <div className="bg-surface rounded-xl border border-border p-4">
           <p className="text-xs text-text-muted">Заказов</p>
           <p className="text-2xl font-bold">{filteredOrders.length}</p>
@@ -207,6 +249,20 @@ export function ProductionJournalTab() {
           <p className="text-xs text-text-muted">Брак</p>
           <p className="text-2xl font-bold text-danger">{totals.defects} <span className="text-sm font-normal">шт</span></p>
         </div>
+        <div className="bg-surface rounded-xl border border-border p-4">
+          <p className="text-xs text-text-muted">Средний брак</p>
+          <p className={`text-2xl font-bold ${defectColor(totals.avgDefectPct)}`}>
+            {totals.avgDefectPct.toFixed(1)}<span className="text-sm font-normal">%</span>
+          </p>
+        </div>
+        {isFinanceVisible && (
+          <div className="bg-surface rounded-xl border border-border p-4">
+            <p className="text-xs text-text-muted">Общая С/С</p>
+            <p className="text-2xl font-bold">
+              {totals.totalCost.toFixed(0)}<span className="text-sm font-normal text-text-muted"> р</span>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -219,21 +275,34 @@ export function ProductionJournalTab() {
               <th className="px-4 py-3 font-medium text-text-muted">Клиент</th>
               <th className="px-4 py-3 font-medium text-text-muted">Статус</th>
               <th className="px-4 py-3 font-medium text-text-muted text-right">Тираж</th>
-              <th className="px-4 py-3 font-medium text-text-muted text-right">Плёнка (м)</th>
-              <th className="px-4 py-3 font-medium text-text-muted text-right">Лам (м)</th>
-              <th className="px-4 py-3 font-medium text-text-muted text-right">Смола (г)</th>
+              <th className="px-4 py-3 font-medium text-text-muted text-right">Напечатано</th>
               <th className="px-4 py-3 font-medium text-text-muted text-right">Брак</th>
+              <th className="px-4 py-3 font-medium text-text-muted text-right">Брак %</th>
+              <th className="px-4 py-3 font-medium text-text-muted text-right">Излишки</th>
+              <th className="px-4 py-3 font-medium text-text-muted text-right">Плёнка (м)</th>
+              <th className="px-4 py-3 font-medium text-text-muted text-right">Смола (г)</th>
+              {isFinanceVisible && (
+                <>
+                  <th className="px-4 py-3 font-medium text-text-muted text-right">С/С плёнки</th>
+                  <th className="px-4 py-3 font-medium text-text-muted text-right">С/С смолы</th>
+                  <th className="px-4 py-3 font-medium text-text-muted text-right">С/С лам.</th>
+                  <th className="px-4 py-3 font-medium text-text-muted text-right">Итого С/С</th>
+                </>
+              )}
               <th className="px-4 py-3 font-medium text-text-muted">Работники</th>
             </tr>
           </thead>
           <tbody>
             {filteredOrders.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-text-muted">Нет заказов</td>
+                <td colSpan={isFinanceVisible ? 16 : 12} className="px-4 py-8 text-center text-text-muted">Нет заказов</td>
               </tr>
             ) : (
               filteredOrders.map(order => {
                 const agg = aggregateLogs(logsByOrder[order.id] || [])
+                const defectPct = agg.stickersPrinted > 0 ? (agg.defects / agg.stickersPrinted) * 100 : 0
+                const surplus = agg.stickersPrinted > 0 ? agg.stickersPrinted - (order.qty || 0) : 0
+                const cost = isFinanceVisible ? calcCost(agg, materialPrices) : null
                 return (
                   <tr key={order.id} className="border-b border-border last:border-0 hover:bg-surface-dim transition-colors">
                     <td className="px-4 py-3">
@@ -245,10 +314,32 @@ export function ProductionJournalTab() {
                     <td className="px-4 py-3 text-text-muted truncate max-w-[120px]">{order.client?.name || '—'}</td>
                     <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
                     <td className="px-4 py-3 text-right">{order.qty}</td>
-                    <td className="px-4 py-3 text-right">{agg.filmMeters > 0 ? agg.filmMeters.toFixed(1) : '—'}</td>
-                    <td className="px-4 py-3 text-right">{agg.lamMeters > 0 ? agg.lamMeters.toFixed(1) : '—'}</td>
-                    <td className="px-4 py-3 text-right">{agg.resinGrams > 0 ? agg.resinGrams.toFixed(0) : '—'}</td>
+                    <td className="px-4 py-3 text-right">{agg.stickersPrinted > 0 ? agg.stickersPrinted : '—'}</td>
                     <td className="px-4 py-3 text-right">{agg.defects > 0 ? <span className="text-danger font-medium">{agg.defects}</span> : '—'}</td>
+                    <td className="px-4 py-3 text-right">
+                      {agg.stickersPrinted > 0 ? (
+                        <span className={`font-medium ${defectColor(defectPct)}`}>
+                          {defectPct.toFixed(1)}%
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {agg.stickersPrinted > 0 ? (
+                        <span className={surplus >= 0 ? 'text-success' : 'text-danger font-medium'}>
+                          {surplus >= 0 ? `+${surplus}` : surplus}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right">{agg.filmMeters > 0 ? agg.filmMeters.toFixed(1) : '—'}</td>
+                    <td className="px-4 py-3 text-right">{agg.resinGrams > 0 ? agg.resinGrams.toFixed(0) : '—'}</td>
+                    {isFinanceVisible && cost && (
+                      <>
+                        <td className="px-4 py-3 text-right">{cost.filmCost > 0 ? `${cost.filmCost.toFixed(0)}р` : '—'}</td>
+                        <td className="px-4 py-3 text-right">{cost.resinCost > 0 ? `${cost.resinCost.toFixed(0)}р` : '—'}</td>
+                        <td className="px-4 py-3 text-right">{cost.lamCost > 0 ? `${cost.lamCost.toFixed(0)}р` : '—'}</td>
+                        <td className="px-4 py-3 text-right font-medium">{cost.totalCost > 0 ? `${cost.totalCost.toFixed(0)}р` : '—'}</td>
+                      </>
+                    )}
                     <td className="px-4 py-3 text-text-muted text-xs">{agg.workers.length > 0 ? agg.workers.join(', ') : '—'}</td>
                   </tr>
                 )

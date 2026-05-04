@@ -12,7 +12,9 @@ import { TechCardPreview } from '@/features/production/components/TechCardPrevie
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
+import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
+import { ProductionJournalTab } from '../components/ProductionJournalTab'
 import { toast } from '@/shared/stores/toast-store'
 import { subDays, startOfDay } from 'date-fns'
 
@@ -79,6 +81,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [workerStats, setWorkerStats] = useState({ todayDone: 0, weekDone: 0 })
   const [batchCompleting, setBatchCompleting] = useState(false)
+  const [managerTab, setManagerTab] = useState('overview')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -294,76 +297,93 @@ export default function DashboardPage() {
       {/* Manager dashboard */}
       {isManager && (
         <>
-          <h1 className="text-2xl font-bold">{profile?.display_name || 'Dashboard'}</h1>
-
-          {/* Top metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-surface rounded-xl border border-border p-5">
-              <p className="text-text-muted text-sm">Заказов в работе</p>
-              <p className="text-3xl font-bold mt-1">{ordersInWork.length}</p>
-            </div>
-            <div className="bg-surface rounded-xl border border-border p-5">
-              <p className="text-text-muted text-sm">К сдаче сегодня</p>
-              <p className="text-3xl font-bold mt-1">{ordersDueToday.length}</p>
-            </div>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">{profile?.display_name || 'Dashboard'}</h1>
           </div>
 
-          {/* Orders due today list */}
-          {ordersDueToday.length > 0 && (
-            <div className="bg-surface rounded-xl border border-border p-5">
-              <h2 className="font-semibold mb-3">Сдача сегодня</h2>
-              <div className="space-y-1">
-                {ordersDueToday.map((order) => (
-                  <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-surface-dim transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="font-medium text-sm">#{order.number}</span>
-                      <span className="text-sm text-text-muted truncate">
-                        {order.client?.name || ''}
-                      </span>
-                    </div>
-                    <StatusBadge status={order.status} />
-                  </Link>
-                ))}
+          <Tabs
+            items={[
+              { key: 'overview', label: 'Обзор' },
+              { key: 'production', label: 'Производство' },
+            ]}
+            active={managerTab}
+            onChange={setManagerTab}
+          />
+
+          {managerTab === 'overview' && (
+            <>
+              {/* Top metrics */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-surface rounded-xl border border-border p-5">
+                  <p className="text-text-muted text-sm">Заказов в работе</p>
+                  <p className="text-3xl font-bold mt-1">{ordersInWork.length}</p>
+                </div>
+                <div className="bg-surface rounded-xl border border-border p-5">
+                  <p className="text-text-muted text-sm">К сдаче сегодня</p>
+                  <p className="text-3xl font-bold mt-1">{ordersDueToday.length}</p>
+                </div>
               </div>
-            </div>
+
+              {/* Orders due today list */}
+              {ordersDueToday.length > 0 && (
+                <div className="bg-surface rounded-xl border border-border p-5">
+                  <h2 className="font-semibold mb-3">Сдача сегодня</h2>
+                  <div className="space-y-1">
+                    {ordersDueToday.map((order) => (
+                      <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-surface-dim transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="font-medium text-sm">#{order.number}</span>
+                          <span className="text-sm text-text-muted truncate">
+                            {order.client?.name || ''}
+                          </span>
+                        </div>
+                        <StatusBadge status={order.status} />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Warehouse block */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Out of stock */}
+                <div className="bg-surface rounded-xl border border-danger/30 p-5">
+                  <h2 className="font-semibold mb-3 text-danger">Закончились</h2>
+                  {outOfStock.length === 0 ? (
+                    <p className="text-text-muted text-sm">Все в наличии</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {outOfStock.map((m) => (
+                        <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-1 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
+                          <span className="text-danger font-medium">{m.name}</span>
+                          <span className="text-text-muted">{m.unit}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Low stock */}
+                <div className="bg-surface rounded-xl border border-warning/30 p-5">
+                  <h2 className="font-semibold mb-3 text-warning">Заканчиваются</h2>
+                  {lowStockOnly.length === 0 ? (
+                    <p className="text-text-muted text-sm">Все в норме</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {lowStockOnly.map((m) => (
+                        <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-1 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
+                          <span className="text-warning font-medium">{m.name}</span>
+                          <span className="text-text-muted">{Number(m.stock_qty).toFixed(1)} / {Number(m.min_qty).toFixed(1)} {m.unit}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
-          {/* Warehouse block */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Out of stock */}
-            <div className="bg-surface rounded-xl border border-danger/30 p-5">
-              <h2 className="font-semibold mb-3 text-danger">Закончились</h2>
-              {outOfStock.length === 0 ? (
-                <p className="text-text-muted text-sm">Все в наличии</p>
-              ) : (
-                <div className="space-y-2">
-                  {outOfStock.map((m) => (
-                    <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-1 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
-                      <span className="text-danger font-medium">{m.name}</span>
-                      <span className="text-text-muted">{m.unit}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Low stock */}
-            <div className="bg-surface rounded-xl border border-warning/30 p-5">
-              <h2 className="font-semibold mb-3 text-warning">Заканчиваются</h2>
-              {lowStockOnly.length === 0 ? (
-                <p className="text-text-muted text-sm">Все в норме</p>
-              ) : (
-                <div className="space-y-2">
-                  {lowStockOnly.map((m) => (
-                    <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-1 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
-                      <span className="text-warning font-medium">{m.name}</span>
-                      <span className="text-text-muted">{Number(m.stock_qty).toFixed(1)} / {Number(m.min_qty).toFixed(1)} {m.unit}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {managerTab === 'production' && <ProductionJournalTab />}
         </>
       )}
     </div>

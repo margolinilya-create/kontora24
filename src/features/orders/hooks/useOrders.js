@@ -113,7 +113,7 @@ export function useOrderDetail(id) {
       const [orderRes, historyRes] = await Promise.all([
         supabase
           .from('k24_orders')
-          .select('*, client:k24_clients(*), assignee:k24_profiles!assigned_to(*), creator:k24_profiles!created_by(*)')
+          .select('*, client:k24_clients(*), assignee:k24_profiles!assigned_to(*), creator:k24_profiles!created_by(*), attachments:k24_order_attachments(id, file_name, file_path, mime_type)')
           .eq('id', id)
           .single(),
         supabase

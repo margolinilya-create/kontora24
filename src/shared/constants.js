@@ -60,7 +60,7 @@ export function getOrderRoute(order) {
 }
 
 // Role permissions: which roles can advance FROM a given status
-const ROLE_STAGE_PERMISSIONS = {
+export const ROLE_STAGE_PERMISSIONS = {
   admin: true, // admin can advance any stage
   manager: true, // manager can advance any stage
   designer: ['design', 'prepress'],
@@ -72,6 +72,12 @@ function canAdvanceFrom(role, status) {
   const perms = ROLE_STAGE_PERMISSIONS[role]
   if (perms === true) return true
   return perms?.includes(status) || false
+}
+
+export function canWorkOnStage(role, stage) {
+  const perms = ROLE_STAGE_PERMISSIONS[role]
+  if (perms === true) return true
+  return perms?.includes(stage) || false
 }
 
 // Admin and manager can cancel from any status

@@ -8,11 +8,15 @@ import { StatusSwitcher } from '../components/StatusSwitcher'
 import { DepartmentTimeline } from '../components/DepartmentTimeline'
 import { OrderComments } from '../components/OrderComments'
 import { OrderAttachments } from '../components/OrderAttachments'
+import { OrderStageInput } from '../components/OrderStageInput'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { StickerActions } from '@/features/techcard/components/StickerActions'
 import { Skeleton } from '@/shared/components/Skeleton'
 import Button from '@/shared/components/Button'
-import { ORDER_TYPES } from '@/shared/constants'
+import {
+  ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES,
+  ORDER_SOURCES, PAYMENT_STATUSES, DESIGN_STATUSES, PRIORITIES,
+} from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { formatPrice } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
@@ -107,10 +111,15 @@ export default function OrderDetailPage() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">
-            ORD-{String(order.number).padStart(4, '0')}
-            <span className="text-text-muted ml-2">—</span>
-            <span className="ml-2">{clientName}</span>
+          <h1 className="text-3xl font-bold flex items-center gap-3 flex-wrap">
+            <span>ORD-{String(order.number).padStart(4, '0')}</span>
+            {order.priority && order.priority !== 'normal' && (
+              <span className={`text-sm px-2 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
+                {PRIORITIES[order.priority]?.label}
+              </span>
+            )}
+            <span className="text-text-muted">—</span>
+            <span>{clientName}</span>
           </h1>
           <p className="text-text-muted text-sm mt-1">
             Менеджер: {managerName}
@@ -180,12 +189,41 @@ export default function OrderDetailPage() {
           <InfoField label="Тип" value={ORDER_TYPES[order.order_type]?.label || order.order_type} />
           <InfoField label="Размер" value={`${order.width_mm} x ${order.height_mm} мм`} />
           <InfoField label="Тираж" value={`${order.qty} шт`} />
-          <InfoField label="Ламинация" value={order.need_lam ? 'Да' : 'Нет'} />
-          <InfoField label="3D" value={order.order_type?.includes('3D') ? 'Да' : 'Нет'} />
-          {order.bopp_bag && <InfoField label="БОПП пакет" value="Да" />}
-          {order.design_variants && <InfoField label="Кол-во видов" value={order.design_variants} />}
+          <InfoField label="Плёнка" value={FILM_TYPES[order.film_type]?.label || order.film_type || '—'} />
+          <InfoField label="Ламинация" value={LAMINATION_TYPES[order.lam_type]?.label || 'Нет'} />
+          <InfoField label="Кол-во видов" value={order.design_variants || 1} />
+          {(order.order_type === 'stickerpack' || order.order_type === 'stickerpack3D') && order.stickers_per_pack && (
+            <InfoField label="Стикеров в паке" value={order.stickers_per_pack} />
+          )}
+          <InfoField label="Дизайн" value={DESIGN_STATUSES[order.design_status]?.label || '—'} />
           <InfoField label="Срок сдачи" value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'} />
+          {order.mockup_path && (
+            <div>
+              <p className="text-xs text-text-muted uppercase">Макет</p>
+              <a href={order.mockup_path} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline truncate block">
+                Открыть
+              </a>
+            </div>
+          )}
         </div>
+
+        {/* Flags */}
+        {(order.is_urgent || order.needs_montage_film || order.needs_individual_cut || order.bopp_bag) && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            {order.is_urgent && <span className="text-xs px-2 py-1 rounded-full bg-danger/10 text-danger font-medium">Срочно</span>}
+            {order.needs_montage_film && <span className="text-xs px-2 py-1 rounded-full bg-surface-dim text-text-muted font-medium">Монтажная плёнка</span>}
+            {order.needs_individual_cut && <span className="text-xs px-2 py-1 rounded-full bg-surface-dim text-text-muted font-medium">Индивид. резка</span>}
+            {order.bopp_bag && <span className="text-xs px-2 py-1 rounded-full bg-surface-dim text-text-muted font-medium">БОПП пакет</span>}
+          </div>
+        )}
+
+        {/* Notes */}
+        {order.notes && (
+          <div className="mt-4">
+            <p className="text-xs text-text-muted uppercase mb-1">Заметки</p>
+            <div className="bg-surface-dim rounded-lg p-3 text-sm whitespace-pre-wrap">{order.notes}</div>
+          </div>
+        )}
 
         {/* Editable production fields */}
         <h3 className="font-semibold mt-6 mb-3">Производственные данные</h3>
@@ -216,6 +254,46 @@ export default function OrderDetailPage() {
           />
         </div>
       </div>
+
+      {/* Stage input for production workers */}
+      <OrderStageInput order={order} onUpdated={refetch} />
+
+      {/* Delivery */}
+      <div className="bg-surface rounded-xl border border-border p-5">
+        <h2 className="font-semibold text-lg mb-4">Отгрузка</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <InfoField label="Получение" value={DELIVERY_TYPES[order.delivery_type]?.label || 'Самовывоз'} />
+          {order.delivery_type === 'delivery' && (
+            <>
+              {order.delivery_city && <InfoField label="Город" value={order.delivery_city} />}
+              {order.delivery_address && <InfoField label="Адрес" value={order.delivery_address} />}
+            </>
+          )}
+        </div>
+        {order.delivery_type === 'delivery' && order.delivery_notes && (
+          <div className="mt-3">
+            <p className="text-xs text-text-muted uppercase mb-1">Комментарий к доставке</p>
+            <div className="bg-surface-dim rounded-lg p-3 text-sm whitespace-pre-wrap">{order.delivery_notes}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Deal info (admin/manager only) */}
+      {isFinance && (
+        <div className="bg-surface rounded-xl border border-border p-5">
+          <h2 className="font-semibold text-lg mb-4">Сделка</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {order.deal_name && <InfoField label="Название сделки" value={order.deal_name} />}
+            {order.bitrix_deal_id && <InfoField label="Bitrix ID" value={order.bitrix_deal_id} />}
+            <InfoField label="Партнёрский" value={order.is_partner ? 'Да (-35%)' : 'Нет'} />
+            <InfoField label="Источник" value={ORDER_SOURCES[order.source]?.label || '—'} />
+            {order.source === 'referrer' && order.source_referrer && (
+              <InfoField label="Референт" value={order.source_referrer} />
+            )}
+            <InfoField label="Оплата" value={PAYMENT_STATUSES[order.payment_status]?.label || '—'} />
+          </div>
+        </div>
+      )}
 
       {/* Finance (admin/manager only) */}
       {isFinance && (
@@ -257,10 +335,7 @@ export default function OrderDetailPage() {
       <OrderAttachments orderId={order.id} />
 
       {/* Comments */}
-      <div className="bg-surface rounded-xl border border-border p-5">
-        <h2 className="font-semibold mb-3">Комментарии</h2>
-        <OrderComments orderId={order.id} />
-      </div>
+      <OrderComments orderId={order.id} />
 
       {/* Tech card panel */}
       {showTechCard && (

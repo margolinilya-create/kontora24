@@ -99,12 +99,6 @@ export function Sidebar({ collapsed }) {
     items: visibleItems.filter((item) => group.paths.includes(item.path)),
   })).filter((g) => g.items.length > 0)
 
-  // Total production queue count for collapsed badge
-  const totalQueueCount = PRODUCTION_QUEUE_PATHS.reduce((sum, p) => {
-    const key = COUNT_MAP[p]
-    return sum + (key ? (counts[key] || 0) : 0)
-  }, 0)
-
   return (
     <aside aria-label="Боковая навигация" className={cn(
       'fixed left-0 top-0 h-screen bg-sidebar text-white flex flex-col transition-all duration-200 z-40 safe-area-top safe-area-left',
@@ -127,6 +121,12 @@ export function Sidebar({ collapsed }) {
             ? group.items.filter((item) => item.path !== group.headerPath)
             : group.items
 
+          // Total badge count for collapsed group header
+          const groupTotal = group.items.reduce((sum, item) => {
+            const key = COUNT_MAP[item.path]
+            return sum + (key ? (counts[key] || 0) : 0)
+          }, 0)
+
           return (
             <div key={group.id} className="mb-1">
               {/* Group header — toggle */}
@@ -136,6 +136,11 @@ export function Sidebar({ collapsed }) {
                   className="flex items-center w-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80 hover:text-white transition-colors"
                 >
                   <span className="flex-1 text-left">{group.label}</span>
+                  {!isOpen && groupTotal > 0 && (
+                    <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center mr-1.5">
+                      {groupTotal > 99 ? '99+' : groupTotal}
+                    </span>
+                  )}
                   <svg
                     className={cn('w-3 h-3 transition-transform', isOpen && 'rotate-180')}
                     fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
@@ -158,16 +163,7 @@ export function Sidebar({ collapsed }) {
                     )}
                   >
                     <Icon />
-                    {!collapsed && (
-                      <>
-                        <span className="flex-1">{item.label}</span>
-                        {!isOpen && totalQueueCount > 0 && (
-                          <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center">
-                            {totalQueueCount > 99 ? '99+' : totalQueueCount}
-                          </span>
-                        )}
-                      </>
-                    )}
+                    {!collapsed && <span className="flex-1">{item.label}</span>}
                   </NavLink>
                 )
               })}

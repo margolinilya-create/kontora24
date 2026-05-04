@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { MS_PER_DAY } from '@/shared/constants'
 
 async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
   for (let i = 0; i <= retries; i++) {
@@ -187,12 +186,6 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
     order_id: orderId, from_status: fromStatus, to_status: toStatus, changed_by: user.id,
   })
 
-  // Set drying timer when entering resin_pouring
-  if (toStatus === 'resin_pouring') {
-    const dryUntil = new Date(Date.now() + MS_PER_DAY).toISOString()
-    await supabase.from('k24_orders').update({ dry_until: dryUntil }).eq('id', orderId)
-  }
-
   // Auto-deduct materials when entering "print"
   if (toStatus === 'print') {
     await supabase.rpc('auto_deduct_materials', {
@@ -231,12 +224,15 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
 /**
  * Add a production log entry and auto-advance status if stage target is met.
  * Core of the v2 quantity-based production tracking model.
+ *
+ * For stickerpack3D orders at dual-track stages (print, cutting, selection_pouring),
+ * both tracks (backgrounds + stickers) must be complete before advancing.
  */
 export async function addProductionLogAndCheckAdvance(orderId, stage, logData, order) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  // 1. Insert production log
+  // 1. Insert production log (pass track field if present)
   const { error } = await supabase.from('k24_production_logs').insert({
     order_id: orderId,
     stage,
@@ -246,21 +242,42 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
   if (error) throw error
 
   // 2. Check if stage is complete
-  const { data: result } = await supabase.rpc('check_stage_completion', {
-    p_order_id: orderId,
-    p_stage: stage,
-  })
+  const { isDualTrack, getNextStatus } = await import('@/shared/constants')
+
+  let isComplete = false
+
+  if (isDualTrack(stage, order)) {
+    // For dual-track stages on stickerpack3D: both tracks must be complete
+    const [bgResult, stResult] = await Promise.all([
+      supabase.rpc('check_stage_completion', {
+        p_order_id: orderId,
+        p_stage: stage,
+        p_track: 'backgrounds',
+      }),
+      supabase.rpc('check_stage_completion', {
+        p_order_id: orderId,
+        p_stage: stage,
+        p_track: 'stickers',
+      }),
+    ])
+    isComplete = bgResult.data?.is_complete && stResult.data?.is_complete
+  } else {
+    const { data: result } = await supabase.rpc('check_stage_completion', {
+      p_order_id: orderId,
+      p_stage: stage,
+    })
+    isComplete = result?.is_complete
+  }
 
   // 3. Auto-advance if complete
-  if (result?.is_complete && order) {
-    const { getNextStatus } = await import('@/shared/constants')
+  if (isComplete && order) {
     const nextStatus = getNextStatus('admin', order.status, order)
     if (nextStatus) {
       await updateOrderStatus(orderId, order.status, nextStatus)
     }
   }
 
-  return result
+  return { is_complete: isComplete }
 }
 
 export async function updateOrder(orderId, updates) {

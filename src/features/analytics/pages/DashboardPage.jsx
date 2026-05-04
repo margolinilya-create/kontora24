@@ -8,7 +8,6 @@ import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { CompleteTaskModal } from '@/features/production/components/CompleteTaskModal'
 import { TaskTimer } from '@/features/production/components/TaskTimer'
-import { DryingTimer } from '@/features/production/components/DryingTimer'
 import { TechCardPreview } from '@/features/production/components/TechCardPreview'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import Button from '@/shared/components/Button'
@@ -47,9 +46,6 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
         </p>
       )}
       {order.client?.name && <p className="text-xs text-text-muted mt-1">{order.client.name}</p>}
-      {order.status === 'resin_pouring' && order.dry_until && (
-        <DryingTimer dryUntil={order.dry_until} />
-      )}
       <TaskTimer orderId={order.id} orderStatus={order.status} compact />
       <TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} />
     </div>
@@ -76,7 +72,7 @@ function EmptyState({ text }) {
 export default function DashboardPage() {
   const { profile, hasRole } = useAuth()
   const isManager = hasRole(['admin', 'manager'])
-  const isWorker = hasRole(['designer', 'printer', 'assembler', 'resin_pourer'])
+  const isWorker = hasRole(['designer', 'printer', 'post_printer'])
   const role = profile?.role
 
   const [data, setData] = useState({ orders: [], statusCounts: {}, lowStock: [], allMaterials: [], myOrders: [], deadlines: [], activity: [] })
@@ -158,10 +154,9 @@ export default function DashboardPage() {
   // Role-specific queue status (memoized)
   const { myTasks, queueTasks } = useMemo(() => {
     const queueStatuses = {
-      designer: ['design'],
-      printer: ['print', 'post_processing'],
-      resin_pourer: ['resin_pouring'],
-      assembler: ['post_processing', 'assembly', 'packaging'],
+      designer: ['design', 'prepress'],
+      printer: ['prepress', 'print', 'lamination', 'cutting'],
+      post_printer: ['selection_pouring', 'pouring', 'assembly_3d', 'packaging'],
     }
     const myQueueStatusList = queueStatuses[role] || []
     const myQueueOrders = myQueueStatusList.length > 0 ? data.orders.filter((o) => myQueueStatusList.includes(o.status)) : []
@@ -199,7 +194,7 @@ export default function DashboardPage() {
   }
 
   // Manager dashboard computed values
-  const workStatuses = ['design', 'design_done', 'print', 'print_done', 'post_processing', 'resin_pouring', 'assembly', 'packaging', 'otk']
+  const workStatuses = ['design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
   const ordersInWork = useMemo(() => data.orders.filter(o => workStatuses.includes(o.status)), [data.orders])
   const ordersDueToday = useMemo(() => {
     const today = startOfDay(new Date())

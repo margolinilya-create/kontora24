@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail, updateOrder } from '../hooks/useOrders'
 import { InfoField } from '../components/InfoField'
@@ -10,7 +10,6 @@ import { OrderComments } from '../components/OrderComments'
 import { OrderAttachments } from '../components/OrderAttachments'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { StickerActions } from '@/features/techcard/components/StickerActions'
-import { CommercialProposal } from '@/features/kp/components/CommercialProposal'
 import Spinner from '@/shared/components/Spinner'
 import Button from '@/shared/components/Button'
 import { ORDER_TYPES } from '@/shared/constants'
@@ -18,7 +17,6 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { formatPrice } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
 import { supabase } from '@/shared/lib/supabase'
-import { calculate } from '@/features/calculator/lib/calculator'
 
 export default function OrderDetailPage() {
   const { id } = useParams()
@@ -27,53 +25,20 @@ export default function OrderDetailPage() {
   const isFinance = hasRole(['admin', 'manager'])
   const isAdmin = realRole === 'admin'
   const [editing, setEditing] = useState(false)
-  const [recalculating, setRecalculating] = useState(false)
   const [showTechCard, setShowTechCard] = useState(false)
-  const [showKP, setShowKP] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showProductionSticker, setShowProductionSticker] = useState(false)
   const [showDeliverySticker, setShowDeliverySticker] = useState(false)
 
-  async function handleRecalculate() {
-    if (!order) return
-    setRecalculating(true)
-    try {
-      const [settingsRes, markupsRes] = await Promise.all([
-        supabase.from('k24_settings').select('value').eq('key', 'calculator').single(),
-        supabase.from('k24_settings').select('value').eq('key', 'markups').single(),
-      ])
-      const overrides = settingsRes.data?.value || {}
-      const markups = markupsRes.data?.value || {}
-      const is3D = order.order_type?.includes('3D') || false
-      const markupOverride = markups[order.order_type]
+  const techCardRef = useRef(null)
+  const productionStickerRef = useRef(null)
+  const deliveryStickerRef = useRef(null)
+  const historyRef = useRef(null)
 
-      const result = calculate({
-        width: order.width_mm, height: order.height_mm, qty: order.qty,
-        orderType: order.order_type, needLam: order.need_lam || false, is3D, overrides,
-      })
+  const scrollToRef = useCallback((ref) => {
+    setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
+  }, [])
 
-      let finalResult = result
-      if (markupOverride && markupOverride !== result.markup) {
-        const priceFinal = Math.round(result.costTotal * markupOverride * (1 - result.discount))
-        const pricePerUnit = order.qty > 0 ? Math.round(priceFinal / order.qty) : 0
-        finalResult = { ...result, markup: markupOverride, priceFinal, pricePerUnit }
-      }
-
-      await updateOrder(order.id, {
-        cost_materials: finalResult.costMaterials, cost_labor: finalResult.costLabor,
-        cost_total: finalResult.costTotal, price_final: finalResult.priceFinal,
-        price_per_unit: finalResult.pricePerUnit, markup: finalResult.markup,
-        discount_pct: finalResult.discount, prod_days: finalResult.prodDays,
-      })
-
-      toast.success(`Пересчитано: ${formatPrice(order.price_final)} -> ${formatPrice(finalResult.priceFinal)}`)
-      refetch()
-    } catch (err) {
-      toast.error('Ошибка: ' + (err.message || 'Неизвестная ошибка'))
-    } finally {
-      setRecalculating(false)
-    }
-  }
 
   function copySourceLink() {
     const attachment = order.attachments?.[0]
@@ -142,19 +107,16 @@ export default function OrderDetailPage() {
               {editing ? 'Закрыть редактор' : 'Редактировать'}
             </Button>
           )}
-          <Button variant="secondary" onClick={() => setShowTechCard(!showTechCard)}>
+          <Button variant="secondary" onClick={() => { setShowTechCard(v => { if (!v) scrollToRef(techCardRef); return !v }) }}>
             Тех. карта
           </Button>
-          <Button variant="secondary" onClick={() => setShowKP(!showKP)}>
-            КП
-          </Button>
-          <Button variant="secondary" onClick={() => setShowProductionSticker(!showProductionSticker)}>
+          <Button variant="secondary" onClick={() => { setShowProductionSticker(v => { if (!v) scrollToRef(productionStickerRef); return !v }) }}>
             В производство
           </Button>
-          <Button variant="secondary" onClick={() => setShowDeliverySticker(!showDeliverySticker)}>
+          <Button variant="secondary" onClick={() => { setShowDeliverySticker(v => { if (!v) scrollToRef(deliveryStickerRef); return !v }) }}>
             На выдачу
           </Button>
-          <Button variant="secondary" onClick={() => setShowHistory(!showHistory)}>
+          <Button variant="secondary" onClick={() => { setShowHistory(v => { if (!v) scrollToRef(historyRef); return !v }) }}>
             История
           </Button>
           <StatusSwitcher order={order} onUpdated={refetch} />
@@ -240,12 +202,7 @@ export default function OrderDetailPage() {
       {/* Finance (admin/manager only) */}
       {isFinance && (
         <div className="bg-surface rounded-xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-lg">Финансы</h2>
-            <Button variant="secondary" size="sm" onClick={handleRecalculate} loading={recalculating}>
-              Пересчитать
-            </Button>
-          </div>
+          <h2 className="font-semibold text-lg mb-4">Финансы</h2>
           <div className="bg-primary text-white rounded-xl p-6 mb-4">
             <p className="text-sm opacity-70">Итого</p>
             <p className="text-4xl font-bold">{formatPrice(order.price_final)}</p>
@@ -289,29 +246,19 @@ export default function OrderDetailPage() {
 
       {/* Tech card panel */}
       {showTechCard && (
-        <div className="bg-surface rounded-xl border border-border p-5">
+        <div ref={techCardRef} className="bg-surface rounded-xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Тех. карта</h2>
             <button onClick={() => setShowTechCard(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
           </div>
-          <TechCardActions order={order} />
+          <TechCardActions order={order} defaultOpen />
         </div>
       )}
 
-      {/* KP panel */}
-      {showKP && (
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Коммерческое предложение</h2>
-            <button onClick={() => setShowKP(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
-          </div>
-          <CommercialProposal order={order} />
-        </div>
-      )}
 
       {/* Production sticker panel */}
       {showProductionSticker && (
-        <div className="bg-surface rounded-xl border border-border p-5">
+        <div ref={productionStickerRef} className="bg-surface rounded-xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Стикер "В производство"</h2>
             <button onClick={() => setShowProductionSticker(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
@@ -322,7 +269,7 @@ export default function OrderDetailPage() {
 
       {/* Delivery sticker panel */}
       {showDeliverySticker && (
-        <div className="bg-surface rounded-xl border border-border p-5">
+        <div ref={deliveryStickerRef} className="bg-surface rounded-xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Стикер "На выдачу"</h2>
             <button onClick={() => setShowDeliverySticker(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
@@ -333,7 +280,7 @@ export default function OrderDetailPage() {
 
       {/* History panel */}
       {showHistory && (
-        <div className="bg-surface rounded-xl border border-border p-5">
+        <div ref={historyRef} className="bg-surface rounded-xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">История изменений</h2>
             <button onClick={() => setShowHistory(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>

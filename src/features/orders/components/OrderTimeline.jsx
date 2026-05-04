@@ -1,11 +1,9 @@
-import { ORDER_STATUSES, IS_3D_TYPE } from '@/shared/constants'
+import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
 
 export function OrderTimeline({ order, history }) {
-  const FLOW = IS_3D_TYPE(order?.order_type)
-    ? ['new', 'design', 'design_done', 'print', 'print_done', 'post_processing', 'resin_pouring', 'assembly', 'packaging', 'done']
-    : ['new', 'design', 'design_done', 'print', 'print_done', 'post_processing', 'assembly', 'packaging', 'done']
   if (!order) return null
+  const FLOW = getOrderRoute(order)
 
   const currentIdx = FLOW.indexOf(order.status)
   const isCancelled = order.status === 'cancelled'

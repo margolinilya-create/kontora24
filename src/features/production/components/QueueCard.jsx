@@ -6,7 +6,6 @@ import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { TechCardPreview } from './TechCardPreview'
 import { TaskTimer } from './TaskTimer'
-import { DryingTimer } from './DryingTimer'
 import { OperationChecklist } from './OperationChecklist'
 import { ProductionLogForm } from './logs/ProductionLogForm'
 import { StageProgressBar } from './logs/StageProgressBar'
@@ -90,10 +89,6 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
 
       {/* Progress bar */}
       <StageProgressBar progress={progress} />
-
-      {order.status === 'resin_pouring' && order.dry_until && (
-        <DryingTimer dryUntil={order.dry_until} />
-      )}
 
       <TaskTimer orderId={order.id} orderStatus={order.status} compact />
 

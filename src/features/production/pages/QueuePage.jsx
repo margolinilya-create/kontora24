@@ -8,10 +8,13 @@ import { OnboardingTip } from '@/shared/components/OnboardingTip'
 
 const QUEUE_CONFIG = {
   design: { title: 'Очередь дизайна', subtitle: 'Заказы со статусом «Дизайн»', status: 'design' },
+  prepress: { title: 'Препресс', subtitle: 'Допечатная подготовка', status: 'prepress' },
   print: { title: 'Очередь печати', subtitle: 'Заказы со статусом «Печать»', status: 'print' },
-  post_processing: { title: 'Постпечатная обработка', subtitle: 'Резка, ламинация, подготовка', status: 'post_processing' },
-  resin_pouring: { title: 'Заливка смолой', subtitle: 'Заказы на заливке смолой', status: 'resin_pouring' },
-  assembly: { title: 'Очередь сборки', subtitle: 'Заказы со статусом «Сборка»', status: 'assembly' },
+  lamination: { title: 'Ламинация', subtitle: 'Ламинация плёнки', status: 'lamination' },
+  cutting: { title: 'Резка', subtitle: 'Плоттерная резка', status: 'cutting' },
+  selection_pouring: { title: 'Выборка / Заливка', subtitle: 'Выборка фонов и заливка', status: 'selection_pouring' },
+  pouring: { title: 'Заливка', subtitle: 'Заливка смолой', status: 'pouring' },
+  assembly_3d: { title: 'Сборка 3D', subtitle: 'Сборка 3D стикерпаков', status: 'assembly_3d' },
   packaging: { title: 'Упаковка', subtitle: 'Упаковка готовой продукции', status: 'packaging' },
   otk: { title: 'ОТК / Выдача', subtitle: 'Контроль качества и выдача заказа', status: 'otk' },
 }

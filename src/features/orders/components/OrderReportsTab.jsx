@@ -14,7 +14,7 @@ export function OrderReportsTab({ order, onUpdated }) {
 
   const myLogs = logs.filter((l) => l.worker_id === profile?.id)
   const progress = getStageProgress(order.status)
-  const canLog = order.status !== 'new' && order.status !== 'done' && order.status !== 'cancelled' && order.status !== 'design' && order.status !== 'design_done' && order.status !== 'print_done'
+  const canLog = order.status !== 'new' && order.status !== 'done' && order.status !== 'cancelled' && order.status !== 'design'
 
   async function handleLogSubmit(stage, logData) {
     await addProductionLogAndCheckAdvance(order.id, stage, logData, order)

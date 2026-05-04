@@ -7,54 +7,101 @@ export const MS_PER_MINUTE = 60_000
 export const ORDER_STATUSES = {
   new: { label: 'Новый', color: 'bg-blue-500/15 text-blue-400', order: 0 },
   design: { label: 'Дизайн', color: 'bg-purple-500/15 text-purple-400', order: 1 },
-  design_done: { label: 'Дизайн готов', color: 'bg-purple-500/15 text-purple-400', order: 2 },
+  prepress: { label: 'Препресс', color: 'bg-violet-500/15 text-violet-400', order: 2 },
   print: { label: 'Печать', color: 'bg-orange-500/15 text-orange-400', order: 3 },
-  print_done: { label: 'Напечатано', color: 'bg-orange-500/15 text-orange-400', order: 4 },
-  post_processing: { label: 'Постпечатная обработка', color: 'bg-amber-500/15 text-amber-400', order: 5 },
-  resin_pouring: { label: 'Заливка смолой', color: 'bg-cyan-500/15 text-cyan-400', order: 6 },
-  assembly: { label: 'Сборка', color: 'bg-yellow-500/15 text-yellow-400', order: 7 },
-  packaging: { label: 'Упаковка', color: 'bg-teal-500/15 text-teal-400', order: 8 },
-  otk: { label: 'ОТК / Выдача', color: 'bg-pink-500/15 text-pink-400', order: 9 },
-  done: { label: 'Готово', color: 'bg-green-500/15 text-green-400', order: 10 },
-  cancelled: { label: 'Отменён', color: 'bg-red-500/15 text-red-400', order: 11 },
+  lamination: { label: 'Ламинация', color: 'bg-amber-500/15 text-amber-400', order: 4 },
+  cutting: { label: 'Резка', color: 'bg-yellow-500/15 text-yellow-400', order: 5 },
+  selection_pouring: { label: 'Выборка / Заливка', color: 'bg-cyan-500/15 text-cyan-400', order: 6 },
+  pouring: { label: 'Заливка', color: 'bg-teal-500/15 text-teal-400', order: 7 },
+  assembly_3d: { label: 'Сборка 3D', color: 'bg-lime-500/15 text-lime-400', order: 8 },
+  packaging: { label: 'Упаковка', color: 'bg-emerald-500/15 text-emerald-400', order: 9 },
+  otk: { label: 'ОТК / Выдача', color: 'bg-pink-500/15 text-pink-400', order: 10 },
+  done: { label: 'Готово', color: 'bg-green-500/15 text-green-400', order: 11 },
+  cancelled: { label: 'Отменён', color: 'bg-red-500/15 text-red-400', order: 12 },
 }
 
-// Status transitions per role
-export const STATUS_TRANSITIONS = {
-  admin: { new: 'design', design: 'design_done', design_done: 'print', print: 'print_done', print_done: 'post_processing', post_processing: 'assembly', resin_pouring: 'assembly', assembly: 'packaging', packaging: 'otk', otk: 'done' },
-  manager: { new: 'design', design_done: 'print', print_done: 'post_processing', post_processing: 'assembly', assembly: 'packaging', packaging: 'otk' },
-  designer: { design: 'design_done' },
-  printer: { print: 'print_done', post_processing: 'assembly' },
-  assembler: { post_processing: 'assembly', assembly: 'packaging', packaging: 'otk' },
-  resin_pourer: { resin_pouring: 'assembly' },
+// --- Order routes by type ---
+// Regular: sticker_cut, sticker_kiss, stickerpack, rect, big
+// lamination is skipped when need_lam=false
+const ROUTE_REGULAR = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
+const ROUTE_3D_STICKER = ['new', 'design', 'prepress', 'print', 'cutting', 'pouring', 'packaging', 'otk', 'done']
+const ROUTE_3D_STICKERPACK = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'assembly_3d', 'packaging', 'otk', 'done']
+
+export const ORDER_ROUTES = {
+  sticker_cut: ROUTE_REGULAR,
+  sticker_kiss: ROUTE_REGULAR,
+  stickerpack: ROUTE_REGULAR,
+  sticker3D: ROUTE_3D_STICKER,
+  stickerpack3D: ROUTE_3D_STICKERPACK,
+  rect: ROUTE_REGULAR,
+  big: ROUTE_REGULAR,
+}
+
+export const IS_3D_TYPE = (orderType) => orderType === 'sticker3D' || orderType === 'stickerpack3D'
+export const IS_3D_STICKERPACK = (orderType) => orderType === 'stickerpack3D'
+
+// Stages where stickerpack3D has two parallel tracks (backgrounds + stickers)
+export const DUAL_TRACK_STAGES = ['print', 'cutting', 'selection_pouring']
+// Stages where only backgrounds track applies (for stickerpack3D)
+export const BACKGROUNDS_ONLY_STAGES = ['lamination']
+
+export function isDualTrack(status, order) {
+  return IS_3D_STICKERPACK(order?.order_type) && DUAL_TRACK_STAGES.includes(status)
+}
+
+// Get the route for an order based on its type
+export function getOrderRoute(order) {
+  const route = ORDER_ROUTES[order?.order_type] || ROUTE_REGULAR
+  // Skip lamination if not needed
+  if (!order?.need_lam) {
+    return route.filter(s => s !== 'lamination')
+  }
+  return route
+}
+
+// Role permissions: which roles can advance FROM a given status
+const ROLE_STAGE_PERMISSIONS = {
+  admin: true, // admin can advance any stage
+  manager: true, // manager can advance any stage
+  designer: ['design', 'prepress'],
+  printer: ['prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging'],
+  post_printer: ['selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'cutting', 'lamination', 'print'],
+}
+
+function canAdvanceFrom(role, status) {
+  const perms = ROLE_STAGE_PERMISSIONS[role]
+  if (perms === true) return true
+  return perms?.includes(status) || false
 }
 
 // Admin and manager can cancel from any status
 export const CAN_CANCEL_ROLES = ['admin', 'manager']
 
-export const IS_3D_TYPE = (orderType) => orderType === 'sticker3D' || orderType === 'stickerpack3D'
-
 export function getNextStatus(role, currentStatus, order) {
-  // 3D orders: post_processing → resin_pouring instead of assembly
-  if (currentStatus === 'post_processing' && IS_3D_TYPE(order?.order_type)) {
-    if (['admin', 'manager', 'printer', 'assembler'].includes(role)) return 'resin_pouring'
-  }
-  // Resin pouring → assembly
-  if (currentStatus === 'resin_pouring') {
-    if (['admin', 'manager', 'assembler', 'resin_pourer'].includes(role)) return 'assembly'
-  }
-  return STATUS_TRANSITIONS[role]?.[currentStatus]
+  if (currentStatus === 'done' || currentStatus === 'cancelled') return undefined
+  if (!canAdvanceFrom(role, currentStatus)) return undefined
+
+  const route = getOrderRoute(order)
+  const idx = route.indexOf(currentStatus)
+  if (idx === -1 || idx === route.length - 1) return undefined
+  return route[idx + 1]
 }
 
 // --- Order types ---
 export const ORDER_TYPES = {
-  sticker_cut: { label: 'Стикер вырубной (die cut)', markup: 4.0 },
-  sticker_kiss: { label: 'Стикер на подложке (kiss cut)', markup: 4.0 },
-  stickerpack: { label: 'Стикерпак', markup: 4.0 },
-  sticker3D: { label: '3D стикер', markup: 4.5 },
-  stickerpack3D: { label: '3D стикерпак', markup: 4.5 },
-  rect: { label: 'Прямоугольный', markup: 4.0 },
-  big: { label: 'Большой формат', markup: 4.0 },
+  sticker_cut: { label: 'Стикер вырубной (die cut)' },
+  sticker_kiss: { label: 'Стикер на подложке (kiss cut)' },
+  stickerpack: { label: 'Стикерпак' },
+  sticker3D: { label: '3D стикер' },
+  stickerpack3D: { label: '3D стикерпак' },
+  rect: { label: 'Прямоугольный' },
+  big: { label: 'Большой формат' },
+}
+
+// --- Lamination types ---
+export const LAMINATION_TYPES = {
+  matte: { label: 'Матовая' },
+  glossy: { label: 'Глянцевая' },
 }
 
 // --- Priorities ---
@@ -71,8 +118,7 @@ export const ROLES = {
   manager: { label: 'Менеджер', color: 'bg-blue-500/15 text-blue-400' },
   designer: { label: 'Дизайнер', color: 'bg-purple-500/15 text-purple-400' },
   printer: { label: 'Печатник', color: 'bg-orange-500/15 text-orange-400' },
-  assembler: { label: 'Сборщик', color: 'bg-yellow-500/15 text-yellow-400' },
-  resin_pourer: { label: 'Заливщик', color: 'bg-cyan-500/15 text-cyan-400' },
+  post_printer: { label: 'Постпечатник', color: 'bg-cyan-500/15 text-cyan-400' },
 }
 
 // --- Material types ---
@@ -87,54 +133,50 @@ export const MATERIAL_TYPES = {
 
 // --- Operation checklists by order type ---
 export const OPERATION_CHECKLISTS = {
-  sticker_cut: ['Печать', 'Резка по контуру', 'Проверка качества'],
-  sticker_kiss: ['Печать', 'Высечка', 'Проверка качества'],
-  stickerpack: ['Печать', 'Резка', 'Ламинация', 'Проверка качества'],
-  sticker3D: ['Печать', 'Резка', 'Ламинация', 'Заливка смолой', 'Сушка 24ч', 'Проверка качества'],
-  stickerpack3D: ['Печать', 'Резка', 'Ламинация', 'Заливка смолой', 'Сушка 24ч', 'Проверка качества'],
-  rect: ['Печать', 'Резка', 'Проверка качества'],
-  big: ['Печать', 'Ламинация', 'Проверка качества'],
+  sticker_cut: ['Препресс', 'Печать', 'Резка по контуру', 'Проверка качества'],
+  sticker_kiss: ['Препресс', 'Печать', 'Высечка', 'Проверка качества'],
+  stickerpack: ['Препресс', 'Печать', 'Ламинация', 'Резка', 'Проверка качества'],
+  sticker3D: ['Препресс', 'Печать', 'Резка', 'Заливка смолой', 'Проверка качества'],
+  stickerpack3D: ['Препресс', 'Печать фонов', 'Печать стикеров', 'Ламинация фонов', 'Резка', 'Выборка фонов', 'Заливка стикеров', 'Сборка 3D', 'Проверка качества'],
+  rect: ['Препресс', 'Печать', 'Резка', 'Проверка качества'],
+  big: ['Препресс', 'Печать', 'Ламинация', 'Проверка качества'],
 }
-
-// --- Volume discounts ---
-export const VOLUME_DISCOUNTS = [
-  { min: 1, max: 9, discount: 0 },
-  { min: 10, max: 24, discount: 0.05 },
-  { min: 25, max: 49, discount: 0.10 },
-  { min: 50, max: 99, discount: 0.15 },
-  { min: 100, max: 199, discount: 0.20 },
-  { min: 200, max: 499, discount: 0.25 },
-  { min: 500, max: Infinity, discount: 0.30 },
-]
 
 // --- Stage notification roles: when order enters status, notify these roles ---
 export const NOTIFY_ROLES = {
   design: ['designer'],
+  prepress: ['designer', 'printer'],
   print: ['printer'],
-  post_processing: ['printer', 'assembler'],
-  resin_pouring: ['resin_pourer'],
-  assembly: ['assembler'],
-  packaging: ['assembler'],
+  lamination: ['printer'],
+  cutting: ['printer'],
+  selection_pouring: ['post_printer'],
+  pouring: ['post_printer'],
+  assembly_3d: ['post_printer'],
+  packaging: ['post_printer'],
 }
 
 // --- Navigation ---
+const ALL_ROLES = ['admin', 'manager', 'designer', 'printer', 'post_printer']
+
 export const NAV_ITEMS = [
-  { path: '/', label: 'Главная', icon: 'LayoutDashboard', roles: ['admin', 'manager', 'designer', 'printer', 'assembler', 'resin_pourer'] },
+  { path: '/', label: 'Главная', icon: 'LayoutDashboard', roles: ALL_ROLES },
   { path: '/orders', label: 'Заказы', icon: 'ShoppingCart', roles: ['admin', 'manager'] },
-  { path: '/calculator', label: 'Калькулятор', icon: 'Calculator', roles: ['admin', 'manager'] },
   { path: '/production', label: 'Производство', icon: 'Palette', roles: ['admin', 'manager'] },
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'] },
+  { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'] },
   { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'] },
-  { path: '/production/post-processing', label: 'Постобработка', icon: 'Scissors', roles: ['admin', 'manager', 'printer', 'assembler'] },
-  { path: '/production/resin', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'resin_pourer'] },
-  { path: '/production/assembly', label: 'Сборка', icon: 'Hammer', roles: ['admin', 'manager', 'assembler'] },
-  { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'assembler'] },
+  { path: '/production/lamination', label: 'Ламинация', icon: 'Layers', roles: ['admin', 'manager', 'printer'] },
+  { path: '/production/cutting', label: 'Резка', icon: 'Scissors', roles: ['admin', 'manager', 'printer'] },
+  { path: '/production/pouring', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'post_printer'] },
+  { path: '/production/selection', label: 'Выборка / Заливка', icon: 'Combine', roles: ['admin', 'manager', 'post_printer'] },
+  { path: '/production/assembly3d', label: 'Сборка 3D', icon: 'Hammer', roles: ['admin', 'manager', 'post_printer'] },
+  { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer'] },
   { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin'] },
-  { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ['admin', 'manager', 'designer', 'printer', 'assembler', 'resin_pourer'] },
+  { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ALL_ROLES },
   { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: ['admin', 'manager'] },
   { path: '/clients', label: 'Клиенты', icon: 'Users', roles: ['admin', 'manager'] },
   { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: ['admin', 'manager'] },
   { path: '/reports', label: 'Отчёты', icon: 'FileText', roles: ['admin'] },
   { path: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'] },
-  { path: '/help', label: 'Справка', icon: 'HelpCircle', roles: ['admin', 'manager', 'designer', 'printer', 'assembler', 'resin_pourer'] },
+  { path: '/help', label: 'Справка', icon: 'HelpCircle', roles: ALL_ROLES },
 ]

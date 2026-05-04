@@ -6,58 +6,73 @@ export const DEPARTMENTS = [
     id: 'sales',
     label: 'Отдел продаж',
     color: 'bg-blue-500/15 text-blue-400',
-    borderColor: 'border-blue-400',
+    borderColor: 'border-blue-500',
+    dotColor: 'bg-blue-500',
     stages: [
       { label: 'Согласование', status: 'new' },
-      { label: 'Ждёт утверждения', status: 'design_done' },
     ],
   },
   {
     id: 'prepress',
     label: 'Допечатная подготовка',
     color: 'bg-purple-500/15 text-purple-400',
-    borderColor: 'border-purple-400',
+    borderColor: 'border-purple-500',
+    dotColor: 'bg-purple-500',
     stages: [
       { label: 'Дизайн', status: 'design' },
+      { label: 'Препресс', status: 'prepress' },
     ],
   },
   {
     id: 'print',
-    label: 'Печать, резка, ламинация',
+    label: 'Печать',
     color: 'bg-orange-500/15 text-orange-400',
-    borderColor: 'border-orange-400',
+    borderColor: 'border-orange-500',
+    dotColor: 'bg-orange-500',
     stages: [
       { label: 'Печать', status: 'print' },
-      { label: 'Ламинация', status: 'print_done' },
-      { label: 'Резка', status: 'post_processing' },
+    ],
+  },
+  {
+    id: 'postprint',
+    label: 'Постпечатная обработка',
+    color: 'bg-amber-500/15 text-amber-400',
+    borderColor: 'border-amber-500',
+    dotColor: 'bg-amber-500',
+    stages: [
+      { label: 'Ламинация', status: 'lamination' },
+      { label: 'Резка', status: 'cutting' },
     ],
   },
   {
     id: '3d',
     label: '3D отдел',
     color: 'bg-cyan-500/15 text-cyan-400',
-    borderColor: 'border-cyan-400',
+    borderColor: 'border-cyan-500',
+    dotColor: 'bg-cyan-500',
     stages: [
-      { label: '3D заливка', status: 'resin_pouring' },
+      { label: 'Выборка / Заливка', status: 'selection_pouring' },
+      { label: 'Заливка', status: 'pouring' },
+      { label: 'Сборка 3D', status: 'assembly_3d' },
     ],
   },
   {
     id: 'osk',
     label: 'ОСК',
     color: 'bg-yellow-500/15 text-yellow-400',
-    borderColor: 'border-yellow-400',
+    borderColor: 'border-yellow-500',
+    dotColor: 'bg-yellow-500',
     stages: [
-      { label: 'Выборка', status: 'assembly' },
-      { label: 'Сборка пака', status: 'packaging' },
       { label: 'Упаковка', status: 'packaging' },
-      { label: 'Ждёт выдачи', status: 'otk' },
+      { label: 'ОТК / Выдача', status: 'otk' },
     ],
   },
   {
     id: 'delivered',
     label: 'Выдан',
     color: 'bg-green-500/15 text-green-400',
-    borderColor: 'border-green-400',
+    borderColor: 'border-green-500',
+    dotColor: 'bg-green-500',
     stages: [
       { label: 'Выдан', status: 'done' },
     ],
@@ -68,7 +83,7 @@ export const DEPARTMENTS = [
 const _statusToDept = {}
 for (const dept of DEPARTMENTS) {
   for (const stage of dept.stages) {
-    // First mapping wins (some statuses appear in multiple stages)
+    // First mapping wins (some statuses may appear in multiple stages)
     if (!_statusToDept[stage.status]) {
       _statusToDept[stage.status] = {
         departmentId: dept.id,

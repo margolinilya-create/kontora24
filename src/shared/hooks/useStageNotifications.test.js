@@ -91,10 +91,10 @@ describe('useStageNotifications', () => {
   })
 
   it('uses statusLabel from ORDER_STATUSES in toast message', () => {
-    mockProfile.current = { id: 'user-1', role: 'resin_pourer', display_name: 'Resin Worker' }
+    mockProfile.current = { id: 'user-1', role: 'post_printer', display_name: 'Post Printer' }
     renderHook(() => useStageNotifications())
-    channelCallback({ new: { id: 'evt-5', to_status: 'resin_pouring', changed_by: 'other-user' } })
-    expect(mockToast.info).toHaveBeenCalledWith('Новый заказ в очереди: Заливка смолой')
+    channelCallback({ new: { id: 'evt-5', to_status: 'pouring', changed_by: 'other-user' } })
+    expect(mockToast.info).toHaveBeenCalledWith('Новый заказ в очереди: Заливка')
   })
 
   it('does not notify for statuses without NOTIFY_ROLES (done, new)', () => {

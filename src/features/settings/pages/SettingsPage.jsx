@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSettings, useUsers } from '../hooks/useSettings'
 import { ProfileCard } from '../components/ProfileCard'
 import { SheetsImport } from '../components/SheetsImport'
-import { ROLES, ORDER_TYPES } from '@/shared/constants'
-import { DEFAULTS } from '@/features/calculator/lib/calculator'
+import { ROLES } from '@/shared/constants'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { formatDateTime } from '@/shared/lib/utils'
@@ -14,8 +13,6 @@ import Modal from '@/shared/components/Modal'
 
 const SETTINGS_TABS = [
   { key: 'profile', label: 'Профиль' },
-  { key: 'calculator', label: 'Калькулятор' },
-  { key: 'markups', label: 'Наценки' },
   { key: 'users', label: 'Пользователи' },
   { key: 'bitrix', label: 'Bitrix24' },
   { key: 'logs', label: 'Логи' },
@@ -35,8 +32,6 @@ export default function SettingsPage() {
       <Tabs items={SETTINGS_TABS} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'profile' && <ProfileCard />}
-      {activeTab === 'calculator' && <CalculatorSettings />}
-      {activeTab === 'markups' && <MarkupSettings />}
       {activeTab === 'users' && (
         <>
           <UserManagement />
@@ -46,77 +41,6 @@ export default function SettingsPage() {
       {activeTab === 'bitrix' && <BitrixSettings />}
       {activeTab === 'logs' && <IntegrationLog />}
       {activeTab === 'import' && <SheetsImport />}
-    </div>
-  )
-}
-
-function CalculatorSettings() {
-  const { value: settings, loading, save } = useSettings('calculator')
-  const [form, setForm] = useState(null)
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (settings && !form) {
-      setForm({ ...DEFAULTS, ...settings })
-    }
-  }, [settings]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (loading || !form) {
-    return (
-      <div className="bg-surface rounded-xl border border-border p-5">
-        <h2 className="font-semibold mb-4">Параметры калькулятора</h2>
-        <div className="animate-pulse space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-8 bg-border/50 rounded" />)}
-        </div>
-      </div>
-    )
-  }
-
-  const fields = [
-    { key: 'printWidth', label: 'Ширина печатного блока (мм)', step: 1 },
-    { key: 'heightMargin', label: 'Тех. отступ по высоте (мм)', step: 1 },
-    { key: 'gap', label: 'Зазор между изделиями (мм)', step: 1 },
-    { key: 'cutSpeed', label: 'Скорость реза (мм/с)', step: 1 },
-    { key: 'lamSpeed', label: 'Скорость ламинации (мм/с)', step: 1 },
-    { key: 'resinPerCm2', label: 'Расход смолы (г/см²)', step: 0.001 },
-    { key: 'resinPourTime', label: 'Время заливки листа (сек)', step: 1 },
-    { key: 'laborCostPerHour', label: 'Стоимость труда (₽/час)', step: 10 },
-    { key: 'filmPricePerM2', label: 'Плёнка (₽/м²)', step: 1 },
-    { key: 'inkPricePerM2', label: 'Краска (₽/м²)', step: 1 },
-    { key: 'resinPricePerG', label: 'Смола (₽/г)', step: 0.01 },
-    { key: 'lamPricePerM2', label: 'Ламинация (₽/м²)', step: 1 },
-  ]
-
-  async function handleSave() {
-    setSaving(true)
-    try {
-      await save(form)
-    } catch (err) {
-      toast.error('Ошибка: ' + err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="bg-surface rounded-xl border border-border p-5">
-      <h2 className="font-semibold mb-4">Параметры калькулятора</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {fields.map((f) => (
-          <Input
-            key={f.key}
-            id={`calc-${f.key}`}
-            label={f.label}
-            type="number"
-            value={form[f.key] ?? ''}
-            onChange={(e) => setForm({ ...form, [f.key]: Number(e.target.value) })}
-            step={f.step}
-          />
-        ))}
-      </div>
-      <Button onClick={handleSave} loading={saving} size="lg" className="mt-4">
-        {saving ? 'Сохранение...' : 'Сохранить настройки'}
-      </Button>
     </div>
   )
 }
@@ -302,56 +226,8 @@ function EditUserModal({ user, onClose, onSave }) {
   )
 }
 
-function MarkupSettings() {
-  const { value: markups, loading, save } = useSettings('markups')
-  const [form, setForm] = useState(null)
-  const [saving, setSaving] = useState(false)
-
-  const defaultMarkups = Object.fromEntries(
-    Object.entries(ORDER_TYPES).map(([k, v]) => [k, v.markup])
-  )
-
-  useEffect(() => {
-    if (markups && !form) {
-      setForm({ ...defaultMarkups, ...markups })
-    } else if (!markups && !form && !loading) {
-      setForm(defaultMarkups)
-    }
-  }, [markups, loading]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleSave() {
-    setSaving(true)
-    try { await save(form) } catch (err) { toast.error(err.message) }
-    finally { setSaving(false) }
-  }
-
-  if (loading || !form) return null
-
-  return (
-    <div className="bg-surface rounded-xl border border-border p-5">
-      <h2 className="font-semibold mb-4">Наценки по типам</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {Object.entries(form).map(([key, val]) => (
-          <Input
-            key={key}
-            label={ORDER_TYPES[key]?.label || key}
-            type="number"
-            value={val}
-            onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })}
-            step="0.1"
-            min="1"
-          />
-        ))}
-      </div>
-      <Button onClick={handleSave} loading={saving} className="mt-3">
-        {saving ? '...' : 'Сохранить наценки'}
-      </Button>
-    </div>
-  )
-}
-
 function CreateUser() {
-  const [form, setForm] = useState({ display_name: '', email: '', password: '', role: 'assembler' })
+  const [form, setForm] = useState({ display_name: '', email: '', password: '', role: 'post_printer' })
   const [saving, setSaving] = useState(false)
 
   function update(field, value) {
@@ -375,7 +251,7 @@ function CreateUser() {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error)
       toast.success(`Пользователь ${form.display_name} создан`)
-      setForm({ display_name: '', email: '', password: '', role: 'assembler' })
+      setForm({ display_name: '', email: '', password: '', role: 'post_printer' })
     } catch (err) {
       toast.error(err.message)
     } finally {

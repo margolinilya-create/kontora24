@@ -6,12 +6,9 @@ import { StageProgressBar } from '@/features/production/components/logs/StagePro
 import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { TaskTimer } from '@/features/production/components/TaskTimer'
-import { DryingTimer } from '@/features/production/components/DryingTimer'
 import { MaterialConsumption } from '@/features/production/components/MaterialConsumption'
-import { ORDER_STATUSES } from '@/shared/constants'
+import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
-
-const PRODUCTION_STAGES = ['print', 'post_processing', 'resin_pouring', 'assembly', 'packaging']
 
 export function OrderProgressTab({ order, history, onUpdated }) {
   const { hasRole } = useAuth()
@@ -26,22 +23,15 @@ export function OrderProgressTab({ order, history, onUpdated }) {
       <div className="bg-surface rounded-xl border border-border p-5">
         <h2 className="font-semibold mb-3">Таймер</h2>
         <TaskTimer orderId={order.id} orderStatus={order.status} />
-        {order.status === 'resin_pouring' && order.dry_until && (
-          <div className="mt-3">
-            <DryingTimer dryUntil={order.dry_until} />
-          </div>
-        )}
       </div>
 
       {/* Stage progress cards */}
       <div className="bg-surface rounded-xl border border-border p-5">
         <h2 className="font-semibold mb-4">Прогресс по этапам</h2>
         <div className="space-y-4">
-          {PRODUCTION_STAGES.map((stage) => {
+          {getOrderRoute(order).filter(s => s !== 'new' && s !== 'done' && s !== 'cancelled').map((stage) => {
             const config = STAGE_FIELDS[stage]
             if (!config) return null
-            // Skip resin for non-3D orders
-            if (stage === 'resin_pouring' && !order.order_type?.includes('3D')) return null
 
             const progress = getStageProgress(stage)
             const isCurrentStage = order.status === stage

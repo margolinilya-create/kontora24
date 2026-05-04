@@ -33,7 +33,7 @@ export function Layout() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   // Simplified layout for worker roles
-  const isWorker = profile && ['designer', 'printer', 'assembler', 'resin_pourer'].includes(profile.role)
+  const isWorker = profile && ['designer', 'printer', 'post_printer'].includes(profile.role)
 
   if (isWorker) {
     return (

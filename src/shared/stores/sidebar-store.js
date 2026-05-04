@@ -18,7 +18,7 @@ export const useSidebarStore = create((set) => ({
         supabase
           .from('k24_orders')
           .select('status')
-          .in('status', ['new', 'design', 'print', 'post_processing', 'resin_pouring', 'assembly', 'packaging']),
+          .in('status', ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']),
         supabase
           .from('k24_materials')
           .select('stock_qty, min_qty'),

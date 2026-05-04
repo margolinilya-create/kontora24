@@ -7,50 +7,64 @@
 export const STAGE_FIELDS = {
   print: {
     label: 'Печать',
-    fields: [
-      { key: 'stickers_printed', label: 'Стикеров напечатано', type: 'number', unit: 'шт', required: true },
-      { key: 'backgrounds_printed', label: 'Фонов напечатано', type: 'number', unit: 'шт' },
-      { key: 'film_meters', label: 'Плёнка использована', type: 'number', unit: 'м', step: '0.1' },
-      { key: 'film_type', label: 'Тип плёнки', type: 'select', options: [
-        { value: 'G', label: 'G (глянцевая)' },
-        { value: 'M', label: 'M (матовая)' },
-        { value: 'Holo', label: 'Holo (голографическая)' },
-        { value: 'Gold', label: 'Gold (золотая)' },
-        { value: 'Chrome', label: 'Chrome (хромированная)' },
-      ]},
-    ],
     quantityField: 'stickers_printed',
-  },
-  post_processing: {
-    label: 'Постобработка',
     fields: [
-      { key: 'stickers_printed', label: 'Стикеров обработано', type: 'number', unit: 'шт', required: true },
+      { key: 'stickers_printed', label: 'Стикеров напечатано', unit: 'шт' },
+      { key: 'backgrounds_printed', label: 'Фонов напечатано', unit: 'шт' },
+      { key: 'film_meters', label: 'Плёнка', unit: 'м', step: '0.1' },
+      { key: 'film_type', label: 'Тип плёнки', type: 'text' },
     ],
-    quantityField: 'stickers_printed',
   },
-  resin_pouring: {
+  lamination: {
+    label: 'Ламинация',
+    quantityField: 'lamination_meters',
+    fields: [
+      { key: 'lamination_meters', label: 'Ламинация', unit: 'м', step: '0.1' },
+      { key: 'defects', label: 'Брак', unit: 'шт' },
+    ],
+  },
+  cutting: {
+    label: 'Резка',
+    quantityField: 'qty_cut',
+    fields: [
+      { key: 'qty_cut', label: 'Нарезано', unit: 'шт' },
+      { key: 'defects', label: 'Брак', unit: 'шт' },
+    ],
+  },
+  pouring: {
     label: 'Заливка',
-    fields: [
-      { key: 'stickers_poured', label: 'Стикеров залито всего', type: 'number', unit: 'шт', required: true },
-      { key: 'stickers_good', label: 'Хороших (после ОТК)', type: 'number', unit: 'шт', required: true },
-      { key: 'resin_grams', label: 'Расход смолы', type: 'number', unit: 'г', step: '0.1' },
-    ],
     quantityField: 'stickers_good',
-  },
-  assembly: {
-    label: 'Сборка',
     fields: [
-      { key: 'packs_selected', label: 'Стикерпаков выбрано', type: 'number', unit: 'шт' },
-      { key: 'packs_assembled', label: 'Стикерпаков собрано', type: 'number', unit: 'шт', required: true },
+      { key: 'stickers_poured', label: 'Залито', unit: 'шт' },
+      { key: 'stickers_good', label: 'Хороших', unit: 'шт' },
+      { key: 'defects', label: 'Брак', unit: 'шт' },
+      { key: 'resin_grams', label: 'Смола', unit: 'г', step: '0.1' },
     ],
+  },
+  selection_pouring: {
+    label: 'Выборка / Заливка',
+    quantityField: 'qty_selected',
+    fields: [
+      { key: 'qty_selected', label: 'Выбрано фонов', unit: 'шт' },
+      { key: 'stickers_poured', label: 'Залито стикеров', unit: 'шт' },
+      { key: 'stickers_good', label: 'Хороших стикеров', unit: 'шт' },
+      { key: 'defects', label: 'Брак', unit: 'шт' },
+      { key: 'resin_grams', label: 'Смола', unit: 'г', step: '0.1' },
+    ],
+  },
+  assembly_3d: {
+    label: 'Сборка 3D',
     quantityField: 'packs_assembled',
+    fields: [
+      { key: 'packs_assembled', label: 'Собрано паков', unit: 'шт' },
+    ],
   },
   packaging: {
     label: 'Упаковка',
-    fields: [
-      { key: 'packs_packaged', label: 'Паков упаковано', type: 'number', unit: 'шт', required: true },
-    ],
     quantityField: 'packs_packaged',
+    fields: [
+      { key: 'packs_packaged', label: 'Упаковано', unit: 'шт' },
+    ],
   },
 }
 
@@ -59,18 +73,57 @@ export const STAGE_FIELDS = {
  * @param {Array} logs - production log entries for an order
  * @param {string} stage - production stage key
  * @param {number} targetQty - order.qty (тираж)
+ * @param {string} [track] - optional track filter (e.g. 'backgrounds', 'stickers')
  * @returns {{ total: number, target: number, percentage: number, isComplete: boolean }}
  */
-export function computeStageProgress(logs, stage, targetQty) {
+export function computeStageProgress(logs, stage, targetQty, track) {
   const config = STAGE_FIELDS[stage]
   if (!config) return { total: 0, target: targetQty, percentage: 0, isComplete: false }
 
   const qtyField = config.quantityField
-  const stageLogs = logs.filter((l) => l.stage === stage)
+  let stageLogs = logs.filter((l) => l.stage === stage)
+  if (track) {
+    stageLogs = stageLogs.filter((l) => l.track === track)
+  }
   const total = stageLogs.reduce((sum, l) => sum + (Number(l[qtyField]) || 0), 0)
   const percentage = targetQty > 0 ? Math.min(100, Math.round((total / targetQty) * 100)) : 0
 
   return { total, target: targetQty, percentage, isComplete: total >= targetQty }
+}
+
+// Field used for each track at dual-track stages
+const DUAL_TRACK_FIELDS = {
+  print: { backgrounds: 'backgrounds_printed', stickers: 'stickers_printed' },
+  cutting: { backgrounds: 'qty_cut', stickers: 'qty_cut' },
+  selection_pouring: { backgrounds: 'qty_selected', stickers: 'stickers_good' },
+}
+
+/**
+ * Compute progress for both tracks (backgrounds + stickers) at a dual-track stage.
+ * @param {Array} logs - production log entries for an order
+ * @param {string} stage - production stage key
+ * @param {number} targetQty - order.qty (тираж)
+ * @returns {{ backgrounds: { total, target, percentage, isComplete }, stickers: { total, target, percentage, isComplete }, bothComplete: boolean }}
+ */
+export function computeDualTrackProgress(logs, stage, targetQty) {
+  const trackFields = DUAL_TRACK_FIELDS[stage]
+  if (!trackFields) {
+    const empty = { total: 0, target: targetQty, percentage: 0, isComplete: false }
+    return { backgrounds: { ...empty }, stickers: { ...empty }, bothComplete: false }
+  }
+
+  function computeTrack(trackName) {
+    const field = trackFields[trackName]
+    const trackLogs = logs.filter((l) => l.stage === stage && l.track === trackName)
+    const total = trackLogs.reduce((sum, l) => sum + (Number(l[field]) || 0), 0)
+    const percentage = targetQty > 0 ? Math.min(100, Math.round((total / targetQty) * 100)) : 0
+    return { total, target: targetQty, percentage, isComplete: total >= targetQty }
+  }
+
+  const backgrounds = computeTrack('backgrounds')
+  const stickers = computeTrack('stickers')
+
+  return { backgrounds, stickers, bothComplete: backgrounds.isComplete && stickers.isComplete }
 }
 
 /**

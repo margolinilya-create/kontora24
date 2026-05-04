@@ -1,16 +1,19 @@
 import { memo } from 'react'
 import { ORDER_STATUSES } from '@/shared/constants'
 
-const COLS = ['new', 'design', 'print', 'post_processing', 'resin_pouring', 'assembly', 'packaging', 'otk']
+const COLS = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
 
 const COL_COLORS = {
   new: 'bg-blue-500',
   design: 'bg-purple-500',
+  prepress: 'bg-violet-500',
   print: 'bg-orange-500',
-  post_processing: 'bg-amber-500',
-  resin_pouring: 'bg-cyan-500',
-  assembly: 'bg-yellow-500',
-  packaging: 'bg-teal-500',
+  lamination: 'bg-amber-500',
+  cutting: 'bg-yellow-500',
+  selection_pouring: 'bg-cyan-500',
+  pouring: 'bg-teal-500',
+  assembly_3d: 'bg-lime-500',
+  packaging: 'bg-emerald-500',
   otk: 'bg-pink-500',
 }
 
@@ -34,7 +37,9 @@ export const PipelineSummary = memo(function PipelineSummary({ columns, activeSt
     <div className="flex items-center gap-1 flex-wrap bg-surface rounded-xl border border-border px-4 py-2.5">
       {COLS.map((status) => {
         const count = columns[status]?.length || 0
-        if (status === 'resin_pouring' && count === 0 && activeStatus !== 'resin_pouring') return null
+        // Hide 3D-only columns when empty and not currently active
+        const threeD_only = ['selection_pouring', 'pouring', 'assembly_3d']
+        if (threeD_only.includes(status) && count === 0 && activeStatus !== status) return null
         const isActive = activeStatus === status
 
         return (

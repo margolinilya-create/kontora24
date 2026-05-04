@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { OrderEditForm } from './OrderEditForm'
 import { OrderAttachments } from './OrderAttachments'
 import { OrderComments } from './OrderComments'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
-import { CommercialProposal } from '@/features/kp/components/CommercialProposal'
 import { OperationChecklist } from '@/features/production/components/OperationChecklist'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { ORDER_TYPES } from '@/shared/constants'
@@ -34,7 +32,6 @@ function PriceCard({ label, value, highlight }) {
 export function OrderInfoTab({ order, onRecalculate, recalculating, onSaved }) {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
-  const [showKP, setShowKP] = useState(false)
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -84,15 +81,6 @@ export function OrderInfoTab({ order, onRecalculate, recalculating, onSaved }) {
 
         {/* Tech Card */}
         <TechCardActions order={order} />
-
-        {/* KP button */}
-        <button
-          onClick={() => setShowKP(true)}
-          className="border border-border text-text hover:bg-surface-dim font-medium rounded-lg px-4 py-2 text-sm transition-colors"
-        >
-          Коммерческое предложение
-        </button>
-        {showKP && <CommercialProposal order={order} onClose={() => setShowKP(false)} />}
 
         {/* Operations */}
         <div className="bg-surface rounded-xl border border-border p-5">

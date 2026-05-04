@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { calculate } from './server-calculator.js'
 
 // Vercel serverless function — receives webhook from Bitrix24
 // POST /api/bitrix/incoming
@@ -29,14 +28,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields: order_type, width_mm, height_mm, qty' })
     }
 
-    // Try to load settings from DB
-    let overrides = {}
-    const { data: settingsRow } = await supabase.from('k24_settings').select('value').eq('key', 'calculator').single()
-    if (settingsRow?.value) overrides = settingsRow.value
-
-    const is3D = order_type === 'sticker3D' || order_type === 'stickerpack3D'
-    const calc = calculate(width_mm, height_mm, qty, order_type, body.need_lam || false, is3D, overrides)
-
     // Find or create client
     let clientId = null
     if (body.client_name) {
@@ -59,7 +50,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Create order
+    // Create order (no price calculation — prices managed externally)
     const { data: order, error } = await supabase
       .from('k24_orders')
       .insert({
@@ -69,11 +60,13 @@ export default async function handler(req, res) {
         qty: Number(qty),
         design_variants: body.design_variants || 1,
         need_lam: body.need_lam || false,
+        lam_type: body.lam_type || null,
         client_id: clientId,
         deadline: body.deadline || null,
+        priority: body.priority || 'normal',
         notes: [body.notes, body.bitrix_deal_id ? `Bitrix #${body.bitrix_deal_id}` : null, body.bitrix_url ? body.bitrix_url : null].filter(Boolean).join('\n'),
+        bitrix_deal_id: body.bitrix_deal_id || null,
         status: 'new',
-        ...calc,
       })
       .select()
       .single()
@@ -89,9 +82,6 @@ export default async function handler(req, res) {
       success: true,
       order_id: order.id,
       order_number: order.number,
-      price_final: order.price_final,
-      price_per_unit: order.price_per_unit,
-      prod_days: order.prod_days,
       kontora_url: `${process.env.VITE_SUPABASE_URL ? 'https://kontora24.vercel.app' : 'http://localhost:5173'}/orders/${order.id}`,
     })
   } catch (err) {

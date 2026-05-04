@@ -92,7 +92,7 @@ export function useBonusReport(period = '30') {
       ])
 
       const rates = ratesRes.data?.value || {
-        print: 0.5, resin_pouring: 1, assembly: 2, packaging: 1, selection: 0.5,
+        print: 0.5, pouring: 1, assembly_3d: 2, packaging: 1, selection: 0.5,
       }
 
       const byWorker = {}
@@ -101,8 +101,8 @@ export function useBonusReport(period = '30') {
         if (!byWorker[name]) byWorker[name] = { name, print: 0, resin: 0, assembly: 0, packaging: 0, selection: 0, total: 0 }
 
         if (l.stickers_printed) { byWorker[name].print += l.stickers_printed; byWorker[name].total += l.stickers_printed * (rates.print || 0) }
-        if (l.stickers_good) { byWorker[name].resin += l.stickers_good; byWorker[name].total += l.stickers_good * (rates.resin_pouring || 0) }
-        if (l.packs_assembled) { byWorker[name].assembly += l.packs_assembled; byWorker[name].total += l.packs_assembled * (rates.assembly || 0) }
+        if (l.stickers_good) { byWorker[name].resin += l.stickers_good; byWorker[name].total += l.stickers_good * (rates.pouring || 0) }
+        if (l.packs_assembled) { byWorker[name].assembly += l.packs_assembled; byWorker[name].total += l.packs_assembled * (rates.assembly_3d || 0) }
         if (l.packs_packaged) { byWorker[name].packaging += l.packs_packaged; byWorker[name].total += l.packs_packaged * (rates.packaging || 0) }
         if (l.packs_selected) { byWorker[name].selection += l.packs_selected; byWorker[name].total += l.packs_selected * (rates.selection || 0) }
       })

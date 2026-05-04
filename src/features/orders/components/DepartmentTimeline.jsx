@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { DEPARTMENTS, getDepartment } from '@/shared/lib/department-mapping'
-import { ORDER_STATUSES, IS_3D_TYPE } from '@/shared/constants'
+import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
 
 export function DepartmentTimeline({ order }) {
   const [hoveredDept, setHoveredDept] = useState(null)
   const currentDept = getDepartment(order.status)
-  const is3D = IS_3D_TYPE(order.order_type)
+  const orderRoute = getOrderRoute(order)
+  const routeSet = new Set(orderRoute)
 
-  // Filter out 3D department for non-3D orders
+  // Filter departments to only show those with stages on this order's route
   const departments = DEPARTMENTS.filter(d => {
-    if (d.id === '3d' && !is3D) return false
-    return true
+    return d.stages.some(s => routeSet.has(s.status))
   })
 
   // Determine each department's state

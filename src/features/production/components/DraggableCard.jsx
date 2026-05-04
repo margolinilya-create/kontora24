@@ -4,7 +4,6 @@ import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { TaskTimer } from './TaskTimer'
-import { DryingTimer } from './DryingTimer'
 import { OperationChecklist } from './OperationChecklist'
 import { TechCardPreview } from './TechCardPreview'
 import { ORDER_TYPES, PRIORITIES, MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
@@ -85,9 +84,6 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
           <AttachmentThumbnail attachments={order.attachments} />
           {order.client?.name && (
             <p className="text-xs text-text-muted truncate">{order.client.name}</p>
-          )}
-          {order.status === 'resin_pouring' && order.dry_until && (
-            <DryingTimer dryUntil={order.dry_until} />
           )}
           <TaskTimer orderId={order.id} orderStatus={order.status} compact />
         </div>

@@ -9,7 +9,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-const VALID_ROLES = ['admin', 'manager', 'designer', 'printer', 'assembler', 'resin_pourer']
+const VALID_ROLES = ['admin', 'manager', 'designer', 'printer', 'post_printer']
 
 export default async function handler(req, res) {
   if (req.method !== 'PUT') {

@@ -58,10 +58,15 @@ export default async function handler(req, res) {
     const STAGE_MAP = {
       new: 'NEW',
       design: 'PREPARATION',
-      design_done: 'PREPARATION',
+      prepress: 'PREPARATION',
       print: 'EXECUTING',
-      print_done: 'EXECUTING',
-      assembly: 'FINAL_INVOICE',
+      lamination: 'EXECUTING',
+      cutting: 'EXECUTING',
+      pouring: 'EXECUTING',
+      selection_pouring: 'EXECUTING',
+      assembly_3d: 'FINAL_INVOICE',
+      packaging: 'FINAL_INVOICE',
+      otk: 'FINAL_INVOICE',
       done: 'WON',
       cancelled: 'LOSE',
     }

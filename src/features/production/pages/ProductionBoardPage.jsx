@@ -6,7 +6,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { DraggableCard, DragOverlayCard } from '../components/DraggableCard'
 import { ProductionCalendar } from '../components/ProductionCalendar'
 import { PipelineSummary, COLS, COL_COLORS } from '../components/PipelineSummary'
-import { ORDER_STATUSES, IS_3D_TYPE, PRIORITIES } from '@/shared/constants'
+import { ORDER_STATUSES, getOrderRoute, PRIORITIES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
@@ -16,9 +16,10 @@ import { OnboardingTip } from '@/shared/components/OnboardingTip'
 const PRODUCTION_STATUSES = new Set(COLS)
 
 const PHASES = [
-  { key: 'prep', label: 'Подготовка', cols: ['new', 'design'] },
-  { key: 'prod', label: 'Производство', cols: ['print', 'post_processing'] },
-  { key: 'finish', label: 'Финиш', cols: ['resin_pouring', 'assembly', 'packaging', 'otk'] },
+  { key: 'prep', label: 'Подготовка', cols: ['new', 'design', 'prepress'] },
+  { key: 'prod', label: 'Производство', cols: ['print', 'lamination', 'cutting'] },
+  { key: '3d', label: '3D', cols: ['selection_pouring', 'pouring', 'assembly_3d'] },
+  { key: 'finish', label: 'Финиш', cols: ['packaging', 'otk'] },
 ]
 
 // --- Droppable column ---
@@ -126,7 +127,7 @@ export default function ProductionBoardPage() {
   // Auto-scroll to worker's relevant column on mount (mobile only)
   useEffect(() => {
     if (!profile || !scrollRef.current || window.innerWidth > 640) return
-    const roleColMap = { designer: 'design', printer: 'print', resin_pourer: 'resin_pouring', assembler: 'assembly' }
+    const roleColMap = { designer: 'design', printer: 'print', post_printer: 'selection_pouring' }
     const targetCol = roleColMap[profile.role]
     if (!targetCol) return
     const colEl = scrollRef.current.querySelector(`[data-col="${targetCol}"]`)
@@ -199,26 +200,20 @@ export default function ProductionBoardPage() {
     setPendingMove({ orderId, targetStatus })
 
     try {
-      const fromIdx = COLS.indexOf(order.status)
-      const toIdx = COLS.indexOf(targetStatus)
+      const route = getOrderRoute(order)
+      const fromIdx = route.indexOf(order.status)
+      const toIdx = route.indexOf(targetStatus)
 
-      if (toIdx > fromIdx) {
+      if (fromIdx === -1 || toIdx === -1) {
+        // Fallback: direct status change
+        await updateOrderStatus(orderId, order.status, targetStatus)
+      } else if (toIdx > fromIdx) {
         let currentStatus = order.status
         for (let i = fromIdx; i < toIdx; i++) {
-          const nextCol = COLS[i + 1]
-          if (nextCol === 'resin_pouring' && !IS_3D_TYPE(order.order_type)) continue
-
-          const intermediateMap = { design: 'design_done', print: 'print_done' }
-          const intermediate = intermediateMap[currentStatus]
+          const nextStep = route[i + 1]
           try {
-            if (intermediate) {
-              await updateOrderStatus(orderId, currentStatus, intermediate)
-              currentStatus = intermediate
-            }
-            if (currentStatus !== nextCol) {
-              await updateOrderStatus(orderId, currentStatus, nextCol)
-              currentStatus = nextCol
-            }
+            await updateOrderStatus(orderId, currentStatus, nextStep)
+            currentStatus = nextStep
           } catch (stepErr) {
             toast.error(`Заказ #${order.number} остановлен на "${ORDER_STATUSES[currentStatus]?.label || currentStatus}": ${stepErr.message}`)
             return
@@ -332,9 +327,9 @@ export default function ProductionBoardPage() {
               className="flex gap-3 overflow-x-auto pb-4 kanban-scroll scroll-smooth snap-x snap-mandatory sm:snap-none"
             >
               {PHASES.map((phase) => {
-                const phaseCols = phase.cols.filter(
-                  (s) => s !== 'resin_pouring' || columns.resin_pouring.length > 0
-                )
+                const phaseCols = phase.key === '3d'
+                  ? phase.cols.filter((s) => (columns[s]?.length || 0) > 0)
+                  : phase.cols
                 if (phaseCols.length === 0) return null
 
                 const phaseCount = phaseCols.reduce((sum, s) => sum + (columns[s]?.length || 0), 0)

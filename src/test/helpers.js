@@ -35,7 +35,6 @@ export function createMockOrder(overrides = {}) {
     price_final: 5000,
     cost_total: 1500,
     checklist: null,
-    dry_until: null,
     created_at: new Date().toISOString(),
     status_changed_at: new Date().toISOString(),
     ...overrides,

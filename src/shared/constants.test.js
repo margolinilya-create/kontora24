@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  getNextStatus, IS_3D_TYPE, OPERATION_CHECKLISTS, PRIORITIES,
-  ORDER_STATUSES, STATUS_TRANSITIONS, CAN_CANCEL_ROLES,
-  ROLES, ORDER_TYPES, VOLUME_DISCOUNTS, NOTIFY_ROLES, NAV_ITEMS,
+  getNextStatus, getOrderRoute, IS_3D_TYPE, IS_3D_STICKERPACK,
+  isDualTrack, DUAL_TRACK_STAGES, BACKGROUNDS_ONLY_STAGES,
+  OPERATION_CHECKLISTS, PRIORITIES, ORDER_STATUSES,
+  CAN_CANCEL_ROLES, ROLES, ORDER_TYPES, ORDER_ROUTES,
+  NOTIFY_ROLES, NAV_ITEMS, LAMINATION_TYPES,
 } from './constants'
 
 describe('IS_3D_TYPE', () => {
@@ -19,119 +21,199 @@ describe('IS_3D_TYPE', () => {
   })
 })
 
+describe('IS_3D_STICKERPACK', () => {
+  it('returns true only for stickerpack3D', () => {
+    expect(IS_3D_STICKERPACK('stickerpack3D')).toBe(true)
+    expect(IS_3D_STICKERPACK('sticker3D')).toBe(false)
+    expect(IS_3D_STICKERPACK('stickerpack')).toBe(false)
+  })
+})
+
+describe('getOrderRoute', () => {
+  it('regular order includes lamination when need_lam=true', () => {
+    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: true })
+    expect(route).toContain('lamination')
+    expect(route).toEqual(['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done'])
+  })
+
+  it('regular order skips lamination when need_lam=false', () => {
+    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: false })
+    expect(route).not.toContain('lamination')
+  })
+
+  it('3D sticker route has pouring, no lamination', () => {
+    const route = getOrderRoute({ order_type: 'sticker3D' })
+    expect(route).toContain('pouring')
+    expect(route).not.toContain('lamination')
+    expect(route).not.toContain('selection_pouring')
+    expect(route).not.toContain('assembly_3d')
+  })
+
+  it('3D stickerpack route has selection_pouring and assembly_3d', () => {
+    const route = getOrderRoute({ order_type: 'stickerpack3D', need_lam: true })
+    expect(route).toContain('selection_pouring')
+    expect(route).toContain('assembly_3d')
+    expect(route).toContain('lamination')
+    expect(route).not.toContain('pouring')
+  })
+
+  it('3D stickerpack skips lamination when need_lam=false', () => {
+    const route = getOrderRoute({ order_type: 'stickerpack3D', need_lam: false })
+    expect(route).not.toContain('lamination')
+    expect(route).toContain('selection_pouring')
+  })
+
+  it('fallback for unknown order type', () => {
+    const route = getOrderRoute({ order_type: 'unknown' })
+    expect(route[0]).toBe('new')
+    expect(route[route.length - 1]).toBe('done')
+  })
+})
+
+describe('isDualTrack', () => {
+  it('true for stickerpack3D at dual-track stages', () => {
+    const order = { order_type: 'stickerpack3D' }
+    expect(isDualTrack('print', order)).toBe(true)
+    expect(isDualTrack('cutting', order)).toBe(true)
+    expect(isDualTrack('selection_pouring', order)).toBe(true)
+  })
+
+  it('false for stickerpack3D at non-dual-track stages', () => {
+    const order = { order_type: 'stickerpack3D' }
+    expect(isDualTrack('design', order)).toBe(false)
+    expect(isDualTrack('lamination', order)).toBe(false)
+    expect(isDualTrack('packaging', order)).toBe(false)
+  })
+
+  it('false for non-stickerpack3D orders', () => {
+    expect(isDualTrack('print', { order_type: 'sticker3D' })).toBe(false)
+    expect(isDualTrack('print', { order_type: 'sticker_cut' })).toBe(false)
+  })
+})
+
 describe('getNextStatus', () => {
-  it('returns next status for admin', () => {
-    expect(getNextStatus('admin', 'new', { order_type: 'sticker_cut' })).toBe('design')
-    expect(getNextStatus('admin', 'design', { order_type: 'sticker_cut' })).toBe('design_done')
-    expect(getNextStatus('admin', 'print_done', { order_type: 'sticker_cut' })).toBe('post_processing')
-    expect(getNextStatus('admin', 'assembly', { order_type: 'sticker_cut' })).toBe('packaging')
-    expect(getNextStatus('admin', 'packaging', { order_type: 'sticker_cut' })).toBe('otk')
-    expect(getNextStatus('admin', 'otk', { order_type: 'sticker_cut' })).toBe('done')
-  })
-
-  it('routes post_processing to assembly for flat orders', () => {
-    expect(getNextStatus('admin', 'post_processing', { order_type: 'sticker_cut' })).toBe('assembly')
-    expect(getNextStatus('admin', 'post_processing', { order_type: 'stickerpack' })).toBe('assembly')
-  })
-
-  it('routes 3D orders through resin_pouring after post_processing', () => {
-    expect(getNextStatus('admin', 'post_processing', { order_type: 'sticker3D' })).toBe('resin_pouring')
-    expect(getNextStatus('manager', 'post_processing', { order_type: 'stickerpack3D' })).toBe('resin_pouring')
-  })
-
-  it('handles resin_pourer role', () => {
-    expect(getNextStatus('resin_pourer', 'resin_pouring', { order_type: 'sticker3D' })).toBe('assembly')
-  })
-
-  it('returns undefined for invalid transitions', () => {
-    expect(getNextStatus('designer', 'print', { order_type: 'sticker_cut' })).toBeUndefined()
-    expect(getNextStatus('printer', 'design', { order_type: 'sticker_cut' })).toBeUndefined()
-  })
-})
-
-describe('OPERATION_CHECKLISTS', () => {
-  it('has checklists for all order types', () => {
-    const types = ['sticker_cut', 'sticker_kiss', 'stickerpack', 'sticker3D', 'stickerpack3D', 'rect', 'big']
-    types.forEach(type => {
-      expect(OPERATION_CHECKLISTS[type]).toBeDefined()
-      expect(OPERATION_CHECKLISTS[type].length).toBeGreaterThan(0)
-    })
-  })
-
-  it('3D types include resin steps', () => {
-    expect(OPERATION_CHECKLISTS['sticker3D']).toContain('Заливка смолой')
-    expect(OPERATION_CHECKLISTS['stickerpack3D']).toContain('Заливка смолой')
-  })
-
-  it('non-3D types do not include resin steps', () => {
-    expect(OPERATION_CHECKLISTS['sticker_cut']).not.toContain('Заливка смолой')
-    expect(OPERATION_CHECKLISTS['rect']).not.toContain('Заливка смолой')
-  })
-})
-
-describe('PRIORITIES', () => {
-  it('has correct sort order', () => {
-    expect(PRIORITIES.low.sortOrder).toBeLessThan(PRIORITIES.normal.sortOrder)
-    expect(PRIORITIES.normal.sortOrder).toBeLessThan(PRIORITIES.high.sortOrder)
-    expect(PRIORITIES.high.sortOrder).toBeLessThan(PRIORITIES.urgent.sortOrder)
-  })
-})
-
-describe('getNextStatus — exhaustive matrix', () => {
-  it('admin has full path from new to done (non-3D)', () => {
-    const order = { order_type: 'sticker_cut' }
-    const path = ['new', 'design', 'design_done', 'print', 'print_done', 'post_processing', 'assembly', 'packaging', 'otk', 'done']
+  it('admin full path — regular order with lamination', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true }
+    const path = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
     for (let i = 0; i < path.length - 1; i++) {
       expect(getNextStatus('admin', path[i], order)).toBe(path[i + 1])
     }
   })
 
-  it('admin 3D path includes resin_pouring', () => {
+  it('admin full path — regular order without lamination', () => {
+    const order = { order_type: 'sticker_cut', need_lam: false }
+    const path = ['new', 'design', 'prepress', 'print', 'cutting', 'packaging', 'otk', 'done']
+    for (let i = 0; i < path.length - 1; i++) {
+      expect(getNextStatus('admin', path[i], order)).toBe(path[i + 1])
+    }
+  })
+
+  it('admin full path — 3D sticker', () => {
     const order = { order_type: 'sticker3D' }
-    expect(getNextStatus('admin', 'post_processing', order)).toBe('resin_pouring')
-    expect(getNextStatus('admin', 'resin_pouring', order)).toBe('assembly')
+    const path = ['new', 'design', 'prepress', 'print', 'cutting', 'pouring', 'packaging', 'otk', 'done']
+    for (let i = 0; i < path.length - 1; i++) {
+      expect(getNextStatus('admin', path[i], order)).toBe(path[i + 1])
+    }
   })
 
-  it('printer can advance post_processing to assembly', () => {
-    expect(getNextStatus('printer', 'post_processing', { order_type: 'sticker_cut' })).toBe('assembly')
+  it('admin full path — 3D stickerpack with lamination', () => {
+    const order = { order_type: 'stickerpack3D', need_lam: true }
+    const path = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'assembly_3d', 'packaging', 'otk', 'done']
+    for (let i = 0; i < path.length - 1; i++) {
+      expect(getNextStatus('admin', path[i], order)).toBe(path[i + 1])
+    }
   })
 
-  it('printer routes 3D post_processing to resin_pouring', () => {
-    expect(getNextStatus('printer', 'post_processing', { order_type: 'sticker3D' })).toBe('resin_pouring')
-  })
-
-  it('assembler can advance post_processing, assembly, packaging', () => {
+  it('designer can advance design and prepress', () => {
     const order = { order_type: 'sticker_cut' }
-    expect(getNextStatus('assembler', 'post_processing', order)).toBe('assembly')
-    expect(getNextStatus('assembler', 'assembly', order)).toBe('packaging')
-    expect(getNextStatus('assembler', 'packaging', order)).toBe('otk')
+    expect(getNextStatus('designer', 'design', order)).toBe('prepress')
+    expect(getNextStatus('designer', 'prepress', order)).toBe('print')
   })
 
-  it('assembler routes 3D post_processing to resin_pouring', () => {
-    expect(getNextStatus('assembler', 'post_processing', { order_type: 'stickerpack3D' })).toBe('resin_pouring')
+  it('designer cannot advance beyond prepress', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true }
+    expect(getNextStatus('designer', 'print', order)).toBeUndefined()
+    expect(getNextStatus('designer', 'cutting', order)).toBeUndefined()
   })
 
-  it('assembler can advance resin_pouring to assembly', () => {
-    expect(getNextStatus('assembler', 'resin_pouring', { order_type: 'sticker3D' })).toBe('assembly')
+  it('printer can advance prepress through cutting', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true }
+    expect(getNextStatus('printer', 'prepress', order)).toBe('print')
+    expect(getNextStatus('printer', 'print', order)).toBe('lamination')
+    expect(getNextStatus('printer', 'lamination', order)).toBe('cutting')
+    expect(getNextStatus('printer', 'cutting', order)).toBe('packaging')
   })
 
-  it('returns undefined for done status (terminal)', () => {
+  it('post_printer can advance pouring, selection_pouring, assembly_3d, packaging', () => {
+    const order3d = { order_type: 'sticker3D' }
+    expect(getNextStatus('post_printer', 'pouring', order3d)).toBe('packaging')
+
+    const orderPack = { order_type: 'stickerpack3D', need_lam: true }
+    expect(getNextStatus('post_printer', 'selection_pouring', orderPack)).toBe('assembly_3d')
+    expect(getNextStatus('post_printer', 'assembly_3d', orderPack)).toBe('packaging')
+    expect(getNextStatus('post_printer', 'packaging', orderPack)).toBe('otk')
+  })
+
+  it('returns undefined for done/cancelled (terminal)', () => {
     expect(getNextStatus('admin', 'done', { order_type: 'sticker_cut' })).toBeUndefined()
-  })
-
-  it('returns undefined for cancelled status (terminal)', () => {
     expect(getNextStatus('admin', 'cancelled', { order_type: 'sticker_cut' })).toBeUndefined()
   })
 
-  it('designer cannot advance beyond design_done', () => {
-    expect(getNextStatus('designer', 'design_done', { order_type: 'sticker_cut' })).toBeUndefined()
+  it('returns undefined for unauthorized role', () => {
     expect(getNextStatus('designer', 'print', { order_type: 'sticker_cut' })).toBeUndefined()
   })
 
   it('handles null/undefined order gracefully', () => {
-    // Without order, IS_3D_TYPE(undefined) returns false, so regular path
-    expect(getNextStatus('admin', 'post_processing', null)).toBe('assembly')
-    expect(getNextStatus('admin', 'post_processing', undefined)).toBe('assembly')
+    // Falls back to regular route
+    expect(getNextStatus('admin', 'new', null)).toBe('design')
+    expect(getNextStatus('admin', 'new', undefined)).toBe('design')
+  })
+})
+
+describe('ORDER_STATUSES', () => {
+  it('has 13 statuses', () => {
+    expect(Object.keys(ORDER_STATUSES)).toHaveLength(13)
+  })
+
+  it('order field is sequential 0-12', () => {
+    const orders = Object.values(ORDER_STATUSES).map(s => s.order).sort((a, b) => a - b)
+    expect(orders).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+  })
+
+  it('each status has label and color', () => {
+    for (const [key, val] of Object.entries(ORDER_STATUSES)) {
+      expect(val.label, `${key} missing label`).toBeDefined()
+      expect(val.color, `${key} missing color`).toBeDefined()
+    }
+  })
+
+  it('includes new stages', () => {
+    expect(ORDER_STATUSES.prepress).toBeDefined()
+    expect(ORDER_STATUSES.lamination).toBeDefined()
+    expect(ORDER_STATUSES.cutting).toBeDefined()
+    expect(ORDER_STATUSES.selection_pouring).toBeDefined()
+    expect(ORDER_STATUSES.pouring).toBeDefined()
+    expect(ORDER_STATUSES.assembly_3d).toBeDefined()
+  })
+
+  it('does not include removed statuses', () => {
+    expect(ORDER_STATUSES.design_done).toBeUndefined()
+    expect(ORDER_STATUSES.print_done).toBeUndefined()
+    expect(ORDER_STATUSES.post_processing).toBeUndefined()
+    expect(ORDER_STATUSES.resin_pouring).toBeUndefined()
+    expect(ORDER_STATUSES.assembly).toBeUndefined()
+  })
+})
+
+describe('ROLES', () => {
+  it('has 5 roles', () => {
+    expect(Object.keys(ROLES)).toHaveLength(5)
+  })
+
+  it('includes post_printer, not assembler/resin_pourer', () => {
+    expect(ROLES.post_printer).toBeDefined()
+    expect(ROLES.assembler).toBeUndefined()
+    expect(ROLES.resin_pourer).toBeUndefined()
   })
 })
 
@@ -141,30 +223,67 @@ describe('CAN_CANCEL_ROLES', () => {
     expect(CAN_CANCEL_ROLES).toContain('manager')
     expect(CAN_CANCEL_ROLES).toHaveLength(2)
   })
+})
 
-  it('does not include worker roles', () => {
-    expect(CAN_CANCEL_ROLES).not.toContain('designer')
-    expect(CAN_CANCEL_ROLES).not.toContain('printer')
-    expect(CAN_CANCEL_ROLES).not.toContain('assembler')
-    expect(CAN_CANCEL_ROLES).not.toContain('resin_pourer')
+describe('ORDER_ROUTES', () => {
+  it('has routes for all order types', () => {
+    for (const type of Object.keys(ORDER_TYPES)) {
+      expect(ORDER_ROUTES[type], `missing route for ${type}`).toBeDefined()
+    }
+  })
+
+  it('all routes start with new and end with done', () => {
+    for (const [type, route] of Object.entries(ORDER_ROUTES)) {
+      expect(route[0], `${type} should start with new`).toBe('new')
+      expect(route[route.length - 1], `${type} should end with done`).toBe('done')
+    }
   })
 })
 
-describe('ORDER_STATUSES', () => {
-  it('has 12 statuses', () => {
-    expect(Object.keys(ORDER_STATUSES)).toHaveLength(12)
+describe('NOTIFY_ROLES', () => {
+  it('notifies designer on design', () => {
+    expect(NOTIFY_ROLES.design).toContain('designer')
   })
 
-  it('order field is sequential 0-11', () => {
-    const orders = Object.values(ORDER_STATUSES).map(s => s.order).sort((a, b) => a - b)
-    expect(orders).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+  it('notifies printer on print, lamination, cutting', () => {
+    expect(NOTIFY_ROLES.print).toContain('printer')
+    expect(NOTIFY_ROLES.lamination).toContain('printer')
+    expect(NOTIFY_ROLES.cutting).toContain('printer')
   })
 
-  it('each status has label and color', () => {
-    for (const [key, val] of Object.entries(ORDER_STATUSES)) {
-      expect(val.label, `${key} missing label`).toBeDefined()
-      expect(val.color, `${key} missing color`).toBeDefined()
+  it('notifies post_printer on pouring, selection_pouring, assembly_3d, packaging', () => {
+    expect(NOTIFY_ROLES.pouring).toContain('post_printer')
+    expect(NOTIFY_ROLES.selection_pouring).toContain('post_printer')
+    expect(NOTIFY_ROLES.assembly_3d).toContain('post_printer')
+    expect(NOTIFY_ROLES.packaging).toContain('post_printer')
+  })
+
+  it('does not notify for terminal statuses', () => {
+    expect(NOTIFY_ROLES.done).toBeUndefined()
+    expect(NOTIFY_ROLES.cancelled).toBeUndefined()
+  })
+})
+
+describe('OPERATION_CHECKLISTS', () => {
+  it('has checklists for all order types', () => {
+    for (const type of Object.keys(ORDER_TYPES)) {
+      expect(OPERATION_CHECKLISTS[type], `missing checklist for ${type}`).toBeDefined()
+      expect(OPERATION_CHECKLISTS[type].length).toBeGreaterThan(0)
     }
+  })
+
+  it('3D stickerpack includes parallel steps', () => {
+    expect(OPERATION_CHECKLISTS.stickerpack3D).toContain('Печать фонов')
+    expect(OPERATION_CHECKLISTS.stickerpack3D).toContain('Заливка стикеров')
+    expect(OPERATION_CHECKLISTS.stickerpack3D).toContain('Сборка 3D')
+  })
+})
+
+describe('PRIORITIES', () => {
+  it('has correct sort order', () => {
+    expect(PRIORITIES.low.sortOrder).toBeLessThan(PRIORITIES.normal.sortOrder)
+    expect(PRIORITIES.normal.sortOrder).toBeLessThan(PRIORITIES.high.sortOrder)
+    expect(PRIORITIES.high.sortOrder).toBeLessThan(PRIORITIES.urgent.sortOrder)
   })
 })
 
@@ -177,48 +296,5 @@ describe('IS_3D_TYPE — all ORDER_TYPES', () => {
         expect(IS_3D_TYPE(key)).toBe(false)
       }
     }
-  })
-})
-
-describe('VOLUME_DISCOUNTS', () => {
-  it('ranges are contiguous (no gaps)', () => {
-    for (let i = 1; i < VOLUME_DISCOUNTS.length; i++) {
-      expect(VOLUME_DISCOUNTS[i].min).toBe(VOLUME_DISCOUNTS[i - 1].max + 1)
-    }
-  })
-
-  it('starts at 1 and ends at Infinity', () => {
-    expect(VOLUME_DISCOUNTS[0].min).toBe(1)
-    expect(VOLUME_DISCOUNTS[VOLUME_DISCOUNTS.length - 1].max).toBe(Infinity)
-  })
-
-  it('discounts increase monotonically', () => {
-    for (let i = 1; i < VOLUME_DISCOUNTS.length; i++) {
-      expect(VOLUME_DISCOUNTS[i].discount).toBeGreaterThanOrEqual(VOLUME_DISCOUNTS[i - 1].discount)
-    }
-  })
-})
-
-describe('NOTIFY_ROLES', () => {
-  it('notifies designer on design status', () => {
-    expect(NOTIFY_ROLES.design).toContain('designer')
-  })
-
-  it('notifies printer on print status', () => {
-    expect(NOTIFY_ROLES.print).toContain('printer')
-  })
-
-  it('notifies resin_pourer on resin_pouring status', () => {
-    expect(NOTIFY_ROLES.resin_pouring).toContain('resin_pourer')
-  })
-
-  it('notifies assembler on assembly and packaging', () => {
-    expect(NOTIFY_ROLES.assembly).toContain('assembler')
-    expect(NOTIFY_ROLES.packaging).toContain('assembler')
-  })
-
-  it('does not notify for terminal statuses (done, cancelled)', () => {
-    expect(NOTIFY_ROLES.done).toBeUndefined()
-    expect(NOTIFY_ROLES.cancelled).toBeUndefined()
   })
 })

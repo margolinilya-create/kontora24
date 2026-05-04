@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { parseCSV } from '../lib/csv-parser'
 import { createOrder } from '@/features/orders/hooks/useOrders'
-import { calculate } from '@/features/calculator/lib/calculator'
 import { toast } from '@/shared/stores/toast-store'
 import Button from '@/shared/components/Button'
 
@@ -28,11 +27,6 @@ export function SheetsImport() {
 
     for (const row of parsed.rows) {
       try {
-        const calcResult = calculate({
-          width: row.width_mm, height: row.height_mm, qty: row.qty,
-          orderType: row.order_type, needLam: row.need_lam, is3D: row.is_3d,
-        })
-
         await createOrder({
           order_type: row.order_type,
           width_mm: row.width_mm,
@@ -44,11 +38,8 @@ export function SheetsImport() {
           film_type: row.film_type || 'white',
           deadline: row.deadline || null,
           notes: row.notes || '',
-          price_final: row.price_final || calcResult.priceFinal,
-          price_per_unit: row.price_final ? Math.round(row.price_final / row.qty) : calcResult.pricePerUnit,
-          cost_total: calcResult.costTotal,
-          cost_materials: calcResult.costMaterials,
-          markup: calcResult.markup,
+          price_final: row.price_final || null,
+          price_per_unit: row.price_final ? Math.round(row.price_final / row.qty) : null,
         })
         success++
       } catch {

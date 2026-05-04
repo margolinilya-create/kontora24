@@ -3,9 +3,9 @@ import { TechCard } from './TechCard'
 import { toast } from '@/shared/stores/toast-store'
 import { exportAsPNG, exportAsPDF } from '@/shared/lib/html-export'
 
-export function TechCardActions({ order }) {
+export function TechCardActions({ order, defaultOpen = false }) {
   const cardRef = useRef(null)
-  const [showPreview, setShowPreview] = useState(false)
+  const [showPreview, setShowPreview] = useState(defaultOpen)
   const [exporting, setExporting] = useState(false)
 
   async function handlePNG() {

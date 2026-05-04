@@ -44,7 +44,8 @@ export function useOrders(filters = {}) {
         query = query.lte('deadline', filters.deadlineTo)
       }
       if (filters.search) {
-        const s = filters.search.replace(/[,()]/g, '')
+        // Sanitize: remove PostgREST operators and escape SQL LIKE wildcards
+        const s = filters.search.replace(/[,()]/g, '').replace(/[%_\\]/g, '\\$&')
         const num = parseInt(s, 10)
         if (!isNaN(num)) {
           query = query.or(`number.eq.${num},notes.ilike.%${s}%`)
@@ -244,6 +245,14 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
   // 2. Check if stage is complete
   const { isDualTrack, getNextStatus } = await import('@/shared/constants')
 
+  // Get worker's actual role for permission check
+  const { data: workerProfile } = await supabase
+    .from('k24_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  const workerRole = workerProfile?.role || 'post_printer'
+
   let isComplete = false
 
   if (isDualTrack(stage, order)) {
@@ -271,7 +280,7 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
 
   // 3. Auto-advance if complete
   if (isComplete && order) {
-    const nextStatus = getNextStatus('admin', order.status, order)
+    const nextStatus = getNextStatus(workerRole, order.status, order)
     if (nextStatus) {
       await updateOrderStatus(orderId, order.status, nextStatus)
     }

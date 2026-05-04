@@ -78,21 +78,25 @@ export async function addMaterialTransaction({ materialId, delta, reason, orderI
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { error } = await supabase.from('k24_material_transactions').insert({
+  const { data: txn, error } = await supabase.from('k24_material_transactions').insert({
     material_id: materialId,
     delta,
     reason,
     order_id: orderId || null,
     created_by: user.id,
-  })
+  }).select('id').single()
   if (error) throw error
 
-  // Atomic stock update via RPC
+  // Atomic stock update via RPC — rollback transaction record on failure
   const { error: rpcError } = await supabase.rpc('update_stock', {
     p_material_id: materialId,
     p_delta: delta,
   })
-  if (rpcError) throw rpcError
+  if (rpcError) {
+    // Rollback: delete the orphan transaction record
+    await supabase.from('k24_material_transactions').delete().eq('id', txn.id)
+    throw rpcError
+  }
 }
 
 export async function createMaterial({ type, name, unit, stockQty, minQty, pricePerUnit }) {

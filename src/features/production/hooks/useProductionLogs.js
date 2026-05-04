@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { computeStageProgress } from '../lib/production-logs'
@@ -25,7 +25,10 @@ export function useProductionLogs(orderId, targetQty) {
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
-  // Realtime updates
+  // Realtime updates — stable subscription via ref (no re-subscribe on fetchLogs change)
+  const fetchRef = useRef(fetchLogs)
+  useEffect(() => { fetchRef.current = fetchLogs }, [fetchLogs])
+
   useEffect(() => {
     if (!orderId) return
     const channel = supabase
@@ -35,10 +38,10 @@ export function useProductionLogs(orderId, targetQty) {
         schema: 'public',
         table: 'k24_production_logs',
         filter: `order_id=eq.${orderId}`,
-      }, () => fetchLogs())
+      }, () => fetchRef.current())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [orderId, fetchLogs])
+  }, [orderId])
 
   const addLog = useCallback(async (stage, data) => {
     if (!profile) throw new Error('Не авторизован')

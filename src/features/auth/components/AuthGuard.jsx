@@ -18,7 +18,16 @@ export function AuthGuard({ children, roles }) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (roles && profile && !roles.includes(profile.role)) {
+  // Wait for profile to load before checking roles
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    )
+  }
+
+  if (roles && !roles.includes(profile.role)) {
     return <Navigate to="/" replace />
   }
 

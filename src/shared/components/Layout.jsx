@@ -10,6 +10,7 @@ import { useDeadlineAlerts } from '@/shared/hooks/useDeadlineAlerts'
 import { useStageNotifications } from '@/shared/hooks/useStageNotifications'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { ROLES, NAV_ITEMS } from '@/shared/constants'
+import { RoleEmulationBanner } from './RoleEmulationBanner'
 
 const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map(item => [item.path, item.label]))
 
@@ -53,6 +54,7 @@ export function Layout() {
             </Suspense>
           </ErrorBoundary>
         </main>
+        <RoleEmulationBanner />
         <ConfirmDialog
           isOpen={showLogoutConfirm}
           onClose={() => setShowLogoutConfirm(false)}
@@ -111,6 +113,7 @@ export function Layout() {
           </ErrorBoundary>
         </main>
       </div>
+      <RoleEmulationBanner />
     </div>
   )
 }

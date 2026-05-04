@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail, updateOrder } from '../hooks/useOrders'
 import { InfoField } from '../components/InfoField'
 import { EditableField } from '../components/EditableField'
+import { AdminOrderEditor } from '../components/AdminOrderEditor'
 import { StatusSwitcher } from '../components/StatusSwitcher'
 import { DepartmentTimeline } from '../components/DepartmentTimeline'
 import { OrderComments } from '../components/OrderComments'
@@ -22,8 +23,10 @@ import { calculate } from '@/features/calculator/lib/calculator'
 export default function OrderDetailPage() {
   const { id } = useParams()
   const { order, history, loading, refetch } = useOrderDetail(id)
-  const { hasRole } = useAuth()
+  const { hasRole, realRole } = useAuth()
   const isFinance = hasRole(['admin', 'manager'])
+  const isAdmin = realRole === 'admin'
+  const [editing, setEditing] = useState(false)
   const [recalculating, setRecalculating] = useState(false)
   const [showTechCard, setShowTechCard] = useState(false)
   const [showKP, setShowKP] = useState(false)
@@ -134,6 +137,11 @@ export default function OrderDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && (
+            <Button variant={editing ? 'primary' : 'secondary'} onClick={() => setEditing(!editing)}>
+              {editing ? 'Закрыть редактор' : 'Редактировать'}
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setShowTechCard(!showTechCard)}>
             Тех. карта
           </Button>
@@ -155,6 +163,15 @@ export default function OrderDetailPage() {
 
       {/* Department timeline */}
       <DepartmentTimeline order={order} />
+
+      {/* Admin edit mode */}
+      {editing && isAdmin && (
+        <AdminOrderEditor
+          order={order}
+          onSaved={() => { setEditing(false); refetch() }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
 
       {/* Source files link */}
       <div className="bg-surface rounded-xl border border-border p-4 flex items-center gap-3">

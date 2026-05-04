@@ -37,9 +37,6 @@ export const PipelineSummary = memo(function PipelineSummary({ columns, activeSt
     <div className="flex items-center gap-1 flex-wrap bg-surface rounded-xl border border-border px-4 py-2.5">
       {COLS.map((status) => {
         const count = columns[status]?.length || 0
-        // Hide 3D-only columns when empty and not currently active
-        const threeD_only = ['selection_pouring', 'pouring', 'assembly_3d']
-        if (threeD_only.includes(status) && count === 0 && activeStatus !== status) return null
         const isActive = activeStatus === status
 
         return (

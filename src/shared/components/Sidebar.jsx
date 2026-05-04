@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useThemeStore } from '@/shared/stores/theme-store'
@@ -31,10 +31,12 @@ const ICONS = {
   HelpCircle: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
 }
 
-// Nav groups
+// Nav groups — production queues are collapsible
+const PRODUCTION_QUEUE_PATHS = ['/production/design', '/production/prepress', '/production/print', '/production/lamination', '/production/cutting', '/production/pouring', '/production/selection', '/production/assembly3d', '/production/packaging', '/production/otk']
+
 const NAV_GROUPS = [
   { label: 'Управление', paths: ['/', '/orders'] },
-  { label: 'Производство', paths: ['/production', '/production/design', '/production/prepress', '/production/print', '/production/lamination', '/production/cutting', '/production/pouring', '/production/selection', '/production/assembly3d', '/production/packaging', '/production/otk'] },
+  { label: 'Производство', paths: ['/production', ...PRODUCTION_QUEUE_PATHS], collapsible: true, headerPath: '/production', queuePaths: PRODUCTION_QUEUE_PATHS },
   { label: 'Ресурсы', paths: ['/warehouse', '/clients', '/analytics'] },
   { label: 'Система', paths: ['/cabinet', '/reports', '/settings', '/help'] },
 ]
@@ -61,11 +63,20 @@ export function Sidebar({ collapsed }) {
   const lowStockCount = useSidebarStore((s) => s.lowStockCount)
   const fetchCounts = useSidebarStore((s) => s.fetchCounts)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [queuesOpen, setQueuesOpen] = useState(() => localStorage.getItem('sidebar-queues-open') !== 'false')
   const role = profile?.role || 'viewer'
+
+  const toggleQueues = useCallback(() => {
+    setQueuesOpen((prev) => {
+      const next = !prev
+      localStorage.setItem('sidebar-queues-open', next)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     fetchCounts()
-    const interval = setInterval(fetchCounts, 60000) // Reduced from 30s to 60s
+    const interval = setInterval(fetchCounts, 60000)
     return () => clearInterval(interval)
   }, [fetchCounts])
 
@@ -76,6 +87,12 @@ export function Sidebar({ collapsed }) {
     ...group,
     items: visibleItems.filter((item) => group.paths.includes(item.path)),
   })).filter((g) => g.items.length > 0)
+
+  // Total production queue count for collapsed badge
+  const totalQueueCount = PRODUCTION_QUEUE_PATHS.reduce((sum, p) => {
+    const key = COUNT_MAP[p]
+    return sum + (key ? (counts[key] || 0) : 0)
+  }, 0)
 
   return (
     <aside aria-label="Боковая навигация" className={cn(
@@ -94,46 +111,121 @@ export function Sidebar({ collapsed }) {
       <nav aria-label="Основная навигация" className="flex-1 overflow-y-auto py-2 px-2">
         {groupedNav.map((group) => (
           <div key={group.label} className="mb-2">
-            {!collapsed && (
+            {!collapsed && !group.collapsible && (
               <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80">
                 {group.label}
               </p>
             )}
-            {group.items.map((item) => {
-              const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
-              const count = COUNT_MAP[item.path] ? counts[COUNT_MAP[item.path]] : null
-              const hasAlert = item.path === '/warehouse' && lowStockCount > 0
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === '/'}
-                  className={({ isActive }) => cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
-                    isActive
-                      ? 'bg-white/15 text-white font-medium'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
-                  )}
-                >
-                  <span className="relative">
-                    <Icon />
-                    {hasAlert && (
-                      <span role="img" className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" aria-label="Низкий остаток материалов" />
-                    )}
-                  </span>
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1">{item.label}</span>
-                      {count > 0 && (
-                        <span className="bg-accent text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                          {count > 99 ? '99+' : count}
-                        </span>
+            {group.collapsible ? (
+              <>
+                {/* Group label as toggle button */}
+                {!collapsed && (
+                  <button
+                    onClick={toggleQueues}
+                    className="flex items-center w-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80 hover:text-white transition-colors"
+                  >
+                    <span className="flex-1 text-left">{group.label}</span>
+                    <svg
+                      className={cn('w-3 h-3 transition-transform', queuesOpen && 'rotate-180')}
+                      fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                    </svg>
+                  </button>
+                )}
+                {/* Header item (Производство board) — always visible */}
+                {group.items.filter((item) => item.path === group.headerPath).map((item) => {
+                  const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      className={({ isActive }) => cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
+                        isActive ? 'bg-white/15 text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'
                       )}
-                    </>
-                  )}
-                </NavLink>
-              )
-            })}
+                    >
+                      <Icon />
+                      {!collapsed && (
+                        <>
+                          <span className="flex-1">{item.label}</span>
+                          {!queuesOpen && totalQueueCount > 0 && (
+                            <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center">
+                              {totalQueueCount > 99 ? '99+' : totalQueueCount}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  )
+                })}
+                {/* Queue items — collapsible */}
+                {(collapsed || queuesOpen) && group.items
+                  .filter((item) => item.path !== group.headerPath)
+                  .map((item) => {
+                    const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
+                    const count = COUNT_MAP[item.path] ? counts[COUNT_MAP[item.path]] : null
+                    return (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        className={({ isActive }) => cn(
+                          'flex items-center gap-3 rounded-lg text-sm transition-colors min-h-[44px]',
+                          collapsed ? 'px-3 py-2.5' : 'pl-6 pr-3 py-1.5',
+                          isActive ? 'bg-white/15 text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                        )}
+                      >
+                        <Icon />
+                        {!collapsed && (
+                          <>
+                            <span className="flex-1">{item.label}</span>
+                            {count > 0 && (
+                              <span className="bg-accent text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                {count > 99 ? '99+' : count}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </NavLink>
+                    )
+                  })}
+              </>
+            ) : (
+              /* Regular non-collapsible group */
+              group.items.map((item) => {
+                const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
+                const count = COUNT_MAP[item.path] ? counts[COUNT_MAP[item.path]] : null
+                const hasAlert = item.path === '/warehouse' && lowStockCount > 0
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === '/'}
+                    className={({ isActive }) => cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
+                      isActive ? 'bg-white/15 text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    )}
+                  >
+                    <span className="relative">
+                      <Icon />
+                      {hasAlert && (
+                        <span role="img" className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" aria-label="Низкий остаток материалов" />
+                      )}
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1">{item.label}</span>
+                        {count > 0 && (
+                          <span className="bg-accent text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {count > 99 ? '99+' : count}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                )
+              })
+            )}
           </div>
         ))}
       </nav>

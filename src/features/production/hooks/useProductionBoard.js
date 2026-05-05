@@ -20,7 +20,7 @@ export function useProductionBoard() {
   const scrollRef = useRef(null)
   const [scrollState, setScrollState] = useState({ start: true, end: false })
 
-  const { orders: allFetchedOrders, loading, refetch } = useOrders()
+  const { orders: allFetchedOrders, loading, error, refetch } = useOrders()
 
   useEffect(() => {
     async function fetchTodayDone() {
@@ -138,7 +138,7 @@ export function useProductionBoard() {
     search, setSearch,
     activeId, setActiveId,
     scrollRef, scrollState, setScrollState,
-    loading, refetch,
+    loading, error, refetch,
     columns,
     activeOrder,
     total,

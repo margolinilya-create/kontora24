@@ -4,61 +4,76 @@ import { supabase } from '@/shared/lib/supabase'
 export function useClients(search = '') {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchClients = useCallback(async () => {
     setLoading(true)
-    let query = supabase
-      .from('k24_clients')
-      .select('*, orders(created_at)')
-      .order('created_at', { ascending: false })
+    setError(null)
+    try {
+      let query = supabase
+        .from('k24_clients')
+        .select('*, orders(created_at)')
+        .order('created_at', { ascending: false })
 
-    if (search) {
-      const s = search.replace(/[,()]/g, '')
-      query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`)
+      if (search) {
+        const s = search.replace(/[,()]/g, '')
+        query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`)
+      }
+
+      const { data, error: err } = await query
+      if (err) throw err
+      const enriched = (data || []).map((client) => {
+        const orders = client.orders || []
+        const lastOrderDate = orders.length > 0
+          ? orders.reduce((latest, o) => {
+              const d = new Date(o.created_at)
+              return d > latest ? d : latest
+            }, new Date(0)).toISOString()
+          : null
+        const { orders: _omit, ...rest } = client // eslint-disable-line no-unused-vars
+        return { ...rest, last_order_date: lastOrderDate }
+      })
+      setClients(enriched)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
     }
-
-    const { data } = await query
-    // Compute last_order_date from embedded orders
-    const enriched = (data || []).map((client) => {
-      const orders = client.orders || []
-      const lastOrderDate = orders.length > 0
-        ? orders.reduce((latest, o) => {
-            const d = new Date(o.created_at)
-            return d > latest ? d : latest
-          }, new Date(0)).toISOString()
-        : null
-      const { orders: _omit, ...rest } = client // eslint-disable-line no-unused-vars
-      return { ...rest, last_order_date: lastOrderDate }
-    })
-    setClients(enriched)
-    setLoading(false)
   }, [search])
 
   useEffect(() => { fetchClients() }, [fetchClients])
 
-  return { clients, loading, refetch: fetchClients }
+  return { clients, loading, error, refetch: fetchClients }
 }
 
 export function useClientOrders(clientId) {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!clientId) return
     async function fetch() {
       setLoading(true)
-      const { data } = await supabase
-        .from('k24_orders')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false })
-      setOrders(data || [])
-      setLoading(false)
+      setError(null)
+      try {
+        const { data, error: err } = await supabase
+          .from('k24_orders')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
+        if (err) throw err
+        setOrders(data || [])
+      } catch (err) {
+        setError(err)
+      } finally {
+        setLoading(false)
+      }
     }
     fetch()
   }, [clientId])
 
-  return { orders, loading }
+  return { orders, loading, error }
 }
 
 export async function createClient({ name, phone, email, comment, tags }) {

@@ -7,9 +7,10 @@ import { ConsumptionChart } from '../components/ConsumptionChart'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
+import ErrorState from '@/shared/components/ErrorState'
 
 export default function WarehousePage() {
-  const { materials, loading, refetch } = useMaterials()
+  const { materials, loading, error, refetch } = useMaterials()
   const [selectedMaterial, setSelectedMaterial] = useState(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showLowOnly, setShowLowOnly] = useState(false)
@@ -93,6 +94,8 @@ export default function WarehousePage() {
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
+      ) : error ? (
+        <ErrorState error={error} onRetry={refetch} />
       ) : materials.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">
           <p className="text-text-muted">Нет материалов. Запустите seed.sql в Supabase для начальных данных.</p>

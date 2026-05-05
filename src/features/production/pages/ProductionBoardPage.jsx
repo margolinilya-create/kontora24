@@ -9,6 +9,7 @@ import { useProductionBoard } from '../hooks/useProductionBoard'
 import { ORDER_STATUSES } from '@/shared/constants'
 import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
+import ErrorState from '@/shared/components/ErrorState'
 
 const PHASES = [
   { key: 'prep', label: 'Подготовка', cols: ['new', 'design', 'prepress'] },
@@ -228,7 +229,11 @@ export default function ProductionBoardPage() {
             </div>
           )}
 
-          {!board.loading && <DndContext
+          {!board.loading && board.error && (
+            <ErrorState error={board.error} onRetry={board.refetch} />
+          )}
+
+          {!board.loading && !board.error && <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={(e) => board.setActiveId(e.active.id)}

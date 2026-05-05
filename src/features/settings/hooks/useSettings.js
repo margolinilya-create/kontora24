@@ -5,12 +5,21 @@ import { toast } from '@/shared/stores/toast-store'
 export function useSettings(key) {
   const [value, setValue] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchSettings = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('k24_settings').select('value').eq('key', key).single()
-    setValue(data?.value || null)
-    setLoading(false)
+    setError(null)
+    try {
+      const { data, error: err } = await supabase.from('k24_settings').select('value').eq('key', key).single()
+      // PGRST116 = no rows; first-run scenario, not a real error
+      if (err && err.code !== 'PGRST116') throw err
+      setValue(data?.value || null)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
+    }
   }, [key])
 
   useEffect(() => { fetchSettings() }, [fetchSettings])
@@ -24,21 +33,29 @@ export function useSettings(key) {
     toast.success('Настройки сохранены')
   }
 
-  return { value, loading, save: saveSettings, refetch: fetchSettings }
+  return { value, loading, error, save: saveSettings, refetch: fetchSettings }
 }
 
 export function useUsers() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchUsers = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('k24_profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setUsers(data || [])
-    setLoading(false)
+    setError(null)
+    try {
+      const { data, error: err } = await supabase
+        .from('k24_profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (err) throw err
+      setUsers(data || [])
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
@@ -69,5 +86,5 @@ export function useUsers() {
     fetchUsers()
   }
 
-  return { users, loading, updateUserRole, updateUser, refetch: fetchUsers }
+  return { users, loading, error, updateUserRole, updateUser, refetch: fetchUsers }
 }

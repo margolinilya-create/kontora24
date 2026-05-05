@@ -8,12 +8,13 @@ import { MS_PER_DAY } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import SearchInput from '@/shared/components/SearchInput'
 import Spinner from '@/shared/components/Spinner'
+import ErrorState from '@/shared/components/ErrorState'
 
 export default function ClientsPage() {
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const debouncedSearch = useDebounce(search, 300)
-  const { clients, loading, refetch } = useClients(debouncedSearch)
+  const { clients, loading, error, refetch } = useClients(debouncedSearch)
 
   return (
     <div className="space-y-6">
@@ -41,6 +42,8 @@ export default function ClientsPage() {
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
+      ) : error ? (
+        <ErrorState error={error} onRetry={refetch} />
       ) : clients.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">
           <h3 className="text-lg font-semibold mb-1">{search ? 'Ничего не найдено' : 'Нет клиентов'}</h3>

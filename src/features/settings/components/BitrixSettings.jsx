@@ -3,6 +3,7 @@ import { useSettings } from '../hooks/useSettings'
 import { toast } from '@/shared/stores/toast-store'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
+import ErrorState from '@/shared/components/ErrorState'
 
 const FIELD_MAPPING_LABELS = {
   dealTitle: { bitrix: 'Название сделки', kontora: 'Тип заказа' },
@@ -25,7 +26,7 @@ const DEFAULT_BITRIX_CONFIG = {
 }
 
 export function BitrixSettings() {
-  const { value: config, loading, save } = useSettings('bitrix')
+  const { value: config, loading, error, save, refetch } = useSettings('bitrix')
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -67,6 +68,10 @@ export function BitrixSettings() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (error) {
+    return <ErrorState error={error} onRetry={refetch} />
   }
 
   if (loading || !form) {

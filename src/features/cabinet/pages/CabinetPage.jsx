@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
+import ErrorState from '@/shared/components/ErrorState'
 import { toast } from '@/shared/stores/toast-store'
 import { differenceInMinutes } from 'date-fns'
 
@@ -22,7 +23,7 @@ export default function CabinetPage() {
   const { profile } = useAuth()
   const { isOnShift, activeShift, todayMinutes, clockIn, clockOut, loading: shiftLoading } = useShiftTracker()
   const [period, setPeriod] = useState('30')
-  const { stats, loading } = useCabinetStats(period)
+  const { stats, loading, error, refetch } = useCabinetStats(period)
 
   function formatMinutes(min) {
     const h = Math.floor(min / 60)
@@ -89,6 +90,8 @@ export default function CabinetPage() {
 
       {loading ? (
         <div className="flex justify-center py-12"><Spinner /></div>
+      ) : error ? (
+        <ErrorState error={error} onRetry={refetch} />
       ) : (
         <>
           {/* Summary cards */}

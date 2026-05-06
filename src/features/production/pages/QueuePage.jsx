@@ -2,14 +2,16 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { QueueCard } from '../components/QueueCard'
+import { BatchView } from '../components/BatchView'
 import { playNotificationSound } from '@/shared/lib/sound'
 import Spinner from '@/shared/components/Spinner'
+import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 
 const QUEUE_CONFIG = {
-  design: { title: 'Очередь дизайна', subtitle: 'Заказы со статусом «Дизайн»', status: 'design' },
+  design: { title: 'Дизайн', subtitle: 'Разработка макетов', status: 'design' },
   prepress: { title: 'Препресс', subtitle: 'Допечатная подготовка', status: 'prepress' },
-  print: { title: 'Очередь печати', subtitle: 'Заказы со статусом «Печать»', status: 'print' },
+  print: { title: 'Печать', subtitle: 'Печать на плёнке', status: 'print' },
   lamination: { title: 'Ламинация', subtitle: 'Ламинация плёнки', status: 'lamination' },
   cutting: { title: 'Резка', subtitle: 'Плоттерная резка', status: 'cutting' },
   selection_pouring: { title: 'Выборка / Заливка', subtitle: 'Выборка фонов и заливка', status: 'selection_pouring' },
@@ -50,12 +52,13 @@ function sortOrders(orders, sortBy) {
   })
 }
 
-export default function QueuePage({ queueType, hideHeader }) {
+export default function QueuePage({ queueType, hideHeader, enableBatchView = false }) {
   const config = QUEUE_CONFIG[queueType]
   const { profile } = useAuth()
   const { orders: allOrders, loading, refetch } = useOrders({ statuses: [config.status] })
   const [showMine, setShowMine] = useState(false)
   const [sortBy, setSortBy] = useState('deadline')
+  const [viewMode, setViewMode] = useState('list')
 
   const orders = useMemo(() => {
     let filtered = allOrders
@@ -96,7 +99,14 @@ export default function QueuePage({ queueType, hideHeader }) {
               Нажмите «Взять» чтобы назначить заказ на себя. Кнопка «Записать» — для внесения отчёта о проделанной работе.
             </OnboardingTip>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {enableBatchView && (
+              <Tabs
+                items={[{ key: 'list', label: 'Список' }, { key: 'batch', label: 'Группировка' }]}
+                active={viewMode}
+                onChange={setViewMode}
+              />
+            )}
             <button
               onClick={() => setShowMine(!showMine)}
               aria-pressed={showMine}
@@ -122,7 +132,9 @@ export default function QueuePage({ queueType, hideHeader }) {
         </div>
       )}
 
-      {loading ? (
+      {enableBatchView && viewMode === 'batch' ? (
+        <BatchView orders={orders} onUpdated={refetch} />
+      ) : loading ? (
         <div className="flex justify-center py-12">
           <Spinner />
         </div>

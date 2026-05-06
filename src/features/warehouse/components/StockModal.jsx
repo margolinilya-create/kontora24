@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { addMaterialTransaction, useMaterialTransactions } from '../hooks/useMaterials'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { formatNumber, formatDateTime } from '@/shared/lib/utils'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
@@ -30,7 +31,7 @@ export function StockModal({ material, onClose, onDone }) {
       toast.success(isExpense ? 'Списано' : 'Оприходовано')
       onDone()
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setLoading(false)
     }

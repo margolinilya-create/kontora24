@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createClient } from '../hooks/useClients'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
@@ -21,7 +22,7 @@ export function ClientForm({ onClose, onCreated }) {
       const client = await createClient(form)
       onCreated(client)
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setLoading(false)
     }

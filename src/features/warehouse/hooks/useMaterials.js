@@ -25,7 +25,7 @@ export function useMaterials() {
       reservations = results[1].data
       if (results[0].error) throw results[0].error
     } catch (err) {
-      setError(err.message || 'Ошибка загрузки материалов')
+      setError(err)
       setLoading(false)
       return
     }

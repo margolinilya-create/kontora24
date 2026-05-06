@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { COLS } from '../components/PipelineSummary'
 import { ORDER_STATUSES, getOrderRoute, PRIORITIES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
 
@@ -114,7 +115,7 @@ export function useProductionBoard() {
             await updateOrderStatus(orderId, currentStatus, nextStep)
             currentStatus = nextStep
           } catch (stepErr) {
-            toast.error(`Заказ #${order.number} остановлен на "${ORDER_STATUSES[currentStatus]?.label || currentStatus}": ${stepErr.message}`)
+            toast.error(`Не удалось обновить "${ORDER_STATUSES[currentStatus]?.label || currentStatus}": ${translateError(stepErr).message}`)
             return
           }
         }
@@ -124,7 +125,7 @@ export function useProductionBoard() {
 
       toast.success(`Заказ #${order.number} → ${ORDER_STATUSES[targetStatus]?.label}`)
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setPendingMove(null)
       refetch()

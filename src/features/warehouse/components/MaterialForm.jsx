@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createMaterial } from '../hooks/useMaterials'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
@@ -28,7 +29,7 @@ export function MaterialForm({ onClose, onCreated }) {
       toast.success('Материал добавлен')
       onCreated()
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setLoading(false)
     }

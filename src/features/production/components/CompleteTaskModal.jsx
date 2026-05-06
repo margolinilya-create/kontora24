@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { getNextStatus, MS_PER_MINUTE } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
 
@@ -74,7 +75,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
       onCompleted?.()
       onClose()
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setSaving(false)
     }

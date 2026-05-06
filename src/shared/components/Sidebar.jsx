@@ -77,7 +77,7 @@ function Badge({ count, size = 'sm' }) {
   )
 }
 
-function NavItem({ item, counts, lowStockCount, collapsed, indent }) {
+function NavItem({ item, counts, lowStockCount, collapsed, indent, isHelper }) {
   const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
   const count = COUNT_MAP[item.path] ? counts[COUNT_MAP[item.path]] : null
   const hasAlert = item.path === '/warehouse' && lowStockCount > 0
@@ -86,12 +86,14 @@ function NavItem({ item, counts, lowStockCount, collapsed, indent }) {
     <NavLink
       to={item.path}
       end={item.path === '/'}
+      title={isHelper ? `${item.label} (помощь)` : undefined}
       className={({ isActive }) => cn(
         'group relative flex items-center gap-2.5 rounded-lg text-[13px] transition-all min-h-[40px]',
         collapsed ? 'px-3 py-2 justify-center' : indent ? 'pl-9 pr-3 py-1.5' : 'px-3 py-2',
         isActive
           ? 'bg-white/12 text-white font-medium'
-          : 'text-white/60 hover:bg-white/8 hover:text-white/90'
+          : 'text-white/60 hover:bg-white/8 hover:text-white/90',
+        isHelper && !isActive && 'opacity-55 hover:opacity-100'
       )}
     >
       {({ isActive }) => (
@@ -224,6 +226,7 @@ export function Sidebar({ collapsed }) {
                     counts={counts}
                     lowStockCount={lowStockCount}
                     collapsed={collapsed}
+                    isHelper={item.helperRoles?.includes(role)}
                   />
                 ))}
 
@@ -236,6 +239,7 @@ export function Sidebar({ collapsed }) {
                   lowStockCount={lowStockCount}
                   collapsed={collapsed}
                   indent={hasHeader}
+                  isHelper={item.helperRoles?.includes(role)}
                 />
               ))}
             </div>

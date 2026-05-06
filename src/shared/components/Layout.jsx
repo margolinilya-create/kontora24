@@ -2,14 +2,12 @@ import { useState, useEffect, Suspense } from 'react'
 import { Outlet, useLocation, Link } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { ErrorBoundary } from './ErrorBoundary'
-import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import Spinner from '@/shared/components/Spinner'
 import { useSidebarStore } from '@/shared/stores/sidebar-store'
 import { cn } from '@/shared/lib/utils'
 import { useDeadlineAlerts } from '@/shared/hooks/useDeadlineAlerts'
 import { useStageNotifications } from '@/shared/hooks/useStageNotifications'
-import { useAuth } from '@/features/auth/hooks/useAuth'
-import { ROLES, NAV_ITEMS } from '@/shared/constants'
+import { NAV_ITEMS } from '@/shared/constants'
 import { RoleEmulationBanner } from './RoleEmulationBanner'
 
 const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map(item => [item.path, item.label]))
@@ -19,7 +17,6 @@ export function Layout() {
   const toggleCollapsed = useSidebarStore((s) => s.toggleCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
-  const { profile, signOut } = useAuth()
 
   useDeadlineAlerts()
   useStageNotifications()
@@ -29,43 +26,6 @@ export function Layout() {
   // Get page title from path (handle /orders/:id etc)
   const basePath = '/' + (location.pathname.split('/').filter(Boolean).slice(0, 2).join('/') || '')
   const pageTitle = PAGE_TITLES[location.pathname] || PAGE_TITLES[basePath] || PAGE_TITLES['/' + location.pathname.split('/')[1]] || ''
-
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-
-  // Simplified layout for worker roles
-  const isWorker = profile && ['designer', 'printer', 'post_printer'].includes(profile.role)
-
-  if (isWorker) {
-    return (
-      <div className="min-h-screen bg-surface-dim">
-        <header className="sticky top-0 z-40 bg-sidebar text-white px-4 py-3 flex items-center justify-between safe-area-top">
-          <div>
-            <span className="font-semibold">{ROLES[profile.role]?.label}</span>
-            <span className="text-white/60 ml-2 text-sm">{profile.display_name}</span>
-          </div>
-          <button onClick={() => setShowLogoutConfirm(true)} className="text-white/60 hover:text-white text-sm min-h-[44px]">
-            Выход
-          </button>
-        </header>
-        <main id="main-content" className="p-4 sm:p-6">
-          <ErrorBoundary>
-            <Suspense fallback={<div className="flex justify-center py-12"><Spinner size="lg" /></div>}>
-              <Outlet />
-            </Suspense>
-          </ErrorBoundary>
-        </main>
-        <RoleEmulationBanner />
-        <ConfirmDialog
-          isOpen={showLogoutConfirm}
-          onClose={() => setShowLogoutConfirm(false)}
-          onConfirm={() => { setShowLogoutConfirm(false); signOut() }}
-          title="Выйти?"
-          message="Вы уверены, что хотите выйти?"
-          confirmText="Выйти"
-        />
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-surface-dim">

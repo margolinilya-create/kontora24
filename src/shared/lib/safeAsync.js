@@ -3,8 +3,20 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from './error-translator'
 
 /**
- * Wrap an async operation: catches throws, sends to Sentry, optionally
- * shows toast and calls onError. Never throws.
+ * Wrapper around try/catch that:
+ * - sends errors to Sentry via captureError
+ * - optionally shows toast (via translateError)
+ * - calls onError callback
+ * - returns { data, error } instead of throwing
+ *
+ * USE WHEN: writing custom action handlers outside data-fetching hooks
+ * where you need all three (Sentry + toast + recovery callback) in one call.
+ *
+ * DON'T USE WHEN:
+ * - Inside data-fetching hooks (useXxx) — use try/catch + setError(err) instead,
+ *   error propagates to UI via ErrorState
+ * - For non-critical RPCs — use safeRpc helper (no toast, log-only)
+ * - For simple toast-on-catch — use direct translateError(err).message in catch
  *
  * @template T
  * @param {() => Promise<T> | T} fn

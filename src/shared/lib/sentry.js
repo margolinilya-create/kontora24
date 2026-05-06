@@ -14,15 +14,20 @@ export async function initSentry() {
 }
 
 /**
- * Capture an error with enriched context (user role, current route).
+ * Capture an error to Sentry with enriched context (route auto-tagged).
  * Use instead of raw console.error in catch blocks.
+ *
+ * @param {Error|string} error
+ * @param {object} [context] - { tags, extra }
+ * @returns {string|null} eventId for support reference, or null if Sentry
+ *                        unavailable. In DEV returns synthetic 'dev-<ts>'.
  */
 export function captureError(error, context = {}) {
   if (import.meta.env.DEV) {
     console.error('[captureError]', error, context)
-    return
+    return `dev-${Date.now()}`
   }
-  if (!SentryModule) return
+  if (!SentryModule) return null
 
   const enriched = {
     tags: {
@@ -32,9 +37,9 @@ export function captureError(error, context = {}) {
     extra: context.extra,
   }
   if (error instanceof Error) {
-    SentryModule.captureException(error, enriched)
+    return SentryModule.captureException(error, enriched)
   } else {
-    SentryModule.captureMessage(String(error), { level: 'error', ...enriched })
+    return SentryModule.captureMessage(String(error), { level: 'error', ...enriched })
   }
 }
 

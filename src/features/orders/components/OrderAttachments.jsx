@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 import { formatRelative } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
@@ -71,8 +72,26 @@ export function OrderAttachments({ orderId }) {
 
   async function handleDelete(attachment) {
     try {
-      await supabase.storage.from('order-files').remove([attachment.file_path])
-      await supabase.from('k24_order_attachments').delete().eq('id', attachment.id)
+      // 1. DB delete первым — если упадёт, файл цел, юзер может повторить
+      const { error: dbError } = await supabase
+        .from('k24_order_attachments')
+        .delete()
+        .eq('id', attachment.id)
+      if (dbError) throw dbError
+
+      // 2. Storage delete вторым — если упадёт, orphan-файл в bucket,
+      // но в UI его уже нет, юзер не пострадает
+      const { error: storageError } = await supabase.storage
+        .from('order-files')
+        .remove([attachment.file_path])
+      if (storageError) {
+        captureError(storageError, {
+          tags: { source: 'OrderAttachments.handleDelete.storage' },
+          extra: { attachmentId: attachment.id, filePath: attachment.file_path },
+        })
+        // НЕ throw — DB-запись уже удалена, юзер увидел "удалено"
+      }
+
       toast.success('Файл удалён')
       fetchFiles()
     } catch (err) {

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { isDualTrack, getNextStatus } from '@/shared/constants'
+import { safeRpc } from '@/shared/lib/safeRpc'
+import { captureError } from '@/shared/lib/sentry'
 
 async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
   for (let i = 0; i <= retries; i++) {
@@ -191,17 +193,19 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
 
   // Auto-deduct materials when entering "print"
   if (toStatus === 'print') {
-    await supabase.rpc('auto_deduct_materials', {
-      p_order_id: orderId,
-      p_changed_by: user.id,
-    })
-    // Convert reservations to consumed
-    await supabase.rpc('consume_reservations', { p_order_id: orderId, p_changed_by: user.id })
+    await safeRpc('auto_deduct_materials',
+      { p_order_id: orderId, p_changed_by: user.id },
+      { source: 'updateOrderStatus.deduct', extra: { orderId, fromStatus, toStatus } })
+    await safeRpc('consume_reservations',
+      { p_order_id: orderId, p_changed_by: user.id },
+      { source: 'updateOrderStatus.consume', extra: { orderId, fromStatus, toStatus } })
   }
 
   // Release reservations when order is cancelled
   if (toStatus === 'cancelled') {
-    await supabase.rpc('release_materials', { p_order_id: orderId, p_changed_by: user.id })
+    await safeRpc('release_materials',
+      { p_order_id: orderId, p_changed_by: user.id },
+      { source: 'updateOrderStatus.release', extra: { orderId, fromStatus, toStatus } })
   }
 
   // Notify Bitrix24 about status change (non-blocking with retry)
@@ -221,7 +225,9 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
         }),
       }).catch(() => {}) // silent fail after all retries
     }
-  } catch { /* ignored */ } // non-critical
+  } catch (err) {
+    captureError(err, { tags: { source: 'updateOrderStatus.notifyBitrix' }, extra: { orderId } })
+  }
 }
 
 /**
@@ -256,27 +262,36 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
 
   let isComplete = false
 
-  if (isDualTrack(stage, order)) {
-    // For dual-track stages on stickerpack3D: both tracks must be complete
-    const [bgResult, stResult] = await Promise.all([
-      supabase.rpc('check_stage_completion', {
+  try {
+    if (isDualTrack(stage, order)) {
+      // For dual-track stages on stickerpack3D: both tracks must be complete
+      const [bgResult, stResult] = await Promise.all([
+        supabase.rpc('check_stage_completion', {
+          p_order_id: orderId,
+          p_stage: stage,
+          p_track: 'backgrounds',
+        }),
+        supabase.rpc('check_stage_completion', {
+          p_order_id: orderId,
+          p_stage: stage,
+          p_track: 'stickers',
+        }),
+      ])
+      isComplete = bgResult.data?.is_complete && stResult.data?.is_complete
+    } else {
+      const { data: result } = await supabase.rpc('check_stage_completion', {
         p_order_id: orderId,
         p_stage: stage,
-        p_track: 'backgrounds',
-      }),
-      supabase.rpc('check_stage_completion', {
-        p_order_id: orderId,
-        p_stage: stage,
-        p_track: 'stickers',
-      }),
-    ])
-    isComplete = bgResult.data?.is_complete && stResult.data?.is_complete
-  } else {
-    const { data: result } = await supabase.rpc('check_stage_completion', {
-      p_order_id: orderId,
-      p_stage: stage,
+      })
+      isComplete = result?.is_complete
+    }
+  } catch (err) {
+    captureError(err, {
+      tags: { source: 'addProductionLogAndCheckAdvance.checkCompletion' },
+      extra: { orderId, stage },
     })
-    isComplete = result?.is_complete
+    // isComplete остаётся false → advance не произойдёт, что безопаснее чем
+    // продолжать с потенциально некорректным значением
   }
 
   // 3. Auto-advance if complete

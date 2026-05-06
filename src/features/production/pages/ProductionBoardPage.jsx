@@ -169,7 +169,7 @@ export default function ProductionBoardPage() {
         <div className="relative">
           <h1 className="text-2xl font-bold">Производство</h1>
           <p className="text-text-muted text-sm">
-            {board.total} {board.total === 1 ? 'заказ' : board.total < 5 ? 'заказа' : 'заказов'} · Выполнено сегодня: {board.todayDone}
+            {board.total} {board.total === 1 ? 'заказ' : board.total < 5 ? 'заказа' : 'заказов'} · Выполнено сегодня: {board.todayDone ?? '—'}
           </p>
           <OnboardingTip id="production-board-intro">
             Перетаскивайте карточки между колонками для смены статуса. Используйте фильтр «Мои» чтобы видеть только свои заказы.

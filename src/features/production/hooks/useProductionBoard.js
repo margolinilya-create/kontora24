@@ -5,6 +5,7 @@ import { COLS } from '../components/PipelineSummary'
 import { ORDER_STATUSES, getOrderRoute, PRIORITIES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
 
@@ -25,14 +26,20 @@ export function useProductionBoard() {
 
   useEffect(() => {
     async function fetchTodayDone() {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const { count } = await supabase
-        .from('k24_order_status_history')
-        .select('*', { count: 'exact', head: true })
-        .eq('to_status', 'done')
-        .gte('created_at', today.toISOString())
-      setTodayDone(count || 0)
+      try {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const { count, error } = await supabase
+          .from('k24_order_status_history')
+          .select('*', { count: 'exact', head: true })
+          .eq('to_status', 'done')
+          .gte('created_at', today.toISOString())
+        if (error) throw error
+        setTodayDone(count ?? 0)
+      } catch (err) {
+        captureError(err, { tags: { source: 'useProductionBoard.fetchTodayDone' } })
+        setTodayDone(null)
+      }
     }
     fetchTodayDone()
   }, [])

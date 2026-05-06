@@ -11,6 +11,7 @@ import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
 import ErrorState from '@/shared/components/ErrorState'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { differenceInMinutes } from 'date-fns'
 
 const PERIOD_TABS = [
@@ -37,11 +38,11 @@ export default function CabinetPage() {
   }
 
   async function handleClockIn() {
-    try { await clockIn(); toast.success('Смена начата') } catch (e) { toast.error(e.message) }
+    try { await clockIn(); toast.success('Смена начата') } catch (e) { toast.error(translateError(e).message) }
   }
 
   async function handleClockOut() {
-    try { await clockOut(); toast.success('Смена завершена') } catch (e) { toast.error(e.message) }
+    try { await clockOut(); toast.success('Смена завершена') } catch (e) { toast.error(translateError(e).message) }
   }
 
   return (

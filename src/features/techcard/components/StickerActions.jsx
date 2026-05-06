@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Sticker } from './Sticker'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import { exportAsPNG, exportAsPDF, printElement } from '@/shared/lib/html-export'
 
@@ -46,7 +47,7 @@ export function StickerActions({ type, order }) {
     try {
       await printElement(stickerRef.current, { scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm' })
     } catch (err) {
-      toast.error(err.message)
+      toast.error(translateError(err).message)
     }
   }
 

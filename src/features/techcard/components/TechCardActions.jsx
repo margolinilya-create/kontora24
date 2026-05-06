@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { TechCard } from './TechCard'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { exportAsPNG, exportAsPDF } from '@/shared/lib/html-export'
 
 export function TechCardActions({ order, defaultOpen = false }) {
@@ -14,7 +15,7 @@ export function TechCardActions({ order, defaultOpen = false }) {
     try {
       await exportAsPNG(cardRef.current, `techcard-${order.number}`, { scale: 2 })
     } catch (err) {
-      toast.error('Ошибка экспорта: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setExporting(false)
     }
@@ -26,7 +27,7 @@ export function TechCardActions({ order, defaultOpen = false }) {
     try {
       await exportAsPDF(cardRef.current, `techcard-${order.number}`, { scale: 2, orientation: 'p', format: 'a4', width: 210, height: 297 })
     } catch (err) {
-      toast.error('Ошибка PDF: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setExporting(false)
     }

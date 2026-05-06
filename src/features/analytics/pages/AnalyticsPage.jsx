@@ -6,6 +6,7 @@ import { ProductionTab } from '../components/ProductionTab'
 import { ResourcesTab } from '../components/ResourcesTab'
 import { formatPrice } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Tabs from '@/shared/components/Tabs'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
@@ -84,7 +85,7 @@ export default function AnalyticsPage() {
                 doc.text(`Kontora24 · ${new Date().toLocaleDateString('ru-RU')}`, 15, 285)
                 doc.save('analytics.pdf')
                 toast.success('PDF экспортирован')
-              } catch (e) { toast.error('Ошибка: ' + e.message) }
+              } catch (e) { toast.error(translateError(e).message) }
             }}
           >
             PDF

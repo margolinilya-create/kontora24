@@ -16,6 +16,7 @@ import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { ProductionJournalTab } from '../components/ProductionJournalTab'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { subDays, startOfDay } from 'date-fns'
 
 const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }) {
@@ -192,7 +193,7 @@ export default function DashboardPage() {
       fetchData()
       fetchWorkerStats()
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setBatchCompleting(false)
     }

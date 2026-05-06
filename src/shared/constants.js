@@ -209,6 +209,7 @@ export const NOTIFY_ROLES = {
   pouring: ['post_printer'],
   assembly_3d: ['post_printer'],
   packaging: ['post_printer'],
+  otk: ['manager'],
 }
 
 // --- Navigation ---
@@ -227,7 +228,7 @@ export const NAV_ITEMS = [
   { path: '/production/selection', label: 'Выборка / Заливка', icon: 'Combine', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'] },
   { path: '/production/assembly3d', label: 'Сборка 3D', icon: 'Hammer', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'] },
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'] },
-  { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin'] },
+  { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'] },
   { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ALL_ROLES },
   { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: ['admin', 'manager'] },
   { path: '/clients', label: 'Клиенты', icon: 'Users', roles: ['admin', 'manager'] },

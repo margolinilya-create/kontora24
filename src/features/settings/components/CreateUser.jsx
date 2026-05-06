@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ROLES } from '@/shared/constants'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 
@@ -32,7 +33,7 @@ export function CreateUser() {
       toast.success(`Пользователь ${form.display_name} создан`)
       setForm({ display_name: '', email: '', password: '', role: 'post_printer' })
     } catch (err) {
-      toast.error(err.message)
+      toast.error(translateError(err).message)
     } finally {
       setSaving(false)
     }

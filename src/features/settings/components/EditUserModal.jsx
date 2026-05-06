@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ROLES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import Modal from '@/shared/components/Modal'
@@ -40,7 +41,7 @@ export function EditUserModal({ user, onClose, onSave }) {
       await onSave(user.id, updates)
       onClose()
     } catch (err) {
-      toast.error(err.message)
+      toast.error(translateError(err).message)
     } finally {
       setSaving(false)
     }

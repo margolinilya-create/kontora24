@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { ROLES } from '@/shared/constants'
 
 export function ProfileCard() {
@@ -20,7 +21,7 @@ export function ProfileCard() {
       if (error) throw error
       toast.success('Имя обновлено')
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setSaving(false)
     }
@@ -38,7 +39,7 @@ export function ProfileCard() {
       toast.success('Пароль изменён')
       setNewPassword('')
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setSaving(false)
     }

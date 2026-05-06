@@ -167,12 +167,26 @@ export async function createOrder(orderData) {
     .single()
   if (error) throw error
 
-  await supabase.from('k24_order_status_history').insert({
+  const { error: historyError } = await supabase.from('k24_order_status_history').insert({
     order_id: data.id, from_status: null, to_status: 'new', changed_by: user.id,
   })
+  if (historyError) throw historyError
 
   // Reserve materials for the new order
-  await supabase.rpc('reserve_materials', { p_order_id: data.id, p_changed_by: user.id })
+  const { error: reserveError } = await supabase.rpc('reserve_materials', {
+    p_order_id: data.id,
+    p_changed_by: user.id,
+  })
+  if (reserveError) {
+    // Order is already inserted in DB. Rollback is complex and could fail too.
+    // Log with partialState flag and propagate — caller will toast user.
+    // TODO: atomic create_order_with_reserve RPC (Phase B).
+    captureError(reserveError, {
+      tags: { source: 'createOrder.reserve' },
+      extra: { orderId: data.id, partialState: true },
+    })
+    throw reserveError
+  }
 
   return data
 }
@@ -187,9 +201,10 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus) {
     .eq('id', orderId)
   if (error) throw error
 
-  await supabase.from('k24_order_status_history').insert({
+  const { error: historyError } = await supabase.from('k24_order_status_history').insert({
     order_id: orderId, from_status: fromStatus, to_status: toStatus, changed_by: user.id,
   })
+  if (historyError) throw historyError
 
   // Auto-deduct materials when entering "print"
   if (toStatus === 'print') {
@@ -277,13 +292,31 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
           p_track: 'stickers',
         }),
       ])
-      isComplete = bgResult.data?.is_complete && stResult.data?.is_complete
+      if (bgResult.error) {
+        captureError(bgResult.error, {
+          tags: { source: 'addProductionLogAndCheckAdvance.checkCompletion.backgrounds' },
+          extra: { orderId, stage },
+        })
+      }
+      if (stResult.error) {
+        captureError(stResult.error, {
+          tags: { source: 'addProductionLogAndCheckAdvance.checkCompletion.stickers' },
+          extra: { orderId, stage },
+        })
+      }
+      isComplete = (bgResult.data?.is_complete ?? false) && (stResult.data?.is_complete ?? false)
     } else {
-      const { data: result } = await supabase.rpc('check_stage_completion', {
+      const { data: result, error: checkError } = await supabase.rpc('check_stage_completion', {
         p_order_id: orderId,
         p_stage: stage,
       })
-      isComplete = result?.is_complete
+      if (checkError) {
+        captureError(checkError, {
+          tags: { source: 'addProductionLogAndCheckAdvance.checkCompletion' },
+          extra: { orderId, stage },
+        })
+      }
+      isComplete = result?.is_complete ?? false
     }
   } catch (err) {
     captureError(err, {

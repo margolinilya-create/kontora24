@@ -17,13 +17,23 @@ export function OrderAttachments({ orderId }) {
   const [deleteTarget, setDeleteTarget] = useState(null)
 
   const fetchFiles = useCallback(async () => {
-    const { data } = await supabase
-      .from('k24_order_attachments')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: false })
-    setFiles(data || [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from('k24_order_attachments')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setFiles(data || [])
+    } catch (err) {
+      captureError(err, {
+        tags: { source: 'OrderAttachments.fetchFiles' },
+        extra: { orderId },
+      })
+      // Fallback: empty list. User sees "Нет файлов" — degraded but not broken.
+    } finally {
+      setLoading(false)
+    }
   }, [orderId])
 
   useEffect(() => { fetchFiles() }, [fetchFiles])

@@ -8,19 +8,17 @@ export function useAuth() {
   const loading = useAuthStore((s) => s.loading)
   const signIn = useAuthStore((s) => s.signIn)
   const signOut = useAuthStore((s) => s.signOut)
-  const emulatedRole = useRoleSwitcherStore((s) => s.emulatedRole)
+  const impersonatedProfile = useRoleSwitcherStore((s) => s.impersonatedProfile)
 
   const realRole = profile?.role
-  const isEmulating = realRole === 'admin' && emulatedRole !== null
+  const isImpersonating = realRole === 'admin' && impersonatedProfile !== null
 
-  // Effective profile — with emulated role if active
+  // Effective profile — full impersonated profile if active, else real
   const effectiveProfile = useMemo(() => {
     if (!profile) return null
-    if (isEmulating) {
-      return { ...profile, role: emulatedRole }
-    }
+    if (isImpersonating) return impersonatedProfile
     return profile
-  }, [profile, isEmulating, emulatedRole])
+  }, [profile, isImpersonating, impersonatedProfile])
 
   const hasRole = (roles) => {
     if (!effectiveProfile) return false
@@ -36,7 +34,7 @@ export function useAuth() {
     signIn,
     signOut,
     hasRole,
-    isEmulating,
+    isImpersonating,
     realRole,
   }
 }

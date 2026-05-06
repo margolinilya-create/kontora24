@@ -1,11 +1,14 @@
 import { create } from 'zustand'
 
+// Admin impersonation: when set, useAuth() returns this profile instead of the
+// real admin profile, so the entire UI (sidebar, guards, cabinet) reflects what
+// the impersonated user sees. Resets on page reload (not persisted).
 export const useRoleSwitcherStore = create((set, get) => ({
-  emulatedRole: null,
+  impersonatedProfile: null,
 
-  setEmulatedRole: (role) => set({ emulatedRole: role }),
+  setImpersonatedProfile: (profile) => set({ impersonatedProfile: profile }),
 
-  resetRole: () => set({ emulatedRole: null }),
+  resetImpersonation: () => set({ impersonatedProfile: null }),
 
-  isEmulating: () => get().emulatedRole !== null,
+  isImpersonating: () => get().impersonatedProfile !== null,
 }))

@@ -12,34 +12,43 @@ export function useShiftTracker() {
   const [activeShift, setActiveShift] = useState(null)
   const [todayMinutes, setTodayMinutes] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchShiftData = useCallback(async () => {
     if (!profile) return
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    setError(null)
+    try {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
 
-    const [activeRes, todayRes] = await Promise.all([
-      // Active shift (started but not ended)
-      supabase
-        .from('k24_shift_entries')
-        .select('*')
-        .eq('worker_id', profile.id)
-        .is('ended_at', null)
-        .order('started_at', { ascending: false })
-        .limit(1),
-      // Today's completed shifts
-      supabase
-        .from('k24_shift_entries')
-        .select('duration_minutes')
-        .eq('worker_id', profile.id)
-        .not('ended_at', 'is', null)
-        .gte('started_at', today.toISOString()),
-    ])
+      const [activeRes, todayRes] = await Promise.all([
+        // Active shift (started but not ended)
+        supabase
+          .from('k24_shift_entries')
+          .select('*')
+          .eq('worker_id', profile.id)
+          .is('ended_at', null)
+          .order('started_at', { ascending: false })
+          .limit(1),
+        // Today's completed shifts
+        supabase
+          .from('k24_shift_entries')
+          .select('duration_minutes')
+          .eq('worker_id', profile.id)
+          .not('ended_at', 'is', null)
+          .gte('started_at', today.toISOString()),
+      ])
+      if (activeRes.error) throw activeRes.error
+      if (todayRes.error) throw todayRes.error
 
-    setActiveShift(activeRes.data?.[0] || null)
-    const totalMinutes = (todayRes.data || []).reduce((sum, s) => sum + (s.duration_minutes || 0), 0)
-    setTodayMinutes(totalMinutes)
-    setLoading(false)
+      setActiveShift(activeRes.data?.[0] || null)
+      const totalMinutes = (todayRes.data || []).reduce((sum, s) => sum + (s.duration_minutes || 0), 0)
+      setTodayMinutes(totalMinutes)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
+    }
   }, [profile])
 
   useEffect(() => { fetchShiftData() }, [fetchShiftData])
@@ -72,6 +81,7 @@ export function useShiftTracker() {
     activeShift,
     todayMinutes,
     loading,
+    error,
     clockIn,
     clockOut,
   }

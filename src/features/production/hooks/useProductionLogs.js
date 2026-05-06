@@ -11,16 +11,24 @@ export function useProductionLogs(orderId, targetQty) {
   const { profile } = useAuth()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchLogs = useCallback(async () => {
     if (!orderId) return
-    const { data } = await supabase
-      .from('k24_production_logs')
-      .select('*, worker:k24_profiles!worker_id(display_name, role)')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: false })
-    setLogs(data || [])
-    setLoading(false)
+    setError(null)
+    try {
+      const { data, error: err } = await supabase
+        .from('k24_production_logs')
+        .select('*, worker:k24_profiles!worker_id(display_name, role)')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false })
+      if (err) throw err
+      setLogs(data || [])
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
+    }
   }, [orderId])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
@@ -63,5 +71,5 @@ export function useProductionLogs(orderId, targetQty) {
     return getStageProgress(stage).isComplete
   }
 
-  return { logs, loading, addLog, getStageProgress, isStageComplete, refetch: fetchLogs }
+  return { logs, loading, error, addLog, getStageProgress, isStageComplete, refetch: fetchLogs }
 }

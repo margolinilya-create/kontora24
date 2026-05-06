@@ -45,9 +45,10 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
           .single()
         if (timerEntry) {
           const durationMinutes = Math.max(1, Math.round((endedAt - new Date(timerEntry.started_at)) / MS_PER_MINUTE))
-          await supabase.from('k24_time_entries')
+          const { error: timerError } = await supabase.from('k24_time_entries')
             .update({ ended_at: endedAt.toISOString(), duration_minutes: durationMinutes })
             .eq('id', savedTimer.entryId)
+          if (timerError) throw timerError
         }
         localStorage.removeItem(TIMER_KEY)
       }
@@ -56,14 +57,19 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
       for (const item of consumption) {
         const qty = Number(item.qty)
         if (!item.materialId || !qty || qty <= 0) continue
-        await supabase.from('k24_material_transactions').insert({
+        const { error: txError } = await supabase.from('k24_material_transactions').insert({
           material_id: item.materialId,
           order_id: order.id,
           delta: -qty,
           reason: `Заказ #${order.number}`,
           created_by: profile.id,
         })
-        await supabase.rpc('update_stock', { p_material_id: item.materialId, p_delta: -qty })
+        if (txError) throw txError
+        const { error: stockError } = await supabase.rpc('update_stock', {
+          p_material_id: item.materialId,
+          p_delta: -qty,
+        })
+        if (stockError) throw stockError
       }
 
       // 3. Change status

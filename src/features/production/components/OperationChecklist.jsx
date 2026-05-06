@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { OPERATION_CHECKLISTS } from '@/shared/constants'
+import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 
 export function OperationChecklist({ order, compact = false }) {
   const operations = OPERATION_CHECKLISTS[order.order_type] || []
@@ -11,9 +14,23 @@ export function OperationChecklist({ order, compact = false }) {
   const completedCount = operations.filter(op => checklist[op]).length
 
   async function toggle(operation) {
-    const updated = { ...checklist, [operation]: !checklist[operation] }
-    setChecklist(updated)
-    await supabase.from('k24_orders').update({ checklist: updated }).eq('id', order.id)
+    const prev = checklist
+    const next = { ...prev, [operation]: !prev[operation] }
+    setChecklist(next)
+
+    const { error } = await supabase
+      .from('k24_orders')
+      .update({ checklist: next })
+      .eq('id', order.id)
+
+    if (error) {
+      setChecklist(prev)
+      toast.error(translateError(error).message)
+      captureError(error, {
+        tags: { source: 'OperationChecklist.toggle' },
+        extra: { orderId: order.id, operationKey: operation },
+      })
+    }
   }
 
   if (compact) {

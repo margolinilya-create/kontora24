@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
+import { captureError } from '@/shared/lib/sentry'
 
 export function useDeadlineAlerts() {
   const hasChecked = useRef(false)
@@ -48,7 +49,7 @@ export function useDeadlineAlerts() {
         // Mark as shown today
         localStorage.setItem(dismissKey, JSON.stringify([...dismissed, ...urgent.map((o) => o.number)]))
       } catch (err) {
-        console.error('Failed to check deadline alerts:', err)
+        captureError(err, { tags: { source: 'useDeadlineAlerts.checkDeadlines' } })
       }
     }
 

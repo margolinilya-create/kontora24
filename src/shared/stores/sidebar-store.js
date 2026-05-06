@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/shared/lib/supabase'
+import { captureError } from '@/shared/lib/sentry'
 
 export const useSidebarStore = create((set) => ({
   collapsed: localStorage.getItem('sidebar-collapsed') === 'true',
@@ -35,7 +36,7 @@ export const useSidebarStore = create((set) => ({
 
       set({ counts, lowStockCount })
     } catch (err) {
-      console.error('Failed to fetch sidebar counts:', err)
+      captureError(err, { tags: { source: 'sidebar-store.fetchCounts' } })
     }
   },
 }))

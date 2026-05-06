@@ -3,6 +3,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { updateOrderStatus } from '../hooks/useOrders'
 import { CAN_CANCEL_ROLES, ORDER_STATUSES, getNextStatus } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
 export function StatusSwitcher({ order, onUpdated }) {
@@ -26,7 +27,7 @@ export function StatusSwitcher({ order, onUpdated }) {
       await updateOrderStatus(order.id, currentStatus, toStatus)
       onUpdated?.()
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setLoading(false)
     }

@@ -70,7 +70,7 @@ export function useOrders(filters = {}) {
       setOrders(data || [])
       setTotalCount(count || 0)
     } catch (err) {
-      setError(err.message)
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -129,7 +129,7 @@ export function useOrderDetail(id) {
       setOrder(orderRes.data)
       setHistory(historyRes.data || [])
     } catch (err) {
-      setError(err.message)
+      setError(err)
     } finally {
       setLoading(false)
     }

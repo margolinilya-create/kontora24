@@ -7,6 +7,7 @@ import { OrderFinanceFields } from './editor/OrderFinanceFields'
 import { supabase } from '@/shared/lib/supabase'
 import Button from '@/shared/components/Button'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 
 const INPUT_CLASS = 'w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50'
 const LABEL_CLASS = 'block text-xs text-text-muted uppercase mb-1'
@@ -127,7 +128,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       toast.success('Заказ обновлён')
       onSaved()
     } catch (err) {
-      toast.error('Ошибка: ' + (err.message || 'Не удалось сохранить'))
+      toast.error(translateError(err).message)
     } finally {
       setSaving(false)
     }

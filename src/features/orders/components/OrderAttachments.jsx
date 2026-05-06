@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { formatRelative } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
@@ -61,7 +62,7 @@ export function OrderAttachments({ orderId }) {
       toast.success('Файл загружен')
       fetchFiles()
     } catch (err) {
-      toast.error('Ошибка загрузки: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -75,7 +76,7 @@ export function OrderAttachments({ orderId }) {
       toast.success('Файл удалён')
       fetchFiles()
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setDeleteTarget(null)
     }

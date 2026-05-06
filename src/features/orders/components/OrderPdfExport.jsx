@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
 import { formatPrice, formatDate } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 
 export function OrderPdfExport({ order }) {
   const [exporting, setExporting] = useState(false)
@@ -119,7 +120,7 @@ export function OrderPdfExport({ order }) {
       doc.save(`order-${order.number}.pdf`)
       toast.success('PDF экспортирован')
     } catch (err) {
-      toast.error('Ошибка PDF: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setExporting(false)
     }

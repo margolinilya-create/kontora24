@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { formatRelative } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
@@ -52,7 +53,7 @@ export function OrderComments({ orderId }) {
       setText('')
       // Don't call fetchComments() — realtime subscription handles it
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setSending(false)
     }

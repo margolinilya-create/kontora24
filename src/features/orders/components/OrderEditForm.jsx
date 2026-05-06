@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { updateOrder, useProfiles } from '../hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import { PRIORITIES } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
@@ -35,7 +36,7 @@ export function OrderEditForm({ order, onSaved }) {
       setEditing(false)
       onSaved?.()
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setSaving(false)
     }

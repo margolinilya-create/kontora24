@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { claimOrder } from '../hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
 export function ClaimButton({ order, onClaimed }) {
@@ -34,7 +35,7 @@ export function ClaimButton({ order, onClaimed }) {
       toast.success(`Заказ #${order.number} взят в работу`)
       onClaimed?.()
     } catch (err) {
-      toast.error('Ошибка: ' + err.message)
+      toast.error(translateError(err).message)
     } finally {
       setClaiming(false)
     }

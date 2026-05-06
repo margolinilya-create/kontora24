@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 
@@ -259,7 +260,7 @@ export default function CreateOrderPage() {
       toast.success(`Заказ ORD-${String(order.number).padStart(4, '0')} создан`)
       navigate(`/orders/${order.id}`)
     } catch (err) {
-      toast.error('Ошибка: ' + (err.message || 'Не удалось создать заказ'))
+      toast.error(translateError(err).message)
     } finally {
       setSubmitting(false)
     }

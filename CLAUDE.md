@@ -179,7 +179,7 @@ src/
       pages/              # ProductionBoardPage (DnD), QueuePage (unified),
                           #   10 очередей: Design, Prepress, Print, Lamination, Cutting,
                           #   Pouring, SelectionPouring, Assembly3d, Packaging, Otk
-      components/         # DraggableCard, QueueCard, TechCardPreview, BatchView,
+      components/         # DraggableCard, QueueCard, BatchView,
                           #   OperationChecklist, CompleteTaskModal, MaterialConsumption,
                           #   ProductionCalendar, PipelineSummary, TaskTimer
         logs/             # ProductionLogForm, ProductionLogHistory, StageProgressBar

@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { TaskTimer } from './TaskTimer'
 import { OperationChecklist } from './OperationChecklist'
-import { TechCardPreview } from './TechCardPreview'
 import { ORDER_TYPES, PRIORITIES, MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
 import { supabase } from '@/shared/lib/supabase'
 // Use simple arithmetic instead of date-fns to avoid pulling it into production board chunk
@@ -30,7 +29,6 @@ function formatDeadline(deadline) {
 }
 
 const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = false }) {
-  const [showTechCard, setShowTechCard] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const now = Date.now()
   const timeInStatus = formatTimeInStatus(order.status_changed_at || order.updated_at)
@@ -47,23 +45,14 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
         {isOverlay ? (
           <span className="font-bold text-accent">#{order.number}</span>
         ) : (
-          <div className="flex items-center gap-1.5">
-            <Link
-              to={`/orders/${order.id}`}
-              className="font-bold text-accent hover:underline"
-              onClick={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              #{order.number}
-            </Link>
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowTechCard(true) }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="text-xs text-text-muted hover:text-accent transition-colors min-h-[44px] px-1"
-            >
-              Тех карта
-            </button>
-          </div>
+          <Link
+            to={`/orders/${order.id}`}
+            className="font-bold text-accent hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            #{order.number}
+          </Link>
         )}
         {!isOverlay && <ClaimButton order={order} onClaimed={onUpdated} />}
       </div>
@@ -136,7 +125,6 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
           )}
         </div>
       </div>
-      {!isOverlay && <TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} />}
     </div>
   )
 })

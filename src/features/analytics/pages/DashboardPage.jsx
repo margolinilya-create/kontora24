@@ -9,7 +9,6 @@ import { TaskTimer } from '@/features/production/components/TaskTimer'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 
 const CompleteTaskModal = lazy(() => import('@/features/production/components/CompleteTaskModal').then(m => ({ default: m.CompleteTaskModal })))
-const TechCardPreview = lazy(() => import('@/features/production/components/TechCardPreview').then(m => ({ default: m.TechCardPreview })))
 import Button from '@/shared/components/Button'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import Tabs from '@/shared/components/Tabs'
@@ -22,15 +21,11 @@ import { subDays, startOfDay } from 'date-fns'
 
 const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }) {
   const [showComplete, setShowComplete] = useState(false)
-  const [showTechCard, setShowTechCard] = useState(false)
 
   return (
     <div className="bg-surface rounded-xl border border-border p-5 mb-3">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Link to={`/orders/${order.id}`} className="text-base font-bold text-accent hover:underline">#{order.number}</Link>
-          <button onClick={() => setShowTechCard(true)} className="text-xs text-text-muted hover:text-accent transition-colors min-h-[44px]">Тех карта</button>
-        </div>
+        <Link to={`/orders/${order.id}`} className="text-base font-bold text-accent hover:underline">#{order.number}</Link>
         <div className="flex items-center gap-2">
           {isMine ? (
             <>
@@ -51,7 +46,6 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
       )}
       {order.client?.name && <p className="text-xs text-text-muted mt-1">{order.client.name}</p>}
       <TaskTimer orderId={order.id} orderStatus={order.status} compact />
-      <Suspense fallback={null}><TechCardPreview orderId={order.id} isOpen={showTechCard} onClose={() => setShowTechCard(false)} /></Suspense>
     </div>
   )
 })

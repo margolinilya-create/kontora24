@@ -2,7 +2,7 @@ import { useTimer, formatElapsed, formatTotalTime } from '../hooks/useTimer'
 import Button from '@/shared/components/Button'
 
 export function TaskTimer({ orderId, orderStatus, compact = false }) {
-  const { isRunning, elapsed, totalMinutes, start, stop } = useTimer(orderId, { tickInterval: compact ? 30000 : 1000 })
+  const { isRunning, elapsed, totalMinutes, start, stop, error: timerError } = useTimer(orderId, { tickInterval: compact ? 30000 : 1000 })
 
   async function handleToggle() {
     if (isRunning) {
@@ -33,25 +33,35 @@ export function TaskTimer({ orderId, orderStatus, compact = false }) {
         {totalMinutes > 0 && !isRunning && (
           <span className="text-xs text-text-muted">{formatTotalTime(totalMinutes)}</span>
         )}
+        {timerError && (
+          <span role="alert" className="text-xs text-danger" title="Обновите страницу">!</span>
+        )}
       </div>
     )
   }
 
   // Full view for detail pages
   return (
-    <div className="flex items-center gap-3">
-      {isRunning && (
-        <span className="text-lg font-mono text-accent font-bold">{formatElapsed(elapsed)}</span>
-      )}
-      <Button
-        variant={isRunning ? 'danger' : 'primary'}
-        size="sm"
-        onClick={handleToggle}
-      >
-        {isRunning ? 'Остановить' : 'Начать работу'}
-      </Button>
-      {totalMinutes > 0 && (
-        <span className="text-sm text-text-muted">Всего: {formatTotalTime(totalMinutes)}</span>
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        {isRunning && (
+          <span className="text-lg font-mono text-accent font-bold">{formatElapsed(elapsed)}</span>
+        )}
+        <Button
+          variant={isRunning ? 'danger' : 'primary'}
+          size="sm"
+          onClick={handleToggle}
+        >
+          {isRunning ? 'Остановить' : 'Начать работу'}
+        </Button>
+        {totalMinutes > 0 && (
+          <span className="text-sm text-text-muted">Всего: {formatTotalTime(totalMinutes)}</span>
+        )}
+      </div>
+      {timerError && (
+        <span role="alert" className="text-xs text-danger">
+          Таймер: статус неизвестен. Обновите страницу.
+        </span>
       )}
     </div>
   )

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { captureError } from '@/shared/lib/sentry'
 import { MS_PER_MINUTE } from '@/shared/constants'
 
 const ACTIVE_TIMER_KEY_PREFIX = 'kontora24_active_timer'
@@ -15,6 +16,7 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
   const [entries, setEntries] = useState([])
   const [activeEntry, setActiveEntry] = useState(null)
   const [elapsed, setElapsed] = useState(0)
+  const [error, setError] = useState(null)
   const intervalRef = useRef(null)
 
   // Load entries + check localStorage for active timer
@@ -22,25 +24,43 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
     if (!orderId) return
 
     async function load() {
-      const { data } = await supabase
-        .from('k24_time_entries')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: false })
-      setEntries(data || [])
-
-      // Check for active timer in localStorage
-      const saved = JSON.parse(localStorage.getItem(ACTIVE_TIMER_KEY) || 'null')
-      if (saved && saved.orderId === orderId && saved.entryId) {
-        const { data: entry } = await supabase
+      // 1. loadEntries — history of entries for this order
+      try {
+        const { data, error: err } = await supabase
           .from('k24_time_entries')
           .select('*')
-          .eq('id', saved.entryId)
-          .single()
-        if (entry && !entry.ended_at) {
-          setActiveEntry(entry)
-        } else {
-          localStorage.removeItem(ACTIVE_TIMER_KEY)
+          .eq('order_id', orderId)
+          .order('created_at', { ascending: false })
+        if (err) throw err
+        setEntries(data || [])
+      } catch (err) {
+        setError(err)
+        captureError(err, { tags: { source: 'useTimer.loadEntries' }, extra: { orderId } })
+      }
+
+      // 2. checkRunning — verify that localStorage-saved active timer still exists in DB
+      const saved = JSON.parse(localStorage.getItem(ACTIVE_TIMER_KEY) || 'null')
+      if (saved && saved.orderId === orderId && saved.entryId) {
+        try {
+          const { data: entry, error: err } = await supabase
+            .from('k24_time_entries')
+            .select('*')
+            .eq('id', saved.entryId)
+            .single()
+          // PGRST116 (no rows) = entry was deleted; valid case, clear localStorage
+          if (err && err.code !== 'PGRST116') throw err
+          if (entry && !entry.ended_at) {
+            setActiveEntry(entry)
+          } else {
+            localStorage.removeItem(ACTIVE_TIMER_KEY)
+          }
+        } catch (err) {
+          setError(err)
+          captureError(err, { tags: { source: 'useTimer.checkRunning' }, extra: { entryId: saved.entryId, orderId } })
+          // Do NOT reset activeEntry or clear localStorage on error.
+          // If we lost connectivity but a timer was running, keep showing it as
+          // running so the user can stop it; clearing here would risk a duplicate
+          // timer being started over an existing one and inflating billable hours.
         }
       }
     }
@@ -96,12 +116,18 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
     localStorage.removeItem(ACTIVE_TIMER_KEY)
 
     // Refresh entries
-    const { data } = await supabase
-      .from('k24_time_entries')
-      .select('*')
-      .eq('order_id', activeEntry.order_id)
-      .order('created_at', { ascending: false })
-    setEntries(data || [])
+    try {
+      const { data, error: refreshErr } = await supabase
+        .from('k24_time_entries')
+        .select('*')
+        .eq('order_id', activeEntry.order_id)
+        .order('created_at', { ascending: false })
+      if (refreshErr) throw refreshErr
+      setEntries(data || [])
+    } catch (err) {
+      setError(err)
+      captureError(err, { tags: { source: 'useTimer.refresh' }, extra: { orderId: activeEntry.order_id } })
+    }
   }, [activeEntry])
 
   const totalMinutes = useMemo(() => entries.reduce((sum, e) => sum + (e.duration_minutes || 0), 0), [entries])
@@ -111,6 +137,7 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
     elapsed, // seconds
     totalMinutes,
     entries,
+    error,
     start,
     stop,
   }

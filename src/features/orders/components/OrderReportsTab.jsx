@@ -10,7 +10,7 @@ import { formatDateTime } from '@/shared/lib/utils'
 export function OrderReportsTab({ order, onUpdated }) {
   const { profile } = useAuth()
   const { logs, getStageProgress, refetch, error: logsError } = useProductionLogs(order.id, order.qty)
-  const { entries } = useTimer(order.id)
+  const { entries, error: timerError } = useTimer(order.id)
 
   const myLogs = logs.filter((l) => l.worker_id === profile?.id)
   const progress = getStageProgress(order.status)
@@ -42,6 +42,11 @@ export function OrderReportsTab({ order, onUpdated }) {
       <div className="bg-surface rounded-xl border border-border p-5">
         <h2 className="font-semibold mb-4">Время работы</h2>
         <TaskTimer orderId={order.id} orderStatus={order.status} />
+        {timerError && (
+          <p role="alert" className="text-xs text-danger mt-2">
+            Не удалось загрузить историю таймера. Обновите страницу.
+          </p>
+        )}
         {entries.length > 0 && (
           <div className="mt-4 space-y-2">
             {entries.map((entry) => (

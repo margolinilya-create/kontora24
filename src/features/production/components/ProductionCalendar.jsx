@@ -3,27 +3,37 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/shared/lib/supabase'
 import { addDays, format, startOfDay, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { captureError } from '@/shared/lib/sentry'
 import Spinner from '@/shared/components/Spinner'
 
 export function ProductionCalendar() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
 
   useEffect(() => {
     async function fetch() {
-      const today = startOfDay(new Date())
-      const endDate = addDays(today, 14)
+      try {
+        const today = startOfDay(new Date())
+        const endDate = addDays(today, 14)
 
-      const { data } = await supabase
-        .from('k24_orders')
-        .select('id, number, order_type, deadline, status, qty, width_mm, height_mm, assigned_to, assignee:k24_profiles!assigned_to(display_name)')
-        .not('status', 'in', '("done","cancelled")')
-        .not('deadline', 'is', null)
-        .lte('deadline', endDate.toISOString().split('T')[0])
-        .order('deadline')
+        const { data, error: err } = await supabase
+          .from('k24_orders')
+          .select('id, number, order_type, deadline, status, qty, width_mm, height_mm, assigned_to, assignee:k24_profiles!assigned_to(display_name)')
+          .not('status', 'in', '("done","cancelled")')
+          .not('deadline', 'is', null)
+          .lte('deadline', endDate.toISOString().split('T')[0])
+          .order('deadline')
+        if (err) throw err
 
-      setOrders(data || [])
-      setLoading(false)
+        setOrders(data || [])
+      } catch (err) {
+        captureError(err, { tags: { source: 'ProductionCalendar.fetchOrders' } })
+        setLoadError(err)
+        setOrders([])
+      } finally {
+        setLoading(false)
+      }
     }
     fetch()
   }, [])
@@ -61,6 +71,11 @@ export function ProductionCalendar() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-lg px-4 py-2 text-sm">
+          Не удалось загрузить дедлайны. Обновите страницу.
+        </div>
+      )}
       {/* Overdue */}
       {overdue.length > 0 && (
         <div className="bg-danger/10 border border-danger/20 rounded-xl p-4">

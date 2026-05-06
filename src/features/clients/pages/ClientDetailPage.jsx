@@ -1,33 +1,50 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/shared/lib/supabase'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatDate, formatRelative } from '@/shared/lib/utils'
+import { captureError } from '@/shared/lib/sentry'
 import Spinner from '@/shared/components/Spinner'
+import ErrorState from '@/shared/components/ErrorState'
 
 export default function ClientDetailPage() {
   const { id } = useParams()
   const [client, setClient] = useState(null)
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
 
-  useEffect(() => {
-    async function fetch() {
-      setLoading(true)
+  const fetchData = useCallback(async () => {
+    if (!id) return
+    setLoading(true)
+    setFetchError(null)
+    try {
       const [clientRes, ordersRes] = await Promise.all([
         supabase.from('k24_clients').select('*').eq('id', id).single(),
         supabase.from('k24_orders').select('*').eq('client_id', id).order('created_at', { ascending: false }),
       ])
+      // PGRST116 на single() = клиент не найден (валидный кейс), не ошибка
+      if (clientRes.error && clientRes.error.code !== 'PGRST116') throw clientRes.error
+      if (ordersRes.error) throw ordersRes.error
       setClient(clientRes.data)
       setOrders(ordersRes.data || [])
+    } catch (err) {
+      captureError(err, { tags: { source: 'ClientDetailPage.fetch' }, extra: { clientId: id } })
+      setFetchError(err)
+    } finally {
       setLoading(false)
     }
-    if (id) fetch()
   }, [id])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   if (loading) {
     return <div className="flex justify-center py-12"><Spinner /></div>
+  }
+
+  if (fetchError) {
+    return <ErrorState error={fetchError} onRetry={fetchData} />
   }
 
   if (!client) {

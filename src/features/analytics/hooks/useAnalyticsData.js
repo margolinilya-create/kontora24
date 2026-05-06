@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
 import { subDays, subMonths, subWeeks, startOfWeek, format, differenceInHours, getISOWeek } from 'date-fns'
@@ -13,10 +13,12 @@ export const PERIODS = [
 export function useAnalyticsData(period) {
   const [data, setData] = useState({ orders: [], statusHistory: [], materialTx: [], prevOrders: [] })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    async function fetch() {
-      setLoading(true)
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
       const periodDef = PERIODS.find((p) => p.key === period) || PERIODS[1]
       const startDate = periodDef.getStart()
       const periodMs = Date.now() - startDate.getTime()
@@ -26,8 +28,12 @@ export function useAnalyticsData(period) {
         supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', startDate.toISOString()).limit(1000),
         supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', startDate.toISOString()).limit(5000),
         supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', startDate.toISOString()).limit(5000),
-        period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', startDate.toISOString()).limit(1000) : Promise.resolve({ data: [] }),
+        period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', startDate.toISOString()).limit(1000) : Promise.resolve({ data: [], error: null }),
       ])
+      if (ordersRes.error) throw ordersRes.error
+      if (historyRes.error) throw historyRes.error
+      if (matTxRes.error) throw matTxRes.error
+      if (prevOrdersRes.error) throw prevOrdersRes.error
 
       setData({
         orders: ordersRes.data || [],
@@ -35,10 +41,14 @@ export function useAnalyticsData(period) {
         materialTx: matTxRes.data || [],
         prevOrders: prevOrdersRes.data || [],
       })
+    } catch (err) {
+      setError(err)
+    } finally {
       setLoading(false)
     }
-    fetch()
   }, [period])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   const orders = data.orders
   const doneOrders = useMemo(() => orders.filter((o) => o.status === 'done'), [orders])
@@ -159,6 +169,8 @@ export function useAnalyticsData(period) {
 
   return {
     loading,
+    error,
+    refetch: fetchData,
     orders,
     doneOrders,
     revenue,

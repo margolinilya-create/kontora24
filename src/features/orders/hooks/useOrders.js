@@ -144,16 +144,27 @@ export function useOrderDetail(id) {
 
 export function useProfiles(role) {
   const [profiles, setProfiles] = useState([])
+  const [error, setError] = useState(null)
   useEffect(() => {
     async function fetch() {
-      let query = supabase.from('k24_profiles').select('id, display_name, role')
-      if (role) query = query.eq('role', role)
-      const { data } = await query.order('display_name')
-      setProfiles(data || [])
+      try {
+        let query = supabase.from('k24_profiles').select('id, display_name, role')
+        if (role) query = query.eq('role', role)
+        const { data, error: err } = await query.order('display_name')
+        if (err) throw err
+        setProfiles(data || [])
+        setError(null)
+      } catch (err) {
+        setError(err)
+        captureError(err, {
+          tags: { source: 'useProfiles' },
+          extra: { role },
+        })
+      }
     }
     fetch()
   }, [role])
-  return profiles
+  return { profiles, error }
 }
 
 export async function createOrder(orderData) {

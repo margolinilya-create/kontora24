@@ -9,7 +9,7 @@ import { formatDateTime } from '@/shared/lib/utils'
 
 export function OrderReportsTab({ order, onUpdated }) {
   const { profile } = useAuth()
-  const { logs, getStageProgress, refetch } = useProductionLogs(order.id, order.qty)
+  const { logs, getStageProgress, refetch, error: logsError } = useProductionLogs(order.id, order.qty)
   const { entries } = useTimer(order.id)
 
   const myLogs = logs.filter((l) => l.worker_id === profile?.id)
@@ -24,6 +24,11 @@ export function OrderReportsTab({ order, onUpdated }) {
 
   return (
     <div className="space-y-6">
+      {logsError && (
+        <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-lg px-3 py-2 text-sm">
+          Не удалось загрузить логи производства
+        </div>
+      )}
       {/* Log form for current stage */}
       {canLog && (
         <ProductionLogForm

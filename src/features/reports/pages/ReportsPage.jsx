@@ -45,8 +45,9 @@ export default function ReportsPage() {
 }
 
 function WorkScheduleReport({ period }) {
-  const { data, loading } = useWorkSchedule(period)
+  const { data, loading, error } = useWorkSchedule(period)
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
+  if (error) return <ReportError text="Не удалось загрузить график" />
   if (data.length === 0) return <Empty text="Нет данных по сменам" />
 
   function handleExport() {
@@ -94,8 +95,9 @@ function WorkScheduleReport({ period }) {
 }
 
 function OrdersCostReport({ period }) {
-  const { data, loading } = useOrdersCostReport(period)
+  const { data, loading, error } = useOrdersCostReport(period)
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
+  if (error) return <ReportError text="Не удалось загрузить отчёт по заказам" />
   if (data.length === 0) return <Empty text="Нет заказов" />
 
   function handleExport() {
@@ -151,8 +153,9 @@ function OrdersCostReport({ period }) {
 }
 
 function BonusReport({ period }) {
-  const { data, loading } = useBonusReport(period)
+  const { data, loading, error } = useBonusReport(period)
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
+  if (error) return <ReportError text="Не удалось загрузить отчёт по премиям" />
   if (data.length === 0) return <Empty text="Нет данных по премиям" />
 
   function handleExport() {
@@ -205,8 +208,9 @@ function BonusReport({ period }) {
 }
 
 function QualityReport({ period }) {
-  const { data, loading } = useQualityReport(period)
+  const { data, loading, error } = useQualityReport(period)
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
+  if (error) return <ReportError text="Не удалось загрузить отчёт по качеству" />
   if (data.length === 0) return <Empty text="Нет данных по качеству" />
 
   function handleExport() {
@@ -263,6 +267,14 @@ function Empty({ text }) {
   return (
     <div className="bg-surface rounded-xl border border-border p-12 text-center">
       <p className="text-text-muted">{text}</p>
+    </div>
+  )
+}
+
+function ReportError({ text }) {
+  return (
+    <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-6 text-center">
+      <p className="text-sm">{text}</p>
     </div>
   )
 }

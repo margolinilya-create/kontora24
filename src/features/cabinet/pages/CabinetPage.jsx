@@ -22,7 +22,7 @@ const PERIOD_TABS = [
 
 export default function CabinetPage() {
   const { profile } = useAuth()
-  const { isOnShift, activeShift, todayMinutes, clockIn, clockOut, loading: shiftLoading } = useShiftTracker()
+  const { isOnShift, activeShift, todayMinutes, clockIn, clockOut, loading: shiftLoading, error: shiftError } = useShiftTracker()
   const [period, setPeriod] = useState('30')
   const { stats, loading, error, refetch } = useCabinetStats(period)
 
@@ -54,6 +54,11 @@ export default function CabinetPage() {
 
       {/* Shift tracker */}
       <div className="bg-surface rounded-xl border border-border p-6">
+        {shiftError && (
+          <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-lg px-3 py-2 mb-3 text-sm">
+            Не удалось загрузить статус смены
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold mb-1">Смена</h2>

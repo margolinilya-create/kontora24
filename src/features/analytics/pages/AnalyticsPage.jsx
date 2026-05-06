@@ -10,6 +10,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import Tabs from '@/shared/components/Tabs'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
+import ErrorState from '@/shared/components/ErrorState'
 
 const TABS = [
   { key: 'finance', label: 'Финансы' },
@@ -42,6 +43,10 @@ export default function AnalyticsPage() {
         <Spinner />
       </div>
     )
+  }
+
+  if (analytics.error) {
+    return <ErrorState error={analytics.error} onRetry={analytics.refetch} />
   }
 
   return (

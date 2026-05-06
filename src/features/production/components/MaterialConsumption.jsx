@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import Modal from '@/shared/components/Modal'
@@ -15,18 +16,29 @@ export function MaterialConsumption({ order }) {
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ materialId: '', qty: '' })
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState(null)
 
   const loadData = useCallback(async () => {
-    const [matRes, txRes] = await Promise.all([
-      supabase.from('k24_materials').select('*').order('name'),
-      supabase.from('k24_material_transactions')
-        .select('*, material:k24_materials(name, unit, type)')
-        .eq('order_id', order.id)
-        .lt('delta', 0)
-        .order('created_at', { ascending: false }),
-    ])
-    setMaterials(matRes.data || [])
-    setConsumed(txRes.data || [])
+    setLoadError(null)
+    try {
+      const [matRes, txRes] = await Promise.all([
+        supabase.from('k24_materials').select('*').order('name'),
+        supabase.from('k24_material_transactions')
+          .select('*, material:k24_materials(name, unit, type)')
+          .eq('order_id', order.id)
+          .lt('delta', 0)
+          .order('created_at', { ascending: false }),
+      ])
+      if (matRes.error) throw matRes.error
+      if (txRes.error) throw txRes.error
+      setMaterials(matRes.data || [])
+      setConsumed(txRes.data || [])
+    } catch (err) {
+      captureError(err, { tags: { source: 'MaterialConsumption.loadData' }, extra: { orderId: order.id } })
+      setLoadError(err)
+      setMaterials([])
+      setConsumed([])
+    }
   }, [order.id])
 
   useEffect(() => {
@@ -70,9 +82,14 @@ export function MaterialConsumption({ order }) {
 
   return (
     <div className="bg-surface rounded-xl border border-border p-5">
+      {loadError && (
+        <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-lg px-3 py-2 mb-3 text-sm">
+          Не удалось загрузить материалы. Списание недоступно.
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold">Расход материалов</h2>
-        <Button variant="secondary" size="sm" onClick={() => setShowForm(true)}>
+        <Button variant="secondary" size="sm" onClick={() => setShowForm(true)} disabled={!!loadError}>
           Записать расход
         </Button>
       </div>

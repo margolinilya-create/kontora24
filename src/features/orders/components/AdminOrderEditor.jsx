@@ -8,6 +8,7 @@ import { supabase } from '@/shared/lib/supabase'
 import Button from '@/shared/components/Button'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 
 const INPUT_CLASS = 'w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50'
 const LABEL_CLASS = 'block text-xs text-text-muted uppercase mb-1'
@@ -16,6 +17,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   const [form, setForm] = useState({})
   const [clients, setClients] = useState([])
   const [profiles, setProfiles] = useState([])
+  const [listsError, setListsError] = useState(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -65,12 +67,22 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
 
   useEffect(() => {
     async function fetchLists() {
-      const [clientsRes, profilesRes] = await Promise.all([
-        supabase.from('k24_clients').select('id, name').order('name'),
-        supabase.from('k24_profiles').select('id, display_name, role').order('display_name'),
-      ])
-      setClients(clientsRes.data || [])
-      setProfiles(profilesRes.data || [])
+      try {
+        const [clientsRes, profilesRes] = await Promise.all([
+          supabase.from('k24_clients').select('id, name').order('name'),
+          supabase.from('k24_profiles').select('id, display_name, role').order('display_name'),
+        ])
+        if (clientsRes.error) throw clientsRes.error
+        if (profilesRes.error) throw profilesRes.error
+        setClients(clientsRes.data || [])
+        setProfiles(profilesRes.data || [])
+        setListsError(null)
+      } catch (err) {
+        captureError(err, { tags: { source: 'AdminOrderEditor.fetchLists' } })
+        setListsError(err)
+        setClients([])
+        setProfiles([])
+      }
     }
     fetchLists()
   }, [])
@@ -136,6 +148,11 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
 
   return (
     <div className="bg-surface rounded-xl border-2 border-accent/30 p-5 space-y-6">
+      {listsError && (
+        <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-lg px-3 py-2 text-sm">
+          Не удалось загрузить списки клиентов и исполнителей. Изменения этих полей могут быть недоступны.
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-lg flex items-center gap-2">
           <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">

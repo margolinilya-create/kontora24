@@ -12,7 +12,7 @@ export function OrderStageInput({ order, onUpdated }) {
   const { profile } = useAuth()
   const stage = order.status
   const config = STAGE_FIELDS[stage]
-  const { logs, getStageProgress } = useProductionLogs(order.id, order.qty)
+  const { logs, getStageProgress, error: logsError } = useProductionLogs(order.id, order.qty)
   const [showHistory, setShowHistory] = useState(false)
 
   const canWork = profile && canWorkOnStage(profile.role, stage)
@@ -32,7 +32,13 @@ export function OrderStageInput({ order, onUpdated }) {
 
       <StageProgressBar progress={progress} />
 
-      {canWork && (
+      {logsError && (
+        <div role="alert" className="text-xs text-danger bg-danger/10 border border-danger/30 rounded px-2 py-1">
+          Не удалось загрузить историю записей
+        </div>
+      )}
+
+      {canWork && !logsError && (
         <ProductionLogForm
           stage={stage}
           progress={progress}

@@ -8,7 +8,7 @@ import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
 import { formatDate } from '@/shared/lib/utils'
 
 export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
-  const { getStageProgress } = useProductionLogs(order.id, order.qty)
+  const { getStageProgress, error: logsError } = useProductionLogs(order.id, order.qty)
   const progress = getStageProgress(order.status)
 
   const deadlineDate = order.deadline ? new Date(order.deadline) : null
@@ -56,7 +56,7 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
       )}
 
       {/* Progress */}
-      <StageProgressBar progress={progress} compact />
+      {!logsError && <StageProgressBar progress={progress} compact />}
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1" onClick={(e) => e.preventDefault()}>

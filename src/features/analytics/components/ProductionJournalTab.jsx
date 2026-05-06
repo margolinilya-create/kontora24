@@ -4,6 +4,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES } from '@/shared/constants'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { captureError } from '@/shared/lib/sentry'
 import Spinner from '@/shared/components/Spinner'
 
 const STAGE_FILTERS = [
@@ -86,6 +87,7 @@ export function ProductionJournalTab() {
   const [profiles, setProfiles] = useState([])
   const [materialPrices, setMaterialPrices] = useState({})
   const [loading, setLoading] = useState(true)
+  const [tabError, setTabError] = useState(null)
 
   // Filters
   const [dateFrom, setDateFrom] = useState('')
@@ -96,43 +98,57 @@ export function ProductionJournalTab() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const queries = [
-      supabase
-        .from('k24_orders')
-        .select('id, number, order_type, status, qty, width_mm, height_mm, film_type, lam_type, client:k24_clients(name), deadline, created_at')
-        .neq('status', 'cancelled')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('k24_production_logs')
-        .select('*, worker:k24_profiles!worker_id(display_name)')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('k24_profiles')
-        .select('id, display_name, role')
-        .in('role', ['designer', 'printer', 'post_printer']),
-    ]
-    if (isFinanceVisible) {
-      queries.push(
+    setTabError(null)
+    try {
+      const queries = [
         supabase
-          .from('k24_materials')
-          .select('type, price_per_unit')
-          .in('type', ['film', 'lam_film', 'resin'])
-      )
-    }
-    const results = await Promise.all(queries)
-    setOrders(results[0].data || [])
-    setLogs(results[1].data || [])
-    setProfiles(results[2].data || [])
-    if (isFinanceVisible && results[3]) {
-      const prices = {}
-      for (const m of results[3].data || []) {
-        if (!prices[m.type] || m.price_per_unit > 0) {
-          prices[m.type] = Number(m.price_per_unit) || 0
-        }
+          .from('k24_orders')
+          .select('id, number, order_type, status, qty, width_mm, height_mm, film_type, lam_type, client:k24_clients(name), deadline, created_at')
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('k24_production_logs')
+          .select('*, worker:k24_profiles!worker_id(display_name)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('k24_profiles')
+          .select('id, display_name, role')
+          .in('role', ['designer', 'printer', 'post_printer']),
+      ]
+      if (isFinanceVisible) {
+        queries.push(
+          supabase
+            .from('k24_materials')
+            .select('type, price_per_unit')
+            .in('type', ['film', 'lam_film', 'resin'])
+        )
       }
-      setMaterialPrices(prices)
+      const results = await Promise.all(queries)
+      for (const r of results) {
+        if (r.error) throw r.error
+      }
+      setOrders(results[0].data || [])
+      setLogs(results[1].data || [])
+      setProfiles(results[2].data || [])
+      if (isFinanceVisible && results[3]) {
+        const prices = {}
+        for (const m of results[3].data || []) {
+          if (!prices[m.type] || m.price_per_unit > 0) {
+            prices[m.type] = Number(m.price_per_unit) || 0
+          }
+        }
+        setMaterialPrices(prices)
+      }
+    } catch (err) {
+      captureError(err, { tags: { source: 'ProductionJournalTab.fetchData' } })
+      setTabError(err)
+      setOrders([])
+      setLogs([])
+      setProfiles([])
+      setMaterialPrices({})
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [isFinanceVisible])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -193,6 +209,11 @@ export function ProductionJournalTab() {
 
   return (
     <div className="space-y-4">
+      {tabError && (
+        <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-lg px-4 py-2 text-sm">
+          Не удалось загрузить журнал производства. Попробуйте обновить страницу.
+        </div>
+      )}
       {/* Filters */}
       <div className="bg-surface rounded-xl border border-border p-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">

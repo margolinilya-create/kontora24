@@ -17,7 +17,7 @@ export function OrderEditForm({ order, onSaved }) {
   const [saving, setSaving] = useState(false)
 
   // Load profiles for assignee dropdown
-  const profiles = useProfiles()
+  const { profiles, error: profilesError } = useProfiles()
 
   function update(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -61,7 +61,14 @@ export function OrderEditForm({ order, onSaved }) {
       </div>
 
       <div>
-        <label htmlFor="edit-assignee" className="block text-sm font-medium mb-1.5">Исполнитель</label>
+        <label htmlFor="edit-assignee" className="block text-sm font-medium mb-1.5">
+          Исполнитель
+          {profilesError && (
+            <span className="text-xs text-danger ml-2" role="alert">
+              Не удалось загрузить список
+            </span>
+          )}
+        </label>
         <select
           id="edit-assignee"
           value={form.assigned_to}

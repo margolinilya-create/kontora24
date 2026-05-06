@@ -17,6 +17,7 @@ import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { ProductionJournalTab } from '../components/ProductionJournalTab'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfDay } from 'date-fns'
 
 const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }) {
@@ -81,6 +82,7 @@ export default function DashboardPage() {
 
   const [data, setData] = useState({ orders: [], statusCounts: {}, lowStock: [], allMaterials: [], myOrders: [], deadlines: [], activity: [] })
   const [loading, setLoading] = useState(true)
+  const [dataError, setDataError] = useState(null)
   const [workerStats, setWorkerStats] = useState({ todayDone: 0, weekDone: 0 })
   const [batchCompleting, setBatchCompleting] = useState(false)
   const [showBatchConfirm, setShowBatchConfirm] = useState(false)
@@ -88,30 +90,41 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [ordersRes, materialsRes, activityRes] = await Promise.all([
-      supabase.from('k24_orders').select('*, client:k24_clients(name)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('k24_materials').select('*'),
-      supabase.from('k24_order_status_history').select('*, changed_by_profile:k24_profiles!changed_by(display_name), order:k24_orders!order_id(number)').order('created_at', { ascending: false }).limit(15),
-    ])
+    try {
+      const [ordersRes, materialsRes, activityRes] = await Promise.all([
+        supabase.from('k24_orders').select('*, client:k24_clients(name)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('k24_materials').select('*'),
+        supabase.from('k24_order_status_history').select('*, changed_by_profile:k24_profiles!changed_by(display_name), order:k24_orders!order_id(number)').order('created_at', { ascending: false }).limit(15),
+      ])
+      if (ordersRes.error) throw ordersRes.error
+      if (materialsRes.error) throw materialsRes.error
+      if (activityRes.error) throw activityRes.error
 
-    const orders = ordersRes.data || []
-    const materials = materialsRes.data || []
+      const orders = ordersRes.data || []
+      const materials = materialsRes.data || []
 
-    const statusCounts = {}
-    orders.forEach((o) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1 })
+      const statusCounts = {}
+      orders.forEach((o) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1 })
 
-    const lowStock = materials.filter((m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty))
-    const myOrders = profile ? orders.filter((o) => o.assigned_to === profile.id && o.status !== 'done' && o.status !== 'cancelled') : []
+      const lowStock = materials.filter((m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty))
+      const myOrders = profile ? orders.filter((o) => o.assigned_to === profile.id && o.status !== 'done' && o.status !== 'cancelled') : []
 
-    // Deadlines — orders with deadline in next 3 days
-    const now = new Date()
-    const threeDays = new Date(now.getTime() + 3 * MS_PER_DAY)
-    const deadlines = orders
-      .filter((o) => o.deadline && o.status !== 'done' && o.status !== 'cancelled' && new Date(o.deadline) <= threeDays)
-      .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+      // Deadlines — orders with deadline in next 3 days
+      const now = new Date()
+      const threeDays = new Date(now.getTime() + 3 * MS_PER_DAY)
+      const deadlines = orders
+        .filter((o) => o.deadline && o.status !== 'done' && o.status !== 'cancelled' && new Date(o.deadline) <= threeDays)
+        .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
 
-    setData({ orders, statusCounts, lowStock, allMaterials: materials, myOrders, deadlines, activity: activityRes.data || [] })
-    setLoading(false)
+      setData({ orders, statusCounts, lowStock, allMaterials: materials, myOrders, deadlines, activity: activityRes.data || [] })
+      setDataError(null)
+    } catch (err) {
+      captureError(err, { tags: { source: 'DashboardPage.fetchData' } })
+      setDataError(err)
+      // graceful degradation: keep previous data, just flag error
+    } finally {
+      setLoading(false)
+    }
   }, [profile])
 
   // Fetch worker personal stats (today + week)
@@ -120,25 +133,32 @@ export default function DashboardPage() {
     const todayStart = startOfDay(new Date()).toISOString()
     const weekStart = subDays(new Date(), 7).toISOString()
 
-    const [todayRes, weekRes] = await Promise.all([
-      supabase
-        .from('k24_order_status_history')
-        .select('id', { count: 'exact', head: true })
-        .eq('changed_by', profile.id)
-        .eq('to_status', 'done')
-        .gte('created_at', todayStart),
-      supabase
-        .from('k24_order_status_history')
-        .select('id', { count: 'exact', head: true })
-        .eq('changed_by', profile.id)
-        .eq('to_status', 'done')
-        .gte('created_at', weekStart),
-    ])
+    try {
+      const [todayRes, weekRes] = await Promise.all([
+        supabase
+          .from('k24_order_status_history')
+          .select('id', { count: 'exact', head: true })
+          .eq('changed_by', profile.id)
+          .eq('to_status', 'done')
+          .gte('created_at', todayStart),
+        supabase
+          .from('k24_order_status_history')
+          .select('id', { count: 'exact', head: true })
+          .eq('changed_by', profile.id)
+          .eq('to_status', 'done')
+          .gte('created_at', weekStart),
+      ])
+      if (todayRes.error) throw todayRes.error
+      if (weekRes.error) throw weekRes.error
 
-    setWorkerStats({
-      todayDone: todayRes.count || 0,
-      weekDone: weekRes.count || 0,
-    })
+      setWorkerStats({
+        todayDone: todayRes.count ?? 0,
+        weekDone: weekRes.count ?? 0,
+      })
+    } catch (err) {
+      captureError(err, { tags: { source: 'DashboardPage.fetchWorkerStats' } })
+      setWorkerStats({ todayDone: null, weekDone: null })
+    }
   }, [profile, isWorker])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -216,6 +236,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {dataError && (
+        <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-lg px-4 py-2 text-sm">
+          Не удалось загрузить актуальные данные. Показаны последние сохранённые.
+        </div>
+      )}
       {/* Worker dashboard */}
       {isWorker && (
         <>
@@ -225,7 +250,7 @@ export default function DashboardPage() {
             <p className="text-text-muted text-sm mt-1">{ROLES[profile?.role]?.label}</p>
             <div className="grid grid-cols-3 gap-3 mt-3">
               <div className="bg-surface-dim rounded-lg p-2.5 text-center">
-                <span className="text-2xl font-bold block">{workerStats.todayDone}</span>
+                <span className="text-2xl font-bold block">{workerStats.todayDone ?? '—'}</span>
                 <span className="text-xs text-text-muted">сегодня</span>
               </div>
               <div className="bg-surface-dim rounded-lg p-2.5 text-center">
@@ -301,7 +326,7 @@ export default function DashboardPage() {
           <div className="bg-surface rounded-xl border border-border p-5">
             <h2 className="font-semibold mb-3">Моя статистика за неделю</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <StatCard label="Выполнено" value={workerStats.weekDone} />
+              <StatCard label="Выполнено" value={workerStats.weekDone ?? '—'} />
               <StatCard label="В работе" value={myTasks.length} />
             </div>
           </div>

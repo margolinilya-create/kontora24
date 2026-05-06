@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 import { formatRelative } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
@@ -16,13 +17,20 @@ export function OrderComments({ orderId }) {
   const [loading, setLoading] = useState(true)
 
   const fetchComments = useCallback(async () => {
-    const { data } = await supabase
-      .from('k24_order_comments')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: true })
-    setComments(data || [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from('k24_order_comments')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      setComments(data || [])
+    } catch (err) {
+      captureError(err, { tags: { source: 'OrderComments.fetchComments' }, extra: { orderId } })
+      setComments([])
+    } finally {
+      setLoading(false)
+    }
   }, [orderId])
 
   useEffect(() => { fetchComments() }, [fetchComments])

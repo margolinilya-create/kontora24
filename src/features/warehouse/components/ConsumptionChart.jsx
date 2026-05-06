@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { supabase } from '@/shared/lib/supabase'
 import { subDays, format } from 'date-fns'
 import { formatNumber } from '@/shared/lib/utils'
+import { captureError } from '@/shared/lib/sentry'
 import Spinner from '@/shared/components/Spinner'
 
 export function ConsumptionChart() {
@@ -12,11 +13,20 @@ export function ConsumptionChart() {
   useEffect(() => {
     async function fetch() {
       const since = subDays(new Date(), 30).toISOString()
-      const { data: txs } = await supabase
-        .from('k24_material_transactions')
-        .select('delta, created_at, material:k24_materials(name, type, unit, stock_qty)')
-        .lt('delta', 0)
-        .gte('created_at', since)
+      let txs
+      try {
+        const { data, error } = await supabase
+          .from('k24_material_transactions')
+          .select('delta, created_at, material:k24_materials(name, type, unit, stock_qty)')
+          .lt('delta', 0)
+          .gte('created_at', since)
+        if (error) throw error
+        txs = data
+      } catch (err) {
+        captureError(err, { tags: { source: 'ConsumptionChart.fetch' } })
+        setLoading(false)
+        return
+      }
 
       if (!txs) { setLoading(false); return }
 

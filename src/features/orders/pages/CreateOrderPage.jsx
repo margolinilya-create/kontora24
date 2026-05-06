@@ -209,22 +209,26 @@ export default function CreateOrderPage() {
       // Find or create client
       let clientId = null
       if (values.client_name?.trim()) {
-        const { data: existing } = await supabase
+        const { data: existing, error: findError } = await supabase
           .from('k24_clients')
           .select('id')
           .eq('name', values.client_name.trim())
           .limit(1)
           .single()
 
+        // PGRST116 = no rows found, valid case (new client) — fall through to insert
+        if (findError && findError.code !== 'PGRST116') throw findError
+
         if (existing) {
           clientId = existing.id
         } else {
-          const { data: newClient } = await supabase
+          const { data: newClient, error: createError } = await supabase
             .from('k24_clients')
             .insert({ name: values.client_name.trim() })
             .select('id')
             .single()
-          if (newClient) clientId = newClient.id
+          if (createError) throw createError
+          clientId = newClient.id
         }
       }
 

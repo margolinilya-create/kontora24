@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
+import { captureError } from '@/shared/lib/sentry'
 
 export function useMaterials() {
   const [materials, setMaterials] = useState([])
@@ -54,24 +55,34 @@ export function useMaterials() {
 export function useMaterialTransactions(materialId) {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!materialId) return
     async function fetch() {
       setLoading(true)
-      const { data } = await supabase
-        .from('k24_material_transactions')
-        .select('*, material:k24_materials(name), created_by_profile:k24_profiles!created_by(display_name)')
-        .eq('material_id', materialId)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      setTransactions(data || [])
-      setLoading(false)
+      setError(null)
+      try {
+        const { data, error: err } = await supabase
+          .from('k24_material_transactions')
+          .select('*, material:k24_materials(name), created_by_profile:k24_profiles!created_by(display_name)')
+          .eq('material_id', materialId)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        if (err) throw err
+        setTransactions(data || [])
+      } catch (err) {
+        captureError(err, { tags: { source: 'useMaterialTransactions.fetch' }, extra: { materialId } })
+        setError(err)
+        setTransactions([])
+      } finally {
+        setLoading(false)
+      }
     }
     fetch()
   }, [materialId])
 
-  return { transactions, loading }
+  return { transactions, loading, error }
 }
 
 export async function addMaterialTransaction({ materialId, delta, reason, orderId }) {

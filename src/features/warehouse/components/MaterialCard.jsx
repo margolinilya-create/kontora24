@@ -7,21 +7,23 @@ export function MaterialCard({ material, onAddStock }) {
 
   return (
     <div className={`bg-surface rounded-2xl border shadow-card p-5 transition-colors ${isLow ? 'border-danger/40' : 'border-border'}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="font-semibold font-display tracking-tight">{material.name}</h3>
-          <p className="text-xs text-text-muted">{typeInfo?.label || material.type}</p>
+      <div className="flex items-start justify-between mb-3 gap-2">
+        <div className="min-w-0">
+          <h3 className="font-bold text-base leading-tight">{material.name}</h3>
+          <p className="text-xs text-text-muted mt-0.5">{typeInfo?.label || material.type}</p>
         </div>
         {isLow && (
-          <span className="bg-danger/15 text-danger text-xs font-medium px-2 py-0.5 rounded-full">
+          <span className="bg-danger/15 text-danger text-xs font-medium px-2 py-0.5 rounded-full shrink-0">
             Мало
           </span>
         )}
       </div>
 
-      <div className="text-3xl font-bold font-display tracking-tight mb-1">
-        {formatNumber(material.stock_qty, 1)}
-        <span className="text-sm font-normal text-text-muted ml-1">{material.unit}</span>
+      <div className="mb-1">
+        <span className="text-3xl font-bold font-display tracking-tight">
+          {formatNumber(material.stock_qty, 1)}
+        </span>
+        <span className="text-sm font-normal text-text-muted ml-1 font-sans">{material.unit}</span>
       </div>
 
       {material.reserved > 0 && (

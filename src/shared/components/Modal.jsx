@@ -76,7 +76,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
         className={`relative bg-surface rounded-2xl border border-border shadow-modal animate-card-enter ${maxWidth} w-full max-h-[90vh] flex flex-col`}
       >
         <div className="flex justify-between items-center px-5 py-4 border-b border-border">
-          <h2 id={titleId} className="text-lg font-semibold text-text font-display tracking-tight">{title}</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-text tracking-tight">{title}</h2>
           <button
             onClick={onClose}
             aria-label="Закрыть"

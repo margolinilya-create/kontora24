@@ -85,7 +85,7 @@ export default function Sheet({ isOpen, onClose, title, children, maxWidth = 'ma
           <span className="w-10 h-1 rounded-full bg-border" aria-hidden="true" />
         </div>
         <div className="flex justify-between items-center px-5 py-3 sm:py-4 border-b border-border">
-          <h2 id={titleId} className="text-base sm:text-lg font-semibold text-text font-display tracking-tight">{title}</h2>
+          <h2 id={titleId} className="text-base sm:text-lg font-semibold text-text tracking-tight">{title}</h2>
           <button
             onClick={onClose}
             aria-label="Закрыть"

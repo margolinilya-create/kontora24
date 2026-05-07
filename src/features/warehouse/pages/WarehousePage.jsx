@@ -82,8 +82,9 @@ export default function WarehousePage() {
           return (
             <div key={type} className="bg-surface rounded-2xl border border-border shadow-card p-4">
               <p className="text-sm text-text-muted">{info.label}</p>
-              <p className="text-xl font-bold font-display tracking-tight mt-1">
-                {total.toFixed(1)} <span className="text-sm font-normal text-text-muted">{info.unit}</span>
+              <p className="mt-1">
+                <span className="text-xl font-bold font-display tracking-tight">{total.toFixed(1)}</span>
+                <span className="text-sm font-normal text-text-muted ml-1 font-sans">{info.unit}</span>
               </p>
             </div>
           )

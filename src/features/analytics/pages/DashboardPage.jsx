@@ -241,9 +241,10 @@ export default function DashboardPage() {
       {/* Worker dashboard */}
       {isWorker && (
         <>
-          {/* Greeting + stats */}
+          {/* Greeting + stats — full sentence stays on Guidy (Onder would
+              force all-caps which reads as shouting). */}
           <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-            <h1 className="text-xl font-bold font-display tracking-tight">Привет, {profile?.display_name}!</h1>
+            <h1 className="text-xl font-bold tracking-tight">Привет, {profile?.display_name}!</h1>
             <p className="text-text-muted text-sm mt-1">{ROLES[profile?.role]?.label}</p>
             <div className="grid grid-cols-3 gap-3 mt-4">
               <div className="bg-surface-2 rounded-xl p-3 text-center">
@@ -321,7 +322,7 @@ export default function DashboardPage() {
 
           {/* Personal weekly stats */}
           <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-            <h2 className="font-semibold mb-3 font-display tracking-tight">Моя статистика за неделю</h2>
+            <h2 className="font-semibold mb-3">Моя статистика за неделю</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <StatCard label="Выполнено" value={workerStats.weekDone ?? '—'} />
               <StatCard label="В работе" value={myTasks.length} />
@@ -363,7 +364,7 @@ export default function DashboardPage() {
               {/* Orders due today list */}
               {ordersDueToday.length > 0 && (
                 <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-                  <h2 className="font-semibold mb-3 font-display tracking-tight">Сдача сегодня</h2>
+                  <h2 className="font-semibold mb-3">Сдача сегодня</h2>
                   <div className="space-y-1">
                     {ordersDueToday.map((order) => (
                       <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-dim transition-colors">
@@ -384,7 +385,7 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Out of stock */}
                 <div className="bg-surface rounded-2xl border border-danger/30 shadow-card p-5">
-                  <h2 className="font-semibold mb-3 text-danger font-display tracking-tight">Закончились</h2>
+                  <h2 className="font-semibold mb-3 text-danger">Закончились</h2>
                   {outOfStock.length === 0 ? (
                     <p className="text-text-muted text-sm">Все в наличии</p>
                   ) : (
@@ -401,7 +402,7 @@ export default function DashboardPage() {
 
                 {/* Low stock — using dept-pouring (orange) since warning is yellow=accent */}
                 <div className="bg-surface rounded-2xl border border-dept-pouring/30 shadow-card p-5">
-                  <h2 className="font-semibold mb-3 text-dept-pouring font-display tracking-tight">Заканчиваются</h2>
+                  <h2 className="font-semibold mb-3 text-dept-pouring">Заканчиваются</h2>
                   {lowStockOnly.length === 0 ? (
                     <p className="text-text-muted text-sm">Все в норме</p>
                   ) : (

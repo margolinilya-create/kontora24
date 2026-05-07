@@ -15,16 +15,16 @@ test.describe('Orders page (R6+R7)', () => {
     await expect(page.getByRole('tab', { name: 'Календарь' })).toBeVisible()
   })
 
-  test('список — карточки, не таблица', async ({ page }) => {
+  test('список — таблица с группировкой по отделам', async ({ page }) => {
     await page.goto('/orders')
     await page.waitForLoadState('networkidle')
-    // Таблицы не должно быть
-    await expect(page.locator('table')).toHaveCount(0)
-    // Карточки заказов с ссылками /orders/UUID
-    const cards = page.locator('a[href^="/orders/"]:not([href*="create"])')
-    const count = await cards.count()
+    // Должна быть хотя бы одна группа (section) с заголовком и таблицей
+    const sections = page.locator('section').filter({ has: page.locator('table') })
+    const count = await sections.count()
     if (count === 0) { test.skip(); return }
-    await expect(cards.first()).toBeVisible()
+    await expect(sections.first()).toBeVisible()
+    // Заголовок группы — кнопка с aria-expanded
+    await expect(page.locator('button[aria-expanded]').first()).toBeVisible()
   })
 
   test('toggle «Завершённые» переключает выборку', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ROLES } from '@/shared/constants'
-import { supabase } from '@/shared/lib/supabase'
+import { getFreshAccessToken } from '@/shared/lib/auth-token'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
@@ -19,12 +19,12 @@ export function CreateUser() {
     if (!form.display_name || !form.email || !form.password) return
     setSaving(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = await getFreshAccessToken()
       const res = await fetch('/api/users/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify(form),
       })

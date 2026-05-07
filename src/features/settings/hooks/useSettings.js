@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
+import { getFreshAccessToken } from '@/shared/lib/auth-token'
 import { toast } from '@/shared/stores/toast-store'
 
 export function useSettings(key) {
@@ -71,17 +72,22 @@ export function useUsers() {
   }
 
   async function updateUser(userId, updates) {
-    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = await getFreshAccessToken()
     const res = await fetch('/api/users/update', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ userId, ...updates }),
     })
     const result = await res.json()
-    if (!res.ok) throw new Error(result.error)
+    if (!res.ok) {
+      const msg = result.detail
+        ? `${result.error} — ${result.detail}${result.supaHost ? ` (host: ${result.supaHost})` : ''}`
+        : result.error
+      throw new Error(msg)
+    }
     toast.success('Пользователь обновлён')
     fetchUsers()
   }

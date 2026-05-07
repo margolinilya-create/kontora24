@@ -22,9 +22,22 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Не авторизован' })
   }
 
-  const { data: { user: caller } } = await supabase.auth.getUser(token)
-  if (!caller) {
-    return res.status(401).json({ error: 'Недействительный токен' })
+  const { data: userData, error: userError } = await supabase.auth.getUser(token)
+  const caller = userData?.user
+  if (userError || !caller) {
+    const supaUrl = process.env.VITE_SUPABASE_URL || ''
+    const supaHost = supaUrl.replace(/^https?:\/\//, '').split('.')[0]
+    console.error('[users/update] auth.getUser failed:', {
+      msg: userError?.message,
+      status: userError?.status,
+      tokenLen: token.length,
+      supaHost,
+    })
+    return res.status(401).json({
+      error: 'Недействительный токен',
+      detail: userError?.message || 'no user',
+      supaHost,
+    })
   }
 
   const { data: callerProfile } = await supabase

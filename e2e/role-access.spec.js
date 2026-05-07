@@ -1,16 +1,9 @@
 import { test, expect } from '@playwright/test'
-import { login } from './helpers'
+import { login, ensureSidebarOpen, expandSidebarGroup, emulateRole } from './helpers'
 
 // admin (mib@pnhd.ru) с эмуляцией ролей через RoleSwitcher.
 // По R8: рабочие сразу попадают на /orders (HomeRoute), главная и аналитика
 // скрыты в сайдбаре, /orders открыт всем ролям.
-
-async function emulateRole(page, roleName) {
-  const switchBtn = page.locator('button[aria-label="Переключение роли"]')
-  await switchBtn.click()
-  await page.getByText(roleName, { exact: true }).click()
-  await page.waitForTimeout(500)
-}
 
 test.describe('Role-Based Access Control (R8)', () => {
   test.beforeEach(async ({ page }) => {
@@ -62,9 +55,14 @@ test.describe('Role-Based Access Control (R8)', () => {
   test('worker видит Заказы в сайдбаре, не видит Главную/Аналитику', async ({ page }) => {
     await emulateRole(page, 'Печатник')
     await page.waitForTimeout(800)
+    await ensureSidebarOpen(page)
+    // Группы collapsed по умолчанию — раскрываем "Управление" и "Ресурсы"
+    await expandSidebarGroup(page, 'Управление')
     const sidebar = page.locator('aside')
     await expect(sidebar.getByRole('link', { name: 'Заказы' })).toBeVisible()
-    await expect(sidebar.getByRole('link', { name: 'Главная' })).not.toBeVisible()
+    // У рабочих в группе Управление главной нет вообще
+    await expect(sidebar.getByRole('link', { name: 'Главная', exact: true })).not.toBeVisible()
+    await expandSidebarGroup(page, 'Ресурсы')
     await expect(sidebar.getByRole('link', { name: 'Аналитика' })).not.toBeVisible()
   })
 

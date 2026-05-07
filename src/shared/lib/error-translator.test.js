@@ -24,8 +24,10 @@ describe('translateError', () => {
       // Гарантирует что /^[А-ЯЁ]/ проверяет ИМЕННО кириллицу, а не любую заглавную.
       // Этот тест упадёт если кто-то изменит регэксп на /^[A-ZА-ЯЁ]/ или /^[\p{Lu}]/.
       const r = translateError({ message: 'Some english error' })
-      expect(r.title).not.toBe('Ошибка')
-      expect(r.message).not.toBe('Some english error')
+      // Title — generic «Что-то пошло не так», а не кириллический passthrough «Ошибка»
+      expect(r.title).toBe('Что-то пошло не так')
+      // Message — оригинал (теперь fallback показывает его, чтобы не терять информацию)
+      expect(r.message).toBe('Some english error')
     })
 
     it('fallback path is reachable for unknown error codes', () => {

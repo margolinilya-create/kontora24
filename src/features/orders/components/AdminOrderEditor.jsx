@@ -140,6 +140,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       toast.success('Заказ обновлён')
       onSaved()
     } catch (err) {
+      captureError(err, { tags: { source: 'AdminOrderEditor.save' }, extra: { orderId: order.id } })
       toast.error(translateError(err).message)
     } finally {
       setSaving(false)

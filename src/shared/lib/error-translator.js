@@ -47,6 +47,14 @@ export function translateError(err) {
     return { title: 'Нет прав', message: 'У вас нет прав на это действие.' }
   }
 
+  // Case 4b — protected order columns (триггер k24_protect_order_columns)
+  if (/access denied: workers cannot modify protected/i.test(message)) {
+    return {
+      title: 'Нет прав',
+      message: 'Финансы, цена и реквизиты сделки доступны только менеджеру и администратору. Сбросьте эмуляцию роли в сайдбаре и попробуйте снова.',
+    }
+  }
+
   // Case 5 — auth expired
   if (status === 401 || /jwt (expired|invalid)/i.test(message) || message === 'Not authenticated') {
     return { title: 'Сессия устарела', message: 'Обновите страницу.', action: 'reauth' }
@@ -76,6 +84,11 @@ export function translateError(err) {
     return { title: 'Файл слишком большой', message: 'Уменьшите размер и попробуйте снова.' }
   }
 
-  // Case 10 — fallback
+  // Case 10 — fallback. Если есть текст ошибки — показываем его, чтобы
+  // пользователь имел шанс понять что именно сломалось (вместо вечного
+  // «Попробуйте ещё раз»).
+  if (message) {
+    return { title: 'Что-то пошло не так', message }
+  }
   return { ...FALLBACK }
 }

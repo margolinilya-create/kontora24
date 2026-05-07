@@ -4,13 +4,11 @@ import { useOrders } from '../hooks/useOrders'
 import { StatusBadge } from '../components/StatusBadge'
 import { ORDER_TYPES } from '@/shared/constants'
 import { useDebounce } from '@/shared/hooks/useDebounce'
-import { exportCSV } from '@/shared/lib/export'
 import { Pagination } from '@/shared/components/Pagination'
 import { TableSkeleton } from '@/shared/components/Skeleton'
 import { OrdersKanban } from '../components/OrdersKanban'
 import { DepartmentFilter } from '../components/DepartmentFilter'
 import { DateRangeFilter } from '../components/DateRangeFilter'
-import Button from '@/shared/components/Button'
 import SearchInput from '@/shared/components/SearchInput'
 
 export default function OrdersPage() {
@@ -102,26 +100,6 @@ export default function OrdersPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" /></svg>
             </button>
           </div>
-          {orders.length > 0 && (
-            <Button
-              variant="secondary"
-              onClick={() => exportCSV(orders, [
-                { key: 'number', label: '№' },
-                { key: 'order_type', label: 'Тип', format: (v) => ORDER_TYPES[v]?.label || v },
-                { key: 'client', label: 'Заказчик', format: (_, o) => o.client?.name || '' },
-                { key: 'status', label: 'Статус' },
-                { key: 'deadline', label: 'Дедлайн', format: (v) => v ? new Date(v).toLocaleDateString('ru-RU') : '' },
-                { key: 'width_mm', label: 'Ширина' },
-                { key: 'height_mm', label: 'Высота' },
-                { key: 'qty', label: 'Тираж' },
-                { key: 'price_final', label: 'Цена' },
-                { key: 'cost_total', label: 'Себестоимость' },
-                { key: 'created_at', label: 'Создан' },
-              ], 'orders.csv')}
-            >
-              Выгрузить
-            </Button>
-          )}
           <Link
             to="/orders/create"
             className="bg-accent hover:bg-accent-hover text-on-accent font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors shadow-card"

@@ -12,7 +12,7 @@ import Button from '@/shared/components/Button'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
-import { ProductionJournalTab } from '../components/ProductionJournalTab'
+import { ProductionStatsTab } from '../components/ProductionStatsTab'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
@@ -445,7 +445,7 @@ export default function DashboardPage() {
             </>
           )}
 
-          {managerTab === 'production' && <ProductionJournalTab />}
+          {managerTab === 'production' && <ProductionStatsTab />}
         </>
       )}
     </div>

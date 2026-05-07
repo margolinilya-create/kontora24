@@ -171,6 +171,24 @@ export const SIZE_PRESETS = {
   A5: { width: 148, height: 210, label: 'A5' },
 }
 
+// --- Material costs (себестоимость по ТЗ 06.05) ---
+// Цены за 1 пог. м плёнки (или 1 г для смолы). Источник — ручной список менеджера;
+// в будущем переедут в БД с UI редактирования.
+export const MATERIAL_COSTS = [
+  { name: 'Duckson белая 3640 (Матовая)', spec: 'Ширина 1,26 м', unit: 'руб/пог.м', value: 130 },
+  { name: 'Duckson белая 3640 (Глянцевая)', spec: 'Ширина 1,26 м', unit: 'руб/пог.м', value: 130 },
+  { name: 'Dickson прозр. 3640 (Матовая)', spec: 'Ширина 1,26 м', unit: 'руб/пог.м', value: 130 },
+  { name: 'Dickson прозр. 3640 (Глянцевая)', spec: 'Ширина 1,26 м', unit: 'руб/пог.м', value: 130 },
+  { name: 'Orajet 3640 бел. (Глянцевая)', spec: 'Ширина 1,26 м', unit: 'руб/пог.м', value: 235 },
+  { name: 'Orajet 3640 бел. (Матовая)', spec: 'Ширина 1,26 м', unit: 'руб/пог.м', value: 235 },
+  { name: 'Orajet 3640 прозр. (Глянцевая)', spec: 'Ширина 1,26 м', unit: 'руб/пог.м', value: 235 },
+  { name: 'Orajet 3640 прозр. (Матовая)', spec: 'Ширина 1,26 м', unit: 'руб/пог.м', value: 235 },
+  { name: 'Голография', spec: 'Ширина 1,22 м', unit: 'руб/пог.м', value: 240 },
+  { name: 'Oracal 352 Золото', spec: 'Ширина 1 м', unit: 'руб/пог.м', value: 670 },
+  { name: 'Oracal 352 Серебро', spec: 'Ширина 1 м', unit: 'руб/пог.м', value: 555 },
+  { name: 'Смола ПУ КДР', spec: '—', unit: 'руб/г', value: 2.35 },
+]
+
 // --- Priorities ---
 export const PRIORITIES = {
   low: { label: 'Низкий', color: 'bg-text-muted/15 text-text-muted', sortOrder: 0 },

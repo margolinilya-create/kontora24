@@ -4,20 +4,31 @@ export const MS_PER_HOUR = 3_600_000
 export const MS_PER_MINUTE = 60_000
 
 // --- Order statuses ---
+// Color comes from the department palette (4 colors): purple — design,
+// blue — print/lamination/cutting, orange — pouring, green — finish/done.
+const _DEPT = {
+  design:  'bg-dept-design/15 text-dept-design',
+  print:   'bg-dept-print/15 text-dept-print',
+  pouring: 'bg-dept-pouring/15 text-dept-pouring',
+  finish:  'bg-dept-finish/15 text-dept-finish',
+  info:    'bg-info/15 text-info',
+  danger:  'bg-danger/15 text-danger',
+}
+
 export const ORDER_STATUSES = {
-  new: { label: 'Новый', color: 'bg-blue-500/15 text-blue-400', order: 0 },
-  design: { label: 'Дизайн', color: 'bg-purple-500/15 text-purple-400', order: 1 },
-  prepress: { label: 'Препресс', color: 'bg-violet-500/15 text-violet-400', order: 2 },
-  print: { label: 'Печать', color: 'bg-orange-500/15 text-orange-400', order: 3 },
-  lamination: { label: 'Ламинация', color: 'bg-amber-500/15 text-amber-400', order: 4 },
-  cutting: { label: 'Резка', color: 'bg-yellow-500/15 text-yellow-400', order: 5 },
-  selection_pouring: { label: 'Выборка / Заливка', color: 'bg-cyan-500/15 text-cyan-400', order: 6 },
-  pouring: { label: 'Заливка', color: 'bg-teal-500/15 text-teal-400', order: 7 },
-  assembly_3d: { label: 'Сборка 3D', color: 'bg-lime-500/15 text-lime-400', order: 8 },
-  packaging: { label: 'Упаковка', color: 'bg-emerald-500/15 text-emerald-400', order: 9 },
-  otk: { label: 'ОТК / Выдача', color: 'bg-pink-500/15 text-pink-400', order: 10 },
-  done: { label: 'Готово', color: 'bg-green-500/15 text-green-400', order: 11 },
-  cancelled: { label: 'Отменён', color: 'bg-red-500/15 text-red-400', order: 12 },
+  new: { label: 'Новый', color: _DEPT.info, order: 0 },
+  design: { label: 'Дизайн', color: _DEPT.design, order: 1 },
+  prepress: { label: 'Препресс', color: _DEPT.design, order: 2 },
+  print: { label: 'Печать', color: _DEPT.print, order: 3 },
+  lamination: { label: 'Ламинация', color: _DEPT.print, order: 4 },
+  cutting: { label: 'Резка', color: _DEPT.print, order: 5 },
+  selection_pouring: { label: 'Выборка / Заливка', color: _DEPT.pouring, order: 6 },
+  pouring: { label: 'Заливка', color: _DEPT.pouring, order: 7 },
+  assembly_3d: { label: 'Сборка 3D', color: _DEPT.finish, order: 8 },
+  packaging: { label: 'Упаковка', color: _DEPT.finish, order: 9 },
+  otk: { label: 'ОТК / Выдача', color: _DEPT.finish, order: 10 },
+  done: { label: 'Готово', color: _DEPT.finish, order: 11 },
+  cancelled: { label: 'Отменён', color: _DEPT.danger, order: 12 },
 }
 
 // --- Order routes by type ---

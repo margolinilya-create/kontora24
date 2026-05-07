@@ -1,6 +1,21 @@
 @import "tailwindcss";
 
-/* Local Bebas Neue for jsPDF/html2canvas (also loaded via Google Fonts CDN) */
+/* Brand fonts — Onder for headings, Guidy for body. */
+@font-face {
+  font-family: 'Onder';
+  src: url('../assets/fonts/ONDER-REGULAR.TTF') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Guidy';
+  src: url('../assets/fonts/Guidy.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+/* Bebas Neue — used by stickers via jsPDF/html2canvas */
 @font-face {
   font-family: 'Bebas Neue';
   src: url('../assets/fonts/BebasNeue-Regular.ttf') format('truetype');
@@ -10,39 +25,84 @@
 }
 
 @theme {
-  --color-primary: #1a1a2e;
-  --color-primary-light: #16213e;
-  --color-accent: #e94560;
-  --color-accent-hover: #c73e54;
-  --color-surface: #ffffff;
-  --color-surface-dim: #f8f9fa;
-  --color-border: #e5e7eb;
-  --color-text: #1f2937;
-  --color-text-muted: #6b7280;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-sidebar: #1a1a2e;
-  --color-chart-grid: #e5e7eb;
-  --color-chart-tooltip-bg: #ffffff;
-  --color-chart-tooltip-border: #e5e7eb;
+  /* Base */
+  --color-bg: #F5F5F5;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F0F0F0;
+  --color-surface-dim: #F5F5F5;
+  --color-border: #E5E5E7;
+  --color-text: #141414;
+  --color-text-muted: #6E6E73;
 
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  /* Accent (yellow) */
+  --color-accent: #FFD24E;
+  --color-accent-hover: #F2C13A;
+  --color-on-accent: #141414;
+
+  /* Primary token — kept for back-compat (now graphite) */
+  --color-primary: #141414;
+  --color-primary-light: #1F1F22;
+
+  /* Sidebar */
+  --color-sidebar: #141414;
+  --color-sidebar-fg: #F5F5F5;
+
+  /* Semantic (iOS palette) */
+  --color-success: #34C759;
+  --color-warning: #FFD24E;
+  --color-danger:  #FF3B30;
+  --color-info:    #0A84FF;
+
+  /* Production departments — 4-color scheme */
+  --color-dept-design:  #AF52DE; /* purple — design, prepress */
+  --color-dept-print:   #0A84FF; /* blue — print, lamination, cutting */
+  --color-dept-pouring: #FF9500; /* orange — pouring, selection_pouring */
+  --color-dept-finish:  #34C759; /* green — assembly_3d, packaging, otk, done */
+
+  /* Deadline urgency */
+  --color-deadline-ok:     #34C759;
+  --color-deadline-warn:   #FFD24E;
+  --color-deadline-urgent: #FF3B30;
+
+  /* Charts */
+  --color-chart-grid: #E5E5E7;
+  --color-chart-tooltip-bg: #FFFFFF;
+  --color-chart-tooltip-border: #E5E5E7;
+
+  /* Typography */
+  --font-sans: "Guidy", "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Onder", "Guidy", system-ui, -apple-system, sans-serif;
+
+  /* Radii (iOS-style) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 2px rgba(20,20,20,0.04), 0 6px 16px rgba(20,20,20,0.05);
+  --shadow-modal: 0 20px 40px rgba(20,20,20,0.18);
 }
 
-/* Dark mode — bumped contrast for WCAG AA (4.5:1+ on #1e1e2e bg) */
 .dark {
-  --color-primary: #e8ecf2;
-  --color-primary-light: #d1d9e4;
-  --color-surface: #1e1e2e;
-  --color-surface-dim: #161622;
-  --color-border: #404060;
-  --color-text: #edf0f5;
-  --color-text-muted: #a8b8d0;
-  --color-sidebar: #161622;
-  --color-chart-grid: #404060;
-  --color-chart-tooltip-bg: #2a2a3e;
-  --color-chart-tooltip-border: #404060;
+  --color-bg: #0A0A0B;
+  --color-surface: #141416;
+  --color-surface-2: #1C1C1F;
+  --color-surface-dim: #0A0A0B;
+  --color-border: #2C2C2E;
+  --color-text: #F5F5F5;
+  --color-text-muted: #A1A1A6;
+  --color-primary: #F5F5F5;
+  --color-primary-light: #E5E5E7;
+  --color-sidebar: #0A0A0B;
+  --color-sidebar-fg: #F5F5F5;
+  --color-on-accent: #141414;
+  --color-chart-grid: #2C2C2E;
+  --color-chart-tooltip-bg: #1C1C1F;
+  --color-chart-tooltip-border: #2C2C2E;
+
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.5), 0 6px 16px rgba(0,0,0,0.45);
+  --shadow-modal: 0 20px 40px rgba(0,0,0,0.6);
 }
 
 body {

@@ -127,3 +127,73 @@ export function getStatusesForDepartment(departmentId) {
   if (!dept) return []
   return [...new Set(dept.stages.map(s => s.status))]
 }
+
+// --- Production department color groups (4-color scheme per design system) ---
+// Used by status badges, kanban columns, pipeline summary.
+
+export const DEPT_GROUPS = {
+  design:  { token: 'dept-design',  label: 'Дизайн',   stages: ['design', 'prepress'] },
+  print:   { token: 'dept-print',   label: 'Печать',   stages: ['print', 'lamination', 'cutting'] },
+  pouring: { token: 'dept-pouring', label: 'Заливка',  stages: ['pouring', 'selection_pouring'] },
+  finish:  { token: 'dept-finish',  label: 'Сборка',   stages: ['assembly_3d', 'packaging', 'otk', 'done'] },
+}
+
+const _stageToGroup = {}
+for (const [key, group] of Object.entries(DEPT_GROUPS)) {
+  for (const stage of group.stages) {
+    _stageToGroup[stage] = { ...group, key }
+  }
+}
+
+/** Department token (color theme name) for a production stage */
+export function getStageDeptToken(status) {
+  if (status === 'new') return 'info'
+  if (status === 'cancelled') return 'danger'
+  return _stageToGroup[status]?.token || null
+}
+
+// Literal Tailwind classes — kept verbatim so the content scanner picks them up.
+const STAGE_BADGE_CLASSES = {
+  'dept-design':  'bg-dept-design/15 text-dept-design',
+  'dept-print':   'bg-dept-print/15 text-dept-print',
+  'dept-pouring': 'bg-dept-pouring/15 text-dept-pouring',
+  'dept-finish':  'bg-dept-finish/15 text-dept-finish',
+  'info':         'bg-info/15 text-info',
+  'danger':       'bg-danger/15 text-danger',
+}
+
+const STAGE_DOT_CLASSES = {
+  'dept-design':  'bg-dept-design',
+  'dept-print':   'bg-dept-print',
+  'dept-pouring': 'bg-dept-pouring',
+  'dept-finish':  'bg-dept-finish',
+  'info':         'bg-info',
+  'danger':       'bg-danger',
+}
+
+const STAGE_BORDER_CLASSES = {
+  'dept-design':  'border-dept-design',
+  'dept-print':   'border-dept-print',
+  'dept-pouring': 'border-dept-pouring',
+  'dept-finish':  'border-dept-finish',
+  'info':         'border-info',
+  'danger':       'border-danger',
+}
+
+/** Tailwind badge classes (bg + text) for a stage, using its department color */
+export function stageBadgeClasses(status) {
+  const token = getStageDeptToken(status)
+  return STAGE_BADGE_CLASSES[token] || 'bg-text-muted/15 text-text-muted'
+}
+
+/** Solid background dot color for a stage (for kanban column headers, dots) */
+export function stageDotClass(status) {
+  const token = getStageDeptToken(status)
+  return STAGE_DOT_CLASSES[token] || 'bg-text-muted'
+}
+
+/** Border color class for a stage (for accent strips on cards/columns) */
+export function stageBorderClass(status) {
+  const token = getStageDeptToken(status)
+  return STAGE_BORDER_CLASSES[token] || 'border-border'
+}

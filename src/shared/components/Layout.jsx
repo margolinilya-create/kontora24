@@ -28,8 +28,8 @@ export function Layout() {
   const pageTitle = PAGE_TITLES[location.pathname] || PAGE_TITLES[basePath] || PAGE_TITLES['/' + location.pathname.split('/')[1]] || ''
 
   return (
-    <div className="min-h-screen bg-surface-dim">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-accent focus:text-white focus:px-4 focus:py-2 focus:rounded-lg">
+    <div className="min-h-screen bg-bg">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-accent focus:text-on-accent focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-card">
         Перейти к содержимому
       </a>
       <div className="hidden md:block">
@@ -38,7 +38,7 @@ export function Layout() {
 
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setMobileOpen(false)}>
-          <div className="absolute inset-0 bg-black/50" role="button" aria-label="Закрыть меню" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setMobileOpen(false))} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" role="button" aria-label="Закрыть меню" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setMobileOpen(false))} />
           <div className="relative z-50 w-60" onClick={(e) => e.stopPropagation()}>
             <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
           </div>
@@ -46,13 +46,13 @@ export function Layout() {
       )}
 
       <div className={cn('transition-all duration-200', collapsed ? 'md:ml-16' : 'md:ml-60')}>
-        <header className="sticky top-0 z-30 flex items-center gap-4 h-14 bg-surface border-b border-border px-4 sm:px-6">
+        <header className="sticky top-0 z-30 flex items-center gap-4 h-14 bg-surface/80 backdrop-blur-md border-b border-border px-4 sm:px-6">
           <button
             onClick={() => {
               if (window.innerWidth < 768) setMobileOpen(!mobileOpen)
               else toggleCollapsed()
             }}
-            className="p-3 rounded-lg hover:bg-surface-dim transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="p-3 rounded-xl hover:bg-surface-2 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
             aria-label="Меню"
           >
             <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -60,7 +60,7 @@ export function Layout() {
             </svg>
           </button>
           {pageTitle && <h2 className="text-sm font-medium text-text-muted">{pageTitle}</h2>}
-          <Link to="/help" className="ml-auto p-2.5 rounded-lg hover:bg-surface-dim transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Справка">
+          <Link to="/help" className="ml-auto p-2.5 rounded-xl hover:bg-surface-2 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Справка">
             <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </Link>
         </header>

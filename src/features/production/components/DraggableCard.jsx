@@ -5,13 +5,13 @@ import { Link } from 'react-router-dom'
 import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { TaskTimer } from './TaskTimer'
 import { OperationChecklist } from './OperationChecklist'
-import { ORDER_TYPES, PRIORITIES, MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
+import { ORDER_TYPES, PRIORITIES, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
+import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
 import { supabase } from '@/shared/lib/supabase'
-// Use simple arithmetic instead of date-fns to avoid pulling it into production board chunk
 
 const PRIORITY_BORDER = {
   urgent: 'border-l-danger',
-  high: 'border-l-warning',
+  high: 'border-l-dept-pouring',
 }
 
 function formatTimeInStatus(timestamp) {
@@ -30,11 +30,10 @@ function formatDeadline(deadline) {
 
 const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = false }) {
   const [expanded, setExpanded] = useState(false)
-  const now = Date.now()
   const timeInStatus = formatTimeInStatus(order.status_changed_at || order.updated_at)
-  const deadlineTime = order.deadline ? new Date(order.deadline).getTime() : null
-  const isOverdue = deadlineTime && deadlineTime < now
-  const isUrgentDeadline = deadlineTime && !isOverdue && (deadlineTime - now) < MS_PER_DAY
+  const deadlineLevel = getDeadlineLevel(order.deadline)
+  const deadlineTextClass = getDeadlineClasses(order.deadline) || 'text-text-muted'
+  const deadlineDotClass = getDeadlineDotClass(order.deadline)
   const priority = PRIORITIES[order.priority]
   const showPriority = order.priority === 'urgent' || order.priority === 'high'
 
@@ -43,11 +42,11 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
       {/* Header: number + claim */}
       <div className="flex items-center justify-between">
         {isOverlay ? (
-          <span className="font-bold text-accent">#{order.number}</span>
+          <span className="font-bold text-text">#{order.number}</span>
         ) : (
           <Link
             to={`/orders/${order.id}`}
-            className="font-bold text-accent hover:underline"
+            className="font-bold text-text hover:text-accent transition-colors"
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -81,7 +80,7 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
         <button
           onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="text-xs text-accent/70 hover:text-accent transition-colors py-1 min-h-[44px] sm:hidden"
+          className="text-xs text-text-muted hover:text-text transition-colors py-1 min-h-[44px] sm:hidden"
         >
           Подробнее...
         </button>
@@ -90,16 +89,15 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
       {/* Footer: meta row */}
       <div className="flex items-center justify-between pt-2 border-t border-border">
         <div className="flex items-center gap-1.5 min-w-0">
-          {/* Deadline */}
+          {/* Deadline with colored dot */}
           {order.deadline && (
-            <span className={`text-xs shrink-0 ${
-              isOverdue
-                ? 'text-danger font-medium'
-                : isUrgentDeadline
-                  ? 'text-warning font-medium'
-                  : 'text-text-muted'
-            }`}>
-              {formatDeadline(order.deadline)}
+            <span className="flex items-center gap-1.5 shrink-0">
+              {deadlineDotClass && (
+                <span className={`w-1.5 h-1.5 rounded-full ${deadlineDotClass}`} aria-hidden="true" />
+              )}
+              <span className={`text-xs ${deadlineTextClass} ${deadlineLevel === 'urgent' ? 'font-medium' : ''}`}>
+                {formatDeadline(order.deadline)}
+              </span>
             </span>
           )}
           {/* Assignee */}
@@ -167,7 +165,7 @@ export const DraggableCard = memo(function DraggableCard({ order, onUpdated }) {
       <div
         ref={setNodeRef}
         style={style}
-        className="rounded-xl border-2 border-dashed border-accent/20 bg-accent/[0.03] h-[120px] transition-all duration-200"
+        className="rounded-2xl border-2 border-dashed border-accent/30 bg-accent/[0.04] h-[120px] transition-all duration-200"
       />
     )
   }
@@ -179,10 +177,10 @@ export const DraggableCard = memo(function DraggableCard({ order, onUpdated }) {
       {...attributes}
       {...listeners}
       aria-roledescription="перетаскиваемый элемент"
-      className={`kanban-card bg-surface rounded-xl border border-border p-3.5 cursor-grab active:cursor-grabbing touch-none
-        hover:shadow-md hover:border-accent/20
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:border-accent/30
-        transition-all duration-200 ease-out
+      className={`kanban-card bg-surface rounded-2xl border border-border shadow-card p-3.5 cursor-grab active:cursor-grabbing touch-none
+        hover:border-accent/40
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:border-accent/40
+        transition-[border-color,box-shadow] duration-200 ease-out
         ${priorityBorder ? `border-l-[3px] ${priorityBorder}` : ''}`}
     >
       <CardContent order={order} onUpdated={onUpdated} />
@@ -195,10 +193,9 @@ export function DragOverlayCard({ order }) {
 
   return (
     <div
-      className={`bg-surface rounded-xl border-2 border-accent shadow-2xl p-3.5 w-[272px]
+      className={`bg-surface rounded-2xl border-2 border-accent shadow-modal p-3.5 w-[272px]
         rotate-[1.5deg] scale-[1.03] pointer-events-none
         ${priorityBorder ? `border-l-[3px] ${priorityBorder}` : ''}`}
-      style={{ filter: 'drop-shadow(0 16px 24px rgba(0,0,0,0.12))' }}
     >
       <CardContent order={order} isOverlay />
     </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getDeadlineLevel, getDeadlineClasses, getDeadlineBadgeClasses } from './deadline'
+import { getDeadlineLevel, getDeadlineClasses, getDeadlineBadgeClasses, getDeadlineDotClass, getDeadlineBorderClass } from './deadline'
 
 describe('getDeadlineLevel', () => {
   const now = new Date('2026-05-07T12:00:00Z')
@@ -61,5 +61,23 @@ describe('getDeadlineBadgeClasses', () => {
 
   it('returns empty string when no deadline', () => {
     expect(getDeadlineBadgeClasses(null, now)).toBe('')
+  })
+})
+
+describe('getDeadlineDotClass / getDeadlineBorderClass', () => {
+  const now = new Date('2026-05-07T12:00:00Z')
+
+  it('dot class matches level', () => {
+    expect(getDeadlineDotClass('2026-05-06T12:00:00Z', now)).toBe('bg-deadline-urgent')
+    expect(getDeadlineDotClass('2026-05-09T12:00:00Z', now)).toBe('bg-deadline-warn')
+    expect(getDeadlineDotClass('2026-06-01T00:00:00Z', now)).toBe('bg-deadline-ok')
+    expect(getDeadlineDotClass(null, now)).toBe('')
+  })
+
+  it('border class matches level', () => {
+    expect(getDeadlineBorderClass('2026-05-06T12:00:00Z', now)).toBe('border-deadline-urgent')
+    expect(getDeadlineBorderClass('2026-05-09T12:00:00Z', now)).toBe('border-deadline-warn')
+    expect(getDeadlineBorderClass('2026-06-01T00:00:00Z', now)).toBe('border-deadline-ok')
+    expect(getDeadlineBorderClass(null, now)).toBe('')
   })
 })

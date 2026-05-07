@@ -4,9 +4,10 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { DraggableCard, DragOverlayCard } from '../components/DraggableCard'
 import { ProductionCalendar } from '../components/ProductionCalendar'
-import { PipelineSummary, COL_COLORS } from '../components/PipelineSummary'
+import { PipelineSummary } from '../components/PipelineSummary'
 import { useProductionBoard } from '../hooks/useProductionBoard'
 import { ORDER_STATUSES } from '@/shared/constants'
+import { stageDotClass } from '@/shared/lib/department-mapping'
 import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import ErrorState from '@/shared/components/ErrorState'
@@ -81,11 +82,11 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, onUpdate
     >
       <div className="flex items-center justify-between mb-3 px-1 py-2">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${COL_COLORS[status]}`} aria-hidden="true" />
+          <span className={`w-2 h-2 rounded-full ${stageDotClass(status)}`} aria-hidden="true" />
           <h3 className="font-semibold text-sm">{label}</h3>
         </div>
         <span className={`text-xs font-medium min-w-[24px] text-center py-0.5 px-2 rounded-full transition-colors
-          ${isOver ? 'bg-accent text-white' : 'text-text-muted bg-surface-dim'}`}
+          ${isOver ? 'bg-accent text-on-accent' : 'text-text-muted bg-surface-2'}`}
         >
           {orders.length}
         </span>

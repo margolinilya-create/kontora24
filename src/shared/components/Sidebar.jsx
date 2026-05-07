@@ -69,7 +69,7 @@ function Badge({ count, size = 'sm' }) {
   const label = count > 99 ? '99+' : count
   return (
     <span className={cn(
-      'bg-accent/90 text-white font-bold rounded-full flex items-center justify-center shrink-0',
+      'bg-accent text-on-accent font-bold rounded-full flex items-center justify-center shrink-0',
       size === 'sm' ? 'text-[9px] min-w-[18px] h-[18px] px-1' : 'text-[10px] min-w-5 h-5 px-1'
     )}>
       {label}
@@ -104,7 +104,7 @@ function NavItem({ item, counts, lowStockCount, collapsed, indent, isHelper }) {
           <span className="relative shrink-0">
             <Icon />
             {hasAlert && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-sidebar" aria-label="Низкий остаток материалов" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-danger ring-2 ring-sidebar" aria-label="Низкий остаток материалов" />
             )}
           </span>
           {!collapsed && (
@@ -158,10 +158,10 @@ export function Sidebar({ collapsed }) {
     )}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 h-14 border-b border-white/8">
-        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-accent flex items-center justify-center font-bold text-sm">
+        <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-accent flex items-center justify-center font-bold text-sm text-on-accent">
           K
         </div>
-        {!collapsed && <span className="text-lg font-semibold tracking-tight">Kontora24</span>}
+        {!collapsed && <span className="text-lg font-semibold tracking-tight font-display">Kontora24</span>}
       </div>
 
       {/* Nav */}
@@ -251,7 +251,7 @@ export function Sidebar({ collapsed }) {
       <div className="border-t border-white/8 p-2 space-y-0.5">
         {!collapsed && profile && (
           <div className="flex items-center gap-2.5 px-3 py-1.5">
-            <div className="w-7 h-7 rounded-full bg-accent/25 flex items-center justify-center text-[11px] font-semibold text-accent">
+            <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-[11px] font-semibold text-accent">
               {profile.display_name?.[0]?.toUpperCase() || 'U'}
             </div>
             <div className="flex-1 min-w-0">

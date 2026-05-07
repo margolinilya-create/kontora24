@@ -28,6 +28,18 @@ const BG_CLASSES = {
   urgent: 'bg-deadline-urgent/15 text-deadline-urgent',
 }
 
+const DOT_CLASSES = {
+  ok: 'bg-deadline-ok',
+  warn: 'bg-deadline-warn',
+  urgent: 'bg-deadline-urgent',
+}
+
+const BORDER_CLASSES = {
+  ok: 'border-deadline-ok',
+  warn: 'border-deadline-warn',
+  urgent: 'border-deadline-urgent',
+}
+
 export function getDeadlineClasses(deadline, now) {
   const level = getDeadlineLevel(deadline, now)
   return level ? TEXT_CLASSES[level] : ''
@@ -36,4 +48,14 @@ export function getDeadlineClasses(deadline, now) {
 export function getDeadlineBadgeClasses(deadline, now) {
   const level = getDeadlineLevel(deadline, now)
   return level ? BG_CLASSES[level] : ''
+}
+
+export function getDeadlineDotClass(deadline, now) {
+  const level = getDeadlineLevel(deadline, now)
+  return level ? DOT_CLASSES[level] : ''
+}
+
+export function getDeadlineBorderClass(deadline, now) {
+  const level = getDeadlineLevel(deadline, now)
+  return level ? BORDER_CLASSES[level] : ''
 }

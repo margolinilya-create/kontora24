@@ -6,27 +6,33 @@ import { StageProgressBar } from './logs/StageProgressBar'
 import { useProductionLogs } from '../hooks/useProductionLogs'
 import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
 import { formatDate } from '@/shared/lib/utils'
+import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
+
+const PRIORITY_BORDER = {
+  urgent: 'border-l-danger',
+  high: 'border-l-dept-pouring',
+}
 
 export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
   const { getStageProgress, error: logsError } = useProductionLogs(order.id, order.qty)
   const progress = getStageProgress(order.status)
 
-  const deadlineDate = order.deadline ? new Date(order.deadline) : null
-  const now = new Date()
-  const isOverdue = deadlineDate && deadlineDate < now
-  const isUrgentDeadline = deadlineDate && !isOverdue && deadlineDate < new Date(now.getTime() + 86400000 * 2)
+  const deadlineLevel = getDeadlineLevel(order.deadline)
+  const deadlineTextClass = getDeadlineClasses(order.deadline) || 'text-text-muted'
+  const deadlineDotClass = getDeadlineDotClass(order.deadline)
+  const priorityBorder = PRIORITY_BORDER[order.priority]
 
   return (
     <Link
       to={`/orders/${order.id}`}
-      className={`block bg-surface rounded-xl border border-border p-4 space-y-2 transition-colors hover:border-accent/30 active:bg-surface-dim${
-        order.assigned_to ? ' ring-2 ring-accent/20' : ''
-      }${order.priority === 'urgent' ? ' border-l-4 border-l-danger' : order.priority === 'high' ? ' border-l-4 border-l-warning' : ''}`}
+      className={`block bg-surface rounded-2xl border border-border shadow-card p-4 space-y-2 transition-[border-color,box-shadow] hover:border-accent/40 active:bg-surface-2${
+        order.assigned_to ? ' ring-2 ring-accent/30' : ''
+      }${priorityBorder ? ` border-l-[4px] ${priorityBorder}` : ''}`}
     >
       {/* Header: #number · client | priority */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-base font-semibold text-accent shrink-0">#{order.number}</span>
+          <span className="text-base font-semibold text-text shrink-0">#{order.number}</span>
           {order.client?.name && (
             <>
               <span className="text-text-muted">·</span>
@@ -35,7 +41,7 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
           )}
         </div>
         {(order.priority === 'urgent' || order.priority === 'high') && (
-          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0 ${PRIORITIES[order.priority]?.color}`}>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${PRIORITIES[order.priority]?.color}`}>
             {PRIORITIES[order.priority]?.label}
           </span>
         )}
@@ -48,9 +54,12 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
         {' · '}{order.qty} шт
       </p>
 
-      {/* Deadline */}
-      {deadlineDate && (
-        <p className={`text-sm ${isOverdue ? 'text-danger font-semibold' : isUrgentDeadline ? 'text-warning font-semibold' : 'text-text-muted'}`}>
+      {/* Deadline with colored dot */}
+      {order.deadline && (
+        <p className={`text-sm flex items-center gap-1.5 ${deadlineTextClass} ${deadlineLevel === 'urgent' ? 'font-semibold' : ''}`}>
+          {deadlineDotClass && (
+            <span className={`w-1.5 h-1.5 rounded-full ${deadlineDotClass}`} aria-hidden="true" />
+          )}
           Сдача: {formatDate(order.deadline)}
         </p>
       )}

@@ -8,7 +8,6 @@ const MM = 2.833
 const PAGE_W = 595
 const PAGE_H = 842
 const MARGIN = 5 * MM // 5mm side margins
-const CONTENT_W = PAGE_W - MARGIN * 2
 const HEADER_H = 20 * MM // 57px
 const BLOCK1_H = 64 * MM // 181px
 const BLOCK2_H = 42 * MM // 119px

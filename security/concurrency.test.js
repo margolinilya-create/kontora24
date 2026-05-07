@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 
 /**
  * Concurrency and race condition tests.
@@ -144,7 +144,7 @@ describe('Concurrency: Timer start/stop rapid clicks', () => {
     // In this case, activeEntry is null when stop() is called -> no-op
 
     const startPromise = new Promise(resolve => setTimeout(() => resolve({ id: 'entry-1' }), 50))
-    const stopTime = Date.now()
+    const _stopTime = Date.now()
 
     // If stop is called while start is in-flight:
     // activeEntry is still null -> stop() returns immediately

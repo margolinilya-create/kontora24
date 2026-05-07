@@ -46,7 +46,7 @@ function loadOpenGroups() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
     if (stored && typeof stored === 'object') return stored
-  } catch {}
+  } catch { /* ignore corrupted localStorage */ }
   return {}
 }
 

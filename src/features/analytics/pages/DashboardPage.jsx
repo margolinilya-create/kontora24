@@ -75,7 +75,7 @@ export default function DashboardPage() {
   const role = profile?.role
 
   const [data, setData] = useState({ orders: [], statusCounts: {}, lowStock: [], allMaterials: [], myOrders: [], deadlines: [], activity: [] })
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const [dataError, setDataError] = useState(null)
   const [workerStats, setWorkerStats] = useState({ todayDone: 0, weekDone: 0 })
   const [batchCompleting, setBatchCompleting] = useState(false)

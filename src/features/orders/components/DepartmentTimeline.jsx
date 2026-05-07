@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { DEPARTMENTS, getDepartment } from '@/shared/lib/department-mapping'
+import { DEPARTMENTS } from '@/shared/lib/department-mapping'
 import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
 
 export function DepartmentTimeline({ order }) {
   const [hoveredDept, setHoveredDept] = useState(null)
-  const currentDept = getDepartment(order.status)
   const orderRoute = getOrderRoute(order)
   const routeSet = new Set(orderRoute)
 

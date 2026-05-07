@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react'
+import { useState, memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
@@ -128,16 +128,13 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
 })
 
 function AttachmentThumbnail({ attachments }) {
-  const imgAttachment = useMemo(() => {
-    if (!attachments?.length) return null
-    return attachments.find(a => a.mime_type?.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(a.file_name))
-  }, [attachments])
-
-  const publicUrl = useMemo(() => {
-    if (!imgAttachment?.file_path) return null
-    const { data } = supabase.storage.from('order-files').getPublicUrl(imgAttachment.file_path)
-    return data?.publicUrl || null
-  }, [imgAttachment?.file_path])
+  // React Compiler memoizes these automatically — no useMemo wrapper needed.
+  const imgAttachment = attachments?.find(a =>
+    a.mime_type?.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(a.file_name)
+  )
+  const publicUrl = imgAttachment?.file_path
+    ? supabase.storage.from('order-files').getPublicUrl(imgAttachment.file_path).data?.publicUrl ?? null
+    : null
 
   if (!publicUrl) return null
   return (

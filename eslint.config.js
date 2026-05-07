@@ -21,6 +21,9 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Pre-existing patterns: many test/helper files declare unused destructure
+      // bindings or skipped Promise reject handlers — allow when prefixed with `_`.
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {
@@ -33,6 +36,27 @@ export default defineConfig([
     files: ['api/**/*.js', 'vite.config.js'],
     languageOptions: {
       globals: { ...globals.node, process: 'readonly', __dirname: 'readonly' },
+    },
+  },
+  {
+    // Vitest unit tests run in node env and use vitest globals.
+    files: ['**/*.test.{js,jsx}', 'src/test/**/*.{js,jsx}', 'security/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.vitest, vi: 'readonly' },
+    },
+  },
+  {
+    // Playwright e2e specs and config.
+    files: ['e2e/**/*.{js,jsx}', 'playwright.config.js'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+  {
+    // k6 load tests have their own runtime globals.
+    files: ['load/**/*.js'],
+    languageOptions: {
+      globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly' },
     },
   },
 ])

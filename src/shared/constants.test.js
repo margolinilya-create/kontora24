@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   getNextStatus, getOrderRoute, IS_3D_TYPE, IS_3D_STICKERPACK,
-  isDualTrack, DUAL_TRACK_STAGES, BACKGROUNDS_ONLY_STAGES,
+  isDualTrack,
   OPERATION_CHECKLISTS, PRIORITIES, ORDER_STATUSES,
   CAN_CANCEL_ROLES, ROLES, ORDER_TYPES, ORDER_ROUTES,
-  NOTIFY_ROLES, NAV_ITEMS, LAMINATION_TYPES,
+  NOTIFY_ROLES,
 } from './constants'
 
 describe('IS_3D_TYPE', () => {

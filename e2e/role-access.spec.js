@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, navigateTo } from './helpers'
+import { login } from './helpers'
 
 // Tests use admin account (mib@pnhd.ru) with role emulation via RoleSwitcher.
 // AuthGuard redirects to "/" when role lacks access.
@@ -11,6 +11,7 @@ async function emulateRole(page, roleName) {
   await page.waitForTimeout(500)
 }
 
+// eslint-disable-next-line no-unused-vars -- kept for future tests that need to clear role emulation
 async function resetEmulation(page) {
   const banner = page.locator('[class*="amber"], [class*="warning"]').filter({ hasText: /эмуля|роль/i })
   const resetBtn = banner.getByRole('button').first()

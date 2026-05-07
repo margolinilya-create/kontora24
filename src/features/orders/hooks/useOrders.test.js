@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 
 // Mock supabase before importing hook
 const { mockSupabase } = vi.hoisted(() => {
@@ -183,7 +183,7 @@ describe('useOrders', () => {
       Object.keys(q).forEach((k) => {
         if (typeof q[k]?.mockReturnThis === 'function') q[k].mockReturnThis()
       })
-      q.then = vi.fn((_, reject) => { throw { message: 'DB error' } })
+      q.then = vi.fn((_, _reject) => { throw { message: 'DB error' } })
       return q
     })
 

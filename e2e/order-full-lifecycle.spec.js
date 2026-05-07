@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, waitForToast, navigateTo } from './helpers'
+import { login } from './helpers'
 
 test.describe('Order Full Lifecycle', () => {
   test.beforeEach(async ({ page }) => {

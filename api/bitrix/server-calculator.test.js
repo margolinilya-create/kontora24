@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculate, DEFAULTS, MARKUPS, DISCOUNTS } from './server-calculator'
+import { calculate, MARKUPS, DISCOUNTS } from './server-calculator'
 
 describe('server-side calculate', () => {
   const w = 50, h = 50, qty = 100, type = 'sticker_cut'

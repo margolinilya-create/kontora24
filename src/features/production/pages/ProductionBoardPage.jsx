@@ -120,6 +120,14 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, onUpdate
 export default function ProductionBoardPage() {
   const [viewMode, setViewMode] = useState('board')
   const board = useProductionBoard()
+  // Destructure board members so the React Compiler lint rule doesn't conflate
+  // non-ref properties with the scrollRef ref it's wrapped together with.
+  const {
+    scrollRef, scrollState, setScrollState,
+    profile, search, setSearch, showMine, setShowMine, sortBy, setSortBy,
+    columns, total, todayDone, loading, error, refetch,
+    activeId, setActiveId, activeOrder, handleDragEnd,
+  } = board
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
@@ -128,14 +136,14 @@ export default function ProductionBoardPage() {
 
   // Scroll fade indicators
   useEffect(() => {
-    const el = board.scrollRef.current
+    const el = scrollRef.current
     if (!el) return
     let rafId = null
     function onScroll() {
       if (rafId) return
       rafId = requestAnimationFrame(() => {
         rafId = null
-        board.setScrollState({
+        setScrollState({
           start: el.scrollLeft < 10,
           end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 10,
         })
@@ -147,19 +155,19 @@ export default function ProductionBoardPage() {
       el.removeEventListener('scroll', onScroll)
       if (rafId) cancelAnimationFrame(rafId)
     }
-  }, [viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewMode, scrollRef, setScrollState])
 
   // Auto-scroll to worker's relevant column on mount (mobile only)
   useEffect(() => {
-    if (!board.profile || !board.scrollRef.current || window.innerWidth > 640) return
+    if (!profile || !scrollRef.current || window.innerWidth > 640) return
     const roleColMap = { designer: 'design', printer: 'print', post_printer: 'selection_pouring' }
-    const targetCol = roleColMap[board.profile.role]
+    const targetCol = roleColMap[profile.role]
     if (!targetCol) return
-    const colEl = board.scrollRef.current.querySelector(`[data-col="${targetCol}"]`)
+    const colEl = scrollRef.current.querySelector(`[data-col="${targetCol}"]`)
     if (colEl) {
       setTimeout(() => colEl.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }), 300)
     }
-  }, [board.profile, viewMode])
+  }, [profile, viewMode, scrollRef])
 
   const dropAnimation = { duration: 250, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' }
 
@@ -170,7 +178,7 @@ export default function ProductionBoardPage() {
         <div className="relative">
           <h1 className="text-2xl font-bold">Производство</h1>
           <p className="text-text-muted text-sm">
-            {board.total} {board.total === 1 ? 'заказ' : board.total < 5 ? 'заказа' : 'заказов'} · Выполнено сегодня: {board.todayDone ?? '—'}
+            {total} {total === 1 ? 'заказ' : total < 5 ? 'заказа' : 'заказов'} · Выполнено сегодня: {todayDone ?? '—'}
           </p>
           <OnboardingTip id="production-board-intro">
             Перетаскивайте карточки между колонками для смены статуса. Используйте фильтр «Мои» чтобы видеть только свои заказы.
@@ -184,26 +192,26 @@ export default function ProductionBoardPage() {
           />
           <input
             type="text"
-            value={board.search}
-            onChange={(e) => board.setSearch(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Поиск по №..."
             aria-label="Поиск по номеру заказа"
             className="rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50 w-full sm:w-36 min-h-[44px]"
           />
           <button
-            onClick={() => board.setShowMine(!board.showMine)}
-            aria-pressed={board.showMine}
+            onClick={() => setShowMine(!showMine)}
+            aria-pressed={showMine}
             className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 min-h-[44px] ${
-              board.showMine
+              showMine
                 ? 'bg-accent text-on-accent shadow-sm shadow-accent/25'
                 : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
             }`}
           >
-            {board.showMine ? 'Мои' : 'Все'}
+            {showMine ? 'Мои' : 'Все'}
           </button>
           <select
-            value={board.sortBy}
-            onChange={(e) => board.setSortBy(e.target.value)}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
             aria-label="Сортировка"
             className="rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50 min-h-[44px]"
           >
@@ -215,9 +223,9 @@ export default function ProductionBoardPage() {
 
       {viewMode === 'board' ? (
         <>
-          <PipelineSummary columns={board.columns} scrollRef={board.scrollRef} />
+          <PipelineSummary columns={columns} scrollRef={scrollRef} />
 
-          {board.loading && (
+          {loading && (
             <div className="flex gap-3 overflow-hidden pb-4">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="shrink-0 bg-surface rounded-2xl border border-border p-4 w-[70vw] sm:w-[260px]">
@@ -230,35 +238,35 @@ export default function ProductionBoardPage() {
             </div>
           )}
 
-          {!board.loading && board.error && (
-            <ErrorState error={board.error} onRetry={board.refetch} />
+          {!loading && error && (
+            <ErrorState error={error} onRetry={refetch} />
           )}
 
-          {!board.loading && !board.error && <DndContext
+          {!loading && !error && <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
-            onDragStart={(e) => board.setActiveId(e.active.id)}
-            onDragEnd={board.handleDragEnd}
-            onDragCancel={() => board.setActiveId(null)}
+            onDragStart={(e) => setActiveId(e.active.id)}
+            onDragEnd={handleDragEnd}
+            onDragCancel={() => setActiveId(null)}
           >
             <div className="relative">
-              {!board.scrollState.start && (
+              {!scrollState.start && (
                 <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-surface-dim to-transparent z-10 pointer-events-none sm:hidden" />
               )}
-              {!board.scrollState.end && (
+              {!scrollState.end && (
                 <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-surface-dim to-transparent z-10 pointer-events-none sm:hidden" />
               )}
             <div
-              ref={board.scrollRef}
+              ref={scrollRef}
               className="flex gap-3 overflow-x-auto pb-4 kanban-scroll scroll-smooth snap-x snap-mandatory sm:snap-none"
             >
               {PHASES.map((phase) => {
                 const phaseCols = phase.key === '3d'
-                  ? phase.cols.filter((s) => (board.columns[s]?.length || 0) > 0)
+                  ? phase.cols.filter((s) => (columns[s]?.length || 0) > 0)
                   : phase.cols
                 if (phaseCols.length === 0) return null
 
-                const phaseCount = phaseCols.reduce((sum, s) => sum + (board.columns[s]?.length || 0), 0)
+                const phaseCount = phaseCols.reduce((sum, s) => sum + (columns[s]?.length || 0), 0)
 
                 return (
                   <div key={phase.key} className="shrink-0 bg-surface rounded-2xl border border-border p-4 snap-start">
@@ -276,10 +284,10 @@ export default function ProductionBoardPage() {
                         <DroppableColumn
                           key={status}
                           status={status}
-                          orders={board.columns[status]}
-                          onUpdated={board.refetch}
-                          isActive={!!board.activeId}
-                          activeFromStatus={board.activeOrder?.status}
+                          orders={columns[status]}
+                          onUpdated={refetch}
+                          isActive={!!activeId}
+                          activeFromStatus={activeOrder?.status}
                         />
                       ))}
                     </div>
@@ -290,7 +298,7 @@ export default function ProductionBoardPage() {
             </div>
 
             <DragOverlay dropAnimation={dropAnimation}>
-              {board.activeOrder && <DragOverlayCard order={board.activeOrder} />}
+              {activeOrder && <DragOverlayCard order={activeOrder} />}
             </DragOverlay>
           </DndContext>}
         </>

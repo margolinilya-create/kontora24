@@ -23,6 +23,9 @@ export function useOrders(filters = {}) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Serialize statuses array to a primitive so the deps array stays stable.
+  const statusesKey = filters.statuses?.join(',') ?? ''
+
   const fetchOrders = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -76,8 +79,8 @@ export function useOrders(filters = {}) {
     } finally {
       setLoading(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- statuses serialized to avoid array reference loops
-  }, [filters.status, filters.statuses?.join(','), filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- statusesKey is the serialized form of filters.statuses
+  }, [filters.status, statusesKey, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
@@ -374,7 +377,7 @@ export async function claimOrder(orderId, newOwnerId, expectedCurrentOwner) {
     query = query.eq('assigned_to', expectedCurrentOwner)
   }
 
-  const { data, error, count } = await query.select()
+  const { data, error } = await query.select()
 
   if (error) throw error
   if (!data || data.length === 0) {

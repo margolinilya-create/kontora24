@@ -28,7 +28,7 @@ export default function ReportsPage() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Отчёты</h1>
+          <h1 className="text-2xl font-bold font-display tracking-tight">Отчёты</h1>
           <p className="text-text-muted text-sm">Аналитика по персоналу и производству</p>
         </div>
         <Tabs items={PERIOD_TABS} active={period} onChange={setPeriod} />

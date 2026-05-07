@@ -21,7 +21,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Настройки</h1>
+        <h1 className="text-2xl font-bold font-display tracking-tight">Настройки</h1>
         <p className="text-text-muted">Параметры производства и управление пользователями</p>
       </div>
 

@@ -272,7 +272,7 @@ export default function CreateOrderPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Новый заказ</h1>
+      <h1 className="text-2xl font-bold font-display tracking-tight mb-6">Новый заказ</h1>
 
       {/* Error summary */}
       {errorCount > 0 && (

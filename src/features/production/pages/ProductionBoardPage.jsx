@@ -176,7 +176,7 @@ export default function ProductionBoardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="relative">
-          <h1 className="text-2xl font-bold">Производство</h1>
+          <h1 className="text-2xl font-bold font-display tracking-tight">Производство</h1>
           <p className="text-text-muted text-sm">
             {total} {total === 1 ? 'заказ' : total < 5 ? 'заказа' : 'заказов'} · Выполнено сегодня: {todayDone ?? '—'}
           </p>

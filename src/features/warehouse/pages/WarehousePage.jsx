@@ -27,7 +27,7 @@ export default function WarehousePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap gap-4 items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Склад</h1>
+          <h1 className="text-2xl font-bold font-display tracking-tight">Склад</h1>
           <p className="text-text-muted">
             {materials.length} материалов
             {lowStockCount > 0 && (

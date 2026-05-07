@@ -48,7 +48,7 @@ export default function CabinetPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Личный кабинет</h1>
+        <h1 className="text-2xl font-bold font-display tracking-tight">Личный кабинет</h1>
         <p className="text-text-muted">{profile?.display_name} · {ROLES[profile?.role]?.label}</p>
       </div>
 

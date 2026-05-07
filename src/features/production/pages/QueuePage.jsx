@@ -89,7 +89,7 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
       {!hideHeader && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="relative">
-            <h1 className="text-2xl font-bold">{config.title}</h1>
+            <h1 className="text-2xl font-bold font-display tracking-tight">{config.title}</h1>
             <p className="text-text-muted text-sm">
               {totalInQueue > 0
                 ? `${totalInQueue} в очереди${myCount > 0 ? ` · ${myCount} моих` : ''}`

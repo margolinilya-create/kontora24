@@ -78,7 +78,7 @@ export default function OrdersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Заказы</h1>
+          <h1 className="text-2xl font-bold font-display tracking-tight">Заказы</h1>
           <p className="text-text-muted">
             {totalCount > 0 ? `${totalCount} заказов` : 'Управление заказами'}
           </p>

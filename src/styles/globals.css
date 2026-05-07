@@ -1,12 +1,15 @@
 @import "tailwindcss";
 
-/* Brand fonts — Onder for headings, Guidy for body. */
+/* Brand fonts — Onder for headings, Guidy for body.
+ * size-adjust normalizes Onder's tall caps so it lines up with Guidy
+ * at the same Tailwind text-* size. */
 @font-face {
   font-family: 'Onder';
   src: url('../assets/fonts/ONDER-REGULAR.TTF') format('truetype');
   font-weight: 400 700;
   font-style: normal;
   font-display: swap;
+  size-adjust: 90%;
 }
 @font-face {
   font-family: 'Guidy';
@@ -115,10 +118,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4 {
-  font-family: var(--font-display);
-  letter-spacing: -0.01em;
-}
+/* Headings use the display font only when explicitly classed (.font-display).
+ * Plain h2/h3 are caption-like and stay on Guidy to avoid Onder's wide caps
+ * blowing up small headers like the page-title strip in <Layout>. */
 
 * {
   box-sizing: border-box;

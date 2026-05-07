@@ -59,7 +59,7 @@ export default function ClientDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link to="/clients" className="text-text-muted hover:text-text text-sm">← Клиенты</Link>
-        <h1 className="text-2xl font-bold">{client.name}</h1>
+        <h1 className="text-2xl font-bold font-display tracking-tight">{client.name}</h1>
         {client.name && (
           <a
             href={`https://kontora24.bitrix24.ru/crm/contact/list/?FIND=${encodeURIComponent(client.name)}`}

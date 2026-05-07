@@ -94,7 +94,7 @@ export default function OrderDetailPage() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3 flex-wrap">
+          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3 flex-wrap">
             <span>ORD-{String(order.number).padStart(4, '0')}</span>
             {order.priority && order.priority !== 'normal' && (
               <span className={`text-sm px-2 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>

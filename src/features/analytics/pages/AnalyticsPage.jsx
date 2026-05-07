@@ -53,7 +53,7 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Аналитика</h1>
+          <h1 className="text-2xl font-bold font-display tracking-tight">Аналитика</h1>
           <p className="text-text-muted">Финансы и производственные метрики</p>
         </div>
         <div className="flex gap-2 flex-wrap">

@@ -37,8 +37,8 @@ const CardContent = memo(function CardContent({ order, isOverlay = false }) {
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Header: number */}
-      <div className="flex items-center justify-between">
+      {/* Header: number (left) + deadline (right top corner per ТЗ R6.2) */}
+      <div className="flex items-start justify-between gap-2">
         {isOverlay ? (
           <span className="font-bold text-text">#{order.number}</span>
         ) : (
@@ -50,6 +50,16 @@ const CardContent = memo(function CardContent({ order, isOverlay = false }) {
           >
             #{order.number}
           </Link>
+        )}
+        {order.deadline && (
+          <span className="flex items-center gap-1 shrink-0">
+            {deadlineDotClass && (
+              <span className={`w-1.5 h-1.5 rounded-full ${deadlineDotClass}`} aria-hidden="true" />
+            )}
+            <span className={`text-xs ${deadlineTextClass} ${deadlineLevel === 'urgent' ? 'font-medium' : ''}`}>
+              {formatDeadline(order.deadline)}
+            </span>
+          </span>
         )}
       </div>
 
@@ -82,38 +92,22 @@ const CardContent = memo(function CardContent({ order, isOverlay = false }) {
         </button>
       )}
 
-      {/* Footer: meta row */}
+      {/* Footer: assignee + priority + checklist + time */}
       <div className="flex items-center justify-between pt-2 border-t border-border">
         <div className="flex items-center gap-1.5 min-w-0">
-          {/* Deadline with colored dot */}
-          {order.deadline && (
-            <span className="flex items-center gap-1.5 shrink-0">
-              {deadlineDotClass && (
-                <span className={`w-1.5 h-1.5 rounded-full ${deadlineDotClass}`} aria-hidden="true" />
-              )}
-              <span className={`text-xs ${deadlineTextClass} ${deadlineLevel === 'urgent' ? 'font-medium' : ''}`}>
-                {formatDeadline(order.deadline)}
-              </span>
-            </span>
-          )}
-          {/* Assignee */}
           {order.assignee?.display_name && (
             <span className="text-xs text-text-muted truncate">
-              · {order.assignee.display_name}
+              {order.assignee.display_name}
             </span>
           )}
         </div>
-
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Priority badge */}
           {showPriority && (
             <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${priority?.color}`}>
               {priority?.label}
             </span>
           )}
-          {/* Operation checklist progress */}
           <OperationChecklist order={order} compact />
-          {/* Time in status */}
           {timeInStatus && (
             <span className="text-xs text-text-muted">{timeInStatus}</span>
           )}

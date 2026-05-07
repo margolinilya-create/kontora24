@@ -236,7 +236,9 @@ export default function DashboardPage() {
         return da - db
       })
   }, [data.orders])
-  const outOfStock = useMemo(() => data.allMaterials.filter(m => m.min_qty > 0 && Number(m.stock_qty) === 0), [data.allMaterials])
+  // Отрицательный stock_qty (накопленный из-за списаний без поступлений) трактуем
+  // как "закончилось". Иначе материал терялся бы между виджетами.
+  const outOfStock = useMemo(() => data.allMaterials.filter(m => m.min_qty > 0 && Number(m.stock_qty) <= 0), [data.allMaterials])
   const lowStockOnly = useMemo(() => data.allMaterials.filter(m => m.min_qty > 0 && Number(m.stock_qty) > 0 && Number(m.stock_qty) <= Number(m.min_qty)), [data.allMaterials])
 
   return (

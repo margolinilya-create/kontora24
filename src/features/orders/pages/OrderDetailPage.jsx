@@ -49,16 +49,14 @@ function OverviewTab({ order }) {
           <InfoField label="Тип" value={ORDER_TYPES[order.order_type]?.label || order.order_type} />
           <InfoField label="Размер" value={`${order.width_mm} x ${order.height_mm} мм`} />
           <InfoField label="Тираж" value={`${order.qty} шт`} />
-          <InfoField label="Плёнка" value={FILM_TYPES[order.film_type]?.label || order.film_type || '—'} />
+          <InfoField label="Плёнка" value={FILM_TYPES[order.film_type]?.label || (order.film_type && order.film_type !== 'white' ? order.film_type : '—')} />
         </div>
         {/* Row 2: Ламинация / БОПП / Стикеров в паке (только пак) / Отгрузка */}
         <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <InfoField label="Ламинация" value={order.need_lam ? (LAMINATION_TYPES[order.lam_type]?.label || 'Да') : 'Нет'} />
           <InfoField label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
-          {isPack ? (
+          {isPack && (
             <InfoField label="Стикеров в паке" value={order.stickers_per_pack || '—'} />
-          ) : (
-            <InfoField label="Срок сдачи" value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'} />
           )}
           <InfoField label="Отгрузка" value={DELIVERY_TYPES[order.delivery_type]?.label || 'Самовывоз'} />
         </div>

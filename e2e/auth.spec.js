@@ -53,8 +53,8 @@ test.describe('Authentication', () => {
 
     const sidebar = page.locator('aside')
     await expect(sidebar.getByRole('link', { name: 'Заказы' })).toBeVisible()
-    await expect(sidebar.getByRole('link', { name: 'Калькулятор' })).toBeVisible()
-    await expect(sidebar.getByRole('link', { name: 'Производство' })).toBeVisible()
+    await expect(sidebar.getByRole('link', { name: 'Главная' })).toBeVisible()
+    await expect(sidebar.getByRole('link', { name: 'Аналитика' })).toBeVisible()
     await expect(sidebar.getByText('Выйти')).toBeVisible()
   })
 

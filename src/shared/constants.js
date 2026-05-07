@@ -229,7 +229,8 @@ const ALL_ROLES = ['admin', 'manager', 'designer', 'printer', 'post_printer']
 export const NAV_ITEMS = [
   { path: '/', label: 'Главная', icon: 'LayoutDashboard', roles: ALL_ROLES },
   { path: '/orders', label: 'Заказы', icon: 'ShoppingCart', roles: ['admin', 'manager'] },
-  { path: '/production', label: 'Производство', icon: 'Palette', roles: ['admin', 'manager'] },
+  // Страница /production оставлена для bookmarks, но скрыта из меню — её
+  // функционал дублирует канбан на странице заказов (уберём после R6).
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'] },
   { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'] },
   { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'] },

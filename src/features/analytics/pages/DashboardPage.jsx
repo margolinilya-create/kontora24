@@ -5,6 +5,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
+import { getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
 
 const CompleteTaskModal = lazy(() => import('@/features/production/components/CompleteTaskModal').then(m => ({ default: m.CompleteTaskModal })))
 import Button from '@/shared/components/Button'
@@ -219,6 +220,22 @@ export default function DashboardPage() {
       return d >= today && d < tomorrow
     })
   }, [data.orders])
+  // "Срочные" по ТЗ 06.05: priority=urgent ИЛИ просрочено (deadline < сегодня)
+  const urgentOrders = useMemo(() => {
+    const today = startOfDay(new Date())
+    return data.orders
+      .filter(o => {
+        if (o.status === 'done' || o.status === 'cancelled') return false
+        if (o.priority === 'urgent') return true
+        if (o.deadline && new Date(o.deadline) < today) return true
+        return false
+      })
+      .sort((a, b) => {
+        const da = a.deadline ? new Date(a.deadline).getTime() : Infinity
+        const db = b.deadline ? new Date(b.deadline).getTime() : Infinity
+        return da - db
+      })
+  }, [data.orders])
   const outOfStock = useMemo(() => data.allMaterials.filter(m => m.min_qty > 0 && Number(m.stock_qty) === 0), [data.allMaterials])
   const lowStockOnly = useMemo(() => data.allMaterials.filter(m => m.min_qty > 0 && Number(m.stock_qty) > 0 && Number(m.stock_qty) <= Number(m.min_qty)), [data.allMaterials])
 
@@ -331,8 +348,8 @@ export default function DashboardPage() {
 
           <Tabs
             items={[
-              { key: 'overview', label: 'Обзор' },
-              { key: 'production', label: 'Производство' },
+              { key: 'overview', label: 'Обзор производства' },
+              { key: 'production', label: 'Статистика производства' },
             ]}
             active={managerTab}
             onChange={setManagerTab}
@@ -340,39 +357,46 @@ export default function DashboardPage() {
 
           {managerTab === 'overview' && (
             <>
-              {/* Top metrics — bento tiles */}
+              {/* Top metrics — bento tiles, +8pt по ТЗ */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
                   <p className="text-text-muted text-sm">Заказов в работе</p>
-                  <p className="text-3xl font-bold mt-1 font-display tracking-tight">{ordersInWork.length}</p>
+                  <p className="text-5xl font-bold mt-2 font-display tracking-tight leading-none">{ordersInWork.length}</p>
                 </div>
                 <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
                   <p className="text-text-muted text-sm">К сдаче сегодня</p>
-                  <p className="text-3xl font-bold mt-1 font-display tracking-tight">{ordersDueToday.length}</p>
+                  <p className="text-5xl font-bold mt-2 font-display tracking-tight leading-none">{ordersDueToday.length}</p>
                 </div>
               </div>
 
-              {/* Orders due today list */}
-              {ordersDueToday.length > 0 && (
+              {/* Список срочных заказов (priority=urgent или просроченные) */}
+              {urgentOrders.length > 0 && (
                 <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-                  <h2 className="font-semibold mb-3">Сдача сегодня</h2>
-                  <div className="space-y-1">
-                    {ordersDueToday.map((order) => (
-                      <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-dim transition-colors">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="font-medium text-sm text-text">#{order.number}</span>
-                          <span className="text-sm text-text-muted truncate">
-                            {order.client?.name || ''}
-                          </span>
-                        </div>
-                        <StatusBadge status={order.status} />
-                      </Link>
-                    ))}
+                  <h2 className="font-semibold mb-3">Список срочных заказов</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {urgentOrders.map((order) => {
+                      const dotClass = getDeadlineDotClass(order.deadline)
+                      const borderClass = getDeadlineBorderClass(order.deadline) || 'border-danger'
+                      return (
+                        <Link
+                          key={order.id}
+                          to={`/orders/${order.id}`}
+                          className={`flex items-center justify-between gap-2 py-3 px-3 rounded-xl border border-border bg-surface hover:border-accent/40 hover:bg-surface-2 transition-colors border-l-4 ${borderClass}`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {dotClass && <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} aria-hidden="true" />}
+                            <span className="font-semibold text-sm text-text shrink-0">#{order.number}</span>
+                            <span className="text-sm text-text-muted truncate">{order.client?.name || ''}</span>
+                          </div>
+                          <StatusBadge status={order.status} />
+                        </Link>
+                      )
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Warehouse block */}
+              {/* Warehouse block — позиции тоже карточками */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Out of stock */}
                 <div className="bg-surface rounded-2xl border border-danger/30 shadow-card p-5">
@@ -380,28 +404,38 @@ export default function DashboardPage() {
                   {outOfStock.length === 0 ? (
                     <p className="text-text-muted text-sm">Все в наличии</p>
                   ) : (
-                    <div className="space-y-1">
+                    <div className="grid grid-cols-1 gap-2">
                       {outOfStock.map((m) => (
-                        <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-2 hover:bg-surface-dim rounded-lg px-2 -mx-2 transition-colors">
-                          <span className="text-danger font-medium">{m.name}</span>
-                          <span className="text-text-muted">{m.unit}</span>
+                        <Link
+                          key={m.id}
+                          to="/warehouse"
+                          className="flex items-center justify-between text-sm py-2.5 px-3 rounded-xl border border-danger/20 bg-danger/[0.04] hover:bg-danger/10 hover:border-danger/40 transition-colors"
+                        >
+                          <span className="text-danger font-medium truncate">{m.name}</span>
+                          <span className="text-text-muted shrink-0 ml-2">{m.unit}</span>
                         </Link>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {/* Low stock — using dept-pouring (orange) since warning is yellow=accent */}
+                {/* Low stock */}
                 <div className="bg-surface rounded-2xl border border-dept-pouring/30 shadow-card p-5">
                   <h2 className="font-semibold mb-3 text-dept-pouring">Заканчиваются</h2>
                   {lowStockOnly.length === 0 ? (
                     <p className="text-text-muted text-sm">Все в норме</p>
                   ) : (
-                    <div className="space-y-1">
+                    <div className="grid grid-cols-1 gap-2">
                       {lowStockOnly.map((m) => (
-                        <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-2 hover:bg-surface-dim rounded-lg px-2 -mx-2 transition-colors">
-                          <span className="text-dept-pouring font-medium">{m.name}</span>
-                          <span className="text-text-muted">{Number(m.stock_qty).toFixed(1)} / {Number(m.min_qty).toFixed(1)} {m.unit}</span>
+                        <Link
+                          key={m.id}
+                          to="/warehouse"
+                          className="flex items-center justify-between text-sm py-2.5 px-3 rounded-xl border border-dept-pouring/20 bg-dept-pouring/[0.04] hover:bg-dept-pouring/10 hover:border-dept-pouring/40 transition-colors"
+                        >
+                          <span className="text-dept-pouring font-medium truncate">{m.name}</span>
+                          <span className="text-text-muted shrink-0 ml-2">
+                            {Number(m.stock_qty).toFixed(1)} / {Number(m.min_qty).toFixed(1)} {m.unit}
+                          </span>
                         </Link>
                       ))}
                     </div>

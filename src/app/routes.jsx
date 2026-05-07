@@ -1,9 +1,23 @@
 import { lazy } from 'react'
+import { Navigate } from 'react-router-dom'
 import { Layout } from '@/shared/components/Layout'
 import { AuthGuard } from '@/features/auth/components/AuthGuard'
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 import { LoginForm } from '@/features/auth/components/LoginForm'
 import { NotFoundPage } from '@/shared/components/NotFoundPage'
+import { useAuth } from '@/features/auth/hooks/useAuth'
+
+/**
+ * Главная по ТЗ R8: для рабочих ролей сразу редирект на /orders;
+ * админ/менеджер видят DashboardPage.
+ */
+function HomeRoute() {
+  const { profile, hasRole } = useAuth()
+  if (!profile) return null
+  const isManager = hasRole(['admin', 'manager'])
+  if (!isManager) return <Navigate to="/orders" replace />
+  return <DashboardPage />
+}
 
 // Lazy-loaded pages
 const DashboardPage = lazy(() => import('@/features/analytics/pages/DashboardPage'))
@@ -41,8 +55,8 @@ export const routes = [
       </AuthGuard>
     ),
     children: [
-      { index: true, element: <ErrorBoundary><DashboardPage /></ErrorBoundary> },
-      { path: 'orders', element: <AuthGuard roles={['admin', 'manager']}><ErrorBoundary><OrdersPage /></ErrorBoundary></AuthGuard> },
+      { index: true, element: <ErrorBoundary><HomeRoute /></ErrorBoundary> },
+      { path: 'orders', element: <ErrorBoundary><OrdersPage /></ErrorBoundary> },
       { path: 'orders/create', element: <AuthGuard roles={['admin', 'manager']}><ErrorBoundary><CreateOrderPage /></ErrorBoundary></AuthGuard> },
       { path: 'orders/:id', element: <ErrorBoundary><OrderDetailPage /></ErrorBoundary> },
       { path: 'production/design', element: <AuthGuard roles={['admin', 'manager', 'designer']}><ErrorBoundary><DesignQueuePage /></ErrorBoundary></AuthGuard> },

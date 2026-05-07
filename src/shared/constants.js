@@ -251,10 +251,12 @@ export const NOTIFY_ROLES = {
 
 // --- Navigation ---
 const ALL_ROLES = ['admin', 'manager', 'designer', 'printer', 'post_printer']
+const MANAGER_ROLES = ['admin', 'manager']
 
 export const NAV_ITEMS = [
-  { path: '/', label: 'Главная', icon: 'LayoutDashboard', roles: ALL_ROLES },
-  { path: '/orders', label: 'Заказы', icon: 'ShoppingCart', roles: ['admin', 'manager'] },
+  // Главная и Аналитика — только для manager+admin (по ТЗ R8: рабочие сразу попадают на /orders)
+  { path: '/', label: 'Главная', icon: 'LayoutDashboard', roles: MANAGER_ROLES },
+  { path: '/orders', label: 'Заказы', icon: 'ShoppingCart', roles: ALL_ROLES },
   // Страница /production оставлена для bookmarks, но скрыта из меню — её
   // функционал дублирует канбан на странице заказов (уберём после R6).
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'] },
@@ -268,9 +270,9 @@ export const NAV_ITEMS = [
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'] },
   { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'] },
   { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ALL_ROLES },
-  { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: ['admin', 'manager'] },
-  { path: '/clients', label: 'Клиенты', icon: 'Users', roles: ['admin', 'manager'] },
-  { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: ['admin', 'manager'] },
+  { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: MANAGER_ROLES },
+  { path: '/clients', label: 'Клиенты', icon: 'Users', roles: MANAGER_ROLES },
+  { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: MANAGER_ROLES },
   { path: '/reports', label: 'Отчёты', icon: 'FileText', roles: ['admin'] },
   { path: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'] },
   { path: '/help', label: 'Справка', icon: 'HelpCircle', roles: ALL_ROLES },

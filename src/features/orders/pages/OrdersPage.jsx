@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useOrders } from '../hooks/useOrders'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { StatusBadge } from '../components/StatusBadge'
 import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
 import { useDebounce } from '@/shared/hooks/useDebounce'
@@ -9,6 +10,7 @@ import { OrdersKanban } from '../components/OrdersKanban'
 import { ProductionCalendar } from '@/features/production/components/ProductionCalendar'
 import { DepartmentFilter } from '../components/DepartmentFilter'
 import { DateRangeFilter } from '../components/DateRangeFilter'
+import { SavedFilters } from '../components/SavedFilters'
 import SearchInput from '@/shared/components/SearchInput'
 import Tabs from '@/shared/components/Tabs'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
@@ -17,6 +19,8 @@ const ACTIVE_STATUSES = ['new', 'design', 'prepress', 'print', 'lamination', 'cu
 const ARCHIVED_STATUSES = ['done', 'cancelled']
 
 export default function OrdersPage() {
+  const { hasRole } = useAuth()
+  const isManager = hasRole(['admin', 'manager'])
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('deadline')
   const [sortAsc, setSortAsc] = useState(true)
@@ -26,6 +30,18 @@ export default function OrdersPage() {
   const [includeArchived, setIncludeArchived] = useState(false)
   const [deadlineFrom, setDeadlineFrom] = useState(null)
   const [deadlineTo, setDeadlineTo] = useState(null)
+
+  function applySavedFilter(config) {
+    if (!config) return
+    setStatusFilters(config.statusFilters || [])
+    setDeptFilter(config.deptFilter || [])
+    setIncludeArchived(!!config.includeArchived)
+    setSortBy(config.sortBy || 'deadline')
+    setSortAsc(config.sortAsc ?? true)
+    setSearch(config.search || '')
+  }
+
+  const currentFilter = { statusFilters, deptFilter, includeArchived, sortBy, sortAsc, search }
 
   const debouncedSearch = useDebounce(search, 300)
   const [pPage, setPPage] = useState(1)
@@ -91,12 +107,14 @@ export default function OrdersPage() {
             active={viewMode}
             onChange={setViewMode}
           />
-          <Link
-            to="/orders/create"
-            className="bg-accent hover:bg-accent-hover text-on-accent font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors shadow-card"
-          >
-            + Новый заказ
-          </Link>
+          {isManager && (
+            <Link
+              to="/orders/create"
+              className="bg-accent hover:bg-accent-hover text-on-accent font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors shadow-card"
+            >
+              + Новый заказ
+            </Link>
+          )}
         </div>
       </div>
 
@@ -142,6 +160,8 @@ export default function OrdersPage() {
             to={deadlineTo}
             onChange={({ from: f, to: t }) => { setDeadlineFrom(f); setDeadlineTo(t) }}
           />
+
+          <SavedFilters currentFilter={currentFilter} onApply={applySavedFilter} />
         </>
       )}
 

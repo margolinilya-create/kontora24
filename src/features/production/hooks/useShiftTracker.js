@@ -64,16 +64,28 @@ export function useShiftTracker() {
 
   const clockOut = useCallback(async () => {
     if (!profile || !activeShift) return
+    const snapshot = activeShift
     const now = new Date()
-    const started = new Date(activeShift.started_at)
+    const started = new Date(snapshot.started_at)
     const durationMinutes = Math.round((now - started) / MS_PER_MINUTE)
 
-    const { error } = await supabase
-      .from('k24_shift_entries')
-      .update({ ended_at: now.toISOString(), duration_minutes: durationMinutes })
-      .eq('id', activeShift.id)
-    if (error) throw error
-    await fetchShiftData()
+    // Optimistic — сразу убираем активную смену из UI
+    setActiveShift(null)
+
+    try {
+      const { error } = await supabase
+        .from('k24_shift_entries')
+        .update({ ended_at: now.toISOString(), duration_minutes: durationMinutes })
+        .eq('id', snapshot.id)
+      if (error) throw error
+      // Рефреш не критичен — если упал, активная смена уже null, todayMinutes
+      // поправится при следующем монтировании.
+      try { await fetchShiftData() } catch { /* swallow */ }
+    } catch (err) {
+      // Откат: возвращаем активную смену чтобы пользователь мог повторить
+      setActiveShift(snapshot)
+      throw err
+    }
   }, [profile, activeShift, fetchShiftData])
 
   return {

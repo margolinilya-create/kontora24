@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useShiftTracker } from '@/features/production/hooks/useShiftTracker'
 import { useCabinetStats } from '../hooks/useCabinetStats'
@@ -13,6 +13,8 @@ import ErrorState from '@/shared/components/ErrorState'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { differenceInMinutes } from 'date-fns'
+
+const MonthlyChart = lazy(() => import('../components/MonthlyChart').then((m) => ({ default: m.MonthlyChart })))
 
 const PERIOD_TABS = [
   { key: '7', label: '7 дней' },
@@ -103,21 +105,58 @@ export default function CabinetPage() {
           {/* Summary cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="bg-surface rounded-xl border border-border p-4">
-              <p className="text-2xl font-bold">{stats.totalItems}</p>
+              <p className="text-3xl font-bold font-display tracking-tight">{stats.totalItems}</p>
               <p className="text-xs text-text-muted">Записей</p>
             </div>
             <div className="bg-surface rounded-xl border border-border p-4">
-              <p className="text-2xl font-bold">{stats.byOrder.length}</p>
+              <p className="text-3xl font-bold font-display tracking-tight">{stats.byOrder.length}</p>
               <p className="text-xs text-text-muted">Заказов</p>
             </div>
             <div className="bg-surface rounded-xl border border-border p-4">
-              <p className="text-2xl font-bold">{stats.totalHours}ч</p>
+              <p className="text-3xl font-bold font-display tracking-tight">{stats.totalHours}ч</p>
               <p className="text-xs text-text-muted">Отработано</p>
             </div>
             <div className="bg-surface rounded-xl border border-border p-4">
-              <p className="text-2xl font-bold">{stats.shifts?.length || 0}</p>
+              <p className="text-3xl font-bold font-display tracking-tight">{stats.shifts?.length || 0}</p>
               <p className="text-xs text-text-muted">Смен</p>
             </div>
+          </div>
+
+          {/* Personal production headline */}
+          {(stats.headline.poured > 0 || stats.headline.packaged > 0 || stats.headline.selected > 0 || stats.headline.printed > 0) && (
+            <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+              <h2 className="font-semibold mb-4">Мой личный вклад</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="bg-dept-print/10 rounded-xl p-3">
+                  <p className="text-2xl font-bold font-display tracking-tight text-dept-print">{stats.headline.printed}</p>
+                  <p className="text-xs text-text-muted">Напечатано</p>
+                </div>
+                <div className="bg-dept-pouring/10 rounded-xl p-3">
+                  <p className="text-2xl font-bold font-display tracking-tight text-dept-pouring">{stats.headline.poured}</p>
+                  <p className="text-xs text-text-muted">Залито хороших</p>
+                </div>
+                <div className="bg-dept-pouring/10 rounded-xl p-3">
+                  <p className="text-2xl font-bold font-display tracking-tight text-dept-pouring">{stats.headline.selected}</p>
+                  <p className="text-xs text-text-muted">Выбрано фонов</p>
+                </div>
+                <div className="bg-dept-finish/10 rounded-xl p-3">
+                  <p className="text-2xl font-bold font-display tracking-tight text-dept-finish">{stats.headline.packaged}</p>
+                  <p className="text-xs text-text-muted">Упаковано паков</p>
+                </div>
+                <div className="bg-danger/10 rounded-xl p-3">
+                  <p className="text-2xl font-bold font-display tracking-tight text-danger">{stats.headline.defects}</p>
+                  <p className="text-xs text-text-muted">Брак</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Monthly chart — last 6 months */}
+          <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+            <h2 className="font-semibold mb-4">Производство по месяцам</h2>
+            <Suspense fallback={<Spinner />}>
+              <MonthlyChart data={stats.byMonth} />
+            </Suspense>
           </div>
 
           {/* By action type */}

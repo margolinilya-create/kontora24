@@ -54,15 +54,15 @@ export function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-dim p-4">
+    <div className="min-h-screen flex items-center justify-center bg-bg p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4">
-            <svg viewBox="0 0 32 32" className="w-10 h-10 text-accent">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent mb-4 shadow-card">
+            <svg viewBox="0 0 32 32" className="w-10 h-10 text-on-accent">
               <text x="16" y="23" textAnchor="middle" fill="currentColor" fontFamily="sans-serif" fontWeight="700" fontSize="20">K</text>
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-primary">Kontora24</h1>
+          <h1 className="text-2xl font-bold text-text font-display tracking-tight">Kontora24</h1>
           <p className="text-text-muted mt-1">
             {mode === 'login' ? 'Управление производством' : 'Восстановление пароля'}
           </p>

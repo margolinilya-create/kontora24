@@ -88,7 +88,7 @@ function SizePresetPicker({ activePreset, onSelect }) {
           onClick={() => onSelect(key)}
           className={`px-3 py-2 text-xs rounded-lg font-medium transition-all min-h-[40px] ${
             activePreset === key
-              ? 'bg-accent text-white'
+              ? 'bg-accent text-on-accent'
               : 'border border-border bg-surface hover:bg-surface-dim text-text-muted'
           }`}
         >
@@ -100,7 +100,7 @@ function SizePresetPicker({ activePreset, onSelect }) {
         onClick={() => onSelect(null)}
         className={`px-3 py-2 text-xs rounded-lg font-medium transition-all min-h-[40px] ${
           activePreset === null
-            ? 'bg-accent text-white'
+            ? 'bg-accent text-on-accent'
             : 'border border-border bg-surface hover:bg-surface-dim text-text-muted'
         }`}
       >

@@ -28,8 +28,8 @@
   /* Base */
   --color-bg: #F5F5F5;
   --color-surface: #FFFFFF;
-  --color-surface-2: #F0F0F0;
-  --color-surface-dim: #F5F5F5;
+  --color-surface-dim: #F0F0F0;       /* subtle muted surface — hover, chips, progress track */
+  --color-surface-2: #F0F0F0;         /* alias of surface-dim */
   --color-border: #E5E5E7;
   --color-text: #141414;
   --color-text-muted: #6E6E73;
@@ -87,8 +87,8 @@
 .dark {
   --color-bg: #0A0A0B;
   --color-surface: #141416;
+  --color-surface-dim: #1C1C1F;
   --color-surface-2: #1C1C1F;
-  --color-surface-dim: #0A0A0B;
   --color-border: #2C2C2E;
   --color-text: #F5F5F5;
   --color-text-muted: #A1A1A6;
@@ -108,9 +108,16 @@
 body {
   font-family: var(--font-sans);
   color: var(--color-text);
-  background-color: var(--color-surface-dim);
+  background-color: var(--color-bg);
   margin: 0;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 * {

@@ -134,7 +134,7 @@ export function OrderAttachments({ orderId }) {
     <div className="bg-surface rounded-xl border border-border p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold">Файлы ({files.length})</h2>
-        <label className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-3 py-1.5 text-sm transition-colors cursor-pointer disabled:opacity-50">
+        <label className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-3 py-1.5 text-sm transition-colors cursor-pointer disabled:opacity-50">
           {uploading ? 'Загрузка...' : '+ Загрузить'}
           <input
             type="file"

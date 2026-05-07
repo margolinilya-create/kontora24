@@ -126,7 +126,7 @@ function ChunkErrorUI({ onReload }) {
       </p>
       <button
         onClick={onReload}
-        className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-6 min-h-[44px] transition-colors"
+        className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-6 min-h-[44px] transition-colors"
       >
         Обновить страницу
       </button>
@@ -146,7 +146,7 @@ function FirstErrorUI({ eventId, hasCopied, onCopyEventId, onRetry, onHome, erro
       <div className="flex flex-col sm:flex-row gap-2 mb-4 w-full sm:w-auto">
         <button
           onClick={onRetry}
-          className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-6 min-h-[44px] transition-colors"
+          className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-6 min-h-[44px] transition-colors"
         >
           Попробовать снова
         </button>
@@ -177,7 +177,7 @@ function RecoveryModeUI({ eventId, hasCopied, onCopyEventId, onHome, onReload, e
       <div className="flex flex-col sm:flex-row gap-2 mb-4 w-full sm:w-auto">
         <button
           onClick={onHome}
-          className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-6 min-h-[44px] transition-colors"
+          className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-6 min-h-[44px] transition-colors"
         >
           На главную
         </button>

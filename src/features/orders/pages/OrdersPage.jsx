@@ -124,7 +124,7 @@ export default function OrdersPage() {
           )}
           <Link
             to="/orders/create"
-            className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
+            className="bg-accent hover:bg-accent-hover text-on-accent font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors shadow-card"
           >
             + Новый заказ
           </Link>
@@ -174,7 +174,7 @@ export default function OrdersPage() {
           <h3 className="text-lg font-semibold mb-1">{search ? 'Ничего не найдено' : 'Нет заказов'}</h3>
           <p className="text-text-muted text-sm mb-4">{search ? 'Попробуйте другой запрос' : 'Создайте первый заказ'}</p>
           {!search && (
-            <Link to="/orders/create" className="inline-flex bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors">
+            <Link to="/orders/create" className="inline-flex bg-accent hover:bg-accent-hover text-on-accent font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors shadow-card">
               Создать заказ
             </Link>
           )}
@@ -189,10 +189,10 @@ export default function OrdersPage() {
               <Link
                 key={order.id}
                 to={`/orders/${order.id}`}
-                className="block bg-surface rounded-xl border border-border p-4 hover:border-accent/30 transition-colors active:bg-surface-dim"
+                className="block bg-surface rounded-2xl border border-border shadow-card p-4 hover:border-accent/40 transition-colors active:bg-surface-dim"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-accent">#{order.number}</span>
+                  <span className="font-semibold text-text">#{order.number}</span>
                   <StatusBadge status={order.status} />
                 </div>
                 <div className="flex items-center justify-between text-sm">

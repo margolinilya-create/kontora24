@@ -32,7 +32,7 @@ export default function ErrorState({ error, onRetry, hideHomeButton = false }) {
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center justify-center min-h-[44px] bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-5 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            className="inline-flex items-center justify-center min-h-[44px] bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-5 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
           >
             Повторить
           </button>

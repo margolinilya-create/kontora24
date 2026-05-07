@@ -50,7 +50,7 @@ export function InstallPrompt() {
         </button>
         <button
           onClick={handleInstall}
-          className="bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg min-h-[44px]"
+          className="bg-accent hover:bg-accent-hover text-on-accent text-sm font-medium px-4 py-2 rounded-lg min-h-[44px]"
         >
           Установить
         </button>

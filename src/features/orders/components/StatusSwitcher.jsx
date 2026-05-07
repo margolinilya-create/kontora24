@@ -39,7 +39,7 @@ export function StatusSwitcher({ order, onUpdated }) {
         <button
           onClick={() => handleTransition(nextStatus)}
           disabled={loading}
-          className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors disabled:opacity-50 min-h-[44px]"
+          className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-4 py-2.5 text-sm transition-colors disabled:opacity-50 min-h-[44px]"
         >
           {loading ? (
             <span className="flex items-center gap-2">

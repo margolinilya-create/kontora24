@@ -66,8 +66,8 @@ export function OrderTimeline({ order, history }) {
                 >
                   {/* Circle */}
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold z-10 flex-shrink-0 transition-colors ${
-                    isCurrent ? 'bg-accent text-white ring-4 ring-accent/20' :
-                    isCompleted ? 'bg-accent text-white' :
+                    isCurrent ? 'bg-accent text-on-accent ring-4 ring-accent/20' :
+                    isCompleted ? 'bg-accent text-on-accent' :
                     'bg-surface border-2 border-border text-text-muted'
                   }`}>
                     {isCompleted && !isCurrent ? (

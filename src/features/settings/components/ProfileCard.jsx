@@ -77,7 +77,7 @@ export function ProfileCard() {
             <button
               onClick={handleSaveName}
               disabled={saving || name === profile.display_name}
-              className="bg-accent hover:bg-accent-hover text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors disabled:opacity-50"
+              className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-4 py-2 text-sm transition-colors disabled:opacity-50"
             >
               Сохранить
             </button>

@@ -195,7 +195,7 @@ export default function ProductionBoardPage() {
             aria-pressed={board.showMine}
             className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 min-h-[44px] ${
               board.showMine
-                ? 'bg-accent text-white shadow-sm shadow-accent/25'
+                ? 'bg-accent text-on-accent shadow-sm shadow-accent/25'
                 : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
             }`}
           >

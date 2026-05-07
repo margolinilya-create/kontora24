@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createOrder } from '../hooks/useOrders'
 import {
-  ORDER_TYPES, PRIORITIES, LAMINATION_TYPES, FILM_TYPES,
+  ORDER_TYPES, LAMINATION_TYPES, FILM_TYPES,
   ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -16,37 +16,7 @@ import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
-
-function CollapsibleSection({ title, defaultOpen = false, hasError = false, children }) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  return (
-    <fieldset className={`border border-border rounded-xl overflow-hidden transition-colors ${hasError ? 'border-danger/50' : ''}`}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-surface-dim hover:bg-surface-dim/80 transition-colors min-h-[48px]"
-        aria-expanded={open}
-      >
-        <span className="text-sm font-semibold uppercase tracking-wide flex items-center gap-2">
-          {title}
-          {hasError && <span className="w-2 h-2 rounded-full bg-danger" aria-label="Есть ошибки" />}
-        </span>
-        <svg
-          className={`w-4 h-4 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && (
-        <div className="p-4 space-y-4">
-          {children}
-        </div>
-      )}
-    </fieldset>
-  )
-}
+const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
 
 function FieldError({ error }) {
   if (!error) return null
@@ -63,7 +33,7 @@ function OrderTypeSelector({ value, onChange, error }) {
             key={key}
             type="button"
             onClick={() => onChange(key)}
-            className={`text-left px-3 py-3 rounded-xl border-2 text-sm font-medium transition-all min-h-[56px] ${
+            className={`text-left px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition-all min-h-[48px] ${
               value === key
                 ? 'border-accent bg-accent/10 text-accent'
                 : 'border-border bg-surface hover:border-accent/30 text-text'
@@ -78,10 +48,12 @@ function OrderTypeSelector({ value, onChange, error }) {
   )
 }
 
-function SizePresetPicker({ activePreset, onSelect }) {
+function SizePresetPicker({ activePreset, onSelect, isPack }) {
+  // Для стикерпаков квадратные пресеты не имеют смысла (размер всего пака)
+  const presets = Object.entries(SIZE_PRESETS).filter(([, p]) => isPack ? p.kind !== 'square' : true)
   return (
     <div className="flex gap-1.5 flex-wrap">
-      {Object.entries(SIZE_PRESETS).map(([key, { label, width, height }]) => (
+      {presets.map(([key, { label, width, height, kind }]) => (
         <button
           key={key}
           type="button"
@@ -92,7 +64,7 @@ function SizePresetPicker({ activePreset, onSelect }) {
               : 'border border-border bg-surface hover:bg-surface-dim text-text-muted'
           }`}
         >
-          {label} ({width}x{height})
+          {kind === 'square' ? `${label}×${label}` : `${label} (${width}×${height})`}
         </button>
       ))}
       <button
@@ -111,7 +83,7 @@ function SizePresetPicker({ activePreset, onSelect }) {
 }
 
 const schema = z.object({
-  // Deal info
+  // Deal
   deal_name: z.string().optional(),
   bitrix_deal_id: z.string().optional(),
   price_final: z.coerce.number().optional(),
@@ -120,21 +92,21 @@ const schema = z.object({
   source_referrer: z.string().optional(),
   payment_status: z.string().default('not_paid'),
 
-  // Order info
+  // Order
   order_type: z.string().min(1, 'Выберите тип'),
   qty: z.coerce.number().min(1, 'Минимум 1'),
   width_mm: z.coerce.number().min(1, 'Укажите ширину'),
   height_mm: z.coerce.number().min(1, 'Укажите высоту'),
   film_type: z.string().default('G'),
   lam_type: z.string().optional(),
-  design_variants: z.coerce.number().min(1).default(1),
   design_status: z.string().default('provided'),
   mockup_path: z.string().optional(),
   stickers_per_pack: z.coerce.number().optional(),
   client_name: z.string().optional(),
   deadline: z.string().optional(),
-  priority: z.string().default('normal'),
+  is_urgent: z.boolean().default(false),
   notes: z.string().optional(),
+  bopp_bag: z.boolean().default(false),
 
   // Delivery
   delivery_type: z.string().default('pickup'),
@@ -155,17 +127,13 @@ export default function CreateOrderPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       order_type: '', qty: 1, width_mm: 100, height_mm: 100,
-      lam_type: '', priority: 'normal', design_variants: 1,
+      lam_type: '', is_urgent: false, bopp_bag: false,
       film_type: 'G', is_partner: false, payment_status: 'not_paid',
       design_status: 'provided', delivery_type: 'pickup',
     },
   })
 
   const errorCount = Object.keys(errors).length
-  const coreErrors = ['order_type', 'qty', 'width_mm', 'height_mm'].some(k => errors[k])
-  const extraErrors = ['film_type', 'lam_type', 'design_variants', 'design_status', 'mockup_path', 'stickers_per_pack', 'notes'].some(k => errors[k])
-  const dealErrors = ['deal_name', 'bitrix_deal_id', 'price_final', 'is_partner', 'source', 'source_referrer', 'payment_status'].some(k => errors[k])
-  const deliveryErrors = ['delivery_type', 'delivery_city', 'delivery_address', 'delivery_notes'].some(k => errors[k])
 
   const scrollToFirstError = useCallback(() => {
     setTimeout(() => {
@@ -182,7 +150,9 @@ export default function CreateOrderPage() {
   const orderType = watch('order_type')
   const source = watch('source')
   const deliveryType = watch('delivery_type')
+  const mockupPath = watch('mockup_path')
   const isStickerpack = orderType === 'stickerpack' || orderType === 'stickerpack3D'
+  const isMockupImage = mockupPath && IMAGE_RX.test(mockupPath)
 
   // Smart defaults for 3D types
   useEffect(() => {
@@ -216,7 +186,6 @@ export default function CreateOrderPage() {
           .limit(1)
           .single()
 
-        // PGRST116 = no rows found, valid case (new client) — fall through to insert
         if (findError && findError.code !== 'PGRST116') throw findError
 
         if (existing) {
@@ -242,9 +211,9 @@ export default function CreateOrderPage() {
         film_type: values.film_type,
         client_id: clientId,
         deadline: values.deadline || null,
-        priority: values.priority,
+        priority: values.is_urgent ? 'urgent' : 'normal',
         notes: values.notes || null,
-        design_variants: values.design_variants,
+        bopp_bag: values.bopp_bag,
         deal_name: values.deal_name || null,
         bitrix_deal_id: values.bitrix_deal_id || null,
         price_final: canSeeFinance && values.price_final ? values.price_final : null,
@@ -271,8 +240,22 @@ export default function CreateOrderPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold font-display tracking-tight mb-6">Новый заказ</h1>
+    <div className="max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold font-display tracking-tight">Новый заказ</h1>
+          <p className="text-text-muted text-sm">Заполните параметры и создайте заказ</p>
+        </div>
+        <button
+          type="button"
+          disabled
+          title="Bitrix24 пока не подключён"
+          className="border border-border bg-surface text-text-muted/60 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
+        >
+          Заполнить из Bitrix
+        </button>
+      </div>
 
       {/* Error summary */}
       {errorCount > 0 && (
@@ -286,216 +269,227 @@ export default function CreateOrderPage() {
         </div>
       )}
 
-      <form ref={formRef} onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="space-y-4">
-
-        {/* === Основное (always open) === */}
-        <CollapsibleSection title="Основное" defaultOpen hasError={coreErrors}>
-          {/* Order type — visual cards */}
-          <OrderTypeSelector
-            value={orderType}
-            onChange={(val) => setValue('order_type', val, { shouldValidate: true })}
-            error={errors.order_type}
-          />
-
-          {/* Size: presets + inputs */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Размер, мм <span className="text-danger">*</span></label>
-            <SizePresetPicker activePreset={activePreset} onSelect={applyPreset} />
-            <div className="grid grid-cols-2 gap-4 mt-2">
-              <div>
-                <Input type="number" placeholder="Ширина" inputMode="numeric" aria-invalid={!!errors.width_mm} className={errors.width_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('width_mm', { onChange: () => setActivePreset(null) })} />
-                <FieldError error={errors.width_mm} />
-              </div>
-              <div>
-                <Input type="number" placeholder="Высота" inputMode="numeric" aria-invalid={!!errors.height_mm} className={errors.height_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('height_mm', { onChange: () => setActivePreset(null) })} />
-                <FieldError error={errors.height_mm} />
-              </div>
-            </div>
-          </div>
-
-          {/* Qty + Deadline */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Тираж, шт <span className="text-danger">*</span></label>
-              <Input type="number" inputMode="numeric" aria-invalid={!!errors.qty} className={errors.qty ? 'border-danger ring-1 ring-danger/30' : ''} {...register('qty')} />
-              <FieldError error={errors.qty} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Срок сдачи</label>
-              <Input type="date" {...register('deadline')} />
-            </div>
-          </div>
-
-          {/* Client + Priority */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Заказчик</label>
-              <Input type="text" placeholder="Имя клиента" {...register('client_name')} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Приоритет</label>
-              <select {...register('priority')} className={SELECT_CLASS}>
-                {Object.entries(PRIORITIES).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </CollapsibleSection>
-
-        {/* === Дополнительно (collapsed) === */}
-        <CollapsibleSection title="Дополнительно" hasError={extraErrors}>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Материал (плёнка)</label>
-              <select {...register('film_type')} className={SELECT_CLASS}>
-                {Object.entries(FILM_TYPES).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Ламинация</label>
-              <select {...register('lam_type')} className={SELECT_CLASS}>
-                <option value="">Без ламинации</option>
-                {Object.entries(LAMINATION_TYPES).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Видов дизайна</label>
-              <Input type="number" inputMode="numeric" min="1" {...register('design_variants')} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Дизайн макета</label>
-              <select {...register('design_status')} className={SELECT_CLASS}>
-                {Object.entries(DESIGN_STATUSES).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Ссылка на макет</label>
-            <Input type="text" placeholder="Путь к файлу на сервере" {...register('mockup_path')} />
-          </div>
-
-          {isStickerpack && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Стикеров в паке</label>
-              <Input type="number" inputMode="numeric" min="1" {...register('stickers_per_pack')} />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Комментарий</label>
-            <textarea
-              {...register('notes')}
-              rows={3}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm resize-none"
-              placeholder="Особенности заказа, доп. услуги..."
+      <form ref={formRef} onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* === LEFT: Основное + Дополнительное === */}
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-5">
+          {/* Основное */}
+          <div className="space-y-4">
+            <OrderTypeSelector
+              value={orderType}
+              onChange={(val) => setValue('order_type', val, { shouldValidate: true })}
+              error={errors.order_type}
             />
-          </div>
-        </CollapsibleSection>
 
-        {/* === Сделка (collapsed) === */}
-        <CollapsibleSection title="Сделка" hasError={dealErrors}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Размер */}
             <div>
-              <label className="block text-sm font-medium mb-1">Название сделки</label>
-              <Input type="text" placeholder="Название заказа" {...register('deal_name')} />
+              <label className="block text-sm font-medium mb-2">Размер, мм <span className="text-danger">*</span></label>
+              <SizePresetPicker activePreset={activePreset} onSelect={applyPreset} isPack={isStickerpack} />
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <div>
+                  <Input type="number" placeholder="Ширина" inputMode="numeric" aria-invalid={!!errors.width_mm} className={errors.width_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('width_mm', { onChange: () => setActivePreset(null) })} />
+                  <FieldError error={errors.width_mm} />
+                </div>
+                <div>
+                  <Input type="number" placeholder="Высота" inputMode="numeric" aria-invalid={!!errors.height_mm} className={errors.height_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('height_mm', { onChange: () => setActivePreset(null) })} />
+                  <FieldError error={errors.height_mm} />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Номер сделки (Bitrix)</label>
-              <Input type="text" placeholder="ID сделки" {...register('bitrix_deal_id')} />
+
+            {/* Тираж + Дедлайн */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Тираж, шт <span className="text-danger">*</span></label>
+                <Input type="number" inputMode="numeric" aria-invalid={!!errors.qty} className={errors.qty ? 'border-danger ring-1 ring-danger/30' : ''} {...register('qty')} />
+                <FieldError error={errors.qty} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Срок сдачи</label>
+                <Input type="date" {...register('deadline')} />
+              </div>
+            </div>
+
+            {/* Стикеров в паке (только для пака) */}
+            {isStickerpack && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Стикеров в паке</label>
+                <Input type="number" inputMode="numeric" min="1" {...register('stickers_per_pack')} />
+              </div>
+            )}
+
+            {/* Плёнка + Ламинация */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Плёнка</label>
+                <select {...register('film_type')} className={SELECT_CLASS}>
+                  {Object.entries(FILM_TYPES).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Ламинация</label>
+                <select {...register('lam_type')} className={SELECT_CLASS}>
+                  <option value="">Без ламинации</option>
+                  {Object.entries(LAMINATION_TYPES).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Заказчик + Срочность */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Заказчик</label>
+                <Input type="text" placeholder="Имя клиента" {...register('client_name')} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Срочность</label>
+                <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
+                  <input type="checkbox" {...register('is_urgent')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent accent-danger" />
+                  <span className="text-sm">Срочный заказ</span>
+                </label>
+              </div>
+            </div>
+
+            {/* БОПП + Дизайн макета */}
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
+                <input type="checkbox" {...register('bopp_bag')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
+                <span className="text-sm">Упаковка в БОПП-пакет</span>
+              </label>
+              <div>
+                <label className="block text-sm font-medium mb-1">Дизайн макета</label>
+                <select {...register('design_status')} className={SELECT_CLASS}>
+                  {Object.entries(DESIGN_STATUSES).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
+          <hr className="border-border" />
+
+          {/* Дополнительное */}
+          <div className="space-y-4">
+            <h2 className="text-xs uppercase tracking-wide text-text-muted">Дополнительно</h2>
+
+            {/* Сделка */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Название сделки</label>
+                <Input type="text" placeholder="Название заказа" {...register('deal_name')} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Bitrix ID</label>
+                <Input type="text" placeholder="ID сделки" {...register('bitrix_deal_id')} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Источник</label>
+                <select {...register('source')} className={SELECT_CLASS}>
+                  <option value="">— не указан —</option>
+                  {Object.entries(ORDER_SOURCES).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Оплата</label>
+                <select {...register('payment_status')} className={SELECT_CLASS}>
+                  {Object.entries(PAYMENT_STATUSES).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {source === 'referrer' && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Имя референта</label>
+                <Input type="text" placeholder="Кто привёл клиента" {...register('source_referrer')} />
+              </div>
+            )}
+
+            <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
+              <input type="checkbox" {...register('is_partner')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
+              <span className="text-sm">Партнёрский (-35%)</span>
+            </label>
+
+            {/* Отгрузка */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Получение</label>
+              <select {...register('delivery_type')} className={SELECT_CLASS}>
+                {Object.entries(DELIVERY_TYPES).map(([key, { label }]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+            {deliveryType === 'delivery' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input type="text" placeholder="Город" {...register('delivery_city')} />
+                  <Input type="text" placeholder="Адрес" {...register('delivery_address')} />
+                </div>
+                <textarea
+                  {...register('delivery_notes')}
+                  rows={2}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm resize-none"
+                  placeholder="Комментарий к доставке..."
+                />
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* === RIGHT: Цена + Макет + Комментарий === */}
+        <div className="space-y-4">
           {canSeeFinance && (
-            <div>
+            <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
               <label className="block text-sm font-medium mb-1">Стоимость (бюджет), руб.</label>
               <Input type="number" step="0.01" placeholder="0" {...register('price_final')} />
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer min-h-[44px]">
-                <input type="checkbox" {...register('is_partner')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
-                <span className="text-sm">Партнёрский (-35%)</span>
-              </label>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Источник</label>
-              <select {...register('source')} className={SELECT_CLASS}>
-                <option value="">-- Не указан --</option>
-                {Object.entries(ORDER_SOURCES).map(([key, { label }]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {source === 'referrer' && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Имя референта</label>
-              <Input type="text" placeholder="Кто привёл клиента" {...register('source_referrer')} />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Оплата</label>
-            <select {...register('payment_status')} className={SELECT_CLASS}>
-              {Object.entries(PAYMENT_STATUSES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-        </CollapsibleSection>
-
-        {/* === Отгрузка (collapsed) === */}
-        <CollapsibleSection title="Отгрузка" hasError={deliveryErrors}>
-          <div>
-            <label className="block text-sm font-medium mb-1">Получение</label>
-            <select {...register('delivery_type')} className={SELECT_CLASS}>
-              {Object.entries(DELIVERY_TYPES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          {deliveryType === 'delivery' && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Город</label>
-                  <Input type="text" placeholder="Город отгрузки" {...register('delivery_city')} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Адрес</label>
-                  <Input type="text" placeholder="Адрес доставки" {...register('delivery_address')} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Комментарий к доставке</label>
-                <textarea
-                  {...register('delivery_notes')}
-                  rows={2}
-                  className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm resize-none"
-                  placeholder="Детали доставки..."
+          <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+            <label className="block text-sm font-medium mb-2">Ссылка на макет</label>
+            <Input type="text" placeholder="https://... или путь на сервере" {...register('mockup_path')} />
+            <div className="mt-3">
+              {isMockupImage ? (
+                <img
+                  src={mockupPath}
+                  alt="Превью макета"
+                  loading="lazy"
+                  className="w-full max-h-[280px] object-contain rounded-xl border border-border bg-surface-dim"
+                  onError={(e) => { e.currentTarget.style.display = 'none' }}
                 />
-              </div>
-            </>
-          )}
-        </CollapsibleSection>
+              ) : mockupPath ? (
+                <p className="text-xs text-text-muted">Ссылка не на изображение — будет открыта по клику в карточке.</p>
+              ) : (
+                <div className="h-[180px] flex items-center justify-center text-text-muted text-sm bg-surface-dim rounded-xl border border-dashed border-border">
+                  Превью появится при вводе ссылки на JPEG/PNG
+                </div>
+              )}
+            </div>
+          </div>
 
-        {/* Submit — sticky on mobile */}
-        <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface-dim/80 backdrop-blur-sm py-4 -mx-4 px-4 sm:static sm:bg-transparent sm:backdrop-blur-none sm:py-0 sm:mx-0 sm:px-0">
+          <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+            <label className="block text-sm font-medium mb-1">Комментарий заказчика</label>
+            <textarea
+              {...register('notes')}
+              rows={5}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm resize-none"
+              placeholder="Особенности заказа, доп. услуги..."
+            />
+          </div>
+        </div>
+
+        {/* Submit — sticky on mobile, spans both columns */}
+        <div className="lg:col-span-2 flex gap-3 pt-2 sticky bottom-0 bg-surface-dim/80 backdrop-blur-sm py-4 -mx-4 px-4 sm:static sm:bg-transparent sm:backdrop-blur-none sm:py-0 sm:mx-0 sm:px-0">
           <Button type="submit" loading={submitting} className="flex-1 sm:flex-none">Создать заказ</Button>
           <Button type="button" variant="secondary" onClick={() => navigate('/orders')} className="flex-1 sm:flex-none">Отмена</Button>
         </div>

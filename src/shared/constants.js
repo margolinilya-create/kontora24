@@ -125,6 +125,8 @@ export const LAMINATION_TYPES = {
 export const FILM_TYPES = {
   G: { label: 'Глянцевая (G)' },
   M: { label: 'Матовая (M)' },
+  Transparent_G: { label: 'Прозрачная глянцевая' },
+  Transparent_M: { label: 'Прозрачная матовая' },
   Holo: { label: 'Голографическая' },
   Gold: { label: 'Золотая' },
   Chrome: { label: 'Хром' },
@@ -165,10 +167,16 @@ export const DESIGN_STATUSES = {
 }
 
 // --- Quick size presets ---
+// `kind: 'square'` — квадратные пресеты, не показываются для стикерпаков
+// (там размер = размер всего пака, не отдельного стикера).
 export const SIZE_PRESETS = {
-  A7: { width: 74, height: 105, label: 'A7' },
-  A6: { width: 105, height: 148, label: 'A6' },
-  A5: { width: 148, height: 210, label: 'A5' },
+  S25: { width: 25, height: 25, label: '25', kind: 'square' },
+  S30: { width: 30, height: 30, label: '30', kind: 'square' },
+  S35: { width: 35, height: 35, label: '35', kind: 'square' },
+  S40: { width: 40, height: 40, label: '40', kind: 'square' },
+  A7: { width: 74, height: 105, label: 'A7', kind: 'sheet' },
+  A6: { width: 105, height: 148, label: 'A6', kind: 'sheet' },
+  A5: { width: 148, height: 210, label: 'A5', kind: 'sheet' },
 }
 
 // --- Material costs (себестоимость по ТЗ 06.05) ---

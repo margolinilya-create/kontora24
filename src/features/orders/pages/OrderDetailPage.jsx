@@ -261,7 +261,7 @@ export default function OrderDetailPage() {
       />
 
       {/* Edit modal (gear) */}
-      <Modal isOpen={editorOpen} onClose={() => setEditorOpen(false)} title="Редактирование заказа" maxWidth="max-w-3xl">
+      <Modal isOpen={editorOpen} onClose={() => setEditorOpen(false)} title="Редактирование заказа" maxWidth="max-w-5xl">
         <AdminOrderEditor
           order={order}
           onSaved={() => { setEditorOpen(false); refetch() }}

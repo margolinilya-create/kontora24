@@ -74,17 +74,22 @@ export default function WarehousePage() {
         <ConsumptionChart />
       ) : (
       <>
-      {/* Summary cards — bento tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* Summary cards — bento tiles. Wide Onder numerals don't fit in
+          6-column grid; 3-col on large keeps room for tail units. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {Object.entries(MATERIAL_TYPES).map(([type, info]) => {
           const items = materials.filter((m) => m.type === type)
           const total = items.reduce((sum, m) => sum + Number(m.stock_qty), 0)
+          const display = total.toFixed(1)
+          const shrinkValue = display.length > 8
           return (
             <div key={type} className="bg-surface rounded-2xl border border-border shadow-card p-4">
               <p className="text-sm text-text-muted">{info.label}</p>
-              <p className="mt-1">
-                <span className="text-xl font-bold font-display tracking-tight">{total.toFixed(1)}</span>
-                <span className="text-sm font-normal text-text-muted ml-1 font-sans">{info.unit}</span>
+              <p className="mt-1 flex items-baseline gap-1 min-w-0">
+                <span className={`font-bold font-display tracking-tight truncate ${shrinkValue ? 'text-base' : 'text-xl'} ${total < 0 ? 'text-danger' : ''}`} title={total < 0 ? 'Отрицательный остаток' : undefined}>
+                  {display}
+                </span>
+                <span className="text-sm font-normal text-text-muted font-sans">{info.unit}</span>
               </p>
             </div>
           )

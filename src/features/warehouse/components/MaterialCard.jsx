@@ -19,11 +19,16 @@ export function MaterialCard({ material, onAddStock }) {
         )}
       </div>
 
-      <div className="mb-1">
-        <span className="text-3xl font-bold font-display tracking-tight">
+      <div className="mb-1 flex items-baseline gap-1 min-w-0">
+        <span
+          className={`font-bold font-display tracking-tight truncate ${
+            String(formatNumber(material.stock_qty, 1)).length > 9 ? 'text-xl' : 'text-3xl'
+          } ${Number(material.stock_qty) < 0 ? 'text-danger' : ''}`}
+          title={Number(material.stock_qty) < 0 ? 'Отрицательный остаток — проверьте расходы' : undefined}
+        >
           {formatNumber(material.stock_qty, 1)}
         </span>
-        <span className="text-sm font-normal text-text-muted ml-1 font-sans">{material.unit}</span>
+        <span className="text-sm font-normal text-text-muted font-sans">{material.unit}</span>
       </div>
 
       {material.reserved > 0 && (

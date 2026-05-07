@@ -72,7 +72,7 @@ npx vercel deploy --yes --prod --scope margolinilya-creates-projects  # Deploy
 
 **Ламинация:** matte (матовая), glossy (глянцевая), null (без ламинации) — задаётся при создании заказа.
 
-**Плёнка (film_type):** G (глянцевая), M (матовая), Holo (голографическая), Gold (золотая), Chrome (хром) — default 'G'.
+**Плёнка (film_type):** G (глянцевая), M (матовая), Transparent_G (прозрачная глянцевая), Transparent_M (прозрачная матовая), Holo (голографическая), Gold (золотая), Chrome (хром) — default 'G'.
 
 ## Структура заказа (входящие данные)
 
@@ -107,7 +107,7 @@ npx vercel deploy --yes --prod --scope margolinilya-creates-projects  # Deploy
 | Дизайн макета | `design_status` | выбор | `provided` (предоставлен заказчиком) / `needs_development` (требуется разработка) |
 | Ссылка на макет | `mockup_path` | текст | Путь к файлу на внутреннем сервере |
 | Заказчик | `client_name` → `client_id` | текст | Автопоиск/создание клиента в `k24_clients` |
-| Приоритет | `priority` | выбор | `low` / `normal` / `high` / `urgent` |
+| Приоритет | `priority` | выбор | `urgent` (срочный) / `normal` (обычный). В БД остаются `low`/`high` для совместимости со старыми заказами; новые формы используют только два варианта (R7 2026-05). |
 | Комментарий | `notes` | текст | Особенности заказа, доп. услуги |
 
 ### Отгрузка
@@ -165,23 +165,29 @@ src/
       components/         # LoginForm, AuthGuard
       hooks/useAuth.js
     orders/
-      pages/              # OrdersPage (table+kanban), OrderDetailPage, CreateOrderPage
-      components/         # OrderEditForm, OrdersKanban, OrderTimeline, DepartmentTimeline,
-                          #   OrderInfoTab, OrderProgressTab, OrderReportsTab,
-                          #   OrderAttachments, OrderComments, OrderPdfExport,
+      pages/              # OrdersPage (3 вида: список карточками / DnD-канбан / календарь),
+                          #   OrderDetailPage (header + Stepper + Tabs), CreateOrderPage (1 экран)
+      components/         # OrdersKanban (DnD по отделам), OrderStepper (тонкая лента),
+                          #   OrderProgressTab, OrderReportsTab, OrderHistoryTab, FinanceTab,
+                          #   OrderTimeline (legacy, переписан на Stepper), DepartmentTimeline,
+                          #   OrderAttachments, OrderComments, OrderStageInput, OrderPdfExport,
                           #   AdminOrderEditor (editor/: OrderBasicFields, OrderStatusFields,
                           #     OrderProductionFields, OrderFinanceFields),
-                          #   StatusSwitcher, StatusBadge, ClaimButton,
-                          #   DateRangeFilter, DepartmentFilter, SavedFilters,
+                          #   StatusSwitcher (только → next), StatusOverride (← откат на пройденные),
+                          #   StatusBadge, DateRangeFilter, DepartmentFilter, SavedFilters (БД),
                           #   EditableField, InfoField
-      hooks/useOrders.js
+      hooks/useOrders.js  # updateOrderStatus(orderId, from, to, { isRollback?, force? })
     production/
-      pages/              # ProductionBoardPage (DnD), QueuePage (unified),
-                          #   10 очередей: Design, Prepress, Print, Lamination, Cutting,
-                          #   Pouring, SelectionPouring, Assembly3d, Packaging, Otk
-      components/         # DraggableCard, QueueCard, BatchView,
+      pages/              # QueuePage (unified) + 10 очередей по этапам
+                          # (ProductionBoardPage удалён в R6 — DnD переехал в OrdersKanban)
+      components/         # DraggableCard (без таймера/claim), QueueCard, BatchView,
                           #   OperationChecklist, CompleteTaskModal, MaterialConsumption,
-                          #   ProductionCalendar, PipelineSummary, TaskTimer
+                          #   ProductionCalendar (полный месяц + bottom-sheet),
+                          #   PackDesignsForm (виды стикеров), PipelineSummary
+      hooks/              # useProductionLogs (deleted_at, updateLog/softDeleteLog),
+                          #   useShiftTracker (clockOut с optimistic+revert),
+                          #   useProductionBoard ({ includeArchived }),
+                          #   usePackDesigns
         logs/             # ProductionLogForm, ProductionLogHistory, StageProgressBar
       hooks/              # useProductionLogs, useShiftTracker, useTimer
       lib/production-logs.js  # STAGE_FIELDS, dual-track progress
@@ -254,7 +260,7 @@ supabase/
 
 | Проект | Префикс | Таблицы |
 |--------|---------|---------|
-| **Kontora24** | `k24_` | `k24_profiles`, `k24_orders`, `k24_clients`, `k24_materials`, `k24_material_transactions`, `k24_settings`, `k24_order_status_history`, `k24_order_comments`, `k24_order_attachments`, `k24_time_entries`, `k24_production_logs`, `k24_shift_entries`, `k24_integration_log`, `k24_order_audit`, `k24_order_templates` |
+| **Kontora24** | `k24_` | `k24_profiles`, `k24_orders`, `k24_clients`, `k24_materials`, `k24_material_transactions`, `k24_settings`, `k24_order_status_history`, `k24_order_comments`, `k24_order_attachments`, `k24_time_entries` (legacy, не пишется), `k24_production_logs` (с `deleted_at`), `k24_shift_entries`, `k24_integration_log`, `k24_order_audit`, `k24_order_templates`, `k24_pack_designs` (виды стикеров в паке), `k24_user_filters` (личные пресеты фильтров) |
 | **PinheadOS** | нет/`pinhead_` | `pinhead_users`, `catalog_config`, `app_config` |
 | **Общее** | — | `auth.users` (Supabase Auth, разделить нельзя) |
 
@@ -262,7 +268,7 @@ supabase/
 
 Storage bucket: `order-files`
 
-RPC: `update_stock` · `auto_deduct_materials` · `reserve_materials` · `release_materials` · `consume_reservations` · `is_admin` · `check_stage_completion` (с поддержкой track)
+RPC: `update_stock` · `auto_deduct_materials` · `reserve_materials` · `release_materials` · `consume_reservations` · `is_admin` · `check_stage_completion` (с поддержкой track + pack_designs для stickerpack3D)
 
 ### Ключевые поля k24_orders
 

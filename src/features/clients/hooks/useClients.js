@@ -13,7 +13,7 @@ export function useClients(search = '') {
     try {
       let query = supabase
         .from('k24_clients')
-        .select('*, orders(created_at)')
+        .select('*, k24_orders(created_at)')
         .order('created_at', { ascending: false })
 
       if (search) {
@@ -24,14 +24,14 @@ export function useClients(search = '') {
       const { data, error: err } = await query
       if (err) throw err
       const enriched = (data || []).map((client) => {
-        const orders = client.orders || []
+        const orders = client.k24_orders || []
         const lastOrderDate = orders.length > 0
           ? orders.reduce((latest, o) => {
               const d = new Date(o.created_at)
               return d > latest ? d : latest
             }, new Date(0)).toISOString()
           : null
-        const { orders: _omit, ...rest } = client
+        const { k24_orders: _omit, ...rest } = client
         return { ...rest, last_order_date: lastOrderDate }
       })
       setClients(enriched)

@@ -5,7 +5,8 @@ import { computeStageProgress } from '../lib/production-logs'
 
 /**
  * Hook for managing production logs for a specific order.
- * Fetches all logs, computes stage progress, provides addLog().
+ * Fetches active logs (deleted_at IS NULL), computes stage progress,
+ * provides addLog/updateLog/softDeleteLog.
  */
 export function useProductionLogs(orderId, targetQty) {
   const { profile } = useAuth()
@@ -21,6 +22,7 @@ export function useProductionLogs(orderId, targetQty) {
         .from('k24_production_logs')
         .select('*, worker:k24_profiles!worker_id(display_name, role)')
         .eq('order_id', orderId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
       if (err) throw err
       setLogs(data || [])
@@ -42,7 +44,7 @@ export function useProductionLogs(orderId, targetQty) {
     const channel = supabase
       .channel(`prod-logs-${orderId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'k24_production_logs',
         filter: `order_id=eq.${orderId}`,
@@ -63,13 +65,31 @@ export function useProductionLogs(orderId, targetQty) {
     await fetchLogs()
   }, [orderId, profile, fetchLogs])
 
-  function getStageProgress(stage) {
-    return computeStageProgress(logs, stage, targetQty || 0)
+  const updateLog = useCallback(async (logId, patch) => {
+    const { error } = await supabase
+      .from('k24_production_logs')
+      .update(patch)
+      .eq('id', logId)
+    if (error) throw error
+    await fetchLogs()
+  }, [fetchLogs])
+
+  const softDeleteLog = useCallback(async (logId) => {
+    const { error } = await supabase
+      .from('k24_production_logs')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', logId)
+    if (error) throw error
+    await fetchLogs()
+  }, [fetchLogs])
+
+  function getStageProgress(stage, track) {
+    return computeStageProgress(logs, stage, targetQty || 0, track)
   }
 
-  function isStageComplete(stage) {
-    return getStageProgress(stage).isComplete
+  function isStageComplete(stage, track) {
+    return getStageProgress(stage, track).isComplete
   }
 
-  return { logs, loading, error, addLog, getStageProgress, isStageComplete, refetch: fetchLogs }
+  return { logs, loading, error, addLog, updateLog, softDeleteLog, getStageProgress, isStageComplete, refetch: fetchLogs }
 }

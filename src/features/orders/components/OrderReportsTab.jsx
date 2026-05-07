@@ -6,7 +6,7 @@ import { addProductionLogAndCheckAdvance } from '@/features/orders/hooks/useOrde
 
 export function OrderReportsTab({ order, onUpdated }) {
   const { profile } = useAuth()
-  const { logs, getStageProgress, refetch, error: logsError } = useProductionLogs(order.id, order.qty)
+  const { logs, getStageProgress, refetch, updateLog, softDeleteLog, error: logsError } = useProductionLogs(order.id, order.qty)
 
   const myLogs = logs.filter((l) => l.worker_id === profile?.id)
   const progress = getStageProgress(order.status)
@@ -15,6 +15,16 @@ export function OrderReportsTab({ order, onUpdated }) {
   async function handleLogSubmit(stage, logData) {
     await addProductionLogAndCheckAdvance(order.id, stage, logData, order)
     refetch()
+    onUpdated?.()
+  }
+
+  async function handleUpdateLog(logId, patch) {
+    await updateLog(logId, patch)
+    onUpdated?.()
+  }
+
+  async function handleDeleteLog(logId) {
+    await softDeleteLog(logId)
     onUpdated?.()
   }
 
@@ -29,6 +39,7 @@ export function OrderReportsTab({ order, onUpdated }) {
       {canLog && (
         <ProductionLogForm
           stage={order.status}
+          order={order}
           progress={progress}
           onSubmit={handleLogSubmit}
         />
@@ -39,14 +50,22 @@ export function OrderReportsTab({ order, onUpdated }) {
         <h2 className="font-semibold mb-4">
           Мой вклад в заказ ({myLogs.length} {myLogs.length === 1 ? 'запись' : 'записей'})
         </h2>
-        <ProductionLogHistory logs={myLogs} />
+        <ProductionLogHistory
+          logs={myLogs}
+          onUpdateLog={handleUpdateLog}
+          onDeleteLog={handleDeleteLog}
+        />
       </div>
 
       {/* All contributions (visible to admin/manager) */}
       {logs.length > myLogs.length && (
         <div className="bg-surface rounded-xl border border-border p-5">
           <h2 className="font-semibold mb-4">Все записи ({logs.length})</h2>
-          <ProductionLogHistory logs={logs} />
+          <ProductionLogHistory
+            logs={logs}
+            onUpdateLog={handleUpdateLog}
+            onDeleteLog={handleDeleteLog}
+          />
         </div>
       )}
     </div>

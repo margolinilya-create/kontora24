@@ -4,6 +4,7 @@ import { useOrderDetail } from '../hooks/useOrders'
 import { InfoField } from '../components/InfoField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
 import { StatusSwitcher } from '../components/StatusSwitcher'
+import { StatusOverride } from '../components/StatusOverride'
 import { OrderStepper } from '../components/OrderStepper'
 import { OrderComments } from '../components/OrderComments'
 import { OrderStageInput } from '../components/OrderStageInput'
@@ -180,8 +181,9 @@ export default function OrderDetailPage() {
           </p>
         </div>
 
-        {/* Right: status dropdown + edit gear */}
+        {/* Right: status switch + rollback + edit gear */}
         <div className="flex items-center gap-2 ml-auto">
+          <StatusOverride order={order} onUpdated={refetch} />
           <StatusSwitcher order={order} onUpdated={refetch} />
           {isFinance && (
             <button

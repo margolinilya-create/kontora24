@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { isDualTrack, getNextStatus } from '@/shared/constants'
+import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES } from '@/shared/constants'
 import { safeRpc } from '@/shared/lib/safeRpc'
 import { captureError } from '@/shared/lib/sentry'
+
+/** Этапы, на которых заказ нельзя двигать вперёд без введённых данных. */
+const STAGES_REQUIRING_COMPLETION = new Set([
+  'print', 'lamination', 'cutting', 'pouring', 'selection_pouring', 'assembly_3d', 'packaging',
+])
 
 async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
   for (let i = 0; i <= retries; i++) {
@@ -205,9 +210,49 @@ export async function createOrder(orderData) {
   return data
 }
 
-export async function updateOrderStatus(orderId, fromStatus, toStatus) {
+/**
+ * Сменить статус заказа.
+ *
+ * @param {string} orderId
+ * @param {string} fromStatus
+ * @param {string} toStatus
+ * @param {{ isRollback?: boolean, force?: boolean }} [options]
+ *   `isRollback` — переход назад по маршруту, блокировка пропускается.
+ *   `force` — пропустить блокировку (только для admin/manager override).
+ */
+export async function updateOrderStatus(orderId, fromStatus, toStatus, options = {}) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+
+  // Блокировка перехода вперёд без введённых данных на текущем этапе
+  if (!options.isRollback && !options.force && fromStatus && STAGES_REQUIRING_COMPLETION.has(fromStatus)) {
+    const { data: order } = await supabase
+      .from('k24_orders')
+      .select('order_type')
+      .eq('id', orderId)
+      .single()
+
+    const isPack3D = order?.order_type === 'stickerpack3D'
+    const tracks = isPack3D && DUAL_TRACK_STAGES.includes(fromStatus) ? ['backgrounds', 'stickers'] : [null]
+
+    for (const track of tracks) {
+      const { data: result, error: checkError } = await supabase.rpc('check_stage_completion', {
+        p_order_id: orderId,
+        p_stage: fromStatus,
+        p_track: track,
+      })
+      if (checkError) {
+        // Если RPC недоступна — лучше пропустить заказ (degrade gracefully), чем заблокировать
+        captureError(checkError, { tags: { source: 'updateOrderStatus.checkCompletion' }, extra: { orderId, fromStatus, track } })
+        break
+      }
+      if (!result?.is_complete) {
+        const stageLabel = ORDER_STATUSES[fromStatus]?.label || fromStatus
+        const trackLabel = track === 'backgrounds' ? ' (фоны)' : track === 'stickers' ? ' (стикеры)' : ''
+        throw new Error(`Этап «${stageLabel}»${trackLabel} не завершён. Сначала введите данные на странице заказа.`)
+      }
+    }
+  }
 
   const { error } = await supabase
     .from('k24_orders')

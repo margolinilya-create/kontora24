@@ -12,7 +12,7 @@ export function OrderStageInput({ order, onUpdated }) {
   const { profile } = useAuth()
   const stage = order.status
   const config = STAGE_FIELDS[stage]
-  const { logs, getStageProgress, error: logsError } = useProductionLogs(order.id, order.qty)
+  const { logs, getStageProgress, updateLog, softDeleteLog, error: logsError } = useProductionLogs(order.id, order.qty)
   const [showHistory, setShowHistory] = useState(false)
 
   const canWork = profile && canWorkOnStage(profile.role, stage)
@@ -23,6 +23,16 @@ export function OrderStageInput({ order, onUpdated }) {
     await addProductionLogAndCheckAdvance(order.id, logStage, logData, order)
     onUpdated?.()
   }, [order, onUpdated])
+
+  const handleUpdate = useCallback(async (logId, patch) => {
+    await updateLog(logId, patch)
+    onUpdated?.()
+  }, [updateLog, onUpdated])
+
+  const handleDelete = useCallback(async (logId) => {
+    await softDeleteLog(logId)
+    onUpdated?.()
+  }, [softDeleteLog, onUpdated])
 
   if (!config) return null
 
@@ -41,6 +51,7 @@ export function OrderStageInput({ order, onUpdated }) {
       {canWork && !logsError && (
         <ProductionLogForm
           stage={stage}
+          order={order}
           progress={progress}
           onSubmit={handleSubmit}
         />
@@ -56,7 +67,12 @@ export function OrderStageInput({ order, onUpdated }) {
           </button>
           {showHistory && (
             <div className="mt-3 pt-3 border-t border-border">
-              <ProductionLogHistory logs={stageLogs} stage={stage} />
+              <ProductionLogHistory
+                logs={stageLogs}
+                stage={stage}
+                onUpdateLog={handleUpdate}
+                onDeleteLog={handleDelete}
+              />
             </div>
           )}
         </div>

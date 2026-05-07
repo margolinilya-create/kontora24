@@ -4,8 +4,6 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
-import { ClaimButton } from '@/features/orders/components/ClaimButton'
-import { TaskTimer } from '@/features/production/components/TaskTimer'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 
 const CompleteTaskModal = lazy(() => import('@/features/production/components/CompleteTaskModal').then(m => ({ default: m.CompleteTaskModal })))
@@ -19,7 +17,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfDay } from 'date-fns'
 
-const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }) {
+const WorkerTaskCard = memo(function WorkerTaskCard({ order, onUpdated }) {
   const [showComplete, setShowComplete] = useState(false)
 
   return (
@@ -27,14 +25,8 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
       <div className="flex items-center justify-between mb-3">
         <Link to={`/orders/${order.id}`} className="text-base font-bold text-text hover:text-accent transition-colors">#{order.number}</Link>
         <div className="flex items-center gap-2">
-          {isMine ? (
-            <>
-              <Button size="sm" onClick={() => setShowComplete(true)}>Готово</Button>
-              <Suspense fallback={null}><CompleteTaskModal order={order} isOpen={showComplete} onClose={() => setShowComplete(false)} onCompleted={onUpdated} /></Suspense>
-            </>
-          ) : (
-            <ClaimButton order={order} onClaimed={onUpdated} />
-          )}
+          <Button size="sm" onClick={() => setShowComplete(true)}>Готово</Button>
+          <Suspense fallback={null}><CompleteTaskModal order={order} isOpen={showComplete} onClose={() => setShowComplete(false)} onCompleted={onUpdated} /></Suspense>
         </div>
       </div>
       <p className="text-sm font-medium">{ORDER_TYPES[order.order_type]?.label}</p>
@@ -45,7 +37,6 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
         </p>
       )}
       {order.client?.name && <p className="text-xs text-text-muted mt-1">{order.client.name}</p>}
-      <TaskTimer orderId={order.id} orderStatus={order.status} compact />
     </div>
   )
 })
@@ -268,7 +259,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mb-3 relative">
                 <h2 className="font-semibold">Мои задачи</h2>
                 <OnboardingTip id="worker-my-tasks">
-                  Здесь ваши назначенные заказы. Нажмите "Старт" чтобы начать работу.
+                  Назначенные на вас заказы. Нажмите карточку, чтобы открыть заказ и внести данные.
                 </OnboardingTip>
                 {myTasks.length > 1 && (
                   <>
@@ -290,16 +281,16 @@ export default function DashboardPage() {
               {myTasks.length > 0 ? (
                 myTasks.map((order, idx) => (
                   <div key={order.id} className="relative">
-                    <WorkerTaskCard order={order} isMine={true} onUpdated={handleWorkerUpdated} />
+                    <WorkerTaskCard order={order} onUpdated={handleWorkerUpdated} />
                     {idx === 0 && (
                       <OnboardingTip id="worker-complete" position="right">
-                        Завершите задачу: таймер остановится, можно записать расход материалов.
+                        Завершите задачу: откроется список этапов, на которых заказ перейдёт дальше.
                       </OnboardingTip>
                     )}
                   </div>
                 ))
               ) : (
-                <EmptyState text="Нет задач" hint="Возьмите заказ из очереди справа" />
+                <EmptyState text="Нет назначенных задач" hint="Свободные заказы — в колонке справа" />
               )}
             </div>
 
@@ -307,12 +298,12 @@ export default function DashboardPage() {
               <div className="relative mb-3">
                 <h2 className="font-semibold">Очередь</h2>
                 <OnboardingTip id="worker-queue">
-                  Свободные заказы. Нажмите "Взять" чтобы назначить на себя.
+                  Заказы на ваших этапах. Откройте карточку, чтобы внести данные о работе.
                 </OnboardingTip>
               </div>
               {queueTasks.length > 0 ? (
                 queueTasks.map((order) => (
-                  <WorkerTaskCard key={order.id} order={order} isMine={false} onUpdated={handleWorkerUpdated} />
+                  <WorkerTaskCard key={order.id} order={order} onUpdated={handleWorkerUpdated} />
                 ))
               ) : (
                 <EmptyState text="Очередь пуста" hint="Новые заказы появятся автоматически" />

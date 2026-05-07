@@ -5,7 +5,7 @@ import { OrderComments } from './OrderComments'
 import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { OperationChecklist } from '@/features/production/components/OperationChecklist'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { ORDER_TYPES } from '@/shared/constants'
+import { ORDER_TYPES, FILM_TYPES } from '@/shared/constants'
 import { formatPrice, formatDate, formatDateTime } from '@/shared/lib/utils'
 import Spinner from '@/shared/components/Spinner'
 
@@ -46,7 +46,7 @@ export function OrderInfoTab({ order, onRecalculate, recalculating, onSaved }) {
             <InfoField label="Кол-во видов" value={order.design_variants || 1} />
             <InfoField label="Ламинация" value={order.need_lam ? (order.lam_type || 'Да') : 'Нет'} />
             <InfoField label="Срок" value={`${order.prod_days || '—'} дн.`} />
-            {order.film_type && <InfoField label="Плёнка" value={order.film_type} />}
+            {order.film_type && <InfoField label="Плёнка" value={FILM_TYPES[order.film_type]?.label || order.film_type} />}
             {order.stickers_per_pack && <InfoField label="Видов в паке" value={order.stickers_per_pack} />}
           </div>
         </div>

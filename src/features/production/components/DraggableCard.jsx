@@ -2,8 +2,6 @@ import { useState, memo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
-import { ClaimButton } from '@/features/orders/components/ClaimButton'
-import { TaskTimer } from './TaskTimer'
 import { OperationChecklist } from './OperationChecklist'
 import { ORDER_TYPES, PRIORITIES, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
@@ -28,7 +26,7 @@ function formatDeadline(deadline) {
   return new Date(deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
 }
 
-const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = false }) {
+const CardContent = memo(function CardContent({ order, isOverlay = false }) {
   const [expanded, setExpanded] = useState(false)
   const timeInStatus = formatTimeInStatus(order.status_changed_at || order.updated_at)
   const deadlineLevel = getDeadlineLevel(order.deadline)
@@ -39,7 +37,7 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Header: number + claim */}
+      {/* Header: number */}
       <div className="flex items-center justify-between">
         {isOverlay ? (
           <span className="font-bold text-text">#{order.number}</span>
@@ -53,7 +51,6 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
             #{order.number}
           </Link>
         )}
-        {!isOverlay && <ClaimButton order={order} onClaimed={onUpdated} />}
       </div>
 
       {/* Type + specs */}
@@ -73,7 +70,6 @@ const CardContent = memo(function CardContent({ order, onUpdated, isOverlay = fa
           {order.client?.name && (
             <p className="text-xs text-text-muted truncate">{order.client.name}</p>
           )}
-          <TaskTimer orderId={order.id} orderStatus={order.status} compact />
         </div>
       )}
       {!isOverlay && !expanded && (
@@ -144,7 +140,7 @@ function AttachmentThumbnail({ attachments }) {
   )
 }
 
-export const DraggableCard = memo(function DraggableCard({ order, onUpdated }) {
+export const DraggableCard = memo(function DraggableCard({ order }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: order.id,
     data: { status: order.status },
@@ -180,7 +176,7 @@ export const DraggableCard = memo(function DraggableCard({ order, onUpdated }) {
         transition-[border-color,box-shadow] duration-200 ease-out
         ${priorityBorder ? `border-l-[3px] ${priorityBorder}` : ''}`}
     >
-      <CardContent order={order} onUpdated={onUpdated} />
+      <CardContent order={order} />
     </div>
   )
 })

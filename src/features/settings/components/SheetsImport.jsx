@@ -35,7 +35,7 @@ export function SheetsImport() {
           design_variants: row.design_variants,
           need_lam: row.need_lam,
           is_3d: row.is_3d,
-          film_type: row.film_type || 'white',
+          film_type: row.film_type || 'G',
           deadline: row.deadline || null,
           notes: row.notes || '',
           price_final: row.price_final || null,

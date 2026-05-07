@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import { Link } from 'react-router-dom'
-import { ClaimButton } from '@/features/orders/components/ClaimButton'
 import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { StageProgressBar } from './logs/StageProgressBar'
 import { useProductionLogs } from '../hooks/useProductionLogs'
@@ -26,8 +25,8 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
     <Link
       to={`/orders/${order.id}`}
       className={`block bg-surface rounded-2xl border border-border shadow-card p-4 space-y-2 transition-[border-color,box-shadow] hover:border-accent/40 active:bg-surface-2${
-        order.assigned_to ? ' ring-2 ring-accent/30' : ''
-      }${priorityBorder ? ` border-l-[4px] ${priorityBorder}` : ''}`}
+        priorityBorder ? ` border-l-[4px] ${priorityBorder}` : ''
+      }`}
     >
       {/* Header: #number · client | priority */}
       <div className="flex items-center justify-between gap-2">
@@ -69,7 +68,6 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1" onClick={(e) => e.preventDefault()}>
-        <ClaimButton order={order} onClaimed={onUpdated} />
         <StatusSwitcher order={order} onUpdated={onUpdated} />
       </div>
     </Link>

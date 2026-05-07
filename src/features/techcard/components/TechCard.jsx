@@ -1,7 +1,8 @@
-import { forwardRef } from 'react'
+import { forwardRef, memo, useState } from 'react'
 import { formatOrderType } from '../utils'
 import { formatDate } from '@/shared/lib/utils'
 import { supabase } from '@/shared/lib/supabase'
+import { FILM_TYPES, PRIORITIES } from '@/shared/constants'
 
 // A4 at 72dpi: 595×842px. 1mm = 595/210 = 2.833px
 const MM = 2.833
@@ -19,7 +20,8 @@ const DAYS_RU = ['Воскресенье', 'Понедельник', 'Вторн
  * Redesigned A4 Tech Card per TZ spec.
  * Black header bar, 3 blocks, two-column bottom section.
  */
-export const TechCard = forwardRef(function TechCard({ order }, ref) {
+const TechCardInner = forwardRef(function TechCardInner({ order }, ref) {
+  const [previewBroken, setPreviewBroken] = useState(false)
   if (!order) return null
 
   const is3D = order.order_type === 'sticker3D' || order.order_type === 'stickerpack3D'
@@ -28,21 +30,25 @@ export const TechCard = forwardRef(function TechCard({ order }, ref) {
 
   // Get preview image URL from attachments
   const previewAttachment = order.attachments?.find(a => a.mime_type?.startsWith('image/'))
-  const previewUrl = previewAttachment
+  const previewUrl = !previewBroken && previewAttachment
     ? supabase.storage.from('order-files').getPublicUrl(previewAttachment.file_path).data?.publicUrl
     : null
 
-  // Production info cells (9 numbered)
+  const filmLabel = FILM_TYPES[order.film_type]?.label || '—'
+  const priorityLabel = PRIORITIES[order.priority]?.label || 'Обычный'
+
+  // Production info cells (9 numbered) — "Плёнка" вместо избыточной ячейки "3D"
+  // (3D определяется типом продукции и подсвечивается красной рамкой ниже).
   const prodCells = [
-    { n: 1, label: 'Тип', value: formatOrderType(order.order_type) },
+    { n: 1, label: 'Тип', value: formatOrderType(order.order_type), highlight3d: is3D },
     { n: 2, label: 'Размер', value: `${order.width_mm} x ${order.height_mm} мм` },
     { n: 3, label: 'Тираж', value: `${order.qty} шт` },
-    { n: 4, label: 'Ламинация', value: order.need_lam ? (order.lam_type || 'Да') : 'Нет' },
-    { n: 5, label: '3D', value: is3D ? 'Да' : 'Нет' },
+    { n: 4, label: 'Плёнка', value: filmLabel },
+    { n: 5, label: 'Ламинация', value: order.need_lam ? (order.lam_type || 'Да') : 'Нет' },
     { n: 6, label: 'БОПП пакет', value: order.bopp_bag ? 'Да' : 'Нет' },
     { n: 7, label: 'Кол-во видов', value: order.design_variants || 1 },
     { n: 8, label: 'Срочность', value: order.prod_days ? `${order.prod_days} дн.` : '—' },
-    { n: 9, label: 'Приоритет', value: order.priority || 'Обычный' },
+    { n: 9, label: 'Приоритет', value: priorityLabel },
   ]
 
   // Remaining height for block 3
@@ -122,10 +128,9 @@ export const TechCard = forwardRef(function TechCard({ order }, ref) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           {prodCells.map((cell) => (
             <div key={cell.n} style={{
-              border: '1px solid #e5e7eb',
+              border: cell.highlight3d ? '2px solid #e94560' : '1px solid #e5e7eb',
               borderRadius: RADIUS,
               padding: '4px 8px',
-              ...(cell.label === '3D' && is3D ? { border: '2px solid #e94560' } : {}),
             }}>
               <div style={{ fontSize: 8, color: '#9ca3af', fontWeight: 500 }}>{cell.n}. {cell.label}</div>
               <div style={{ fontWeight: 600, fontSize: 11 }}>{cell.value}</div>
@@ -152,6 +157,8 @@ export const TechCard = forwardRef(function TechCard({ order }, ref) {
             <img
               src={previewUrl}
               alt="Макет"
+              loading="lazy"
+              onError={() => setPreviewBroken(true)}
               style={{ maxWidth: '100%', maxHeight: block3H - 30, objectFit: 'contain', borderRadius: RADIUS, border: '1px solid #e5e7eb' }}
               crossOrigin="anonymous"
             />
@@ -184,3 +191,5 @@ function Field({ label, value }) {
     </div>
   )
 }
+
+export const TechCard = memo(TechCardInner)

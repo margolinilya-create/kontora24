@@ -133,7 +133,7 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
       )}
 
       {enableBatchView && viewMode === 'batch' ? (
-        <BatchView orders={orders} onUpdated={refetch} />
+        <BatchView orders={orders} />
       ) : loading ? (
         <div className="flex justify-center py-12">
           <Spinner />

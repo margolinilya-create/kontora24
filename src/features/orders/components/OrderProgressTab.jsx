@@ -5,7 +5,6 @@ import { ProductionLogHistory } from '@/features/production/components/logs/Prod
 import { StageProgressBar } from '@/features/production/components/logs/StageProgressBar'
 import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { TaskTimer } from '@/features/production/components/TaskTimer'
 import { MaterialConsumption } from '@/features/production/components/MaterialConsumption'
 import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
@@ -23,12 +22,6 @@ export function OrderProgressTab({ order, history, onUpdated }) {
       )}
       {/* Timeline */}
       <OrderTimeline order={order} history={history} />
-
-      {/* Current stage timer */}
-      <div className="bg-surface rounded-xl border border-border p-5">
-        <h2 className="font-semibold mb-3">Таймер</h2>
-        <TaskTimer orderId={order.id} orderStatus={order.status} />
-      </div>
 
       {/* Stage progress cards */}
       <div className="bg-surface rounded-xl border border-border p-5">

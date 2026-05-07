@@ -1,8 +1,7 @@
 import { ORDER_TYPES } from '@/shared/constants'
 import { Link } from 'react-router-dom'
-import { ClaimButton } from '@/features/orders/components/ClaimButton'
 
-export function BatchView({ orders, onUpdated }) {
+export function BatchView({ orders }) {
   // Group by order_type + dimensions (rounded to nearest 10mm for grouping)
   const groups = {}
   orders.forEach((order) => {
@@ -63,7 +62,6 @@ export function BatchView({ orders, onUpdated }) {
                 </div>
                 <div className="flex items-center gap-2">
                   {order.assignee?.display_name && <span className="text-xs text-text-muted">{order.assignee.display_name}</span>}
-                  <ClaimButton order={order} onClaimed={onUpdated} />
                 </div>
               </div>
             ))}

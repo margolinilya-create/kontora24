@@ -23,7 +23,7 @@ export function ProductionLogForm({ stage, progress, onSubmit }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    const error = validateLogEntry(stage, form)
+    const error = validateLogEntry(stage, form, { progress })
     if (error) { toast.error(error); return }
 
     setSaving(true)

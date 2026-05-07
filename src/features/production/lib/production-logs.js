@@ -55,6 +55,7 @@ export const STAGE_FIELDS = {
   assembly_3d: {
     label: 'Сборка 3D',
     quantityField: 'packs_assembled',
+    enforceTargetLimit: true,
     fields: [
       { key: 'packs_assembled', label: 'Собрано паков', unit: 'шт' },
     ],
@@ -62,6 +63,7 @@ export const STAGE_FIELDS = {
   packaging: {
     label: 'Упаковка',
     quantityField: 'packs_packaged',
+    enforceTargetLimit: true,
     fields: [
       { key: 'packs_packaged', label: 'Упаковано', unit: 'шт' },
     ],
@@ -129,8 +131,14 @@ export function computeDualTrackProgress(logs, stage, targetQty) {
 /**
  * Validate a log entry for a given stage.
  * Returns null if valid, or error message string.
+ *
+ * @param {string} stage
+ * @param {object} data
+ * @param {{ progress?: { total: number, target: number } }} [options]
+ *   When `progress` is supplied and the stage has `enforceTargetLimit`, we
+ *   refuse entries that would push the running total past `target`.
  */
-export function validateLogEntry(stage, data) {
+export function validateLogEntry(stage, data, options = {}) {
   const config = STAGE_FIELDS[stage]
   if (!config) return 'Неизвестный этап'
 
@@ -143,5 +151,16 @@ export function validateLogEntry(stage, data) {
       if (isNaN(num) || num < 0) return `"${field.label}" должно быть положительным числом`
     }
   }
+
+  if (config.enforceTargetLimit && options.progress && config.quantityField) {
+    const incoming = Number(data[config.quantityField] || 0)
+    if (incoming > 0) {
+      const remaining = Math.max(0, options.progress.target - options.progress.total)
+      if (incoming > remaining) {
+        return `Превышен тираж (${options.progress.target} шт). Осталось внести: ${remaining}`
+      }
+    }
+  }
+
   return null
 }

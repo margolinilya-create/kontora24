@@ -23,9 +23,9 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
   const [showComplete, setShowComplete] = useState(false)
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-5 mb-3">
+    <div className="bg-surface rounded-2xl border border-border shadow-card p-5 mb-3">
       <div className="flex items-center justify-between mb-3">
-        <Link to={`/orders/${order.id}`} className="text-base font-bold text-accent hover:underline">#{order.number}</Link>
+        <Link to={`/orders/${order.id}`} className="text-base font-bold text-text hover:text-accent transition-colors">#{order.number}</Link>
         <div className="flex items-center gap-2">
           {isMine ? (
             <>
@@ -52,16 +52,16 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
 
 function StatCard({ label, value }) {
   return (
-    <div className="bg-surface-dim rounded-lg p-3">
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-xs text-text-muted">{label}</p>
+    <div className="bg-surface-2 rounded-xl p-3.5">
+      <p className="text-2xl font-bold font-display tracking-tight">{value}</p>
+      <p className="text-xs text-text-muted mt-0.5">{label}</p>
     </div>
   )
 }
 
 function EmptyState({ text, hint }) {
   return (
-    <div className="bg-surface rounded-xl border border-border p-6 text-center">
+    <div className="bg-surface rounded-2xl border border-border shadow-card p-6 text-center">
       <p className="text-text-muted text-sm">{text}</p>
       {hint && <p className="text-text-muted/60 text-xs mt-1">{hint}</p>}
     </div>
@@ -239,20 +239,20 @@ export default function DashboardPage() {
       {isWorker && (
         <>
           {/* Greeting + stats */}
-          <div className="bg-surface rounded-xl border border-border p-5">
-            <h1 className="text-xl font-bold">Привет, {profile?.display_name}!</h1>
+          <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+            <h1 className="text-xl font-bold font-display tracking-tight">Привет, {profile?.display_name}!</h1>
             <p className="text-text-muted text-sm mt-1">{ROLES[profile?.role]?.label}</p>
-            <div className="grid grid-cols-3 gap-3 mt-3">
-              <div className="bg-surface-dim rounded-lg p-2.5 text-center">
-                <span className="text-2xl font-bold block">{workerStats.todayDone ?? '—'}</span>
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              <div className="bg-surface-2 rounded-xl p-3 text-center">
+                <span className="text-2xl font-bold font-display tracking-tight block">{workerStats.todayDone ?? '—'}</span>
                 <span className="text-xs text-text-muted">сегодня</span>
               </div>
-              <div className="bg-surface-dim rounded-lg p-2.5 text-center">
-                <span className="text-2xl font-bold block">{myTasks.length}</span>
+              <div className="bg-surface-2 rounded-xl p-3 text-center">
+                <span className="text-2xl font-bold font-display tracking-tight block">{myTasks.length}</span>
                 <span className="text-xs text-text-muted">в работе</span>
               </div>
-              <div className="bg-surface-dim rounded-lg p-2.5 text-center">
-                <span className="text-2xl font-bold block">{queueTasks.length}</span>
+              <div className="bg-surface-2 rounded-xl p-3 text-center">
+                <span className="text-2xl font-bold font-display tracking-tight block">{queueTasks.length}</span>
                 <span className="text-xs text-text-muted">в очереди</span>
               </div>
             </div>
@@ -317,8 +317,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Personal weekly stats */}
-          <div className="bg-surface rounded-xl border border-border p-5">
-            <h2 className="font-semibold mb-3">Моя статистика за неделю</h2>
+          <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+            <h2 className="font-semibold mb-3 font-display tracking-tight">Моя статистика за неделю</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <StatCard label="Выполнено" value={workerStats.weekDone ?? '—'} />
               <StatCard label="В работе" value={myTasks.length} />
@@ -345,27 +345,27 @@ export default function DashboardPage() {
 
           {managerTab === 'overview' && (
             <>
-              {/* Top metrics */}
+              {/* Top metrics — bento tiles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-surface rounded-xl border border-border p-5">
+                <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
                   <p className="text-text-muted text-sm">Заказов в работе</p>
-                  <p className="text-3xl font-bold mt-1">{ordersInWork.length}</p>
+                  <p className="text-3xl font-bold mt-1 font-display tracking-tight">{ordersInWork.length}</p>
                 </div>
-                <div className="bg-surface rounded-xl border border-border p-5">
+                <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
                   <p className="text-text-muted text-sm">К сдаче сегодня</p>
-                  <p className="text-3xl font-bold mt-1">{ordersDueToday.length}</p>
+                  <p className="text-3xl font-bold mt-1 font-display tracking-tight">{ordersDueToday.length}</p>
                 </div>
               </div>
 
               {/* Orders due today list */}
               {ordersDueToday.length > 0 && (
-                <div className="bg-surface rounded-xl border border-border p-5">
-                  <h2 className="font-semibold mb-3">Сдача сегодня</h2>
+                <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+                  <h2 className="font-semibold mb-3 font-display tracking-tight">Сдача сегодня</h2>
                   <div className="space-y-1">
                     {ordersDueToday.map((order) => (
-                      <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-surface-dim transition-colors">
+                      <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-dim transition-colors">
                         <div className="flex items-center gap-3 min-w-0">
-                          <span className="font-medium text-sm">#{order.number}</span>
+                          <span className="font-medium text-sm text-text">#{order.number}</span>
                           <span className="text-sm text-text-muted truncate">
                             {order.client?.name || ''}
                           </span>
@@ -380,14 +380,14 @@ export default function DashboardPage() {
               {/* Warehouse block */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Out of stock */}
-                <div className="bg-surface rounded-xl border border-danger/30 p-5">
-                  <h2 className="font-semibold mb-3 text-danger">Закончились</h2>
+                <div className="bg-surface rounded-2xl border border-danger/30 shadow-card p-5">
+                  <h2 className="font-semibold mb-3 text-danger font-display tracking-tight">Закончились</h2>
                   {outOfStock.length === 0 ? (
                     <p className="text-text-muted text-sm">Все в наличии</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {outOfStock.map((m) => (
-                        <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-1 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
+                        <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-2 hover:bg-surface-dim rounded-lg px-2 -mx-2 transition-colors">
                           <span className="text-danger font-medium">{m.name}</span>
                           <span className="text-text-muted">{m.unit}</span>
                         </Link>
@@ -396,16 +396,16 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* Low stock */}
-                <div className="bg-surface rounded-xl border border-warning/30 p-5">
-                  <h2 className="font-semibold mb-3 text-warning">Заканчиваются</h2>
+                {/* Low stock — using dept-pouring (orange) since warning is yellow=accent */}
+                <div className="bg-surface rounded-2xl border border-dept-pouring/30 shadow-card p-5">
+                  <h2 className="font-semibold mb-3 text-dept-pouring font-display tracking-tight">Заканчиваются</h2>
                   {lowStockOnly.length === 0 ? (
                     <p className="text-text-muted text-sm">Все в норме</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {lowStockOnly.map((m) => (
-                        <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-1 hover:bg-surface-dim rounded px-2 -mx-2 transition-colors">
-                          <span className="text-warning font-medium">{m.name}</span>
+                        <Link key={m.id} to="/warehouse" className="flex items-center justify-between text-sm py-2 hover:bg-surface-dim rounded-lg px-2 -mx-2 transition-colors">
+                          <span className="text-dept-pouring font-medium">{m.name}</span>
                           <span className="text-text-muted">{Number(m.stock_qty).toFixed(1)} / {Number(m.min_qty).toFixed(1)} {m.unit}</span>
                         </Link>
                       ))}

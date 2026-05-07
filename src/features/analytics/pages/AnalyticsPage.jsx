@@ -99,8 +99,10 @@ export default function AnalyticsPage() {
             <button
               key={p.key}
               onClick={() => setPeriod(p.key)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                period === p.key ? 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
+              className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                period === p.key
+                  ? 'bg-text text-bg shadow-card'
+                  : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
               }`}
             >
               {p.label}

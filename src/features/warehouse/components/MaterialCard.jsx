@@ -6,20 +6,20 @@ export function MaterialCard({ material, onAddStock }) {
   const typeInfo = MATERIAL_TYPES[material.type]
 
   return (
-    <div className={`bg-surface rounded-xl border p-5 ${isLow ? 'border-danger' : 'border-border'}`}>
+    <div className={`bg-surface rounded-2xl border shadow-card p-5 transition-colors ${isLow ? 'border-danger/40' : 'border-border'}`}>
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h3 className="font-semibold">{material.name}</h3>
+          <h3 className="font-semibold font-display tracking-tight">{material.name}</h3>
           <p className="text-xs text-text-muted">{typeInfo?.label || material.type}</p>
         </div>
         {isLow && (
-          <span className="bg-red-500/15 text-red-400 text-xs font-medium px-2 py-0.5 rounded-full">
+          <span className="bg-danger/15 text-danger text-xs font-medium px-2 py-0.5 rounded-full">
             Мало
           </span>
         )}
       </div>
 
-      <div className="text-3xl font-bold mb-1">
+      <div className="text-3xl font-bold font-display tracking-tight mb-1">
         {formatNumber(material.stock_qty, 1)}
         <span className="text-sm font-normal text-text-muted ml-1">{material.unit}</span>
       </div>
@@ -38,7 +38,7 @@ export function MaterialCard({ material, onAddStock }) {
 
       <button
         onClick={() => onAddStock(material)}
-        className="mt-3 w-full border border-border text-text hover:bg-surface-dim font-medium rounded-lg py-2 text-sm transition-colors"
+        className="mt-3 w-full border border-border bg-surface text-text hover:bg-surface-dim font-medium rounded-xl py-2 text-sm transition-colors"
       >
         + Приход / Расход
       </button>

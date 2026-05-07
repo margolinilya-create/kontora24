@@ -58,7 +58,7 @@ export default function OrderDetailPage() {
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-6 w-24" />
         </div>
-        <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="space-y-2">
@@ -77,7 +77,7 @@ export default function OrderDetailPage() {
     return (
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold mb-2">Заказ не найден</h2>
-        <Link to="/orders" className="text-accent hover:underline">← К списку заказов</Link>
+        <Link to="/orders" className="text-text hover:text-accent transition-colors underline decoration-text-muted/40 hover:decoration-accent">← К списку заказов</Link>
       </div>
     )
   }
@@ -109,7 +109,7 @@ export default function OrderDetailPage() {
           <p className="text-text-muted text-sm mt-1">
             Менеджер: {managerName}
           </p>
-          <p className="inline-block bg-accent/10 text-accent font-medium text-sm px-3 py-1 rounded-lg mt-2">
+          <p className="inline-block bg-surface border border-border text-text-muted font-medium text-sm px-3 py-1 rounded-lg mt-2">
             {orderDate}
           </p>
         </div>
@@ -148,14 +148,14 @@ export default function OrderDetailPage() {
       )}
 
       {/* Source files link (internal disk) */}
-      <div className="bg-surface rounded-xl border border-border p-4 flex items-center gap-3">
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-4 flex items-center gap-3">
         <span className="text-sm text-text-muted">Исходные файлы:</span>
         {order.mockup_path ? (
           <a
             href={order.mockup_path}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-accent hover:underline truncate flex-1"
+            className="text-sm text-text hover:text-accent transition-colors truncate flex-1 underline decoration-text-muted/40 hover:decoration-accent"
           >
             {order.mockup_path}
           </a>
@@ -168,7 +168,7 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Order info */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
         <h2 className="font-semibold mb-4 text-lg">Информация о заказе</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           <InfoField label="Тип" value={ORDER_TYPES[order.order_type]?.label || order.order_type} />
@@ -236,7 +236,7 @@ export default function OrderDetailPage() {
       <OrderStageInput order={order} onUpdated={refetch} />
 
       {/* Delivery */}
-      <div className="bg-surface rounded-xl border border-border p-5">
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
         <h2 className="font-semibold text-lg mb-4">Отгрузка</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <InfoField label="Получение" value={DELIVERY_TYPES[order.delivery_type]?.label || 'Самовывоз'} />
@@ -257,7 +257,7 @@ export default function OrderDetailPage() {
 
       {/* Deal info (admin/manager only) */}
       {isFinance && (
-        <div className="bg-surface rounded-xl border border-border p-5">
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <h2 className="font-semibold text-lg mb-4">Сделка</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {order.deal_name && <InfoField label="Название сделки" value={order.deal_name} />}
@@ -274,11 +274,11 @@ export default function OrderDetailPage() {
 
       {/* Finance (admin/manager only) */}
       {isFinance && (
-        <div className="bg-surface rounded-xl border border-border p-5">
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <h2 className="font-semibold text-lg mb-4">Финансы</h2>
-          <div className="bg-primary text-white rounded-xl p-6 mb-4">
+          <div className="bg-accent text-on-accent rounded-2xl shadow-card p-6 mb-4">
             <p className="text-sm opacity-70">Итого</p>
-            <p className="text-4xl font-bold">{formatPrice(order.price_final)}</p>
+            <p className="text-4xl font-bold font-display tracking-tight">{formatPrice(order.price_final)}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <InfoField label="Материалы" value={formatPrice(order.cost_materials)} />
@@ -296,7 +296,7 @@ export default function OrderDetailPage() {
 
       {/* Tech card panel */}
       {showTechCard && (
-        <div ref={techCardRef} className="bg-surface rounded-xl border border-border p-5">
+        <div ref={techCardRef} className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Тех. карта</h2>
             <button onClick={() => setShowTechCard(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
@@ -308,7 +308,7 @@ export default function OrderDetailPage() {
 
       {/* Production sticker panel */}
       {showProductionSticker && (
-        <div ref={productionStickerRef} className="bg-surface rounded-xl border border-border p-5">
+        <div ref={productionStickerRef} className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Стикер "В производство"</h2>
             <button onClick={() => setShowProductionSticker(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
@@ -319,7 +319,7 @@ export default function OrderDetailPage() {
 
       {/* Delivery sticker panel */}
       {showDeliverySticker && (
-        <div ref={deliveryStickerRef} className="bg-surface rounded-xl border border-border p-5">
+        <div ref={deliveryStickerRef} className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Стикер "На выдачу"</h2>
             <button onClick={() => setShowDeliverySticker(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
@@ -330,7 +330,7 @@ export default function OrderDetailPage() {
 
       {/* History panel */}
       {showHistory && (
-        <div ref={historyRef} className="bg-surface rounded-xl border border-border p-5">
+        <div ref={historyRef} className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">История изменений</h2>
             <button onClick={() => setShowHistory(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>

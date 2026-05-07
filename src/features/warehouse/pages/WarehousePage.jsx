@@ -7,6 +7,7 @@ import { ConsumptionChart } from '../components/ConsumptionChart'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
+import Tabs from '@/shared/components/Tabs'
 import ErrorState from '@/shared/components/ErrorState'
 
 export default function WarehousePage() {
@@ -60,28 +61,28 @@ export default function WarehousePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
-        <button onClick={() => setTab('stock')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'stock' ? 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'}`}>
-          Остатки
-        </button>
-        <button onClick={() => setTab('analytics')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'analytics' ? 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'}`}>
-          Расход и прогноз
-        </button>
-      </div>
+      <Tabs
+        items={[
+          { key: 'stock', label: 'Остатки' },
+          { key: 'analytics', label: 'Расход и прогноз' },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
 
       {tab === 'analytics' ? (
         <ConsumptionChart />
       ) : (
       <>
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Summary cards — bento tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {Object.entries(MATERIAL_TYPES).map(([type, info]) => {
           const items = materials.filter((m) => m.type === type)
           const total = items.reduce((sum, m) => sum + Number(m.stock_qty), 0)
           return (
-            <div key={type} className="bg-surface rounded-xl border border-border p-4">
+            <div key={type} className="bg-surface rounded-2xl border border-border shadow-card p-4">
               <p className="text-sm text-text-muted">{info.label}</p>
-              <p className="text-xl font-bold mt-1">
+              <p className="text-xl font-bold font-display tracking-tight mt-1">
                 {total.toFixed(1)} <span className="text-sm font-normal text-text-muted">{info.unit}</span>
               </p>
             </div>
@@ -97,7 +98,7 @@ export default function WarehousePage() {
       ) : error ? (
         <ErrorState error={error} onRetry={refetch} />
       ) : materials.length === 0 ? (
-        <div className="bg-surface rounded-xl border border-border p-12 text-center">
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-12 text-center">
           <p className="text-text-muted">Нет материалов. Запустите seed.sql в Supabase для начальных данных.</p>
         </div>
       ) : (

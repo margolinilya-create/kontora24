@@ -15,7 +15,7 @@ export default function SearchInput({ value, onChange, placeholder = 'Поиск
         onChange={onChange}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className="w-full pl-9 pr-8 py-2 rounded-lg border border-border text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
+        className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-border text-sm bg-surface text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition-colors"
       />
       {value && (
         <button

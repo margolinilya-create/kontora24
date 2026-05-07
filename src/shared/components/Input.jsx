@@ -8,7 +8,7 @@ export default function Input({ label, id, ariaLabel, error, inputMode, classNam
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={inputId} className="block text-sm font-medium text-text mb-1">
+        <label htmlFor={inputId} className="block text-sm font-medium text-text mb-1.5">
           {label}
         </label>
       )}
@@ -18,11 +18,11 @@ export default function Input({ label, id, ariaLabel, error, inputMode, classNam
         aria-invalid={!!error}
         aria-describedby={errorId}
         inputMode={inputMode}
-        className={`w-full rounded-lg border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50 ${error ? 'border-danger' : 'border-border'} ${className}`}
+        className={`w-full rounded-xl border px-3.5 py-2.5 text-sm bg-surface text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition-colors ${error ? 'border-danger' : 'border-border'} ${className}`}
         {...props}
       />
       {error && (
-        <p id={errorId} className="mt-1 text-xs text-danger" role="alert">{error}</p>
+        <p id={errorId} className="mt-1.5 text-xs text-danger" role="alert">{error}</p>
       )}
     </div>
   )

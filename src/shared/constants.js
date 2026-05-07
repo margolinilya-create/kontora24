@@ -173,19 +173,19 @@ export const SIZE_PRESETS = {
 
 // --- Priorities ---
 export const PRIORITIES = {
-  low: { label: 'Низкий', color: 'bg-gray-500/15 text-gray-400', sortOrder: 0 },
-  normal: { label: 'Обычный', color: 'bg-blue-500/15 text-blue-400', sortOrder: 1 },
-  high: { label: 'Высокий', color: 'bg-orange-500/15 text-orange-400', sortOrder: 2 },
-  urgent: { label: 'Срочный', color: 'bg-red-500/15 text-red-400', sortOrder: 3 },
+  low: { label: 'Низкий', color: 'bg-text-muted/15 text-text-muted', sortOrder: 0 },
+  normal: { label: 'Обычный', color: 'bg-info/15 text-info', sortOrder: 1 },
+  high: { label: 'Высокий', color: 'bg-dept-pouring/15 text-dept-pouring', sortOrder: 2 },
+  urgent: { label: 'Срочный', color: 'bg-danger/15 text-danger', sortOrder: 3 },
 }
 
 // --- Roles ---
 export const ROLES = {
-  admin: { label: 'Администратор', color: 'bg-red-500/15 text-red-400' },
-  manager: { label: 'Менеджер', color: 'bg-blue-500/15 text-blue-400' },
-  designer: { label: 'Дизайнер', color: 'bg-purple-500/15 text-purple-400' },
-  printer: { label: 'Печатник', color: 'bg-orange-500/15 text-orange-400' },
-  post_printer: { label: 'Постпечатник', color: 'bg-cyan-500/15 text-cyan-400' },
+  admin: { label: 'Администратор', color: 'bg-danger/15 text-danger' },
+  manager: { label: 'Менеджер', color: 'bg-info/15 text-info' },
+  designer: { label: 'Дизайнер', color: 'bg-dept-design/15 text-dept-design' },
+  printer: { label: 'Печатник', color: 'bg-dept-print/15 text-dept-print' },
+  post_printer: { label: 'Постпечатник', color: 'bg-dept-pouring/15 text-dept-pouring' },
 }
 
 // --- Material types ---

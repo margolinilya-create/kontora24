@@ -3,7 +3,7 @@ import { useToastStore } from '@/shared/stores/toast-store'
 const STYLES = {
   success: 'bg-success text-white',
   error: 'bg-danger text-white',
-  info: 'bg-blue-600 text-white',
+  info: 'bg-info text-white',
 }
 
 export function Toaster() {
@@ -23,7 +23,7 @@ export function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`${STYLES[t.type] || STYLES.info} px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center justify-between gap-3 animate-slide-in`}
+          className={`${STYLES[t.type] || STYLES.info} px-4 py-3 rounded-2xl shadow-modal text-sm font-medium flex items-center justify-between gap-3 animate-slide-in`}
         >
           <span>{t.message}</span>
           <button

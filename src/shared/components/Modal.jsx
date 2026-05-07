@@ -63,21 +63,24 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={handleTabTrap}
-        className={`relative bg-surface rounded-xl border border-border shadow-xl ${maxWidth} w-full max-h-[90vh] flex flex-col`}
+        className={`relative bg-surface rounded-2xl border border-border shadow-modal animate-card-enter ${maxWidth} w-full max-h-[90vh] flex flex-col`}
       >
-        <div className="flex justify-between items-center p-5 border-b border-border">
-          <h2 id={titleId} className="text-lg font-semibold text-text">{title}</h2>
+        <div className="flex justify-between items-center px-5 py-4 border-b border-border">
+          <h2 id={titleId} className="text-lg font-semibold text-text font-display tracking-tight">{title}</h2>
           <button
             onClick={onClose}
             aria-label="Закрыть"
-            className="text-text-muted hover:text-text transition-colors rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            className="text-text-muted hover:text-text hover:bg-surface-2 transition-colors rounded-lg w-9 h-9 flex items-center justify-center text-xl leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
           >
             &#215;
           </button>

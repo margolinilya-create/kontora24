@@ -65,7 +65,7 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
       }
     }
     load()
-  }, [orderId])
+  }, [orderId, ACTIVE_TIMER_KEY])
 
   // Tick at configured interval when timer is active
   useEffect(() => {
@@ -99,7 +99,7 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
     setActiveEntry(data)
     localStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ orderId, entryId: data.id }))
     return data
-  }, [orderId, profile])
+  }, [orderId, profile, ACTIVE_TIMER_KEY])
 
   const stop = useCallback(async () => {
     if (!activeEntry) return
@@ -128,7 +128,7 @@ export function useTimer(orderId, { tickInterval = 1000 } = {}) {
       setError(err)
       captureError(err, { tags: { source: 'useTimer.refresh' }, extra: { orderId: activeEntry.order_id } })
     }
-  }, [activeEntry])
+  }, [activeEntry, ACTIVE_TIMER_KEY])
 
   const totalMinutes = useMemo(() => entries.reduce((sum, e) => sum + (e.duration_minutes || 0), 0), [entries])
 

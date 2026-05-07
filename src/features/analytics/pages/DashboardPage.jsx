@@ -50,6 +50,10 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, isMine, onUpdated }
   )
 })
 
+// Production statuses ordered for "in work" filter (module-level constant
+// keeps useMemo deps stable).
+const WORK_STATUSES = ['design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
+
 function StatCard({ label, value }) {
   return (
     <div className="bg-surface-2 rounded-xl p-3.5">
@@ -214,8 +218,7 @@ export default function DashboardPage() {
   }
 
   // Manager dashboard computed values
-  const workStatuses = ['design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
-  const ordersInWork = useMemo(() => data.orders.filter(o => workStatuses.includes(o.status)), [data.orders])
+  const ordersInWork = useMemo(() => data.orders.filter(o => WORK_STATUSES.includes(o.status)), [data.orders])
   const ordersDueToday = useMemo(() => {
     const today = startOfDay(new Date())
     const tomorrow = new Date(today.getTime() + MS_PER_DAY)

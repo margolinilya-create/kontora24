@@ -30,7 +30,7 @@ export function useClients(search = '') {
               return d > latest ? d : latest
             }, new Date(0)).toISOString()
           : null
-        const { orders: _omit, ...rest } = client // eslint-disable-line no-unused-vars
+        const { orders: _omit, ...rest } = client
         return { ...rest, last_order_date: lastOrderDate }
       })
       setClients(enriched)

@@ -12,6 +12,7 @@ import { TechCardActions } from '@/features/techcard/components/TechCardActions'
 import { StickerActions } from '@/features/techcard/components/StickerActions'
 import { Skeleton } from '@/shared/components/Skeleton'
 import Button from '@/shared/components/Button'
+import Sheet from '@/shared/components/Sheet'
 import {
   ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES,
   ORDER_SOURCES, PAYMENT_STATUSES, DESIGN_STATUSES, PRIORITIES,
@@ -33,9 +34,6 @@ export default function OrderDetailPage() {
   const [showDeliverySticker, setShowDeliverySticker] = useState(false)
 
   const techCardRef = useRef(null)
-  const productionStickerRef = useRef(null)
-  const deliveryStickerRef = useRef(null)
-  const historyRef = useRef(null)
 
   const scrollToRef = useCallback((ref) => {
     setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
@@ -122,13 +120,13 @@ export default function OrderDetailPage() {
           <Button variant="secondary" onClick={() => { setShowTechCard(v => { if (!v) scrollToRef(techCardRef); return !v }) }}>
             Тех. карта
           </Button>
-          <Button variant="secondary" onClick={() => { setShowProductionSticker(v => { if (!v) scrollToRef(productionStickerRef); return !v }) }}>
+          <Button variant="secondary" onClick={() => setShowProductionSticker(true)}>
             В производство
           </Button>
-          <Button variant="secondary" onClick={() => { setShowDeliverySticker(v => { if (!v) scrollToRef(deliveryStickerRef); return !v }) }}>
+          <Button variant="secondary" onClick={() => setShowDeliverySticker(true)}>
             На выдачу
           </Button>
-          <Button variant="secondary" onClick={() => { setShowHistory(v => { if (!v) scrollToRef(historyRef); return !v }) }}>
+          <Button variant="secondary" onClick={() => setShowHistory(true)}>
             История
           </Button>
           <StatusSwitcher order={order} onUpdated={refetch} />
@@ -306,56 +304,51 @@ export default function OrderDetailPage() {
       )}
 
 
-      {/* Production sticker panel */}
-      {showProductionSticker && (
-        <div ref={productionStickerRef} className="bg-surface rounded-2xl border border-border shadow-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Стикер "В производство"</h2>
-            <button onClick={() => setShowProductionSticker(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
-          </div>
-          <StickerActions type="production" order={order} />
-        </div>
-      )}
+      {/* Production sticker — Sheet (info window ≤ 50% screen) */}
+      <Sheet
+        isOpen={showProductionSticker}
+        onClose={() => setShowProductionSticker(false)}
+        title='Стикер "В производство"'
+      >
+        <StickerActions type="production" order={order} />
+      </Sheet>
 
-      {/* Delivery sticker panel */}
-      {showDeliverySticker && (
-        <div ref={deliveryStickerRef} className="bg-surface rounded-2xl border border-border shadow-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Стикер "На выдачу"</h2>
-            <button onClick={() => setShowDeliverySticker(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
-          </div>
-          <StickerActions type="delivery" order={order} />
-        </div>
-      )}
+      {/* Delivery sticker — Sheet */}
+      <Sheet
+        isOpen={showDeliverySticker}
+        onClose={() => setShowDeliverySticker(false)}
+        title='Стикер "На выдачу"'
+      >
+        <StickerActions type="delivery" order={order} />
+      </Sheet>
 
-      {/* History panel */}
-      {showHistory && (
-        <div ref={historyRef} className="bg-surface rounded-2xl border border-border shadow-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">История изменений</h2>
-            <button onClick={() => setShowHistory(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
-          </div>
-          <div className="space-y-2">
-            {history.length === 0 ? (
-              <p className="text-text-muted text-sm">Нет записей</p>
-            ) : (
-              history.map((h) => (
-                <div key={h.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
-                  <div>
-                    <span className="font-medium">{h.changed_by_profile?.display_name || 'Система'}</span>
-                    <span className="text-text-muted ml-2">
-                      {h.from_status || '—'} → {h.to_status}
-                    </span>
-                  </div>
-                  <span className="text-text-muted text-xs">
-                    {new Date(h.created_at).toLocaleString('ru-RU')}
+      {/* History — Sheet */}
+      <Sheet
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        title="История изменений"
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-1">
+          {history.length === 0 ? (
+            <p className="text-text-muted text-sm">Нет записей</p>
+          ) : (
+            history.map((h) => (
+              <div key={h.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
+                <div>
+                  <span className="font-medium text-text">{h.changed_by_profile?.display_name || 'Система'}</span>
+                  <span className="text-text-muted ml-2">
+                    {h.from_status || '—'} → {h.to_status}
                   </span>
                 </div>
-              ))
-            )}
-          </div>
+                <span className="text-text-muted text-xs shrink-0 ml-2">
+                  {new Date(h.created_at).toLocaleString('ru-RU')}
+                </span>
+              </div>
+            ))
+          )}
         </div>
-      )}
+      </Sheet>
     </div>
   )
 }

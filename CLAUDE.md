@@ -44,7 +44,7 @@ CRM — Bitrix24 (интеграция через webhooks, пока не под
 npm run dev            # Dev server (Vite)
 npm run build          # Production build
 npm run preview        # Preview production build
-npm test               # Run tests (Vitest, 354 тестов)
+npm test               # Run tests (Vitest, 360 тестов)
 npm run lint           # ESLint
 npm run check          # lint + test + build
 npm run test:e2e       # Playwright e2e tests
@@ -171,8 +171,8 @@ src/
                           #   OrderProgressTab, OrderReportsTab, OrderHistoryTab, FinanceTab,
                           #   OrderTimeline (legacy, переписан на Stepper), DepartmentTimeline,
                           #   OrderAttachments, OrderComments, OrderStageInput, OrderPdfExport,
-                          #   AdminOrderEditor (editor/: OrderBasicFields, OrderStatusFields,
-                          #     OrderProductionFields, OrderFinanceFields),
+                          #   AdminOrderEditor (7 секций инлайн: Сделка / Заказчик /
+                          #     Продукт / Отгрузка / Производство / Финансы / Примечания),
                           #   StatusSwitcher (только → next), StatusOverride (← откат на пройденные),
                           #   StatusBadge, DateRangeFilter, DepartmentFilter, SavedFilters (БД),
                           #   EditableField, InfoField
@@ -201,7 +201,9 @@ src/
       hooks/useMaterials.js
     clients/
       pages/              # ClientsPage, ClientDetailPage (LTV, order history)
-      components/ClientForm.jsx
+      components/         # ClientForm (создание из ClientsPage),
+                          #   ClientCombobox (поиск + создание на лету —
+                          #     используется в AdminOrderEditor + CreateOrderPage)
       hooks/useClients.js
     analytics/
       pages/              # DashboardPage (worker cabinets + manager metrics),

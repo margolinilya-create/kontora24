@@ -156,12 +156,17 @@ export function Sidebar({ collapsed }) {
       'fixed left-0 top-0 h-screen bg-sidebar text-white flex flex-col transition-all duration-200 z-40 safe-area-top safe-area-left',
       collapsed ? 'w-16' : 'w-60'
     )}>
-      {/* Logo */}
+      {/* Logo — Onder all-caps overflows the sidebar, so the wordmark sits on
+          Guidy. The yellow K mark carries the brand. */}
       <div className="flex items-center gap-3 px-4 h-14 border-b border-white/8">
         <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-accent flex items-center justify-center font-bold text-sm text-on-accent">
           K
         </div>
-        {!collapsed && <span className="text-lg font-semibold tracking-tight font-display">Kontora24</span>}
+        {!collapsed && (
+          <span className="text-base font-bold tracking-tight whitespace-nowrap">
+            Kontora<span className="text-accent">24</span>
+          </span>
+        )}
       </div>
 
       {/* Nav */}

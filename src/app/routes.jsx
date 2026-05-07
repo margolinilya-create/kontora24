@@ -10,7 +10,6 @@ const DashboardPage = lazy(() => import('@/features/analytics/pages/DashboardPag
 const OrdersPage = lazy(() => import('@/features/orders/pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('@/features/orders/pages/OrderDetailPage'))
 const CreateOrderPage = lazy(() => import('@/features/orders/pages/CreateOrderPage'))
-const ProductionBoardPage = lazy(() => import('@/features/production/pages/ProductionBoardPage'))
 const DesignQueuePage = lazy(() => import('@/features/production/pages/DesignQueuePage'))
 const PrepressQueuePage = lazy(() => import('@/features/production/pages/PrepressQueuePage'))
 const PrintQueuePage = lazy(() => import('@/features/production/pages/PrintQueuePage'))
@@ -46,7 +45,6 @@ export const routes = [
       { path: 'orders', element: <AuthGuard roles={['admin', 'manager']}><ErrorBoundary><OrdersPage /></ErrorBoundary></AuthGuard> },
       { path: 'orders/create', element: <AuthGuard roles={['admin', 'manager']}><ErrorBoundary><CreateOrderPage /></ErrorBoundary></AuthGuard> },
       { path: 'orders/:id', element: <ErrorBoundary><OrderDetailPage /></ErrorBoundary> },
-      { path: 'production', element: <AuthGuard roles={['admin', 'manager']}><ErrorBoundary><ProductionBoardPage /></ErrorBoundary></AuthGuard> },
       { path: 'production/design', element: <AuthGuard roles={['admin', 'manager', 'designer']}><ErrorBoundary><DesignQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/prepress', element: <AuthGuard roles={['admin', 'manager', 'designer', 'printer']}><ErrorBoundary><PrepressQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/print', element: <AuthGuard roles={['admin', 'manager', 'printer']}><ErrorBoundary><PrintQueuePage /></ErrorBoundary></AuthGuard> },

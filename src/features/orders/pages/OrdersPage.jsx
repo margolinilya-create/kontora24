@@ -2,21 +2,28 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useOrders } from '../hooks/useOrders'
 import { StatusBadge } from '../components/StatusBadge'
-import { ORDER_TYPES } from '@/shared/constants'
+import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { Pagination } from '@/shared/components/Pagination'
-import { TableSkeleton } from '@/shared/components/Skeleton'
 import { OrdersKanban } from '../components/OrdersKanban'
+import { ProductionCalendar } from '@/features/production/components/ProductionCalendar'
 import { DepartmentFilter } from '../components/DepartmentFilter'
 import { DateRangeFilter } from '../components/DateRangeFilter'
 import SearchInput from '@/shared/components/SearchInput'
+import Tabs from '@/shared/components/Tabs'
+import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
+
+const ACTIVE_STATUSES = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
+const ARCHIVED_STATUSES = ['done', 'cancelled']
 
 export default function OrdersPage() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('deadline')
   const [sortAsc, setSortAsc] = useState(true)
-  const [viewMode, setViewMode] = useState(() => window.innerWidth < 640 ? 'kanban' : 'table')
+  const [viewMode, setViewMode] = useState('list')
   const [statusFilters, setStatusFilters] = useState([])
+  const [deptFilter, setDeptFilter] = useState([])
+  const [includeArchived, setIncludeArchived] = useState(false)
   const [deadlineFrom, setDeadlineFrom] = useState(null)
   const [deadlineTo, setDeadlineTo] = useState(null)
 
@@ -25,13 +32,20 @@ export default function OrdersPage() {
   const [pPerPage, setPPerPage] = useState(25)
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPPage(1) }, [statusFilters, debouncedSearch, sortBy, sortAsc, deadlineFrom, deadlineTo])
+  useEffect(() => { setPPage(1) }, [statusFilters, debouncedSearch, sortBy, sortAsc, deadlineFrom, deadlineTo, includeArchived])
 
   const from = (pPage - 1) * pPerPage
   const to = pPage * pPerPage - 1
 
+  // Если выбран фильтр статусов — используем его. Иначе — все активные (или + архив).
+  const effectiveStatuses = statusFilters.length > 0
+    ? statusFilters
+    : includeArchived
+      ? [...ACTIVE_STATUSES, ...ARCHIVED_STATUSES]
+      : ACTIVE_STATUSES
+
   const { orders, totalCount, loading, error } = useOrders({
-    statuses: statusFilters.length > 0 ? statusFilters : undefined,
+    statuses: effectiveStatuses,
     search: debouncedSearch,
     sortBy,
     sortAsc,
@@ -51,55 +65,32 @@ export default function OrdersPage() {
   }
 
   function handleSortChange(value) {
-    if (value === 'deadline') {
-      setSortBy('deadline')
-      setSortAsc(true)
-    } else {
-      setSortBy('number')
-      setSortAsc(false)
-    }
-  }
-
-  function isDeadlinePast(order) {
-    if (!order.deadline) return false
-    if (['done', 'cancelled'].includes(order.status)) return false
-    return new Date(order.deadline) < new Date()
-  }
-
-  function formatDeadline(deadline) {
-    if (!deadline) return '—'
-    return new Date(deadline).toLocaleDateString('ru-RU')
+    if (value === 'deadline') { setSortBy('deadline'); setSortAsc(true) }
+    else { setSortBy('number'); setSortAsc(false) }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold font-display tracking-tight">Заказы</h1>
           <p className="text-text-muted">
-            {totalCount > 0 ? `${totalCount} заказов` : 'Управление заказами'}
+            {viewMode === 'list' && (totalCount > 0 ? `${totalCount} заказов` : 'Управление заказами')}
+            {viewMode === 'kanban' && 'Канбан с DnD'}
+            {viewMode === 'calendar' && 'Календарь дедлайнов'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex rounded-lg border border-border overflow-hidden">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`px-2.5 py-2 text-sm ${viewMode === 'table' ? 'bg-primary text-white' : 'text-text-muted hover:bg-surface-dim'}`}
-              aria-label="Таблица"
-              aria-pressed={viewMode === 'table'}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M12 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M21.375 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M12 17.25v-5.25" /></svg>
-            </button>
-            <button
-              onClick={() => setViewMode('kanban')}
-              className={`px-2.5 py-2 text-sm ${viewMode === 'kanban' ? 'bg-primary text-white' : 'text-text-muted hover:bg-surface-dim'}`}
-              aria-label="Канбан"
-              aria-pressed={viewMode === 'kanban'}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" /></svg>
-            </button>
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Tabs
+            items={[
+              { key: 'list', label: 'Список' },
+              { key: 'kanban', label: 'Канбан' },
+              { key: 'calendar', label: 'Календарь' },
+            ]}
+            active={viewMode}
+            onChange={setViewMode}
+          />
           <Link
             to="/orders/create"
             className="bg-accent hover:bg-accent-hover text-on-accent font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors shadow-card"
@@ -109,124 +100,136 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* Search + Sort + Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <SearchInput
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по номеру или заметкам..."
-          ariaLabel="Поиск заказов"
-          className="flex-1 max-w-md"
-        />
-        <div className="flex items-center gap-2">
-          <select
-            value={sortBy === 'deadline' ? 'deadline' : 'number'}
-            onChange={(e) => handleSortChange(e.target.value)}
-            className="rounded-lg border border-border px-3 py-2.5 text-sm bg-surface min-h-[44px]"
-            aria-label="Сортировка"
-          >
-            <option value="deadline">По сроку сдачи</option>
-            <option value="number">По номеру заказа</option>
-          </select>
-          <DepartmentFilter
-            selectedStatuses={statusFilters}
-            onChange={setStatusFilters}
-          />
-        </div>
-      </div>
-
-      {/* Date range filter */}
-      <DateRangeFilter
-        from={deadlineFrom}
-        to={deadlineTo}
-        onChange={({ from: f, to: t }) => { setDeadlineFrom(f); setDeadlineTo(t) }}
-      />
-
-      {/* Table / Kanban / Mobile Cards */}
-      {loading ? (
-        <TableSkeleton rows={6} cols={5} />
-      ) : error ? (
-        <div className="bg-danger/10 text-danger rounded-xl p-4 text-sm" role="alert">{error}</div>
-      ) : orders.length === 0 ? (
-        <div className="bg-surface rounded-xl border border-border p-12 text-center">
-          <h3 className="text-lg font-semibold mb-1">{search ? 'Ничего не найдено' : 'Нет заказов'}</h3>
-          <p className="text-text-muted text-sm mb-4">{search ? 'Попробуйте другой запрос' : 'Создайте первый заказ'}</p>
-          {!search && (
-            <Link to="/orders/create" className="inline-flex bg-accent hover:bg-accent-hover text-on-accent font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors shadow-card">
-              Создать заказ
-            </Link>
-          )}
-        </div>
-      ) : viewMode === 'kanban' ? (
-        <OrdersKanban orders={orders} onUpdated={() => {}} />
-      ) : (
+      {/* List view filters */}
+      {viewMode === 'list' && (
         <>
-          {/* Mobile card view */}
-          <div className="sm:hidden space-y-3">
-            {orders.map((order) => (
-              <Link
-                key={order.id}
-                to={`/orders/${order.id}`}
-                className="block bg-surface rounded-2xl border border-border shadow-card p-4 hover:border-accent/40 transition-colors active:bg-surface-dim"
+          <div className="flex flex-col sm:flex-row gap-3">
+            <SearchInput
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по номеру или заметкам..."
+              ariaLabel="Поиск заказов"
+              className="flex-1 max-w-md"
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={sortBy === 'deadline' ? 'deadline' : 'number'}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="rounded-lg border border-border px-3 py-2.5 text-sm bg-surface min-h-[44px]"
+                aria-label="Сортировка"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-text">#{order.number}</span>
-                  <StatusBadge status={order.status} />
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-text truncate mr-2">{order.client?.name || '—'}</span>
-                  <span className="text-text-muted shrink-0">{ORDER_TYPES[order.order_type]?.label || order.order_type}</span>
-                </div>
-                {order.deadline && (
-                  <div className={`text-xs mt-2 ${isDeadlinePast(order) ? 'text-danger font-medium' : 'text-text-muted'}`}>
-                    Сдача: {formatDeadline(order.deadline)}
-                  </div>
-                )}
-              </Link>
-            ))}
-          </div>
-          {/* Desktop table */}
-          <div className="hidden sm:block bg-surface rounded-xl border border-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <caption className="sr-only">Список заказов</caption>
-                <thead>
-                  <tr className="border-b border-border bg-surface-dim">
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">№</th>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Заказчик</th>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Тип</th>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Этап</th>
-                    <th className="text-left px-4 py-3 font-medium text-text-muted">Срок сдачи</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-border last:border-0 hover:bg-surface-dim/50 transition-colors cursor-pointer" onClick={() => window.location.href = `/orders/${order.id}`}>
-                      <td className="px-4 py-3">
-                        <Link to={`/orders/${order.id}`} className="font-medium text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
-                          {order.number}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-text-muted">
-                        {order.client?.name || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-text-muted">
-                        {ORDER_TYPES[order.order_type]?.label || order.order_type}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={order.status} />
-                      </td>
-                      <td className={`px-4 py-3 ${isDeadlinePast(order) ? 'text-danger font-medium' : 'text-text-muted'}`}>
-                        {formatDeadline(order.deadline)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <option value="deadline">По сроку сдачи</option>
+                <option value="number">По номеру заказа</option>
+              </select>
+              <DepartmentFilter
+                selectedStatuses={statusFilters}
+                onChange={setStatusFilters}
+              />
+              <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer rounded-lg border border-border px-3 py-2 hover:bg-surface-2">
+                <input
+                  type="checkbox"
+                  checked={includeArchived}
+                  onChange={(e) => setIncludeArchived(e.target.checked)}
+                  className="accent-accent"
+                />
+                Завершённые
+              </label>
             </div>
           </div>
-          <Pagination {...pagination} />
+
+          <DateRangeFilter
+            from={deadlineFrom}
+            to={deadlineTo}
+            onChange={({ from: f, to: t }) => { setDeadlineFrom(f); setDeadlineTo(t) }}
+          />
         </>
+      )}
+
+      {/* Content */}
+      {viewMode === 'kanban' && (
+        <OrdersKanban
+          deptFilter={deptFilter}
+          onDeptFilterChange={setDeptFilter}
+          includeArchived={includeArchived}
+        />
+      )}
+
+      {viewMode === 'calendar' && <ProductionCalendar />}
+
+      {viewMode === 'list' && (
+        loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-surface rounded-2xl border border-border p-4 animate-pulse">
+                <div className="h-4 bg-surface-dim rounded w-24 mb-3" />
+                <div className="h-3 bg-surface-dim rounded w-full mb-2" />
+                <div className="h-3 bg-surface-dim rounded w-3/4" />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="bg-danger/10 text-danger rounded-xl p-4 text-sm" role="alert">{String(error.message || error)}</div>
+        ) : orders.length === 0 ? (
+          <div className="bg-surface rounded-xl border border-border p-12 text-center">
+            <h3 className="text-lg font-semibold mb-1">{search ? 'Ничего не найдено' : 'Нет заказов'}</h3>
+            <p className="text-text-muted text-sm mb-4">{search ? 'Попробуйте другой запрос' : 'Создайте первый заказ'}</p>
+            {!search && (
+              <Link to="/orders/create" className="inline-flex bg-accent hover:bg-accent-hover text-on-accent font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors shadow-card">
+                Создать заказ
+              </Link>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {orders.map((order) => {
+                const deadlineLevel = getDeadlineLevel(order.deadline)
+                const dotCls = getDeadlineDotClass(order.deadline)
+                const borderCls = getDeadlineBorderClass(order.deadline) || 'border-l-border'
+                const textCls = getDeadlineClasses(order.deadline) || 'text-text-muted'
+                return (
+                  <Link
+                    key={order.id}
+                    to={`/orders/${order.id}`}
+                    className={`block bg-surface rounded-2xl border border-border shadow-card p-4 hover:border-accent/40 hover:shadow-modal transition-[border-color,box-shadow] active:bg-surface-2 border-l-4 ${borderCls}`}
+                  >
+                    {/* Top row: number + deadline (right) */}
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {dotCls && <span className={`w-2 h-2 rounded-full shrink-0 ${dotCls}`} aria-hidden="true" />}
+                        <span className="font-semibold text-text">#{order.number}</span>
+                        {order.priority && order.priority !== 'normal' && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${PRIORITIES[order.priority]?.color}`}>
+                            {PRIORITIES[order.priority]?.label}
+                          </span>
+                        )}
+                      </div>
+                      {order.deadline && (
+                        <span className={`text-xs whitespace-nowrap shrink-0 ${textCls} ${deadlineLevel === 'urgent' ? 'font-medium' : ''}`}>
+                          {new Date(order.deadline).toLocaleDateString('ru-RU')}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Client */}
+                    <p className="text-sm text-text mb-1 truncate">{order.client?.name || '—'}</p>
+
+                    {/* Type / size / qty */}
+                    <p className="text-xs text-text-muted mb-2">
+                      {ORDER_TYPES[order.order_type]?.label || order.order_type}
+                      {order.width_mm && order.height_mm ? ` · ${order.width_mm}×${order.height_mm}мм` : ''}
+                      {' · '}{order.qty} шт
+                    </p>
+
+                    {/* Status */}
+                    <StatusBadge status={order.status} />
+                  </Link>
+                )
+              })}
+            </div>
+            <Pagination {...pagination} />
+          </>
+        )
       )}
     </div>
   )

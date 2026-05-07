@@ -10,8 +10,9 @@ import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
 
 const PRODUCTION_STATUSES = new Set(COLS)
+const ARCHIVED_STATUSES = new Set(['done', 'cancelled'])
 
-export function useProductionBoard() {
+export function useProductionBoard({ includeArchived = false } = {}) {
   const { profile } = useAuth()
   const [showMine, setShowMine] = useState(false)
   const [sortBy, setSortBy] = useState('created')
@@ -45,14 +46,16 @@ export function useProductionBoard() {
   }, [])
 
   const allOrders = useMemo(() => {
-    const orders = allFetchedOrders.filter((o) => PRODUCTION_STATUSES.has(o.status))
+    const orders = allFetchedOrders.filter((o) =>
+      PRODUCTION_STATUSES.has(o.status) || (includeArchived && ARCHIVED_STATUSES.has(o.status))
+    )
     if (pendingMove) {
       return orders.map((o) =>
         o.id === pendingMove.orderId ? { ...o, status: pendingMove.targetStatus } : o
       )
     }
     return orders
-  }, [allFetchedOrders, pendingMove])
+  }, [allFetchedOrders, pendingMove, includeArchived])
 
   const filterAndSort = useCallback((orders) => {
     let filtered = showMine && profile ? orders.filter((o) => o.assigned_to === profile.id) : orders
@@ -76,11 +79,12 @@ export function useProductionBoard() {
 
   const columns = useMemo(() => {
     const result = {}
-    for (const s of COLS) {
+    const allCols = includeArchived ? [...COLS, 'done', 'cancelled'] : COLS
+    for (const s of allCols) {
       result[s] = filterAndSort(allOrders.filter((o) => o.status === s))
     }
     return result
-  }, [allOrders, filterAndSort])
+  }, [allOrders, filterAndSort, includeArchived])
 
   const activeOrder = activeId ? allFetchedOrders.find((o) => o.id === activeId) : null
   const total = allOrders.length

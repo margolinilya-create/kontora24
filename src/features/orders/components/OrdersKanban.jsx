@@ -1,76 +1,176 @@
-import { Link } from 'react-router-dom'
-import { StatusSwitcher } from './StatusSwitcher'
-import { ORDER_STATUSES, ORDER_TYPES } from '@/shared/constants'
-import { stageDotClass } from '@/shared/lib/department-mapping'
-import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
-import { formatPrice, formatRelative } from '@/shared/lib/utils'
+import { useEffect, memo } from 'react'
+import { DndContext, DragOverlay, useDroppable, closestCorners, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { DraggableCard, DragOverlayCard } from '@/features/production/components/DraggableCard'
+import { useProductionBoard } from '@/features/production/hooks/useProductionBoard'
+import { ORDER_STATUSES } from '@/shared/constants'
+import { stageBorderClass, stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
+import MultiSelect from '@/shared/components/MultiSelect'
+import ErrorState from '@/shared/components/ErrorState'
 
-const KANBAN_COLS = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk', 'done', 'cancelled']
+// Все 11 рабочих колонок (без cancelled). 'done' добавится через includeArchived.
+const COLS = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
 
-export function OrdersKanban({ orders, onUpdated }) {
-  const columns = KANBAN_COLS.map((status) => ({
-    status,
-    label: ORDER_STATUSES[status]?.label || status,
-    orders: orders.filter((o) => o.status === status),
-  }))
+const DEPT_OPTIONS = Object.entries(DEPT_GROUPS).map(([key, g]) => ({ value: key, label: g.label }))
+
+const DroppableColumn = memo(function DroppableColumn({ status, orders, isActive, activeFromStatus, includeArchived }) {
+  const { setNodeRef, isOver } = useDroppable({ id: status })
+  const label = ORDER_STATUSES[status]?.label || status
+  const canReceive = isActive && activeFromStatus !== status
+  const dotCls = stageDotClass(status)
+  const borderCls = stageBorderClass(status)
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 kanban-scroll">
-      {columns.map((col) => (
-        <div key={col.status} className="flex-shrink-0 w-72">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <h3 className="font-semibold text-sm flex items-center gap-2 text-text">
-              <span className={`w-2.5 h-2.5 rounded-full ${stageDotClass(col.status)}`} aria-hidden="true" />
-              {col.label}
-            </h3>
-            <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">
-              {col.orders.length}
-            </span>
+    <div
+      ref={setNodeRef}
+      data-col={status}
+      role="region"
+      aria-label={label}
+      className={`flex flex-col rounded-2xl border ${borderCls} bg-surface min-h-[200px] w-[78vw] sm:w-[260px] shrink-0 transition-shadow
+        ${isOver ? 'ring-2 ring-accent/40 shadow-lg' : 'shadow-card'}
+        ${canReceive ? 'opacity-95' : ''}
+      `}
+    >
+      {/* Цветная полоска отдела сверху */}
+      <div className={`h-1.5 rounded-t-2xl ${dotCls.replace('bg-', 'bg-')}`} aria-hidden="true" />
+      <div className="px-3 pt-3 pb-2 flex items-center justify-between">
+        <h3 className="font-semibold text-sm flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${dotCls}`} aria-hidden="true" />
+          {label}
+        </h3>
+        <span className={`text-xs font-medium min-w-[24px] text-center py-0.5 px-2 rounded-full transition-colors
+          ${isOver ? 'bg-accent text-on-accent' : 'text-text-muted bg-surface-2'}`}>
+          {orders.length}
+        </span>
+      </div>
+
+      <SortableContext items={orders.map((o) => o.id)} strategy={verticalListSortingStrategy}>
+        <div className="px-2 pb-2 space-y-2 flex-1 overflow-y-auto max-h-[60vh]">
+          {orders.length === 0 ? (
+            <div className={`border border-dashed rounded-xl py-8 text-center transition-all
+              ${isOver ? 'border-accent/30 bg-accent/[0.03]' : 'border-border/50'}`}>
+              <p className={`text-xs ${isOver ? 'text-accent' : 'text-text-muted/60'}`}>
+                {isOver ? 'Отпустите здесь' : (includeArchived && status === 'done' ? '—' : 'Нет заказов')}
+              </p>
+            </div>
+          ) : (
+            orders.map((order) => <DraggableCard key={order.id} order={order} />)
+          )}
+        </div>
+      </SortableContext>
+    </div>
+  )
+})
+
+/**
+ * Канбан с DnD, цветными полосами по отделам, мульти-фильтром по отделам
+ * и опциональным показом завершённых.
+ */
+export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived }) {
+  const board = useProductionBoard({ includeArchived })
+  const { columns, scrollRef, scrollState, setScrollState, error, refetch, activeId, setActiveId, activeOrder, handleDragEnd, loading } = board
+
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  const keyboardSensor = useSensor(KeyboardSensor)
+  const sensors = useSensors(pointerSensor, touchSensor, keyboardSensor)
+
+  // Scroll fade indicators
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let rafId = null
+    function onScroll() {
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        setScrollState({
+          start: el.scrollLeft < 10,
+          end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 10,
+        })
+      })
+    }
+    onScroll()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => { el.removeEventListener('scroll', onScroll); if (rafId) cancelAnimationFrame(rafId) }
+  }, [scrollRef, setScrollState])
+
+  if (error) return <ErrorState error={error} onRetry={refetch} />
+
+  // Фильтр по отделу: показываем только релевантные колонки
+  const visibleCols = (() => {
+    let cols = [...COLS]
+    if (includeArchived) cols.push('done')
+    if (deptFilter && deptFilter.length > 0) {
+      const allowedStages = new Set()
+      deptFilter.forEach((key) => {
+        DEPT_GROUPS[key]?.stages.forEach((s) => allowedStages.add(s))
+      })
+      cols = cols.filter((s) => allowedStages.has(s) || (s === 'new' && deptFilter.includes('design')))
+    }
+    return cols
+  })()
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-end gap-3">
+        <MultiSelect
+          label="Отдел"
+          options={DEPT_OPTIONS}
+          value={deptFilter || []}
+          onChange={onDeptFilterChange}
+          allLabel="Все отделы"
+        />
+      </div>
+
+      {loading ? (
+        <div className="flex gap-3 overflow-hidden pb-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="shrink-0 bg-surface rounded-2xl border border-border p-4 w-[78vw] sm:w-[260px]">
+              <div className="h-3 bg-surface-dim rounded w-24 mb-3 animate-pulse" />
+              <div className="bg-surface-dim rounded-xl h-24 mb-2 animate-pulse" />
+              <div className="bg-surface-dim rounded-xl h-24 mb-2 animate-pulse" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={(e) => setActiveId(e.active.id)}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
+        >
+          <div className="relative">
+            {!scrollState.start && (
+              <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-surface-dim to-transparent z-10 pointer-events-none sm:hidden" />
+            )}
+            {!scrollState.end && (
+              <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-surface-dim to-transparent z-10 pointer-events-none sm:hidden" />
+            )}
+            <div
+              ref={scrollRef}
+              className="flex gap-3 overflow-x-auto pb-4 kanban-scroll scroll-smooth snap-x snap-mandatory sm:snap-none"
+            >
+              {visibleCols.map((status) => (
+                <div key={status} className="snap-start">
+                  <DroppableColumn
+                    status={status}
+                    orders={columns[status] || []}
+                    isActive={!!activeId}
+                    activeFromStatus={activeOrder?.status}
+                    includeArchived={includeArchived}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-2 min-h-[200px]">
-            {col.orders.length === 0 ? (
-              <div className="border border-dashed border-border rounded-2xl p-6 text-center">
-                <p className="text-xs text-text-muted">Пусто</p>
-              </div>
-            ) : (
-              col.orders.map((order) => {
-                const deadlineLevel = getDeadlineLevel(order.deadline)
-                const deadlineDotClass = getDeadlineDotClass(order.deadline)
-                const deadlineTextClass = getDeadlineClasses(order.deadline) || 'text-text-muted'
-                return (
-                  <div key={order.id} className="bg-surface rounded-2xl border border-border shadow-card p-3 hover:border-accent/40 transition-[border-color] duration-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Link to={`/orders/${order.id}`} className="font-semibold text-sm text-text hover:text-accent transition-colors">
-                        #{order.number}
-                      </Link>
-                      <span className="text-xs font-medium text-text">{formatPrice(order.price_final)}</span>
-                    </div>
-                    <p className="text-xs text-text-muted mb-1">
-                      {ORDER_TYPES[order.order_type]?.label} · {order.qty} шт
-                    </p>
-                    {order.client?.name && (
-                      <p className="text-xs text-text-muted mb-1">{order.client.name}</p>
-                    )}
-                    {order.deadline && (
-                      <p className={`text-xs mb-1 flex items-center gap-1.5 ${deadlineTextClass} ${deadlineLevel === 'urgent' ? 'font-medium' : ''}`}>
-                        {deadlineDotClass && (
-                          <span className={`w-1.5 h-1.5 rounded-full ${deadlineDotClass}`} aria-hidden="true" />
-                        )}
-                        Дедлайн: {new Date(order.deadline).toLocaleDateString('ru-RU')}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
-                      <span className="text-[10px] text-text-muted">{formatRelative(order.created_at)}</span>
-                      <StatusSwitcher order={order} onUpdated={onUpdated} />
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-      ))}
+          <DragOverlay dropAnimation={{ duration: 250, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' }}>
+            {activeOrder && <DragOverlayCard order={activeOrder} />}
+          </DragOverlay>
+        </DndContext>
+      )}
     </div>
   )
 }

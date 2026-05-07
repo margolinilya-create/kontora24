@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, subMonths, subWeeks, startOfWeek, format, differenceInHours, getISOWeek } from 'date-fns'
 
 export const PERIODS = [
@@ -49,6 +50,7 @@ export function useAnalyticsData(period) {
   }, [period])
 
   useEffect(() => { fetchData() }, [fetchData])
+  useRefetchOnFocus(fetchData)
 
   const orders = data.orders
   const doneOrders = useMemo(() => orders.filter((o) => o.status === 'done'), [orders])

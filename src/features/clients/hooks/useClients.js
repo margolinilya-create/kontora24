@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 
 export function useClients(search = '') {
   const [clients, setClients] = useState([])
@@ -42,6 +43,7 @@ export function useClients(search = '') {
   }, [search])
 
   useEffect(() => { fetchClients() }, [fetchClients])
+  useRefetchOnFocus(fetchClients)
 
   return { clients, loading, error, refetch: fetchClients }
 }

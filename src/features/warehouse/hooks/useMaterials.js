@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 
 export function useMaterials() {
   const [materials, setMaterials] = useState([])
@@ -48,6 +49,7 @@ export function useMaterials() {
   }, [])
 
   useEffect(() => { fetchMaterials() }, [fetchMaterials])
+  useRefetchOnFocus(fetchMaterials)
 
   return { materials, loading, error, refetch: fetchMaterials }
 }

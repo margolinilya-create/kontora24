@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { getFreshAccessToken } from '@/shared/lib/auth-token'
 import { toast } from '@/shared/stores/toast-store'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 
 export function useSettings(key) {
   const [value, setValue] = useState(null)
@@ -24,6 +25,7 @@ export function useSettings(key) {
   }, [key])
 
   useEffect(() => { fetchSettings() }, [fetchSettings])
+  useRefetchOnFocus(fetchSettings)
 
   async function saveSettings(newValue) {
     const { error } = await supabase
@@ -60,6 +62,7 @@ export function useUsers() {
   }, [])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
+  useRefetchOnFocus(fetchUsers)
 
   async function updateUserRole(userId, newRole) {
     const { error } = await supabase

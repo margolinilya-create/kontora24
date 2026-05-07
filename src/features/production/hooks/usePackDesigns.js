@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 
 /**
  * Виды стикеров в паке (k24_pack_designs).
@@ -35,6 +36,7 @@ export function usePackDesigns(orderId) {
   }, [orderId])
 
   useEffect(() => { fetchDesigns() }, [fetchDesigns])
+  useRefetchOnFocus(fetchDesigns)
 
   // Realtime
   const fetchRef = useRef(fetchDesigns)

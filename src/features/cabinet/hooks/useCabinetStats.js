@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, startOfMonth, subMonths, format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -146,6 +147,7 @@ export function useCabinetStats(period = '30') {
   }, [profile, period])
 
   useEffect(() => { fetchStats() }, [fetchStats])
+  useRefetchOnFocus(fetchStats)
 
   return { stats, loading, error, refetch: fetchStats }
 }

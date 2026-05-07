@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3'
+const CACHE_VERSION = 'v4'
 const STATIC_CACHE = `kontora24-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `kontora24-dynamic-${CACHE_VERSION}`
 const MAX_DYNAMIC_CACHE_SIZE = 50

@@ -10,12 +10,19 @@ export const useAuthStore = create((set, get) => ({
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileErr } = await supabase
           .from('k24_profiles')
           .select('*')
           .eq('id', session.user.id)
           .single()
-        set({ user: session.user, profile, loading: false })
+        // Если профиль не найден или RLS отказал — сбрасываем сессию,
+        // иначе AuthGuard крутит спиннер вечно (user есть, profile=null).
+        if (profileErr || !profile) {
+          await supabase.auth.signOut()
+          set({ user: null, profile: null, loading: false })
+        } else {
+          set({ user: session.user, profile, loading: false })
+        }
       } else {
         set({ user: null, profile: null, loading: false })
       }
@@ -27,18 +34,39 @@ export const useAuthStore = create((set, get) => ({
     const existing = get()._authSubscription
     if (existing) existing.unsubscribe()
 
-    // Listen for auth changes (store subscription for cleanup)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('k24_profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        set({ user: session.user, profile })
-      } else {
+    // Listen for auth changes (store subscription for cleanup).
+    // ВАЖНО: внутри callback нельзя вызывать supabase.* напрямую — будет дедлок
+    // (см. https://supabase.com/docs/reference/javascript/auth-onauthstatechange).
+    // Поэтому сам callback только синхронно меняет user; profile подтягиваем
+    // через setTimeout(0), вне локa auth.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session?.user) {
         set({ user: null, profile: null })
+        return
       }
+      // Не трогаем стейт сразу — дождёмся профиля. Иначе AuthGuard мигнёт спиннером
+      // на каждом TOKEN_REFRESHED.
+      setTimeout(async () => {
+        try {
+          const { data: profile, error: profileErr } = await supabase
+            .from('k24_profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+          // Транзиентная ошибка при TOKEN_REFRESHED — оставляем текущий профиль
+          // (если он был), иначе на каждом моргании сети будет логаут.
+          if (profileErr) return
+          if (!profile) {
+            // Профиль реально удалён — сбрасываем сессию
+            supabase.auth.signOut()
+            set({ user: null, profile: null })
+            return
+          }
+          set({ user: session.user, profile })
+        } catch {
+          // swallow — keep existing state
+        }
+      }, 0)
     })
     set({ _authSubscription: subscription })
 

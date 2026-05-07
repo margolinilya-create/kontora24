@@ -8,6 +8,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
 import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 
 const PRODUCTION_STATUSES = new Set(COLS)
 const ARCHIVED_STATUSES = new Set(['done', 'cancelled'])
@@ -25,25 +26,25 @@ export function useProductionBoard({ includeArchived = false } = {}) {
 
   const { orders: allFetchedOrders, loading, error, refetch } = useOrders()
 
-  useEffect(() => {
-    async function fetchTodayDone() {
-      try {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const { count, error } = await supabase
-          .from('k24_order_status_history')
-          .select('*', { count: 'exact', head: true })
-          .eq('to_status', 'done')
-          .gte('created_at', today.toISOString())
-        if (error) throw error
-        setTodayDone(count ?? 0)
-      } catch (err) {
-        captureError(err, { tags: { source: 'useProductionBoard.fetchTodayDone' } })
-        setTodayDone(null)
-      }
+  const fetchTodayDone = useCallback(async () => {
+    try {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const { count, error } = await supabase
+        .from('k24_order_status_history')
+        .select('*', { count: 'exact', head: true })
+        .eq('to_status', 'done')
+        .gte('created_at', today.toISOString())
+      if (error) throw error
+      setTodayDone(count ?? 0)
+    } catch (err) {
+      captureError(err, { tags: { source: 'useProductionBoard.fetchTodayDone' } })
+      setTodayDone(null)
     }
-    fetchTodayDone()
   }, [])
+
+  useEffect(() => { fetchTodayDone() }, [fetchTodayDone])
+  useRefetchOnFocus(fetchTodayDone)
 
   const allOrders = useMemo(() => {
     const orders = allFetchedOrders.filter((o) =>

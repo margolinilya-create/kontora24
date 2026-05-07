@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES } from '@/shared/constants'
 import { safeRpc } from '@/shared/lib/safeRpc'
 import { captureError } from '@/shared/lib/sentry'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 
 /** Этапы, на которых заказ нельзя двигать вперёд без введённых данных. */
 const STAGES_REQUIRING_COMPLETION = new Set([
@@ -88,6 +89,7 @@ export function useOrders(filters = {}) {
   }, [filters.status, statusesKey, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
+  useRefetchOnFocus(fetchOrders)
 
   // Realtime — stable subscription (doesn't re-subscribe on filter change)
   const fetchRef = useRef(fetchOrders)
@@ -146,6 +148,7 @@ export function useOrderDetail(id) {
   }, [id])
 
   useEffect(() => { fetchDetail() }, [fetchDetail])
+  useRefetchOnFocus(fetchDetail)
 
   return { order, history, loading, error, refetch: fetchDetail }
 }

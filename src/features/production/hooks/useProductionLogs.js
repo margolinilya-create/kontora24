@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { computeStageProgress } from '../lib/production-logs'
 
 /**
@@ -34,6 +35,7 @@ export function useProductionLogs(orderId, targetQty) {
   }, [orderId])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
+  useRefetchOnFocus(fetchLogs)
 
   // Realtime updates — stable subscription via ref (no re-subscribe on fetchLogs change)
   const fetchRef = useRef(fetchLogs)

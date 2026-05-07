@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { MS_PER_MINUTE } from '@/shared/constants'
 
 /**
@@ -52,6 +53,7 @@ export function useShiftTracker() {
   }, [profile])
 
   useEffect(() => { fetchShiftData() }, [fetchShiftData])
+  useRefetchOnFocus(fetchShiftData)
 
   const clockIn = useCallback(async () => {
     if (!profile || activeShift) return

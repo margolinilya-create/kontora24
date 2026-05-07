@@ -87,6 +87,43 @@ describe('useAuthStore', () => {
       expect(mockSupabase.auth.signOut).toHaveBeenCalled()
       expect(localStorage.getItem('rememberMe')).toBeNull()
     })
+
+    it('signs out and clears state when profile fetch fails (avoids infinite spinner)', async () => {
+      mockSupabase.auth.getSession.mockResolvedValue({
+        data: { session: { user: { id: 'user-1' } } }, error: null,
+      })
+      mockSupabase.from.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
+      })
+
+      await useAuthStore.getState().initialize()
+
+      const state = useAuthStore.getState()
+      expect(state.user).toBeNull()
+      expect(state.profile).toBeNull()
+      expect(state.loading).toBe(false)
+      expect(mockSupabase.auth.signOut).toHaveBeenCalled()
+    })
+
+    it('signs out when profile is missing (no Kontora24 access)', async () => {
+      mockSupabase.auth.getSession.mockResolvedValue({
+        data: { session: { user: { id: 'user-1' } } }, error: null,
+      })
+      mockSupabase.from.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      })
+
+      await useAuthStore.getState().initialize()
+
+      const state = useAuthStore.getState()
+      expect(state.user).toBeNull()
+      expect(state.profile).toBeNull()
+      expect(mockSupabase.auth.signOut).toHaveBeenCalled()
+    })
   })
 
   describe('signIn', () => {

@@ -1,47 +1,116 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail } from '../hooks/useOrders'
 import { InfoField } from '../components/InfoField'
-import { EditableField } from '../components/EditableField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
 import { StatusSwitcher } from '../components/StatusSwitcher'
-import { OrderTimeline } from '../components/OrderTimeline'
+import { OrderStepper } from '../components/OrderStepper'
 import { OrderComments } from '../components/OrderComments'
 import { OrderStageInput } from '../components/OrderStageInput'
-import { TechCardActions } from '@/features/techcard/components/TechCardActions'
-import { StickerActions } from '@/features/techcard/components/StickerActions'
+import { OrderProgressTab } from '../components/OrderProgressTab'
+import { OrderReportsTab } from '../components/OrderReportsTab'
+import { OrderHistoryTab } from '../components/OrderHistoryTab'
+import { FinanceTab } from '../components/FinanceTab'
+import { PrintPreviewModal } from '@/features/techcard/components/PrintPreviewModal'
 import { Skeleton } from '@/shared/components/Skeleton'
 import Button from '@/shared/components/Button'
-import Sheet from '@/shared/components/Sheet'
+import Modal from '@/shared/components/Modal'
+import Tabs from '@/shared/components/Tabs'
 import {
-  ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES,
-  ORDER_SOURCES, PAYMENT_STATUSES, DESIGN_STATUSES, PRIORITIES,
+  ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { formatPrice } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
+
+const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
+
+function isImageUrl(url) {
+  return typeof url === 'string' && IMAGE_RX.test(url)
+}
+
+function GearIcon({ className = '' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  )
+}
+
+function OverviewTab({ order }) {
+  const isPack = order.order_type === 'stickerpack' || order.order_type === 'stickerpack3D'
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Left: 3 rows */}
+      <div className="space-y-3">
+        {/* Row 1: Тип / Размер / Тираж / Плёнка */}
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <InfoField label="Тип" value={ORDER_TYPES[order.order_type]?.label || order.order_type} />
+          <InfoField label="Размер" value={`${order.width_mm} x ${order.height_mm} мм`} />
+          <InfoField label="Тираж" value={`${order.qty} шт`} />
+          <InfoField label="Плёнка" value={FILM_TYPES[order.film_type]?.label || order.film_type || '—'} />
+        </div>
+        {/* Row 2: Ламинация / БОПП / Стикеров в паке (только пак) / Отгрузка */}
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <InfoField label="Ламинация" value={order.need_lam ? (LAMINATION_TYPES[order.lam_type]?.label || 'Да') : 'Нет'} />
+          <InfoField label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
+          {isPack ? (
+            <InfoField label="Стикеров в паке" value={order.stickers_per_pack || '—'} />
+          ) : (
+            <InfoField label="Срок сдачи" value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'} />
+          )}
+          <InfoField label="Отгрузка" value={DELIVERY_TYPES[order.delivery_type]?.label || 'Самовывоз'} />
+        </div>
+        {/* Row 3: highlighted comment from customer */}
+        {order.notes && (
+          <div className="bg-accent/10 border border-accent/30 rounded-2xl p-4">
+            <p className="text-xs font-medium text-accent uppercase mb-1.5">Комментарий заказчика</p>
+            <p className="text-sm whitespace-pre-wrap text-text">{order.notes}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Right: preview */}
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-4">
+        <p className="text-xs text-text-muted uppercase mb-2">Превью макета</p>
+        {order.mockup_path && isImageUrl(order.mockup_path) ? (
+          <img
+            src={order.mockup_path}
+            alt="Макет"
+            loading="lazy"
+            className="w-full max-h-[420px] object-contain rounded-xl border border-border bg-surface-dim"
+          />
+        ) : order.mockup_path ? (
+          <a
+            href={order.mockup_path}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-text hover:text-accent underline decoration-text-muted/40 hover:decoration-accent transition-colors break-all"
+          >
+            {order.mockup_path}
+          </a>
+        ) : (
+          <div className="h-[200px] flex items-center justify-center text-text-muted text-sm bg-surface-dim rounded-xl border border-dashed border-border">
+            Нет макета
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function OrderDetailPage() {
   const { id } = useParams()
   const { order, history, loading, refetch } = useOrderDetail(id)
-  const { hasRole, realRole } = useAuth()
+  const { hasRole } = useAuth()
   const isFinance = hasRole(['admin', 'manager'])
-  const isAdmin = realRole === 'admin'
-  const [editing, setEditing] = useState(false)
-  const [showTechCard, setShowTechCard] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
-  const [showProductionSticker, setShowProductionSticker] = useState(false)
-  const [showDeliverySticker, setShowDeliverySticker] = useState(false)
 
-  const techCardRef = useRef(null)
-
-  const scrollToRef = useCallback((ref) => {
-    setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
-  }, [])
-
+  const [tab, setTab] = useState('overview')
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [printType, setPrintType] = useState(null) // 'techcard' | 'production' | 'delivery' | null
 
   function copySourceLink() {
-    if (order.mockup_path) {
+    if (order?.mockup_path) {
       navigator.clipboard.writeText(order.mockup_path)
       toast.success('Ссылка скопирована')
       return
@@ -53,20 +122,11 @@ export default function OrderDetailPage() {
     return (
       <div className="space-y-6 animate-in fade-in">
         <div className="flex items-center gap-3">
-          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-10 w-64" />
           <Skeleton className="h-6 w-24" />
         </div>
-        <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-5 w-28" />
-              </div>
-            ))}
-          </div>
-        </div>
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-40 w-full" />
       </div>
     )
   }
@@ -83,71 +143,71 @@ export default function OrderDetailPage() {
   const clientName = order.client?.name || '—'
   const managerName = order.creator?.display_name || '—'
   const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('ru-RU') : '—'
+  const deadlineDate = order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : null
+
+  const tabs = [
+    { key: 'overview', label: 'Обзор' },
+    { key: 'progress', label: 'Прогресс' },
+    { key: 'reports', label: 'Расход материалов' },
+    { key: 'history', label: 'История' },
+    ...(isFinance ? [{ key: 'finance', label: 'Финансы' }] : []),
+  ]
 
   return (
-    <div className="space-y-6">
-      {/* Back link */}
+    <div className="space-y-5">
+      {/* Back */}
       <Link to="/orders" className="text-text-muted hover:text-text transition-colors text-sm inline-block">
         ← Назад к списку
       </Link>
 
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3 flex-wrap">
-            <span>ORD-{String(order.number).padStart(4, '0')}</span>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        {/* Left: number + meta */}
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-4xl sm:text-5xl font-bold font-display tracking-tight leading-none">
+              ORD-{String(order.number).padStart(4, '0')}
+            </h1>
             {order.priority && order.priority !== 'normal' && (
-              <span className={`text-sm px-2 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
                 {PRIORITIES[order.priority]?.label}
               </span>
             )}
-            <span className="text-text-muted">—</span>
-            <span>{clientName}</span>
-          </h1>
-          <p className="text-text-muted text-sm mt-1">
-            Менеджер: {managerName}
-          </p>
-          <p className="inline-block bg-surface border border-border text-text-muted font-medium text-sm px-3 py-1 rounded-lg mt-2">
-            {orderDate}
+          </div>
+          <p className="text-text-muted text-sm mt-2">
+            {clientName} · {managerName} · {orderDate}
+            {deadlineDate && <> · <span className="text-text">сдача {deadlineDate}</span></>}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {isAdmin && (
-            <Button variant={editing ? 'primary' : 'secondary'} onClick={() => setEditing(!editing)}>
-              {editing ? 'Закрыть редактор' : 'Редактировать'}
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => { setShowTechCard(v => { if (!v) scrollToRef(techCardRef); return !v }) }}>
-            Тех. карта
-          </Button>
-          <Button variant="secondary" onClick={() => setShowProductionSticker(true)}>
-            В производство
-          </Button>
-          <Button variant="secondary" onClick={() => setShowDeliverySticker(true)}>
-            На выдачу
-          </Button>
-          <Button variant="secondary" onClick={() => setShowHistory(true)}>
-            История
-          </Button>
+
+        {/* Right: status dropdown + edit gear */}
+        <div className="flex items-center gap-2 ml-auto">
           <StatusSwitcher order={order} onUpdated={refetch} />
+          {isFinance && (
+            <button
+              onClick={() => setEditorOpen(true)}
+              aria-label="Редактировать заказ"
+              className="w-10 h-10 rounded-lg border border-border text-text-muted hover:text-text hover:bg-surface-2 transition-colors flex items-center justify-center"
+            >
+              <GearIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Order progress timeline */}
-      <OrderTimeline order={order} history={history} />
+      {/* Print group — sgrouped under common border */}
+      <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface p-1.5">
+        <Button variant="secondary" size="sm" onClick={() => setPrintType('techcard')}>Тех. карта</Button>
+        <Button variant="secondary" size="sm" onClick={() => setPrintType('production')}>На бокс</Button>
+        <Button variant="secondary" size="sm" onClick={() => setPrintType('delivery')}>На выдачу</Button>
+      </div>
 
-      {/* Admin edit mode */}
-      {editing && isAdmin && (
-        <AdminOrderEditor
-          order={order}
-          onSaved={() => { setEditing(false); refetch() }}
-          onCancel={() => setEditing(false)}
-        />
-      )}
+      {/* Stepper */}
+      <OrderStepper order={order} history={history} />
 
-      {/* Source files link (internal disk) */}
+      {/* Source files link */}
       <div className="bg-surface rounded-2xl border border-border shadow-card p-4 flex items-center gap-3">
-        <span className="text-sm text-text-muted">Исходные файлы:</span>
+        <span className="text-sm text-text-muted whitespace-nowrap">Исходные файлы:</span>
         {order.mockup_path ? (
           <a
             href={order.mockup_path}
@@ -160,195 +220,54 @@ export default function OrderDetailPage() {
         ) : (
           <span className="text-sm text-text-muted flex-1">Нет ссылки</span>
         )}
-        <Button variant="secondary" size="sm" onClick={copySourceLink}>
-          Копировать
-        </Button>
+        <Button variant="secondary" size="sm" onClick={copySourceLink}>Копировать</Button>
       </div>
 
-      {/* Order info */}
-      <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-        <h2 className="font-semibold mb-4 text-lg">Информация о заказе</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <InfoField label="Тип" value={ORDER_TYPES[order.order_type]?.label || order.order_type} />
-          <InfoField label="Размер" value={`${order.width_mm} x ${order.height_mm} мм`} />
-          <InfoField label="Тираж" value={`${order.qty} шт`} />
-          <InfoField label="Плёнка" value={FILM_TYPES[order.film_type]?.label || order.film_type || '—'} />
-          <InfoField label="Ламинация" value={LAMINATION_TYPES[order.lam_type]?.label || 'Нет'} />
-          <InfoField label="Кол-во видов" value={order.design_variants || 1} />
-          {(order.order_type === 'stickerpack' || order.order_type === 'stickerpack3D') && order.stickers_per_pack && (
-            <InfoField label="Стикеров в паке" value={order.stickers_per_pack} />
-          )}
-          <InfoField label="Дизайн" value={DESIGN_STATUSES[order.design_status]?.label || '—'} />
-          <InfoField label="Срок сдачи" value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'} />
-        </div>
+      {/* Tabs */}
+      <Tabs items={tabs} active={tab} onChange={setTab} />
 
-        {/* Flags */}
-        {(order.is_urgent || order.needs_montage_film || order.needs_individual_cut || order.bopp_bag) && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            {order.is_urgent && <span className="text-xs px-2 py-1 rounded-full bg-danger/10 text-danger font-medium">Срочно</span>}
-            {order.needs_montage_film && <span className="text-xs px-2 py-1 rounded-full bg-surface-dim text-text-muted font-medium">Монтажная плёнка</span>}
-            {order.needs_individual_cut && <span className="text-xs px-2 py-1 rounded-full bg-surface-dim text-text-muted font-medium">Индивид. резка</span>}
-            {order.bopp_bag && <span className="text-xs px-2 py-1 rounded-full bg-surface-dim text-text-muted font-medium">БОПП пакет</span>}
+      {/* Tab content */}
+      <div>
+        {tab === 'overview' && (
+          <div className="space-y-5">
+            <OverviewTab order={order} />
+            {/* Quick stage input для текущего исполнителя */}
+            <OrderStageInput order={order} onUpdated={refetch} />
           </div>
         )}
-
-        {/* Notes */}
-        {order.notes && (
-          <div className="mt-4">
-            <p className="text-xs text-text-muted uppercase mb-1">Заметки</p>
-            <div className="bg-surface-dim rounded-lg p-3 text-sm whitespace-pre-wrap">{order.notes}</div>
-          </div>
+        {tab === 'progress' && (
+          <OrderProgressTab order={order} history={history} onUpdated={refetch} />
         )}
-
-        {/* Editable production fields */}
-        <h3 className="font-semibold mt-6 mb-3">Производственные данные</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <EditableField
-            label="Напечатано (м)"
-            field="printed_meters"
-            order={order}
-            onSaved={refetch}
-          />
-          <EditableField
-            label="Потрачено смеси"
-            field="resin_used"
-            order={order}
-            onSaved={refetch}
-          />
-          <EditableField
-            label="Брак (шт)"
-            field="rejected_qty"
-            order={order}
-            onSaved={refetch}
-          />
-          <EditableField
-            label="Напечатано (шт)"
-            field="printed_qty"
-            order={order}
-            onSaved={refetch}
-          />
-        </div>
-      </div>
-
-      {/* Stage input for production workers */}
-      <OrderStageInput order={order} onUpdated={refetch} />
-
-      {/* Delivery */}
-      <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-        <h2 className="font-semibold text-lg mb-4">Отгрузка</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <InfoField label="Получение" value={DELIVERY_TYPES[order.delivery_type]?.label || 'Самовывоз'} />
-          {order.delivery_type === 'delivery' && (
-            <>
-              {order.delivery_city && <InfoField label="Город" value={order.delivery_city} />}
-              {order.delivery_address && <InfoField label="Адрес" value={order.delivery_address} />}
-            </>
-          )}
-        </div>
-        {order.delivery_type === 'delivery' && order.delivery_notes && (
-          <div className="mt-3">
-            <p className="text-xs text-text-muted uppercase mb-1">Комментарий к доставке</p>
-            <div className="bg-surface-dim rounded-lg p-3 text-sm whitespace-pre-wrap">{order.delivery_notes}</div>
-          </div>
+        {tab === 'reports' && (
+          <OrderReportsTab order={order} onUpdated={refetch} />
+        )}
+        {tab === 'history' && (
+          <OrderHistoryTab history={history} />
+        )}
+        {tab === 'finance' && isFinance && (
+          <FinanceTab order={order} />
         )}
       </div>
 
-      {/* Deal info (admin/manager only) */}
-      {isFinance && (
-        <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-          <h2 className="font-semibold text-lg mb-4">Сделка</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {order.deal_name && <InfoField label="Название сделки" value={order.deal_name} />}
-            {order.bitrix_deal_id && <InfoField label="Bitrix ID" value={order.bitrix_deal_id} />}
-            <InfoField label="Партнёрский" value={order.is_partner ? 'Да (-35%)' : 'Нет'} />
-            <InfoField label="Источник" value={ORDER_SOURCES[order.source]?.label || '—'} />
-            {order.source === 'referrer' && order.source_referrer && (
-              <InfoField label="Референт" value={order.source_referrer} />
-            )}
-            <InfoField label="Оплата" value={PAYMENT_STATUSES[order.payment_status]?.label || '—'} />
-          </div>
-        </div>
-      )}
-
-      {/* Finance (admin/manager only) */}
-      {isFinance && (
-        <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-          <h2 className="font-semibold text-lg mb-4">Финансы</h2>
-          <div className="bg-accent text-on-accent rounded-2xl shadow-card p-6 mb-4">
-            <p className="text-sm opacity-70">Итого</p>
-            <p className="text-4xl font-bold font-display tracking-tight">{formatPrice(order.price_final)}</p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            <InfoField label="Материалы" value={formatPrice(order.cost_materials)} />
-            <InfoField label="Труд" value={formatPrice(order.cost_labor)} />
-            <InfoField label="Себестоимость" value={formatPrice(order.cost_total)} />
-            <InfoField label="За штуку" value={formatPrice(order.price_per_unit)} />
-            <InfoField label="Наценка" value={order.markup ? `x${order.markup}` : '—'} />
-            <InfoField label="Скидка" value={order.discount_pct ? `${Math.round(order.discount_pct * 100)}%` : '—'} />
-          </div>
-        </div>
-      )}
-
-      {/* Comments */}
+      {/* Comments — visible across tabs (production chat) */}
       <OrderComments orderId={order.id} />
 
-      {/* Tech card panel */}
-      {showTechCard && (
-        <div ref={techCardRef} className="bg-surface rounded-2xl border border-border shadow-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Тех. карта</h2>
-            <button onClick={() => setShowTechCard(false)} className="text-text-muted hover:text-text text-sm">Закрыть</button>
-          </div>
-          <TechCardActions order={order} defaultOpen />
-        </div>
-      )}
+      {/* Print preview modals */}
+      <PrintPreviewModal
+        isOpen={printType !== null}
+        onClose={() => setPrintType(null)}
+        type={printType}
+        order={order}
+      />
 
-
-      {/* Production sticker — Sheet (info window ≤ 50% screen) */}
-      <Sheet
-        isOpen={showProductionSticker}
-        onClose={() => setShowProductionSticker(false)}
-        title='Стикер "В производство"'
-      >
-        <StickerActions type="production" order={order} />
-      </Sheet>
-
-      {/* Delivery sticker — Sheet */}
-      <Sheet
-        isOpen={showDeliverySticker}
-        onClose={() => setShowDeliverySticker(false)}
-        title='Стикер "На выдачу"'
-      >
-        <StickerActions type="delivery" order={order} />
-      </Sheet>
-
-      {/* History — Sheet */}
-      <Sheet
-        isOpen={showHistory}
-        onClose={() => setShowHistory(false)}
-        title="История изменений"
-        maxWidth="max-w-lg"
-      >
-        <div className="space-y-1">
-          {history.length === 0 ? (
-            <p className="text-text-muted text-sm">Нет записей</p>
-          ) : (
-            history.map((h) => (
-              <div key={h.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
-                <div>
-                  <span className="font-medium text-text">{h.changed_by_profile?.display_name || 'Система'}</span>
-                  <span className="text-text-muted ml-2">
-                    {h.from_status || '—'} → {h.to_status}
-                  </span>
-                </div>
-                <span className="text-text-muted text-xs shrink-0 ml-2">
-                  {new Date(h.created_at).toLocaleString('ru-RU')}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </Sheet>
+      {/* Edit modal (gear) */}
+      <Modal isOpen={editorOpen} onClose={() => setEditorOpen(false)} title="Редактирование заказа" maxWidth="max-w-3xl">
+        <AdminOrderEditor
+          order={order}
+          onSaved={() => { setEditorOpen(false); refetch() }}
+          onCancel={() => setEditorOpen(false)}
+        />
+      </Modal>
     </div>
   )
 }

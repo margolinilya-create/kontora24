@@ -4,6 +4,8 @@ import { MaterialCard } from '../components/MaterialCard'
 import { StockModal } from '../components/StockModal'
 import { MaterialForm } from '../components/MaterialForm'
 import { ConsumptionChart } from '../components/ConsumptionChart'
+import { MaterialsTable } from '../components/MaterialsTable'
+import { TransactionsHistory } from '../components/TransactionsHistory'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
@@ -16,7 +18,7 @@ export default function WarehousePage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showLowOnly, setShowLowOnly] = useState(false)
   const [showReservedOnly, setShowReservedOnly] = useState(false)
-  const [tab, setTab] = useState('stock') // 'stock' | 'analytics'
+  const [tab, setTab] = useState('stock') // 'stock' | 'table' | 'history' | 'analytics'
 
   const lowStockCount = materials.filter(
     (m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty)
@@ -63,7 +65,9 @@ export default function WarehousePage() {
       {/* Tabs */}
       <Tabs
         items={[
-          { key: 'stock', label: 'Остатки' },
+          { key: 'stock', label: 'Виджеты' },
+          { key: 'table', label: 'Список' },
+          { key: 'history', label: 'История операций' },
           { key: 'analytics', label: 'Расход и прогноз' },
         ]}
         active={tab}
@@ -72,6 +76,10 @@ export default function WarehousePage() {
 
       {tab === 'analytics' ? (
         <ConsumptionChart />
+      ) : tab === 'table' ? (
+        <MaterialsTable materials={materials} onSelect={setSelectedMaterial} />
+      ) : tab === 'history' ? (
+        <TransactionsHistory />
       ) : (
       <>
       {/* Summary cards — bento tiles. Wide Onder numerals don't fit in

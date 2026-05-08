@@ -282,7 +282,7 @@ export const ROLES = {
   post_printer: { label: 'Постпечатник', color: 'bg-dept-pouring/15 text-dept-pouring' },
 }
 
-// --- Material types ---
+// --- Material types (БД: k24_materials.type) ---
 export const MATERIAL_TYPES = {
   film: { label: 'Плёнка', unit: 'm2' },
   ink: { label: 'Краска', unit: 'ml' },
@@ -290,6 +290,57 @@ export const MATERIAL_TYPES = {
   resin: { label: 'Смола', unit: 'g' },
   packaging_bag: { label: 'Упаковочный пакет', unit: 'шт' },
   box: { label: 'Коробка', unit: 'шт' },
+}
+
+// --- Material categories (UI группировка по аудиту 8.05) ---
+// Старое поле `type` в БД остаётся как есть; категория — это UI-группа,
+// определяемая по type или по имени материала (для пакетов БОПП — по ширине).
+export const MATERIAL_CATEGORIES = {
+  film_print: { label: 'Плёнка для печати' },
+  film_lam: { label: 'Плёнка для ламинации' },
+  chemicals: { label: 'Химические вещества' },
+  utensils: { label: 'Утварь' },
+  packaging: { label: 'Упаковка (коробки)' },
+  bopp_wide: { label: 'БОПП пакеты ширина >100 мм' },
+  bopp_narrow: { label: 'БОПП пакеты ширина ≤100 мм' },
+  household: { label: 'Хоз. товары' },
+}
+
+/**
+ * Определить UI-категорию материала по type и name.
+ * Используется в табличном виде склада с фильтрацией.
+ */
+export function getMaterialCategory(material) {
+  if (!material) return null
+  const type = material.type
+  const name = (material.name || '').toLowerCase()
+  if (type === 'film') return 'film_print'
+  if (type === 'lam_film') return 'film_lam'
+  if (type === 'resin' || type === 'ink' || /смола|отвердитель|клей|газ/i.test(name)) return 'chemicals'
+  if (/шприц|стаканч|ватн.*палочк/i.test(name)) return 'utensils'
+  if (type === 'box' || /короб/i.test(name)) return 'packaging'
+  if (type === 'packaging_bag' || /бопп|пакет/i.test(name)) {
+    // По ширине из имени: ищем число перед 'x' или 'х'
+    const m = name.match(/(\d+)\s*[x×х]/)
+    if (m) {
+      const width = parseInt(m[1], 10)
+      if (!isNaN(width)) return width > 100 ? 'bopp_wide' : 'bopp_narrow'
+    }
+    return 'bopp_wide' // fallback
+  }
+  if (/растворитель|полотенц|салфетк|скотч|термоплёнк/i.test(name)) return 'household'
+  return 'utensils' // fallback для неклассифицированного
+}
+
+/**
+ * Определить статус остатка: достаточно / мало / закончилось.
+ */
+export function getStockStatus(material) {
+  const stock = Number(material?.stock_qty) || 0
+  const min = Number(material?.min_qty) || 0
+  if (stock <= 0) return { key: 'empty', label: 'Закончилось', color: 'bg-danger/15 text-danger' }
+  if (min > 0 && stock <= min) return { key: 'low', label: 'Мало', color: 'bg-warning/20 text-warning' }
+  return { key: 'ok', label: 'Достаточно', color: 'bg-success/15 text-success' }
 }
 
 // --- Operation checklists by order type ---

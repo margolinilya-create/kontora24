@@ -2,13 +2,14 @@ import { useState } from 'react'
 import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_TYPES, ORDER_STATUSES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES, ORDER_SOURCES, PAYMENT_STATUSES } from '@/shared/constants'
+import { ORDER_TYPES, ORDER_STATUSES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES, ORDER_SOURCES, PAYMENT_STATUSES, calculateActualMaterialsCost } from '@/shared/constants'
 import { downloadXlsx } from '@/shared/lib/export-xlsx'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 
 const EXPORTS = [
-  { id: 'orders_full', label: 'Полная таблица заказов' },
+  { id: 'orders_full', label: 'Полная таблица заказов (с фактическим расходом материалов)' },
+  { id: 'materials_log', label: 'Журнал расхода материалов (по логам)' },
 ]
 
 export function ExportDataModal({ isOpen, onClose }) {
@@ -28,6 +29,9 @@ export function ExportDataModal({ isOpen, onClose }) {
     try {
       if (selected.includes('orders_full')) {
         await exportOrdersFull()
+      }
+      if (selected.includes('materials_log')) {
+        await exportMaterialsLog()
       }
       toast.success('Готово')
       onClose()
@@ -74,20 +78,41 @@ export function ExportDataModal({ isOpen, onClose }) {
 }
 
 async function exportOrdersFull() {
-  const { data, error } = await supabase
-    .from('k24_orders')
-    .select('*, client:k24_clients(name, phone), creator:k24_profiles!created_by(display_name), assignee:k24_profiles!assigned_to(display_name)')
-    .order('created_at', { ascending: false })
+  const [{ data: orders, error }, { data: logs, error: logsErr }] = await Promise.all([
+    supabase
+      .from('k24_orders')
+      .select('*, client:k24_clients(name, phone), creator:k24_profiles!created_by(display_name), assignee:k24_profiles!assigned_to(display_name)')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('k24_production_logs')
+      .select('order_id, stage, film_type, film_meters, lamination_meters, resin_grams')
+      .is('deleted_at', null),
+  ])
   if (error) throw error
+  if (logsErr) throw logsErr
+
+  // Группируем логи по order_id для быстрого поиска
+  const logsByOrder = {}
+  for (const l of logs || []) {
+    if (!logsByOrder[l.order_id]) logsByOrder[l.order_id] = []
+    logsByOrder[l.order_id].push(l)
+  }
 
   const headers = [
     '№', 'Клиент', 'Тел.', 'Тип', 'Размер', 'Тираж', 'Плёнка', 'Ламинация',
     'Стикеров в паке', 'Видов', 'Срочность', 'Статус', 'Дата приёма',
     'Дедлайн', 'Менеджер', 'Исполнитель', 'Источник', 'Оплата', 'Отгрузка',
     'Город', 'Адрес', 'Цена', 'Себестоимость', 'Маржа', 'Bitrix ID', 'Комментарий',
+    // Фактический расход материалов из production logs
+    'Факт. плёнка (м)', 'Факт. ламинация (м)', 'Факт. смола (г)', 'Себестоимость материалов (₽)',
   ]
 
-  const rows = (data || []).map((o) => {
+  const rows = (orders || []).map((o) => {
+    const orderLogs = logsByOrder[o.id] || []
+    const filmMeters = orderLogs.reduce((s, l) => s + (Number(l.film_meters) || 0), 0)
+    const lamMeters = orderLogs.reduce((s, l) => s + (Number(l.lamination_meters) || 0), 0)
+    const resinGrams = orderLogs.reduce((s, l) => s + (Number(l.resin_grams) || 0), 0)
+    const actual = calculateActualMaterialsCost(orderLogs, o.film_type)
     const margin = (Number(o.price_final) || 0) - (Number(o.cost_total) || 0)
     return [
       o.number,
@@ -116,8 +141,39 @@ async function exportOrdersFull() {
       margin,
       o.bitrix_deal_id || '',
       o.notes || '',
+      filmMeters > 0 ? Number(filmMeters.toFixed(2)) : '',
+      lamMeters > 0 ? Number(lamMeters.toFixed(2)) : '',
+      resinGrams > 0 ? Number(resinGrams.toFixed(0)) : '',
+      actual.total > 0 ? Number(actual.total.toFixed(2)) : '',
     ]
   })
 
   await downloadXlsx(`orders-${new Date().toISOString().slice(0, 10)}`, 'Заказы', [headers, ...rows])
+}
+
+async function exportMaterialsLog() {
+  const { data, error } = await supabase
+    .from('k24_production_logs')
+    .select('created_at, stage, film_type, film_meters, lamination_meters, resin_grams, defects, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(number)')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(2000)
+  if (error) throw error
+
+  const headers = ['Дата', 'Заказ', 'Этап', 'Тип плёнки', 'Плёнка (м)', 'Ламинация (м)', 'Смола (г)', 'Брак', 'Сотрудник']
+  const rows = (data || [])
+    .filter((l) => Number(l.film_meters) > 0 || Number(l.lamination_meters) > 0 || Number(l.resin_grams) > 0)
+    .map((l) => [
+      new Date(l.created_at).toLocaleString('ru-RU'),
+      l.order?.number ?? '',
+      ORDER_STATUSES[l.stage]?.label || l.stage,
+      FILM_TYPES[l.film_type]?.label || l.film_type || '',
+      Number(l.film_meters) > 0 ? Number(Number(l.film_meters).toFixed(2)) : '',
+      Number(l.lamination_meters) > 0 ? Number(Number(l.lamination_meters).toFixed(2)) : '',
+      Number(l.resin_grams) > 0 ? Number(Number(l.resin_grams).toFixed(0)) : '',
+      Number(l.defects) || '',
+      l.worker?.display_name || '',
+    ])
+
+  await downloadXlsx(`materials-log-${new Date().toISOString().slice(0, 10)}`, 'Расход материалов', [headers, ...rows])
 }

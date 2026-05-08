@@ -12,6 +12,7 @@ const PERIODS = [
   { value: '30', label: '30 дней' },
   { value: '90', label: '90 дней' },
   { value: 'all', label: 'Всё время' },
+  { value: 'custom', label: 'Свой период' },
 ]
 
 const STAGE_OPTIONS = ['design', 'prepress', 'print', 'lamination', 'cutting', 'pouring', 'selection_pouring', 'assembly_3d', 'packaging', 'otk']
@@ -19,9 +20,15 @@ const STAGE_OPTIONS = ['design', 'prepress', 'print', 'lamination', 'cutting', '
 
 const ORDER_TYPE_OPTIONS = Object.entries(ORDER_TYPES).map(([value, { label }]) => ({ value, label }))
 
-function periodStart(period) {
-  if (period === 'all') return null
-  return new Date(Date.now() - Number(period) * MS_PER_DAY).toISOString()
+function periodRange(period, customFrom, customTo) {
+  if (period === 'all') return { from: null, to: null }
+  if (period === 'custom') {
+    return {
+      from: customFrom ? new Date(customFrom).toISOString() : null,
+      to: customTo ? new Date(new Date(customTo).getTime() + MS_PER_DAY).toISOString() : null,
+    }
+  }
+  return { from: new Date(Date.now() - Number(period) * MS_PER_DAY).toISOString(), to: null }
 }
 
 function Tile({ label, value, hint, accent }) {
@@ -45,6 +52,8 @@ function GroupBox({ title, children }) {
 
 export function ProductionStatsTab() {
   const [period, setPeriod] = useState('30')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [stages, setStages] = useState([])
   const [workers, setWorkers] = useState([])
   const [orderTypes, setOrderTypes] = useState([])
@@ -67,12 +76,13 @@ export function ProductionStatsTab() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const since = periodStart(period)
+    const { from: since, to: until } = periodRange(period, customFrom, customTo)
     try {
       let ordersQuery = supabase
         .from('k24_orders')
         .select('id, number, order_type, status, qty, deadline, created_at, client:k24_clients(name)')
       if (since) ordersQuery = ordersQuery.gte('created_at', since)
+      if (until) ordersQuery = ordersQuery.lt('created_at', until)
       if (orderTypes.length > 0) ordersQuery = ordersQuery.in('order_type', orderTypes)
 
       let logsQuery = supabase
@@ -80,6 +90,7 @@ export function ProductionStatsTab() {
         .select('id, order_id, stage, worker_id, track, stickers_printed, backgrounds_printed, film_meters, film_type, lamination_meters, defects, qty_cut, qty_selected, stickers_poured, stickers_good, resin_grams, packs_assembled, packs_packaged, created_at')
         .is('deleted_at', null)
       if (since) logsQuery = logsQuery.gte('created_at', since)
+      if (until) logsQuery = logsQuery.lt('created_at', until)
       if (stages.length > 0) logsQuery = logsQuery.in('stage', stages)
       if (workers.length > 0) logsQuery = logsQuery.in('worker_id', workers)
 
@@ -88,6 +99,7 @@ export function ProductionStatsTab() {
         .select('order_id, created_at, order:k24_orders!order_id(deadline, order_type)')
         .eq('to_status', 'done')
       if (since) completedQuery = completedQuery.gte('created_at', since)
+      if (until) completedQuery = completedQuery.lt('created_at', until)
 
       const [ordersRes, logsRes, completedRes] = await Promise.all([ordersQuery, logsQuery, completedQuery])
       if (ordersRes.error) throw ordersRes.error
@@ -102,7 +114,7 @@ export function ProductionStatsTab() {
     } finally {
       setLoading(false)
     }
-  }, [period, stages, workers, orderTypes])
+  }, [period, customFrom, customTo, stages, workers, orderTypes])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -131,12 +143,14 @@ export function ProductionStatsTab() {
     return { total: orders.length, completed: completedFiltered.length, onTime, early, late }
   }, [orders, completedFiltered])
 
-  // Плёнка по типам (пог.м)
+  // Плёнка по типам (пог.м). Показываем только известные виды из FILM_TYPES;
+  // неизвестные значения (старые данные, мусор) сводим в "Другие".
   const filmByType = useMemo(() => {
     const acc = {}
     logs.forEach((l) => {
       if (l.stage !== 'print' || !l.film_type) return
-      acc[l.film_type] = (acc[l.film_type] || 0) + (Number(l.film_meters) || 0)
+      const key = FILM_TYPES[l.film_type] ? l.film_type : '__other__'
+      acc[key] = (acc[key] || 0) + (Number(l.film_meters) || 0)
     })
     return Object.entries(acc).sort((a, b) => b[1] - a[1])
   }, [logs])
@@ -198,10 +212,22 @@ export function ProductionStatsTab() {
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs text-text-muted mb-1">Период</label>
-            <select value={period} onChange={(e) => setPeriod(e.target.value)} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+            <select value={period} onChange={(e) => setPeriod(e.target.value)} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-[36px]">
               {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
+          {period === 'custom' && (
+            <>
+              <div>
+                <label className="block text-xs text-text-muted mb-1">С даты</label>
+                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-[36px]" />
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1">По дату</label>
+                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-[36px]" />
+              </div>
+            </>
+          )}
           <MultiSelect label="Этапы" options={STAGE_OPTIONS} value={stages} onChange={setStages} />
           <MultiSelect label="Сотрудники" options={workerOptions} value={workers} onChange={setWorkers} />
           <MultiSelect label="Типы заказов" options={ORDER_TYPE_OPTIONS} value={orderTypes} onChange={setOrderTypes} />
@@ -223,11 +249,11 @@ export function ProductionStatsTab() {
 
       {/* Materials */}
       <GroupBox title="Материалы">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <div className="flex items-baseline justify-between mb-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
+          <div className="rounded-xl border border-border bg-surface p-4 flex flex-col">
+            <div className="flex items-baseline justify-between mb-3">
               <p className="text-xs text-text-muted">Плёнка по типам, пог. м</p>
-              <p className="text-2xl font-bold font-display tracking-tight">{totalFilmMeters.toFixed(1)}</p>
+              <p className="text-2xl font-bold font-display tracking-tight tabular-nums">{totalFilmMeters.toFixed(1)}</p>
             </div>
             {filmByType.length === 0 ? (
               <p className="text-xs text-text-muted">Нет данных за период</p>
@@ -235,14 +261,20 @@ export function ProductionStatsTab() {
               <ul className="space-y-1.5">
                 {filmByType.map(([type, meters]) => (
                   <li key={type} className="flex items-center justify-between text-sm">
-                    <span className="text-text-muted">{FILM_TYPES[type]?.label || type}</span>
-                    <span className="font-medium">{meters.toFixed(1)} м</span>
+                    <span className="text-text-muted">{type === '__other__' ? 'Другие' : FILM_TYPES[type]?.label}</span>
+                    <span className="font-medium tabular-nums">{meters.toFixed(1)} м</span>
                   </li>
                 ))}
               </ul>
             )}
           </div>
-          <Tile label="Смола, кг" value={loading ? '…' : totalResinKg.toFixed(2)} />
+          <div className="rounded-xl border border-border bg-surface p-4 flex flex-col">
+            <div className="flex items-baseline justify-between mb-3">
+              <p className="text-xs text-text-muted">Смола, кг</p>
+              <p className="text-2xl font-bold font-display tracking-tight tabular-nums">{loading ? '…' : totalResinKg.toFixed(2)}</p>
+            </div>
+            <p className="text-xs text-text-muted">{loading ? '' : `Всего за период (по логам заливки)`}</p>
+          </div>
         </div>
       </GroupBox>
 

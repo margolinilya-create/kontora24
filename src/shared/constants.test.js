@@ -5,6 +5,7 @@ import {
   OPERATION_CHECKLISTS, PRIORITIES, ORDER_STATUSES,
   CAN_CANCEL_ROLES, ROLES, ORDER_TYPES, ORDER_ROUTES,
   NOTIFY_ROLES,
+  getFilmCostPerMeter, calculateActualMaterialsCost, RESIN_COST_PER_GRAM,
 } from './constants'
 
 describe('IS_3D_TYPE', () => {
@@ -358,6 +359,71 @@ describe('PRIORITIES', () => {
     expect(PRIORITIES.low.sortOrder).toBeLessThan(PRIORITIES.normal.sortOrder)
     expect(PRIORITIES.normal.sortOrder).toBeLessThan(PRIORITIES.high.sortOrder)
     expect(PRIORITIES.high.sortOrder).toBeLessThan(PRIORITIES.urgent.sortOrder)
+  })
+})
+
+describe('getFilmCostPerMeter', () => {
+  it('returns cost for known film types', () => {
+    expect(getFilmCostPerMeter('G')).toBe(130)
+    expect(getFilmCostPerMeter('M')).toBe(130)
+    expect(getFilmCostPerMeter('Holo')).toBe(240)
+    expect(getFilmCostPerMeter('Gold')).toBe(670)
+    expect(getFilmCostPerMeter('Chrome')).toBe(555)
+    expect(getFilmCostPerMeter('Transparent_G')).toBe(130)
+    expect(getFilmCostPerMeter('Transparent_M')).toBe(130)
+  })
+
+  it('returns 0 for unknown or null film type', () => {
+    expect(getFilmCostPerMeter('unknown')).toBe(0)
+    expect(getFilmCostPerMeter(null)).toBe(0)
+    expect(getFilmCostPerMeter(undefined)).toBe(0)
+  })
+})
+
+describe('calculateActualMaterialsCost', () => {
+  it('returns zeros for empty logs', () => {
+    const r = calculateActualMaterialsCost([], 'G')
+    expect(r.total).toBe(0)
+    expect(r.filmsTotal).toBe(0)
+    expect(r.resinGrams).toBe(0)
+    expect(r.films).toEqual({})
+  })
+
+  it('sums film_meters by film_type using fallback', () => {
+    const logs = [
+      { stage: 'print', film_meters: 10, film_type: 'G' },
+      { stage: 'print', film_meters: 5, film_type: 'G' },
+      { stage: 'print', film_meters: 3, film_type: 'Holo' },
+    ]
+    const r = calculateActualMaterialsCost(logs, 'G')
+    expect(r.films.G).toBe(15)
+    expect(r.films.Holo).toBe(3)
+    expect(r.filmsTotal).toBe(15 * 130 + 3 * 240)
+  })
+
+  it('falls back to order film_type when log.film_type missing', () => {
+    const logs = [{ stage: 'print', film_meters: 10 }]
+    const r = calculateActualMaterialsCost(logs, 'M')
+    expect(r.films.M).toBe(10)
+    expect(r.filmsTotal).toBe(10 * 130)
+  })
+
+  it('aggregates resin grams from pouring/selection logs', () => {
+    const logs = [
+      { stage: 'pouring', resin_grams: 100 },
+      { stage: 'selection_pouring', resin_grams: 50 },
+    ]
+    const r = calculateActualMaterialsCost(logs, 'G')
+    expect(r.resinGrams).toBe(150)
+    expect(r.resinCost).toBe(150 * RESIN_COST_PER_GRAM)
+    expect(r.total).toBe(150 * RESIN_COST_PER_GRAM)
+  })
+
+  it('separates lamination meters in films map', () => {
+    const logs = [{ stage: 'lamination', lamination_meters: 20 }]
+    const r = calculateActualMaterialsCost(logs, 'G')
+    expect(r.films.__lamination__).toBe(20)
+    expect(r.filmsTotal).toBe(20 * 130)
   })
 })
 

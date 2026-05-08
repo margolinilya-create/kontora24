@@ -216,6 +216,55 @@ export const MATERIAL_COSTS = [
   { name: 'Смола ПУ КДР', spec: '—', unit: 'руб/г', value: 2.35 },
 ]
 
+// Mapping film_type (k24_orders/k24_production_logs) → имя позиции в MATERIAL_COSTS.
+// Используется для расчёта фактической себестоимости из production logs.
+const FILM_TYPE_TO_COST_NAME = {
+  G: 'Duckson белая 3640 (Глянцевая)',
+  M: 'Duckson белая 3640 (Матовая)',
+  Transparent_G: 'Dickson прозр. 3640 (Глянцевая)',
+  Transparent_M: 'Dickson прозр. 3640 (Матовая)',
+  Holo: 'Голография',
+  Gold: 'Oracal 352 Золото',
+  Chrome: 'Oracal 352 Серебро',
+}
+
+export function getFilmCostPerMeter(filmType) {
+  const name = FILM_TYPE_TO_COST_NAME[filmType]
+  if (!name) return 0
+  return MATERIAL_COSTS.find((m) => m.name === name)?.value || 0
+}
+
+export const RESIN_COST_PER_GRAM = MATERIAL_COSTS.find((m) => m.name === 'Смола ПУ КДР')?.value || 0
+
+// Расчёт фактической себестоимости материалов из production logs.
+// film_meters суммируются по film_type (если указан), resin_grams — общим итогом.
+// Если в логе нет film_type — используется order.film_type как fallback.
+export function calculateActualMaterialsCost(logs, fallbackFilmType) {
+  if (!Array.isArray(logs)) return { films: {}, filmsTotal: 0, resinGrams: 0, resinCost: 0, total: 0 }
+  const films = {}
+  let resinGrams = 0
+  for (const log of logs) {
+    const meters = Number(log.film_meters) || 0
+    const lamMeters = Number(log.lamination_meters) || 0
+    if (meters > 0) {
+      const ft = log.film_type || fallbackFilmType
+      if (ft) films[ft] = (films[ft] || 0) + meters
+    }
+    // Ламинация — отдельная статья, но в текущей модели цены ламинации идут общими 130 руб/м (можно уточнить позже)
+    if (lamMeters > 0) {
+      films['__lamination__'] = (films['__lamination__'] || 0) + lamMeters
+    }
+    resinGrams += Number(log.resin_grams) || 0
+  }
+  let filmsTotal = 0
+  for (const [ft, m] of Object.entries(films)) {
+    if (ft === '__lamination__') filmsTotal += m * 130
+    else filmsTotal += m * getFilmCostPerMeter(ft)
+  }
+  const resinCost = resinGrams * RESIN_COST_PER_GRAM
+  return { films, filmsTotal, resinGrams, resinCost, total: filmsTotal + resinCost }
+}
+
 // --- Priorities ---
 export const PRIORITIES = {
   low: { label: 'Низкий', color: 'bg-text-muted/15 text-text-muted', sortOrder: 0 },

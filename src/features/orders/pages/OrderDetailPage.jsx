@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useOrderDetail } from '../hooks/useOrders'
+import { useOrderDetail, updateOrder } from '../hooks/useOrders'
 import { InfoField } from '../components/InfoField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
 import { StatusSwitcher } from '../components/StatusSwitcher'
 import { StatusOverride } from '../components/StatusOverride'
 import { OrderStepper } from '../components/OrderStepper'
 import { OrderComments } from '../components/OrderComments'
-import { OrderStageInput } from '../components/OrderStageInput'
 import { OrderProgressTab } from '../components/OrderProgressTab'
 import { OrderReportsTab } from '../components/OrderReportsTab'
 import { OrderHistoryTab } from '../components/OrderHistoryTab'
@@ -35,6 +34,73 @@ function GearIcon({ className = '' }) {
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
+  )
+}
+
+function SourceFilesRow({ order, onUpdated, onCopy }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(order.mockup_path || '')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    setSaving(true)
+    try {
+      await updateOrder(order.id, { mockup_path: value.trim() || null })
+      onUpdated?.()
+      setEditing(false)
+    } catch {
+      toast.error('Не удалось сохранить ссылку')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-surface rounded-xl border border-border px-3 py-1.5 flex items-center gap-2 text-sm">
+      <span className="text-text-muted whitespace-nowrap text-xs">Исходники:</span>
+      {editing ? (
+        <>
+          <input
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') save()
+              if (e.key === 'Escape') { setEditing(false); setValue(order.mockup_path || '') }
+            }}
+            placeholder="Ссылка на макет"
+            className="flex-1 bg-surface-2 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+          />
+          <button onClick={save} disabled={saving} className="text-xs px-2 py-1 rounded bg-accent text-on-accent font-medium disabled:opacity-50">
+            {saving ? '…' : 'OK'}
+          </button>
+          <button onClick={() => { setEditing(false); setValue(order.mockup_path || '') }} className="text-xs px-2 py-1 rounded text-text-muted hover:text-text">
+            ×
+          </button>
+        </>
+      ) : (
+        <>
+          {order.mockup_path ? (
+            <a
+              href={order.mockup_path}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text hover:text-accent transition-colors truncate flex-1 underline decoration-text-muted/40 hover:decoration-accent"
+            >
+              {order.mockup_path}
+            </a>
+          ) : (
+            <span className="text-text-muted flex-1">Нет ссылки</span>
+          )}
+          <button onClick={() => setEditing(true)} className="text-xs px-2 py-1 rounded text-text-muted hover:text-text hover:bg-surface-2 transition-colors">
+            Изменить
+          </button>
+          <button onClick={onCopy} className="text-xs px-2 py-1 rounded text-text-muted hover:text-text hover:bg-surface-2 transition-colors">
+            Копировать
+          </button>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -205,36 +271,15 @@ export default function OrderDetailPage() {
       {/* Stepper */}
       <OrderStepper order={order} history={history} onUpdated={refetch} />
 
-      {/* Source files link */}
-      <div className="bg-surface rounded-2xl border border-border shadow-card p-4 flex items-center gap-3">
-        <span className="text-sm text-text-muted whitespace-nowrap">Исходные файлы:</span>
-        {order.mockup_path ? (
-          <a
-            href={order.mockup_path}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-text hover:text-accent transition-colors truncate flex-1 underline decoration-text-muted/40 hover:decoration-accent"
-          >
-            {order.mockup_path}
-          </a>
-        ) : (
-          <span className="text-sm text-text-muted flex-1">Нет ссылки</span>
-        )}
-        <Button variant="secondary" size="sm" onClick={copySourceLink}>Копировать</Button>
-      </div>
+      {/* Source files link — компактная высота, инлайн-редактирование */}
+      <SourceFilesRow order={order} onUpdated={refetch} onCopy={copySourceLink} />
 
       {/* Tabs */}
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {/* Tab content */}
       <div>
-        {tab === 'overview' && (
-          <div className="space-y-5">
-            <OverviewTab order={order} />
-            {/* Quick stage input для текущего исполнителя */}
-            <OrderStageInput order={order} onUpdated={refetch} />
-          </div>
-        )}
+        {tab === 'overview' && <OverviewTab order={order} />}
         {tab === 'progress' && (
           <OrderProgressTab order={order} history={history} onUpdated={refetch} />
         )}
@@ -242,7 +287,7 @@ export default function OrderDetailPage() {
           <OrderReportsTab order={order} onUpdated={refetch} />
         )}
         {tab === 'history' && (
-          <OrderHistoryTab history={history} />
+          <OrderHistoryTab order={order} history={history} />
         )}
         {tab === 'finance' && isFinance && (
           <FinanceTab order={order} />

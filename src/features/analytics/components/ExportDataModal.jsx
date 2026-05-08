@@ -77,19 +77,26 @@ export function ExportDataModal({ isOpen, onClose }) {
   )
 }
 
+const EXPORT_LIMIT = 5000
+
 async function exportOrdersFull() {
-  const [{ data: orders, error }, { data: logs, error: logsErr }] = await Promise.all([
+  const [{ data: orders, error, count }, { data: logs, error: logsErr }] = await Promise.all([
     supabase
       .from('k24_orders')
-      .select('*, client:k24_clients(name, phone), creator:k24_profiles!created_by(display_name), assignee:k24_profiles!assigned_to(display_name)')
-      .order('created_at', { ascending: false }),
+      .select('*, client:k24_clients(name, phone), creator:k24_profiles!created_by(display_name), assignee:k24_profiles!assigned_to(display_name)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .limit(EXPORT_LIMIT),
     supabase
       .from('k24_production_logs')
       .select('order_id, stage, film_type, film_meters, lamination_meters, resin_grams')
-      .is('deleted_at', null),
+      .is('deleted_at', null)
+      .limit(EXPORT_LIMIT * 5),
   ])
   if (error) throw error
   if (logsErr) throw logsErr
+  if (count && count > EXPORT_LIMIT) {
+    toast.error(`Выгружено только ${EXPORT_LIMIT} последних заказов из ${count}. Используйте фильтры для выгрузки старых заказов.`)
+  }
 
   // Группируем логи по order_id для быстрого поиска
   const logsByOrder = {}

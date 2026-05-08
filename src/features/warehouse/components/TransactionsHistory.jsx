@@ -12,6 +12,8 @@ const FILTER_OPTIONS = [
   { value: 'auto', label: 'Автоматические (производство)' },
 ]
 
+const PAGE_SIZE = 100
+
 /**
  * Глобальная история операций по складу: все записи k24_material_transactions
  * (приход, расход, авто-списание из заказов). Фильтры: ручные / авто.
@@ -19,29 +21,35 @@ const FILTER_OPTIONS = [
 export function TransactionsHistory() {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
+  const [hasMore, setHasMore] = useState(false)
 
-  const loadTransactions = async () => {
-    setLoading(true)
+  const loadPage = async (offset = 0, append = false) => {
+    if (append) setLoadingMore(true)
+    else setLoading(true)
     setError(null)
     try {
       const { data, error: err } = await supabase
         .from('k24_material_transactions')
         .select('*, material:k24_materials(name, type), created_by_profile:k24_profiles!created_by(display_name), order:k24_orders(number)')
         .order('created_at', { ascending: false })
-        .limit(200)
+        .range(offset, offset + PAGE_SIZE - 1)
       if (err) throw err
-      setTransactions(data || [])
+      const rows = data || []
+      setHasMore(rows.length === PAGE_SIZE)
+      setTransactions((prev) => append ? [...prev, ...rows] : rows)
     } catch (err) {
       captureError(err, { tags: { source: 'TransactionsHistory.fetch' } })
       setError(err)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
-  useEffect(() => { loadTransactions() }, [])
+  useEffect(() => { loadPage(0, false) }, [])
 
   const filtered = transactions.filter((t) => {
     if (filter === 'manual') return !t.reason?.startsWith('auto_')
@@ -50,7 +58,7 @@ export function TransactionsHistory() {
   })
 
   if (loading) return <div className="flex justify-center py-8"><Spinner /></div>
-  if (error) return <ErrorState error={error} onRetry={loadTransactions} />
+  if (error) return <ErrorState error={error} onRetry={() => loadPage(0, false)} />
 
   return (
     <div className="space-y-3">
@@ -108,6 +116,17 @@ export function TransactionsHistory() {
               </tbody>
             </table>
           </div>
+          {hasMore && (
+            <div className="border-t border-border p-3 flex justify-center">
+              <button
+                onClick={() => loadPage(transactions.length, true)}
+                disabled={loadingMore}
+                className="text-sm px-4 py-2 rounded-lg border border-border hover:bg-surface-2 transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? 'Загружаем…' : 'Показать ещё 100'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

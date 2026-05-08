@@ -128,14 +128,28 @@ export function useProductionBoard({ includeArchived = false } = {}) {
       if (fromIdx === -1 || toIdx === -1) {
         await updateOrderStatus(orderId, order.status, targetStatus)
       } else if (toIdx > fromIdx) {
+        // Multi-step forward: пытаемся пройти всю цепочку.
+        // При падении на шаге N откатываем заказ обратно на исходный статус
+        // (через isRollback, чтобы обойти guard завершения этапа), чтобы не
+        // оставить заказ в промежуточном состоянии.
         let currentStatus = order.status
+        const originalStatus = order.status
         for (let i = fromIdx; i < toIdx; i++) {
           const nextStep = route[i + 1]
           try {
             await updateOrderStatus(orderId, currentStatus, nextStep)
             currentStatus = nextStep
           } catch (stepErr) {
-            toast.error(`Не удалось обновить "${ORDER_STATUSES[currentStatus]?.label || currentStatus}": ${translateError(stepErr).message}`)
+            toast.error(`Не удалось обновить «${ORDER_STATUSES[currentStatus]?.label || currentStatus}» → «${ORDER_STATUSES[nextStep]?.label || nextStep}»: ${translateError(stepErr).message}`)
+            // Откат: вернуть заказ на исходную стадию, если он успел сдвинуться.
+            if (currentStatus !== originalStatus) {
+              try {
+                await updateOrderStatus(orderId, currentStatus, originalStatus, { isRollback: true })
+                toast.error(`Заказ откачен на «${ORDER_STATUSES[originalStatus]?.label || originalStatus}»`)
+              } catch (rollbackErr) {
+                captureError(rollbackErr, { tags: { source: 'useProductionBoard.rollback' }, extra: { orderId, currentStatus, originalStatus } })
+              }
+            }
             return
           }
         }

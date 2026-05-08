@@ -6,6 +6,8 @@ import {
   CAN_CANCEL_ROLES, ROLES, ORDER_TYPES, ORDER_ROUTES,
   NOTIFY_ROLES,
   getFilmCostPerMeter, calculateActualMaterialsCost, RESIN_COST_PER_GRAM,
+  calculateWorkerPayout, WORKER_RATES,
+  getMaterialCategory, getStockStatus,
 } from './constants'
 
 describe('IS_3D_TYPE', () => {
@@ -424,6 +426,99 @@ describe('calculateActualMaterialsCost', () => {
     const r = calculateActualMaterialsCost(logs, 'G')
     expect(r.films.__lamination__).toBe(20)
     expect(r.filmsTotal).toBe(20 * 130)
+  })
+})
+
+describe('calculateWorkerPayout', () => {
+  it('returns zero for empty logs', () => {
+    const r = calculateWorkerPayout([])
+    expect(r.total).toBe(0)
+    for (const v of Object.values(r.breakdown)) expect(v.amount).toBe(0)
+  })
+
+  it('calculates pouring at 1₽ per good sticker', () => {
+    const logs = [
+      { stage: 'pouring', stickers_good: 100 },
+      { stage: 'pouring', stickers_good: 50 },
+    ]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.pouring.count).toBe(150)
+    expect(r.breakdown.pouring.amount).toBe(150 * WORKER_RATES.pouring_per_sticker)
+    expect(r.total).toBe(150)
+  })
+
+  it('selection_pouring counts both selection and pouring', () => {
+    const logs = [
+      { stage: 'selection_pouring', qty_selected: 100, stickers_good: 80 },
+    ]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.selection.count).toBe(100)
+    expect(r.breakdown.selection.amount).toBe(100 * 0.5)
+    expect(r.breakdown.pouring.count).toBe(80)
+    expect(r.breakdown.pouring.amount).toBe(80 * 1)
+    expect(r.total).toBe(50 + 80)
+  })
+
+  it('packaging at 1.5₽ per pack', () => {
+    const logs = [{ stage: 'packaging', packs_packaged: 20 }]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.packaging.amount).toBe(30)
+    expect(r.total).toBe(30)
+  })
+
+  it('assembly at 0.5₽ per pack', () => {
+    const logs = [{ stage: 'assembly_3d', packs_assembled: 50 }]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.assembly.amount).toBe(25)
+    expect(r.total).toBe(25)
+  })
+
+  it('mixed stages aggregate correctly', () => {
+    const logs = [
+      { stage: 'pouring', stickers_good: 100 },
+      { stage: 'selection_pouring', qty_selected: 50, stickers_good: 0 },
+      { stage: 'assembly_3d', packs_assembled: 20 },
+      { stage: 'packaging', packs_packaged: 10 },
+    ]
+    const r = calculateWorkerPayout(logs)
+    expect(r.total).toBe(100 + 25 + 10 + 15)
+  })
+})
+
+describe('getMaterialCategory', () => {
+  it('films → film_print', () => {
+    expect(getMaterialCategory({ type: 'film', name: 'Пленка глянцевая' })).toBe('film_print')
+  })
+  it('lam_film → film_lam', () => {
+    expect(getMaterialCategory({ type: 'lam_film', name: 'Ламинация матовая' })).toBe('film_lam')
+  })
+  it('resin → chemicals', () => {
+    expect(getMaterialCategory({ type: 'resin', name: 'Смола' })).toBe('chemicals')
+  })
+  it('коробка → packaging', () => {
+    expect(getMaterialCategory({ type: 'box', name: 'Коробка 280x160' })).toBe('packaging')
+  })
+  it('БОПП пакет с шириной > 100 → bopp_wide', () => {
+    expect(getMaterialCategory({ type: 'packaging_bag', name: '110x150 пакет' })).toBe('bopp_wide')
+  })
+  it('БОПП пакет с шириной ≤ 100 → bopp_narrow', () => {
+    expect(getMaterialCategory({ type: 'packaging_bag', name: '70x60 пакет' })).toBe('bopp_narrow')
+  })
+})
+
+describe('getStockStatus', () => {
+  it('zero stock → empty', () => {
+    expect(getStockStatus({ stock_qty: 0, min_qty: 10 }).key).toBe('empty')
+  })
+  it('stock <= min → low', () => {
+    expect(getStockStatus({ stock_qty: 5, min_qty: 10 }).key).toBe('low')
+    expect(getStockStatus({ stock_qty: 10, min_qty: 10 }).key).toBe('low')
+  })
+  it('stock > min → ok', () => {
+    expect(getStockStatus({ stock_qty: 50, min_qty: 10 }).key).toBe('ok')
+  })
+  it('without min → ok if positive', () => {
+    expect(getStockStatus({ stock_qty: 5, min_qty: 0 }).key).toBe('ok')
   })
 })
 

@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, startOfMonth, subMonths, format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { calculateWorkerPayout } from '@/shared/constants'
 
 /**
  * Personal stats for worker cabinet:
@@ -129,6 +130,9 @@ export function useCabinetStats(period = '30') {
 
       const totalHours = shifts.reduce((sum, s) => sum + (s.duration_minutes || 0), 0) / 60
 
+      // Расчёт потенциального заработка по ставкам аудита 8.05
+      const payout = calculateWorkerPayout(logs)
+
       setStats({
         byAction: Object.values(actionMap),
         byOrder: Object.values(orderMap).sort((a, b) => b.totalEntries - a.totalEntries),
@@ -137,6 +141,7 @@ export function useCabinetStats(period = '30') {
         shifts,
         logs,
         headline,
+        payout,
         byMonth: Array.from(monthBuckets.values()),
       })
     } catch (err) {

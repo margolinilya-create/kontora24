@@ -151,6 +151,32 @@ export default function CabinetPage() {
             </div>
           )}
 
+          {/* Worker payout — расчёт заработка по ставкам */}
+          {stats.payout && stats.payout.total > 0 && (
+            <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h2 className="font-semibold">Сколько заработано</h2>
+                <span className="text-2xl font-bold font-display tracking-tight text-accent">
+                  {stats.payout.total.toFixed(2)} ₽
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                {Object.entries(stats.payout.breakdown).filter(([, v]) => v.count > 0).map(([key, v]) => (
+                  <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg bg-surface-2">
+                    <div>
+                      <p className="font-medium">{v.label}</p>
+                      <p className="text-xs text-text-muted">{v.count} шт × {v.rate} ₽</p>
+                    </div>
+                    <span className="font-medium tabular-nums">{v.amount.toFixed(2)} ₽</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-text-muted mt-3">
+                Расчёт за выбранный период по ставкам: заливка 1 ₽/шт, выборка 0,5 ₽/шт, сборка 0,5 ₽/пак, упаковка 1,5 ₽/пак.
+              </p>
+            </div>
+          )}
+
           {/* Monthly chart — last 6 months */}
           <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
             <h2 className="font-semibold mb-4">Производство по месяцам</h2>

@@ -343,6 +343,47 @@ export function getStockStatus(material) {
   return { key: 'ok', label: 'Достаточно', color: 'bg-success/15 text-success' }
 }
 
+// --- Worker payout rates (₽ за единицу) — по аудиту 8.05 ---
+// Используется в личном кабинете для расчёта потенциального заработка
+// на основе production logs.
+export const WORKER_RATES = {
+  pouring_per_sticker:  1.0,  // заливка одного стикера (хорошего)
+  selection_per_bg:     0.5,  // выборка одного фона
+  assembly_per_pack:    0.5,  // сборка одного пака
+  packaging_per_pack:   1.5,  // упаковка одного пака
+}
+
+/**
+ * Подсчитать заработок работника из массива production logs.
+ * Возвращает разбивку по операциям и общую сумму.
+ */
+export function calculateWorkerPayout(logs) {
+  let pouring = 0, selection = 0, assembly = 0, packaging = 0
+  for (const l of logs || []) {
+    if (l.stage === 'pouring') {
+      pouring += Number(l.stickers_good) || 0
+    }
+    if (l.stage === 'selection_pouring') {
+      selection += Number(l.qty_selected) || 0
+      pouring += Number(l.stickers_good) || 0
+    }
+    if (l.stage === 'assembly_3d') {
+      assembly += Number(l.packs_assembled) || 0
+    }
+    if (l.stage === 'packaging') {
+      packaging += Number(l.packs_packaged) || 0
+    }
+  }
+  const breakdown = {
+    pouring:    { count: pouring,   rate: WORKER_RATES.pouring_per_sticker, amount: pouring   * WORKER_RATES.pouring_per_sticker, label: 'Заливка стикеров' },
+    selection:  { count: selection, rate: WORKER_RATES.selection_per_bg,    amount: selection * WORKER_RATES.selection_per_bg,    label: 'Выборка фонов' },
+    assembly:   { count: assembly,  rate: WORKER_RATES.assembly_per_pack,   amount: assembly  * WORKER_RATES.assembly_per_pack,   label: 'Сборка паков' },
+    packaging:  { count: packaging, rate: WORKER_RATES.packaging_per_pack,  amount: packaging * WORKER_RATES.packaging_per_pack,  label: 'Упаковка паков' },
+  }
+  const total = breakdown.pouring.amount + breakdown.selection.amount + breakdown.assembly.amount + breakdown.packaging.amount
+  return { breakdown, total }
+}
+
 // --- Operation checklists by order type ---
 export const OPERATION_CHECKLISTS = {
   sticker_cut: ['Препресс', 'Печать', 'Резка по контуру', 'Проверка качества'],

@@ -8,14 +8,14 @@ import { NotFoundPage } from '@/shared/components/NotFoundPage'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 
 /**
- * Главная по ТЗ R8: для рабочих ролей сразу редирект на /orders;
- * админ/менеджер видят DashboardPage.
+ * Главная по аудиту R5 (8.05): для рабочих ролей при первом входе —
+ * сразу личный кабинет; админ/менеджер видят DashboardPage.
  */
 function HomeRoute() {
   const { profile, hasRole } = useAuth()
   if (!profile) return null
   const isManager = hasRole(['admin', 'manager'])
-  if (!isManager) return <Navigate to="/orders" replace />
+  if (!isManager) return <Navigate to="/cabinet" replace />
   return <DashboardPage />
 }
 

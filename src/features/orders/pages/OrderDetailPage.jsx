@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail, updateOrder } from '../hooks/useOrders'
+import { findOrCreateClientByName } from '@/features/clients/hooks/useClients'
 import { InfoField } from '../components/InfoField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
 import { StatusSwitcher } from '../components/StatusSwitcher'
@@ -34,6 +35,123 @@ function GearIcon({ className = '' }) {
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
+  )
+}
+
+function EditableOrderNumber({ order, canEdit, onUpdated }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(String(order.number))
+  const [saving, setSaving] = useState(false)
+  const formatted = `ORD-${String(order.number).padStart(4, '0')}`
+
+  async function save() {
+    const next = parseInt(value, 10)
+    if (isNaN(next) || next <= 0) {
+      toast.error('Номер должен быть положительным числом')
+      return
+    }
+    if (next === order.number) { setEditing(false); return }
+    setSaving(true)
+    try {
+      await updateOrder(order.id, { number: next })
+      toast.success(`Номер изменён на #${next}`)
+      onUpdated?.()
+      setEditing(false)
+    } catch (err) {
+      toast.error(err.message?.includes('duplicate') ? 'Такой номер уже существует' : 'Не удалось изменить номер')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!canEdit) {
+    return (
+      <h1 className="text-4xl sm:text-5xl font-bold font-display tracking-tight leading-none">{formatted}</h1>
+    )
+  }
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-4xl sm:text-5xl font-bold font-display tracking-tight leading-none text-text-muted">ORD-</span>
+        <input
+          autoFocus
+          type="number"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') { setEditing(false); setValue(String(order.number)) }
+          }}
+          className="w-32 bg-surface-2 rounded px-2 py-1 text-3xl font-bold font-display tracking-tight focus:outline-none focus:ring-2 focus:ring-accent/40"
+        />
+        <button onClick={save} disabled={saving} className="text-xs px-2 py-1 rounded bg-accent text-on-accent font-medium disabled:opacity-50">{saving ? '…' : 'OK'}</button>
+        <button onClick={() => { setEditing(false); setValue(String(order.number)) }} className="text-xs px-2 py-1 text-text-muted hover:text-text">×</button>
+      </div>
+    )
+  }
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      title="Изменить номер заказа"
+      className="text-4xl sm:text-5xl font-bold font-display tracking-tight leading-none hover:text-accent transition-colors text-left"
+    >
+      {formatted}
+    </button>
+  )
+}
+
+function EditableClientName({ order, canEdit, onUpdated }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(order.client?.name || '')
+  const [saving, setSaving] = useState(false)
+  const display = order.client?.name || '—'
+
+  async function save() {
+    const trimmed = value.trim()
+    if (trimmed === (order.client?.name || '')) { setEditing(false); return }
+    setSaving(true)
+    try {
+      let clientId = null
+      if (trimmed) {
+        const client = await findOrCreateClientByName(trimmed)
+        clientId = client?.id || null
+      }
+      await updateOrder(order.id, { client_id: clientId })
+      toast.success('Заказчик обновлён')
+      onUpdated?.()
+      setEditing(false)
+    } catch {
+      toast.error('Не удалось обновить заказчика')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!canEdit) return <span>{display}</span>
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <input
+          autoFocus
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') { setEditing(false); setValue(order.client?.name || '') }
+          }}
+          placeholder="Имя или название компании"
+          className="bg-surface-2 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 min-w-[200px]"
+        />
+        <button onClick={save} disabled={saving} className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-on-accent font-medium disabled:opacity-50">{saving ? '…' : 'OK'}</button>
+        <button onClick={() => { setEditing(false); setValue(order.client?.name || '') }} className="text-[10px] px-1.5 py-0.5 text-text-muted hover:text-text">×</button>
+      </span>
+    )
+  }
+  return (
+    <button onClick={() => setEditing(true)} title="Изменить заказчика" className="hover:text-accent transition-colors underline decoration-text-muted/30 decoration-dotted underline-offset-2">
+      {display}
+    </button>
   )
 }
 
@@ -205,7 +323,6 @@ export default function OrderDetailPage() {
     )
   }
 
-  const clientName = order.client?.name || '—'
   const managerName = order.creator?.display_name || '—'
   const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('ru-RU') : '—'
   const deadlineDate = order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : null
@@ -230,9 +347,7 @@ export default function OrderDetailPage() {
         {/* Left: number + meta */}
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-4xl sm:text-5xl font-bold font-display tracking-tight leading-none">
-              ORD-{String(order.number).padStart(4, '0')}
-            </h1>
+            <EditableOrderNumber order={order} canEdit={isFinance} onUpdated={refetch} />
             {order.priority && order.priority !== 'normal' && (
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
                 {PRIORITIES[order.priority]?.label}
@@ -240,7 +355,8 @@ export default function OrderDetailPage() {
             )}
           </div>
           <p className="text-text-muted text-sm mt-2">
-            {clientName} · {managerName} · {orderDate}
+            <EditableClientName order={order} canEdit={isFinance} onUpdated={refetch} />
+            {' · '}{managerName} · {orderDate}
             {deadlineDate && <> · <span className="text-text">сдача {deadlineDate}</span></>}
           </p>
         </div>

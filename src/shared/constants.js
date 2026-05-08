@@ -62,12 +62,24 @@ export function isDualTrack(status, order) {
 
 // Get the route for an order based on its type
 export function getOrderRoute(order) {
-  const route = ORDER_ROUTES[order?.order_type] || ROUTE_REGULAR
+  let route = ORDER_ROUTES[order?.order_type] || ROUTE_REGULAR
   // Skip lamination if not needed
   if (!order?.need_lam) {
-    return route.filter(s => s !== 'lamination')
+    route = route.filter(s => s !== 'lamination')
+  }
+  // Skip design when client provided the mockup (nothing to draw).
+  // 3D-only stages are already absent from non-3D ORDER_ROUTES — no extra filter needed.
+  if (order?.design_status === 'provided') {
+    route = route.filter(s => s !== 'design')
   }
   return route
+}
+
+// Whether a stage is part of the order's effective route.
+// Used for DnD validation in the kanban and for the server-side guard in updateOrderStatus.
+export function isStageAllowed(order, stage) {
+  if (!order || !stage) return false
+  return getOrderRoute(order).includes(stage)
 }
 
 // Role permissions: which roles can advance FROM a given status
@@ -100,8 +112,15 @@ export function getNextStatus(role, currentStatus, order) {
 
   const route = getOrderRoute(order)
   const idx = route.indexOf(currentStatus)
-  if (idx === -1 || idx === route.length - 1) return undefined
-  return route[idx + 1]
+  if (idx === route.length - 1) return undefined
+  if (idx !== -1) return route[idx + 1]
+
+  // currentStatus вне маршрута (заказ оказался на стадии, которую новый маршрут пропускает —
+  // напр. сменили design_status='provided' когда заказ уже в design). Возвращаем
+  // ближайший статус маршрута впереди по каноническому порядку, чтобы кнопка «следующий» работала.
+  const currentOrder = ORDER_STATUSES[currentStatus]?.order ?? -1
+  const next = route.find(s => (ORDER_STATUSES[s]?.order ?? -1) > currentOrder)
+  return next ?? route[0]
 }
 
 // --- Order types ---

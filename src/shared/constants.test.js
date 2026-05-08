@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  getNextStatus, getOrderRoute, IS_3D_TYPE, IS_3D_STICKERPACK,
+  getNextStatus, getOrderRoute, isStageAllowed, IS_3D_TYPE, IS_3D_STICKERPACK,
   isDualTrack,
   OPERATION_CHECKLISTS, PRIORITIES, ORDER_STATUSES,
   CAN_CANCEL_ROLES, ROLES, ORDER_TYPES, ORDER_ROUTES,
@@ -67,6 +67,62 @@ describe('getOrderRoute', () => {
     const route = getOrderRoute({ order_type: 'unknown' })
     expect(route[0]).toBe('new')
     expect(route[route.length - 1]).toBe('done')
+  })
+
+  it('skips design when design_status=provided (mockup from client)', () => {
+    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: true, design_status: 'provided' })
+    expect(route).not.toContain('design')
+    expect(route).toContain('prepress')
+  })
+
+  it('keeps design when design_status=needs_development', () => {
+    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: true, design_status: 'needs_development' })
+    expect(route).toContain('design')
+  })
+
+  it('skips both design and lamination when both flags set', () => {
+    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: false, design_status: 'provided' })
+    expect(route).not.toContain('design')
+    expect(route).not.toContain('lamination')
+    expect(route).toEqual(['new', 'prepress', 'print', 'cutting', 'packaging', 'otk', 'done'])
+  })
+
+  it('3D stickerpack with provided mockup skips design but keeps 3D stages', () => {
+    const route = getOrderRoute({ order_type: 'stickerpack3D', need_lam: true, design_status: 'provided' })
+    expect(route).not.toContain('design')
+    expect(route).toContain('selection_pouring')
+    expect(route).toContain('assembly_3d')
+  })
+})
+
+describe('isStageAllowed', () => {
+  it('returns true for stages in route', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true }
+    expect(isStageAllowed(order, 'print')).toBe(true)
+    expect(isStageAllowed(order, 'lamination')).toBe(true)
+  })
+
+  it('returns false for 3D stages on regular order', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true }
+    expect(isStageAllowed(order, 'pouring')).toBe(false)
+    expect(isStageAllowed(order, 'selection_pouring')).toBe(false)
+    expect(isStageAllowed(order, 'assembly_3d')).toBe(false)
+  })
+
+  it('returns false for design when design_status=provided', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true, design_status: 'provided' }
+    expect(isStageAllowed(order, 'design')).toBe(false)
+    expect(isStageAllowed(order, 'prepress')).toBe(true)
+  })
+
+  it('returns false for lamination when need_lam=false', () => {
+    const order = { order_type: 'sticker_cut', need_lam: false }
+    expect(isStageAllowed(order, 'lamination')).toBe(false)
+  })
+
+  it('handles null/undefined gracefully', () => {
+    expect(isStageAllowed(null, 'print')).toBe(false)
+    expect(isStageAllowed({ order_type: 'sticker_cut' }, null)).toBe(false)
   })
 })
 
@@ -167,6 +223,24 @@ describe('getNextStatus', () => {
     // Falls back to regular route
     expect(getNextStatus('admin', 'new', null)).toBe('design')
     expect(getNextStatus('admin', 'new', undefined)).toBe('design')
+  })
+
+  it('skips design when design_status=provided', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true, design_status: 'provided' }
+    expect(getNextStatus('admin', 'new', order)).toBe('prepress')
+  })
+
+  it('returns nearest forward status when current is outside route', () => {
+    // Заказ в pouring, но новый маршрут регулярный (без pouring) →
+    // должны вернуть ближайший статус впереди (packaging — order=9, у pouring order=7).
+    const order = { order_type: 'sticker_cut', need_lam: true, design_status: 'provided' }
+    expect(getNextStatus('admin', 'pouring', order)).toBe('packaging')
+  })
+
+  it('returns nearest forward status when current is design but design skipped', () => {
+    // Заказ застрял в design, но design_status сменили на provided.
+    const order = { order_type: 'sticker_cut', need_lam: true, design_status: 'provided' }
+    expect(getNextStatus('admin', 'design', order)).toBe('prepress')
   })
 })
 

@@ -1,5 +1,9 @@
-import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
+import { useState } from 'react'
+import { ORDER_STATUSES, ORDER_TYPES, getOrderRoute } from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
+import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
+import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 
 const DEPT_DOT = {
   design:  'bg-dept-design',
@@ -33,18 +37,64 @@ function dotColor(status) {
  * Тонкая «закладочная» лента прогресса по этапам.
  * Каждый этап — точка в цвете отдела, текущий подсвечен ободком,
  * пройденные залиты, будущие — пустые. Tooltip с датой/исполнителем.
+ *
+ * Если статус заказа выпал из маршрута (напр. сменили design_status='provided'
+ * или перетащили в неверную колонку до фикса DnD-валидации) — показываем
+ * предупреждение с кнопкой возврата на ближайший валидный этап.
  */
-export function OrderStepper({ order, history }) {
+export function OrderStepper({ order, history, onUpdated }) {
+  const [returning, setReturning] = useState(false)
   if (!order) return null
   const route = getOrderRoute(order)
   const currentIdx = route.indexOf(order.status)
   const isCancelled = order.status === 'cancelled'
+  const isOffRoute = !isCancelled && currentIdx === -1
 
   // map: status → first transition into it
   const tsByStatus = {}
   history?.forEach((h) => {
     if (!tsByStatus[h.to_status]) tsByStatus[h.to_status] = h
   })
+
+  // Ближайший валидный статус для возврата: первый после 'new' (обычно 'prepress')
+  const recoveryTarget = route.find((s) => s !== 'new') || route[0]
+
+  async function handleReturn() {
+    if (!recoveryTarget) return
+    setReturning(true)
+    try {
+      await updateOrderStatus(order.id, order.status, recoveryTarget, { isRollback: true })
+      toast.success(`Заказ возвращён на «${ORDER_STATUSES[recoveryTarget]?.label || recoveryTarget}»`)
+      onUpdated?.()
+    } catch (err) {
+      toast.error(translateError(err).message)
+    } finally {
+      setReturning(false)
+    }
+  }
+
+  if (isOffRoute) {
+    const currentLabel = ORDER_STATUSES[order.status]?.label || order.status
+    const orderTypeLabel = ORDER_TYPES[order.order_type]?.label || order.order_type
+    const recoveryLabel = ORDER_STATUSES[recoveryTarget]?.label || recoveryTarget
+    return (
+      <div className="bg-warning/10 border border-warning/40 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1 text-sm">
+          <p className="font-medium text-warning">Заказ вне маршрута</p>
+          <p className="text-text-muted text-xs mt-0.5">
+            Статус «{currentLabel}» не входит в маршрут типа «{orderTypeLabel}». Верните заказ на корректный этап.
+          </p>
+        </div>
+        <button
+          onClick={handleReturn}
+          disabled={returning}
+          className="text-sm px-3 py-1.5 rounded-lg bg-warning text-on-accent font-medium hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
+        >
+          {returning ? 'Возвращаем…' : `Вернуть на «${recoveryLabel}»`}
+        </button>
+      </div>
+    )
+  }
 
   if (isCancelled) {
     return (

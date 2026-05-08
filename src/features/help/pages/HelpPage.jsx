@@ -96,6 +96,17 @@ function StagesTab() {
         </div>
       ))}
 
+      <Section title="Когда этап пропускается">
+        <ul className="text-sm text-text-muted space-y-1.5 list-disc list-inside">
+          <li><strong className="text-text">Дизайн</strong> — если макет дан клиентом (поле «Дизайн» = «Предоставлен заказчиком»). Заказ идёт сразу в «Препресс».</li>
+          <li><strong className="text-text">Ламинация</strong> — если ламинация не нужна (поле «Ламинация» = пусто). Заказ идёт в «Резку» сразу после печати.</li>
+          <li><strong className="text-text">Заливка / Выборка / Сборка 3D</strong> — для обычных стикеров (без 3D смолы). Эти этапы есть только в маршрутах «3D стикер» и «3D стикерпак».</li>
+        </ul>
+        <p className="text-sm text-text-muted mt-2">
+          В канбане «лишние» колонки заблокированы для этого заказа — перетащить туда нельзя.
+        </p>
+      </Section>
+
       <Section title="Автоматический переход">
         <p className="text-sm text-text-muted">
           Когда суммарное количество по отчётам достигает тиража заказа,

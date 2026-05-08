@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES } from '@/shared/constants'
+import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageAllowed } from '@/shared/constants'
 import { safeRpc } from '@/shared/lib/safeRpc'
 import { captureError } from '@/shared/lib/sentry'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
@@ -227,13 +227,29 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
+  // Блокировка перехода в стадию, которая не входит в маршрут заказа.
+  // isRollback / force — admin escape (StatusOverride).
+  let orderForRoute = null
+  if (!options.isRollback && !options.force) {
+    const { data: o } = await supabase
+      .from('k24_orders')
+      .select('order_type, design_status, need_lam, number')
+      .eq('id', orderId)
+      .single()
+    orderForRoute = o
+    if (orderForRoute && !isStageAllowed(orderForRoute, toStatus)) {
+      const stageLabel = ORDER_STATUSES[toStatus]?.label || toStatus
+      throw new Error(`Этап «${stageLabel}» не входит в маршрут заказа`)
+    }
+  }
+
   // Блокировка перехода вперёд без введённых данных на текущем этапе
   if (!options.isRollback && !options.force && fromStatus && STAGES_REQUIRING_COMPLETION.has(fromStatus)) {
-    const { data: order } = await supabase
+    const order = orderForRoute || (await supabase
       .from('k24_orders')
       .select('order_type')
       .eq('id', orderId)
-      .single()
+      .single()).data
 
     const isPack3D = order?.order_type === 'stickerpack3D'
     const tracks = isPack3D && DUAL_TRACK_STAGES.includes(fromStatus) ? ['backgrounds', 'stickers'] : [null]

@@ -203,7 +203,7 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Stepper */}
-      <OrderStepper order={order} history={history} />
+      <OrderStepper order={order} history={history} onUpdated={refetch} />
 
       {/* Source files link */}
       <div className="bg-surface rounded-2xl border border-border shadow-card p-4 flex items-center gap-3">

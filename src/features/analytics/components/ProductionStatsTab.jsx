@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import MultiSelect from '@/shared/components/MultiSelect'
 import Button from '@/shared/components/Button'
-import { ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, MATERIAL_COSTS, MS_PER_DAY } from '@/shared/constants'
+import { ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, MATERIAL_COSTS } from '@/shared/constants'
+import { periodRange } from '@/shared/lib/period'
 import { ExportDataModal } from './ExportDataModal'
 import { captureError } from '@/shared/lib/sentry'
 import { startOfDay } from 'date-fns'
@@ -19,21 +20,6 @@ const STAGE_OPTIONS = ['design', 'prepress', 'print', 'lamination', 'cutting', '
   .map((s) => ({ value: s, label: ORDER_STATUSES[s]?.label || s }))
 
 const ORDER_TYPE_OPTIONS = Object.entries(ORDER_TYPES).map(([value, { label }]) => ({ value, label }))
-
-function periodRange(period, customFrom, customTo) {
-  if (period === 'all') return { from: null, to: null }
-  if (period === 'custom') {
-    const fromDate = customFrom ? new Date(customFrom) : null
-    const toDate = customTo ? new Date(customTo) : null
-    // Если from > to, меняем местами (вместо тихого пустого результата)
-    const [a, b] = fromDate && toDate && fromDate > toDate ? [toDate, fromDate] : [fromDate, toDate]
-    return {
-      from: a ? a.toISOString() : null,
-      to: b ? new Date(b.getTime() + MS_PER_DAY).toISOString() : null,
-    }
-  }
-  return { from: new Date(Date.now() - Number(period) * MS_PER_DAY).toISOString(), to: null }
-}
 
 function Tile({ label, value, hint, accent }) {
   return (

@@ -89,6 +89,21 @@ export async function createClient({ name, phone, email, comment, tags }) {
 }
 
 /**
+ * Нормализовать имя клиента: trim + collapse whitespace.
+ * Чистая функция, экспортируется для тестов.
+ */
+export function normalizeClientName(name) {
+  return (name || '').trim().replace(/\s+/g, ' ')
+}
+
+/**
+ * Экранировать метасимволы PostgREST ilike (% _ \).
+ */
+export function escapeIlikePattern(s) {
+  return (s || '').replace(/[%_\\]/g, '\\$&')
+}
+
+/**
  * Найти клиента по точному имени (case-insensitive, обрезаются пробелы) или создать нового.
  * Используется на форме создания заказа: менеджер вводит просто имя
  * заказчика, не выбирая из базы — но за кулисами связь через k24_clients
@@ -99,10 +114,9 @@ export async function createClient({ name, phone, email, comment, tags }) {
  * ошибку и повторяем поиск — вернём найденную запись от первого менеджера.
  */
 export async function findOrCreateClientByName(name) {
-  const trimmed = (name || '').trim().replace(/\s+/g, ' ')
+  const trimmed = normalizeClientName(name)
   if (!trimmed) return null
-  // Экранируем PostgREST/SQL метасимволы для ilike (точный matchпо имени)
-  const escaped = trimmed.replace(/[%_\\]/g, '\\$&')
+  const escaped = escapeIlikePattern(trimmed)
   const { data: existing, error: searchErr } = await supabase
     .from('k24_clients')
     .select('id, name')

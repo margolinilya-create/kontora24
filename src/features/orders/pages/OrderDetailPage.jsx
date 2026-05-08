@@ -45,6 +45,7 @@ function EditableOrderNumber({ order, canEdit, onUpdated }) {
   const formatted = `ORD-${String(order.number).padStart(4, '0')}`
 
   async function save() {
+    if (saving) return
     const next = parseInt(value, 10)
     if (isNaN(next) || next <= 0) {
       toast.error('Номер должен быть положительным числом')
@@ -58,7 +59,9 @@ function EditableOrderNumber({ order, canEdit, onUpdated }) {
       onUpdated?.()
       setEditing(false)
     } catch (err) {
-      toast.error(err.message?.includes('duplicate') ? 'Такой номер уже существует' : 'Не удалось изменить номер')
+      // PG код 23505 = unique_violation; либо ловим по тексту/code
+      const isDuplicate = err?.code === '23505' || /duplicate|unique/i.test(err?.message || '')
+      toast.error(isDuplicate ? 'Заказ с таким номером уже существует' : 'Не удалось изменить номер')
     } finally {
       setSaving(false)
     }

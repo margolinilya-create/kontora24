@@ -23,9 +23,13 @@ const ORDER_TYPE_OPTIONS = Object.entries(ORDER_TYPES).map(([value, { label }]) 
 function periodRange(period, customFrom, customTo) {
   if (period === 'all') return { from: null, to: null }
   if (period === 'custom') {
+    const fromDate = customFrom ? new Date(customFrom) : null
+    const toDate = customTo ? new Date(customTo) : null
+    // Если from > to, меняем местами (вместо тихого пустого результата)
+    const [a, b] = fromDate && toDate && fromDate > toDate ? [toDate, fromDate] : [fromDate, toDate]
     return {
-      from: customFrom ? new Date(customFrom).toISOString() : null,
-      to: customTo ? new Date(new Date(customTo).getTime() + MS_PER_DAY).toISOString() : null,
+      from: a ? a.toISOString() : null,
+      to: b ? new Date(b.getTime() + MS_PER_DAY).toISOString() : null,
     }
   }
   return { from: new Date(Date.now() - Number(period) * MS_PER_DAY).toISOString(), to: null }

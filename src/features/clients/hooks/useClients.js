@@ -89,22 +89,41 @@ export async function createClient({ name, phone, email, comment, tags }) {
 }
 
 /**
- * Найти клиента по точному имени (case-insensitive) или создать нового.
+ * Найти клиента по точному имени (case-insensitive, обрезаются пробелы) или создать нового.
  * Используется на форме создания заказа: менеджер вводит просто имя
  * заказчика, не выбирая из базы — но за кулисами связь через k24_clients
  * сохраняется для аналитики и LTV.
+ *
+ * Race condition: два менеджера одновременно ищут одно имя → оба не находят,
+ * оба создают. На UNIQUE constraint (если он есть) второй упадёт. Catch'им
+ * ошибку и повторяем поиск — вернём найденную запись от первого менеджера.
  */
 export async function findOrCreateClientByName(name) {
-  const trimmed = (name || '').trim()
+  const trimmed = (name || '').trim().replace(/\s+/g, ' ')
   if (!trimmed) return null
+  // Экранируем PostgREST/SQL метасимволы для ilike (точный matchпо имени)
+  const escaped = trimmed.replace(/[%_\\]/g, '\\$&')
   const { data: existing, error: searchErr } = await supabase
     .from('k24_clients')
     .select('id, name')
-    .ilike('name', trimmed)
+    .ilike('name', escaped)
     .limit(1)
   if (searchErr) throw searchErr
   if (existing && existing.length > 0) return existing[0]
-  return await createClient({ name: trimmed })
+  try {
+    return await createClient({ name: trimmed })
+  } catch (err) {
+    // Race: другой клиент создан параллельно — повторяем поиск.
+    if (err?.code === '23505' || /duplicate|unique/i.test(err?.message || '')) {
+      const { data: retry } = await supabase
+        .from('k24_clients')
+        .select('id, name')
+        .ilike('name', escaped)
+        .limit(1)
+      if (retry && retry.length > 0) return retry[0]
+    }
+    throw err
+  }
 }
 
 export async function updateClient(id, updates) {

@@ -24,9 +24,10 @@ export function MaterialsTable({ materials, onSelect }) {
 
   const filtered = useMemo(() => {
     return materials.filter((m) => {
+      if (!m) return false
       if (category !== 'all' && getMaterialCategory(m) !== category) return false
       if (status !== 'all' && getStockStatus(m).key !== status) return false
-      if (search && !m.name.toLowerCase().includes(search.toLowerCase())) return false
+      if (search && !(m.name || '').toLowerCase().includes(search.toLowerCase())) return false
       return true
     })
   }, [materials, category, status, search])
@@ -71,11 +72,12 @@ export function MaterialsTable({ materials, onSelect }) {
                 {filtered.map((m) => {
                   const cat = getMaterialCategory(m)
                   const stStatus = getStockStatus(m)
-                  const unit = MATERIAL_TYPES[m.type]?.unit || m.unit
+                  const unit = MATERIAL_TYPES[m.type]?.unit || m.unit || ''
+                  const catLabel = (cat && MATERIAL_CATEGORIES[cat]?.label) || '—'
                   return (
                     <tr key={m.id} className="border-b border-border last:border-0 hover:bg-surface-2 transition-colors">
                       <td className="px-4 py-2.5 font-medium">{m.name}</td>
-                      <td className="px-4 py-2.5 text-text-muted">{MATERIAL_CATEGORIES[cat]?.label || '—'}</td>
+                      <td className="px-4 py-2.5 text-text-muted">{catLabel}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
                         <span className={Number(m.stock_qty) < 0 ? 'text-danger font-medium' : ''}>
                           {Number(m.stock_qty).toFixed(1)}

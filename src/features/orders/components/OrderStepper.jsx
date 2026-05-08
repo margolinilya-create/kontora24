@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ORDER_STATUSES, ORDER_TYPES, getOrderRoute } from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
@@ -44,6 +44,9 @@ function dotColor(status) {
  */
 export function OrderStepper({ order, history, onUpdated }) {
   const [returning, setReturning] = useState(false)
+  const isMountedRef = useRef(true)
+  useEffect(() => () => { isMountedRef.current = false }, [])
+
   if (!order) return null
   const route = getOrderRoute(order)
   const currentIdx = route.indexOf(order.status)
@@ -56,42 +59,47 @@ export function OrderStepper({ order, history, onUpdated }) {
     if (!tsByStatus[h.to_status]) tsByStatus[h.to_status] = h
   })
 
-  // Ближайший валидный статус для возврата: первый после 'new' (обычно 'prepress')
-  const recoveryTarget = route.find((s) => s !== 'new') || route[0]
+  // Ближайший валидный статус для возврата (первый после 'new'). Если route пустой —
+  // оставляем null и не показываем кнопку.
+  const recoveryTarget = route.find((s) => s !== 'new') ?? route[0] ?? null
 
   async function handleReturn() {
-    if (!recoveryTarget) return
+    if (!recoveryTarget || returning) return
     setReturning(true)
     try {
       await updateOrderStatus(order.id, order.status, recoveryTarget, { isRollback: true })
+      if (!isMountedRef.current) return
       toast.success(`Заказ возвращён на «${ORDER_STATUSES[recoveryTarget]?.label || recoveryTarget}»`)
       onUpdated?.()
     } catch (err) {
-      toast.error(translateError(err).message)
+      if (isMountedRef.current) toast.error(translateError(err).message)
     } finally {
-      setReturning(false)
+      if (isMountedRef.current) setReturning(false)
     }
   }
 
   if (isOffRoute) {
     const currentLabel = ORDER_STATUSES[order.status]?.label || order.status
     const orderTypeLabel = ORDER_TYPES[order.order_type]?.label || order.order_type
-    const recoveryLabel = ORDER_STATUSES[recoveryTarget]?.label || recoveryTarget
+    const recoveryLabel = recoveryTarget ? (ORDER_STATUSES[recoveryTarget]?.label || recoveryTarget) : null
     return (
       <div className="bg-warning/10 border border-warning/40 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1 text-sm">
           <p className="font-medium text-warning">Заказ вне маршрута</p>
           <p className="text-text-muted text-xs mt-0.5">
-            Статус «{currentLabel}» не входит в маршрут типа «{orderTypeLabel}». Верните заказ на корректный этап.
+            Статус «{currentLabel}» не входит в маршрут типа «{orderTypeLabel}».
+            {recoveryTarget ? ' Верните заказ на корректный этап.' : ' Маршрут заказа пуст — обратитесь к администратору.'}
           </p>
         </div>
-        <button
-          onClick={handleReturn}
-          disabled={returning}
-          className="text-sm px-3 py-1.5 rounded-lg bg-warning text-on-accent font-medium hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
-        >
-          {returning ? 'Возвращаем…' : `Вернуть на «${recoveryLabel}»`}
-        </button>
+        {recoveryTarget && (
+          <button
+            onClick={handleReturn}
+            disabled={returning}
+            className="text-sm px-3 py-1.5 rounded-lg bg-warning text-on-accent font-medium hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
+          >
+            {returning ? 'Возвращаем…' : `Вернуть на «${recoveryLabel}»`}
+          </button>
+        )}
       </div>
     )
   }

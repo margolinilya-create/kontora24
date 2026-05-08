@@ -94,9 +94,10 @@ export function useCabinetStats(period = '30') {
         headline.defects += Number(l.defects) || 0
       })
 
-      // Aggregate by order (за выбранный период)
+      // Aggregate by order (за выбранный период). Игнорируем orphan-логи без order_id.
       const orderMap = {}
       logs.forEach((l) => {
+        if (!l.order_id) return
         const key = l.order_id
         if (!orderMap[key]) {
           orderMap[key] = {

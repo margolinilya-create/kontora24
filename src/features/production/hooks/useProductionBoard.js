@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useOrders, updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { COLS } from '../components/PipelineSummary'
-import { ORDER_STATUSES, getOrderRoute, PRIORITIES } from '@/shared/constants'
+import { ORDER_STATUSES, getOrderRoute, PRIORITIES, isStageAllowed } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
@@ -109,6 +109,14 @@ export function useProductionBoard({ includeArchived = false } = {}) {
 
     const targetStatus = COLS.includes(over.id) ? over.id : over.data?.current?.status
     if (!targetStatus || targetStatus === order.status) return
+
+    // Запрещаем drop в стадию, которая не входит в маршрут заказа
+    // (без дизайна / без 3D / без ламинации). Откат разрешён через StatusOverride.
+    if (!isStageAllowed(order, targetStatus)) {
+      const stageLabel = ORDER_STATUSES[targetStatus]?.label || targetStatus
+      toast.error(`Этап «${stageLabel}» не нужен для заказа #${order.number}`)
+      return
+    }
 
     setPendingMove({ orderId, targetStatus })
 

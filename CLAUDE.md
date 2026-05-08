@@ -68,6 +68,13 @@ npx vercel deploy --yes --prod --scope margolinilya-creates-projects  # Deploy
 
 **Статусы (13):** new, design, prepress, print, lamination, cutting, selection_pouring, pouring, assembly_3d, packaging, otk, done, cancelled
 
+**Skip-stages (R1 2026-05-08):** `getOrderRoute(order)` фильтрует маршрут по флагам:
+- `design_status === 'provided'` → пропускается стадия `design` (макет от клиента, сразу в `prepress`)
+- `need_lam === false` → пропускается `lamination`
+- 3D-стадии (`pouring`, `selection_pouring`, `assembly_3d`) уже разруливаются через `ORDER_ROUTES` per-type
+
+`isStageAllowed(order, stage)` валидирует переход. `updateOrderStatus(...)` бросает ошибку при попытке перейти на стадию вне маршрута; `{ isRollback: true }` или `{ force: true }` — admin escape (используется в `StatusOverride` и кнопке возврата в `OrderStepper`). DnD-канбан блокирует колонки запрещённых этапов через `useDroppable({ disabled: !isStageAllowed(...) })`. Если статус уже вне маршрута (грязные данные), `OrderStepper` показывает предупреждение и кнопку «Вернуть на корректный этап».
+
 **Типы заказов (в коде):** sticker_cut, sticker_kiss, stickerpack, sticker3D, stickerpack3D, rect, big
 
 **Ламинация:** matte (матовая), glossy (глянцевая), null (без ламинации) — задаётся при создании заказа.

@@ -287,9 +287,11 @@ export const MATERIAL_TYPES = {
   film: { label: 'Плёнка', unit: 'm2' },
   ink: { label: 'Краска', unit: 'ml' },
   lam_film: { label: 'Ламинация', unit: 'm2' },
-  resin: { label: 'Смола', unit: 'g' },
+  resin: { label: 'Смола / химия', unit: 'g' },
   packaging_bag: { label: 'Упаковочный пакет', unit: 'шт' },
   box: { label: 'Коробка', unit: 'шт' },
+  utensils: { label: 'Утварь', unit: 'шт' },
+  household: { label: 'Хоз. товары', unit: 'шт' },
 }
 
 // --- Material categories (UI группировка по аудиту 8.05) ---
@@ -316,6 +318,8 @@ export function getMaterialCategory(material) {
   const name = (material.name || '').toLowerCase()
   if (type === 'film') return 'film_print'
   if (type === 'lam_film') return 'film_lam'
+  if (type === 'utensils') return 'utensils'
+  if (type === 'household') return 'household'
   if (type === 'resin' || type === 'ink' || /смола|отвердитель|клей|газ/i.test(name)) return 'chemicals'
   if (/шприц|стаканч|ватн.*палочк/i.test(name)) return 'utensils'
   if (type === 'box' || /короб/i.test(name)) return 'packaging'

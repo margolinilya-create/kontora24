@@ -36,9 +36,18 @@ export function useOrders(filters = {}) {
     setLoading(true)
     setError(null)
     try {
+      // Только поля, необходимые для списков/канбана/календаря/дашборда.
+      // Полная карточка заказа подгружается через useOrderDetail.
+      const SELECT_LIST = `id, number, client_id, status, order_type, qty, width_mm, height_mm,
+        film_type, lam_type, need_lam, design_status, priority, deadline, created_at, updated_at,
+        assigned_to, created_by, bopp_bag, is_urgent, notes, deal_name, bitrix_deal_id, mockup_path,
+        stickers_per_pack, design_variants, price_final, cost_total,
+        client:k24_clients(name, phone),
+        assignee:k24_profiles!assigned_to(display_name, role),
+        attachments:k24_order_attachments(id, file_name, file_path, mime_type)`
       let query = supabase
         .from('k24_orders')
-        .select('*, client:k24_clients(name, phone), assignee:k24_profiles!assigned_to(display_name, role), attachments:k24_order_attachments(id, file_name, file_path, mime_type)', { count: 'exact' })
+        .select(SELECT_LIST, { count: 'exact' })
 
       // Filters
       if (filters.statuses && filters.statuses.length > 0) {

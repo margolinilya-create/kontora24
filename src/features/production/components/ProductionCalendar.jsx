@@ -9,8 +9,8 @@ import { ru } from 'date-fns/locale'
 import { captureError } from '@/shared/lib/sentry'
 import Spinner from '@/shared/components/Spinner'
 import Sheet from '@/shared/components/Sheet'
-import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
-import { stageDotClass } from '@/shared/lib/department-mapping'
+import { ORDER_TYPES, PRIORITIES, IS_3D_TYPE } from '@/shared/constants'
+import { stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { getDeadlineDotClass } from '@/shared/lib/deadline'
 
 const LOAD_COLORS = {
@@ -185,6 +185,9 @@ export function ProductionCalendar() {
                   <div key={o.id} className="text-[11px] truncate flex items-center gap-1">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${stageDotClass(o.status)}`} aria-hidden="true" />
                     <span className="truncate">#{o.number}</span>
+                    {IS_3D_TYPE(o.order_type) && (
+                      <span className="text-[9px] font-bold text-dept-pouring shrink-0" title="3D">3D</span>
+                    )}
                   </div>
                 ))}
                 {dayOrders.length > 3 && (
@@ -200,6 +203,31 @@ export function ProductionCalendar() {
             </button>
           )
         })}
+      </div>
+
+      {/* Легенда отделов */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-text-muted bg-surface rounded-xl border border-border px-3 py-2">
+        <span className="font-medium text-text">Отделы:</span>
+        <span className="inline-flex items-center gap-1.5" title={DEPT_GROUPS.design.fullLabel}>
+          <span className="w-2 h-2 rounded-full bg-dept-design" aria-hidden="true" />
+          <span>{DEPT_GROUPS.design.label} — дизайн, препресс</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5" title={DEPT_GROUPS.print.fullLabel}>
+          <span className="w-2 h-2 rounded-full bg-dept-print" aria-hidden="true" />
+          <span>{DEPT_GROUPS.print.label} — печать, ламинация, резка</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5" title={DEPT_GROUPS.pouring.fullLabel}>
+          <span className="w-2 h-2 rounded-full bg-dept-pouring" aria-hidden="true" />
+          <span>{DEPT_GROUPS.pouring.label} — заливка</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5" title={DEPT_GROUPS.finish.fullLabel}>
+          <span className="w-2 h-2 rounded-full bg-dept-finish" aria-hidden="true" />
+          <span>{DEPT_GROUPS.finish.label} — сборка, упаковка, ОТК</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 ml-auto">
+          <span className="text-[9px] font-bold text-dept-pouring">3D</span>
+          <span>— заказ с 3D смолой</span>
+        </span>
       </div>
 
       {/* Bottom sheet: список заказов на выбранный день */}

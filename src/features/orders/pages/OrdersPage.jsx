@@ -123,14 +123,16 @@ export default function OrdersPage() {
             {viewMode === 'list' && (totalCount > 0 ? `${totalCount} заказов` : 'Управление заказами')}
             {viewMode === 'kanban' && 'Канбан с DnD'}
             {viewMode === 'calendar' && 'Календарь дедлайнов'}
+            {viewMode === 'flat' && (totalCount > 0 ? `${totalCount} заказов · единый список` : 'Все заказы')}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Tabs
             items={[
-              { key: 'list', label: 'Список' },
+              { key: 'list', label: 'По отделам' },
               { key: 'kanban', label: 'Канбан' },
               { key: 'calendar', label: 'Календарь' },
+              { key: 'flat', label: 'Все заказы' },
             ]}
             active={viewMode}
             onChange={setViewMode}
@@ -146,8 +148,8 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* List view filters */}
-      {viewMode === 'list' && (
+      {/* List/flat view filters (одинаковые для обоих списочных вьюх) */}
+      {(viewMode === 'list' || viewMode === 'flat') && (
         <>
           <div className="flex flex-col sm:flex-row gap-3">
             <SearchInput
@@ -204,7 +206,7 @@ export default function OrdersPage() {
 
       {viewMode === 'calendar' && <ProductionCalendar />}
 
-      {viewMode === 'list' && (
+      {(viewMode === 'list' || viewMode === 'flat') && (
         loading ? (
           <div className="bg-surface rounded-2xl border border-border overflow-hidden">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -223,6 +225,35 @@ export default function OrdersPage() {
               </Link>
             )}
           </div>
+        ) : viewMode === 'flat' ? (
+          <>
+            <section className="bg-surface rounded-2xl border border-border shadow-card overflow-hidden">
+              {/* Mobile cards */}
+              <ul className="sm:hidden divide-y divide-border">
+                {orders.map((o) => <MobileRow key={o.id} order={o} />)}
+              </ul>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-text-muted bg-surface-dim/50">
+                      <th className="px-4 py-2 font-medium w-16">№</th>
+                      <th className="px-4 py-2 font-medium">Заказчик</th>
+                      <th className="px-4 py-2 font-medium">Тип</th>
+                      <th className="px-4 py-2 font-medium">Размер</th>
+                      <th className="px-4 py-2 font-medium text-right">Тираж</th>
+                      <th className="px-4 py-2 font-medium">Этап</th>
+                      <th className="px-4 py-2 font-medium">Срок</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((o) => <DesktopRow key={o.id} order={o} />)}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <Pagination {...pagination} />
+          </>
         ) : (
           <>
             {grouped.map((group) => {

@@ -13,7 +13,7 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
-import { ClientCombobox } from '@/features/clients/components/ClientCombobox'
+import { findOrCreateClientByName } from '@/features/clients/hooks/useClients'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
@@ -102,7 +102,7 @@ const schema = z.object({
   design_status: z.string().default('provided'),
   mockup_path: z.string().optional(),
   stickers_per_pack: z.coerce.number().optional(),
-  client_id: z.string().optional(),
+  client_name: z.string().optional(),
   deadline: z.string().optional(),
   is_urgent: z.boolean().default(false),
   notes: z.string().optional(),
@@ -123,7 +123,6 @@ export default function CreateOrderPage() {
   const canSeeFinance = hasRole(['admin', 'manager'])
 
   const formRef = useRef(null)
-  const [currentClient, setCurrentClient] = useState(null)
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -131,7 +130,7 @@ export default function CreateOrderPage() {
       lam_type: '', is_urgent: false, bopp_bag: false,
       film_type: 'G', is_partner: false, payment_status: 'not_paid',
       design_status: 'provided', delivery_type: 'pickup',
-      client_id: '',
+      client_name: '',
     },
   })
 
@@ -178,6 +177,12 @@ export default function CreateOrderPage() {
   async function onSubmit(values) {
     setSubmitting(true)
     try {
+      // Свободный ввод имени заказчика — за кулисами ищем/создаём клиента.
+      let clientId = null
+      if (values.client_name?.trim()) {
+        const client = await findOrCreateClientByName(values.client_name)
+        clientId = client?.id || null
+      }
       const order = await createOrder({
         order_type: values.order_type,
         qty: values.qty,
@@ -186,7 +191,7 @@ export default function CreateOrderPage() {
         need_lam: needLam,
         lam_type: needLam ? values.lam_type : null,
         film_type: values.film_type,
-        client_id: values.client_id || null,
+        client_id: clientId,
         deadline: values.deadline || null,
         priority: values.is_urgent ? 'urgent' : 'normal',
         notes: values.notes || null,
@@ -319,12 +324,10 @@ export default function CreateOrderPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Заказчик</label>
-                <ClientCombobox
-                  currentClient={currentClient}
-                  onChange={(id, client) => {
-                    setValue('client_id', id || '', { shouldValidate: true })
-                    setCurrentClient(client)
-                  }}
+                <Input
+                  type="text"
+                  placeholder="Имя или название компании"
+                  {...register('client_name')}
                 />
               </div>
               <div>

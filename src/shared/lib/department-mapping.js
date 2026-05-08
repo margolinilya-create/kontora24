@@ -130,12 +130,17 @@ export function getStatusesForDepartment(departmentId) {
 
 // --- Production department color groups (4-color scheme per design system) ---
 // Used by status badges, kanban columns, pipeline summary.
+// Имена и стадии актуализированы по аудиту 2026-05-08:
+//   ОДП  — Отдел Допечатной Подготовки (Дизайн, Препресс)
+//   ОПРЛ — Отдел Печати, Резки и Ламинации (Печать, Резка, Ламинация)
+//   3DО  — 3D Отдел (Заливка, Выборка/Заливка)
+//   ОСК  — Отдел Сборки и Контроля (Сборка 3D, Упаковка, ОТК, Готово)
 
 export const DEPT_GROUPS = {
-  design:  { token: 'dept-design',  label: 'Дизайн',   stages: ['design', 'prepress'] },
-  print:   { token: 'dept-print',   label: 'Печать',   stages: ['print', 'lamination', 'cutting'] },
-  pouring: { token: 'dept-pouring', label: 'Заливка',  stages: ['pouring', 'selection_pouring'] },
-  finish:  { token: 'dept-finish',  label: 'Сборка',   stages: ['assembly_3d', 'packaging', 'otk', 'done'] },
+  design:  { token: 'dept-design',  label: 'ОДП',  fullLabel: 'Отдел допечатной подготовки',         stages: ['design', 'prepress'] },
+  print:   { token: 'dept-print',   label: 'ОПРЛ', fullLabel: 'Отдел печати, резки и ламинации',     stages: ['print', 'lamination', 'cutting'] },
+  pouring: { token: 'dept-pouring', label: '3DО',  fullLabel: '3D отдел (заливка)',                  stages: ['pouring', 'selection_pouring'] },
+  finish:  { token: 'dept-finish',  label: 'ОСК',  fullLabel: 'Отдел сборки и контроля',             stages: ['assembly_3d', 'packaging', 'otk', 'done'] },
 }
 
 const _stageToGroup = {}

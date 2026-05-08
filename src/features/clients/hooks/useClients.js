@@ -88,6 +88,25 @@ export async function createClient({ name, phone, email, comment, tags }) {
   return data
 }
 
+/**
+ * Найти клиента по точному имени (case-insensitive) или создать нового.
+ * Используется на форме создания заказа: менеджер вводит просто имя
+ * заказчика, не выбирая из базы — но за кулисами связь через k24_clients
+ * сохраняется для аналитики и LTV.
+ */
+export async function findOrCreateClientByName(name) {
+  const trimmed = (name || '').trim()
+  if (!trimmed) return null
+  const { data: existing, error: searchErr } = await supabase
+    .from('k24_clients')
+    .select('id, name')
+    .ilike('name', trimmed)
+    .limit(1)
+  if (searchErr) throw searchErr
+  if (existing && existing.length > 0) return existing[0]
+  return await createClient({ name: trimmed })
+}
+
 export async function updateClient(id, updates) {
   const { error } = await supabase
     .from('k24_clients')

@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense, useMemo } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useShiftTracker } from '@/features/production/hooks/useShiftTracker'
 import { useCabinetStats } from '../hooks/useCabinetStats'
@@ -12,7 +12,10 @@ import Tabs from '@/shared/components/Tabs'
 import ErrorState from '@/shared/components/ErrorState'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
-import { differenceInMinutes } from 'date-fns'
+import { differenceInMinutes, format, startOfDay, isSameDay } from 'date-fns'
+import { ru } from 'date-fns/locale'
+
+const FULL_SHIFT_MIN = 8 * 60
 
 const MonthlyChart = lazy(() => import('../components/MonthlyChart').then((m) => ({ default: m.MonthlyChart })))
 
@@ -203,6 +206,11 @@ export default function CabinetPage() {
             </div>
           )}
 
+          {/* История смен с раскрытием по дням */}
+          {stats.shifts && stats.shifts.length > 0 && (
+            <ShiftHistory shifts={stats.shifts} logs={stats.logs} />
+          )}
+
           {/* By order */}
           {stats.byOrder.length > 0 && (
             <div className="bg-surface rounded-xl border border-border p-5">
@@ -244,4 +252,104 @@ export default function CabinetPage() {
       )}
     </div>
   )
+}
+
+/**
+ * История смен с раскрытием по дням.
+ * Каждая смена — карточка с длительностью, индикатором «полная (8ч)»,
+ * и при клике раскрывает production logs за этот день.
+ */
+function ShiftHistory({ shifts, logs }) {
+  const [openId, setOpenId] = useState(null)
+
+  // Группируем логи по дате (yyyy-MM-dd) для быстрого поиска
+  const logsByDay = useMemo(() => {
+    const map = {}
+    for (const l of logs || []) {
+      const key = format(startOfDay(new Date(l.created_at)), 'yyyy-MM-dd')
+      if (!map[key]) map[key] = []
+      map[key].push(l)
+    }
+    return map
+  }, [logs])
+
+  return (
+    <div className="bg-surface rounded-xl border border-border p-5">
+      <h2 className="font-semibold mb-3">История смен</h2>
+      <p className="text-xs text-text-muted mb-3">
+        Норма смены — 8 часов. Кликните на смену, чтобы посмотреть, что сделано в этот день.
+      </p>
+      <div className="space-y-2">
+        {shifts.map((s) => {
+          const minutes = s.duration_minutes || 0
+          const hours = Math.floor(minutes / 60)
+          const mins = minutes % 60
+          const isFull = minutes >= FULL_SHIFT_MIN
+          const startedAt = new Date(s.started_at)
+          const dayKey = format(startOfDay(startedAt), 'yyyy-MM-dd')
+          const dayLogs = (logsByDay[dayKey] || []).filter((l) => isSameDay(new Date(l.created_at), startedAt))
+          const isOpen = openId === s.id
+          return (
+            <div key={s.id} className="border border-border rounded-xl overflow-hidden">
+              <button
+                onClick={() => setOpenId(isOpen ? null : s.id)}
+                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-surface-2 transition-colors text-left"
+                aria-expanded={isOpen}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`w-2 h-2 rounded-full ${isFull ? 'bg-success' : 'bg-warning'}`} aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-medium capitalize">
+                      {format(startedAt, 'd MMMM yyyy', { locale: ru })}
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      {format(startedAt, 'HH:mm', { locale: ru })}{s.ended_at ? ` – ${format(new Date(s.ended_at), 'HH:mm', { locale: ru })}` : ''}
+                      {' · '}{hours}ч {mins}мин{isFull ? ' · полная' : ' · неполная'}
+                    </p>
+                  </div>
+                </div>
+                <svg className={`w-4 h-4 text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+              {isOpen && (
+                <div className="px-3 py-3 bg-surface-2 border-t border-border">
+                  {dayLogs.length === 0 ? (
+                    <p className="text-xs text-text-muted">В этот день записей по производству нет</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {dayLogs.map((l) => (
+                        <li key={l.id} className="flex items-start gap-2 text-xs">
+                          <span className="text-text-muted mt-0.5">{format(new Date(l.created_at), 'HH:mm', { locale: ru })}</span>
+                          <Link to={`/orders/${l.order_id}`} className="text-text font-medium hover:text-accent">
+                            #{l.order?.number}
+                          </Link>
+                          <span className="text-text-muted">·</span>
+                          <span>{STAGE_FIELDS[l.stage]?.label || l.stage}</span>
+                          <ShiftLogValues log={l} stage={l.stage} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ShiftLogValues({ log, stage }) {
+  const config = STAGE_FIELDS[stage]
+  if (!config) return null
+  const parts = []
+  for (const f of config.fields) {
+    const v = log[f.key]
+    if (v === undefined || v === null || v === '' || v === 0) continue
+    parts.push(`${f.label}: ${v}${f.unit ? ' ' + f.unit : ''}`)
+  }
+  if (parts.length === 0) return null
+  return <span className="text-text-muted">— {parts.join(', ')}</span>
 }

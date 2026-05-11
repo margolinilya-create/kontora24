@@ -8,6 +8,8 @@ import { createClient } from '@supabase/supabase-js'
 //   k24_production_logs, k24_order_audit, k24_pack_designs.
 // FK без ON DELETE (k24_integration_log.order_id, k24_material_transactions.order_id)
 // перед удалением обнуляются — историю списаний материалов терять нельзя.
+// Складские остатки возвращаются компенсационными транзакциями (по материалу
+// суммируем delta списаний этого заказа и применяем обратную).
 // Файлы attachments удаляются из storage bucket 'order-files'.
 
 const supabase = createClient(
@@ -60,9 +62,64 @@ export default async function handler(req, res) {
       await supabase.storage.from('order-files').remove(filePaths)
     }
 
-    // FK без ON DELETE → обнуляем чтобы не упереться в constraint.
-    // k24_material_transactions — историю списаний терять нельзя (склад собьётся),
-    // просто отвязываем от заказа.
+    const { data: orderRow } = await supabase
+      .from('k24_orders')
+      .select('number')
+      .eq('id', orderId)
+      .single()
+    const orderNo = orderRow?.number ?? '?'
+
+    // 1) Soft-delete production_logs заказа — триггер deduct_materials_from_log
+    //    сам вернёт стоки по плёнке / ламинации / смоле и запишет в историю.
+    //    Если бы мы пошли в обход (cascade DELETE), триггер всё равно сработал бы
+    //    на DELETE и попытался бы вставить транзакцию с order_id текущего заказа,
+    //    что нарушило бы FK на момент удаления самого заказа.
+    await supabase
+      .from('k24_production_logs')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('order_id', orderId)
+      .is('deleted_at', null)
+
+    // 2) Краска идёт мимо production_logs (auto_deduct_materials на advance в 'print').
+    //    Триггер её не вернёт — компенсируем вручную одной агрегированной записью
+    //    на материал, чтобы остатки сошлись.
+    const { data: inkTxs } = await supabase
+      .from('k24_material_transactions')
+      .select('material_id, delta, reason')
+      .eq('order_id', orderId)
+      .in('reason', ['Авто: печать заказа (краска)', 'Авто: печать заказа'])
+
+    const sumByMaterial = new Map()
+    for (const t of inkTxs || []) {
+      if (!t.material_id || t.delta == null) continue
+      sumByMaterial.set(t.material_id, (sumByMaterial.get(t.material_id) || 0) + Number(t.delta))
+    }
+
+    for (const [materialId, sumDelta] of sumByMaterial.entries()) {
+      if (!sumDelta) continue
+      await supabase.from('k24_material_transactions').insert({
+        material_id: materialId,
+        order_id: null,
+        delta: -sumDelta,
+        reason: `Возврат при удалении заказа #${orderNo}`,
+        created_by: caller.id,
+      })
+      const { data: m } = await supabase
+        .from('k24_materials')
+        .select('stock_qty')
+        .eq('id', materialId)
+        .single()
+      if (m) {
+        await supabase
+          .from('k24_materials')
+          .update({ stock_qty: Number(m.stock_qty) - sumDelta, updated_at: new Date().toISOString() })
+          .eq('id', materialId)
+      }
+    }
+
+    // 3) FK без ON DELETE → обнуляем чтобы не упереться в constraint.
+    //    Делаем ПОСЛЕ soft-delete, чтобы захватить и вставленные триггером
+    //    компенсационные транзакции с order_id текущего заказа.
     await Promise.all([
       supabase.from('k24_integration_log').update({ order_id: null }).eq('order_id', orderId),
       supabase.from('k24_material_transactions').update({ order_id: null }).eq('order_id', orderId),

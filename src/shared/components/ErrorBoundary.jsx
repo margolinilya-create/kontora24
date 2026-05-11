@@ -116,13 +116,23 @@ function ErrorIcon() {
   )
 }
 
+function RefreshIcon() {
+  // Нейтральная иконка «обновление», а не danger-треугольник.
+  // Chunk-load fail — это нормальная ситуация после деплоя, не ошибка.
+  return (
+    <svg className="w-14 h-14 text-accent mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  )
+}
+
 function ChunkErrorUI({ onReload }) {
   return (
     <ErrorLayout>
-      <ErrorIcon />
+      <RefreshIcon />
       <h2 className="text-xl font-semibold mb-2">Приложение обновилось</h2>
       <p className="text-text-muted mb-6">
-        Обновите страницу, чтобы загрузить новую версию.
+        Вышла новая версия. Обновите страницу, чтобы продолжить работу.
       </p>
       <button
         onClick={onReload}

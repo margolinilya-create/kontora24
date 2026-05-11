@@ -87,7 +87,7 @@ const schema = z.object({
   // Deal
   deal_name: z.string().optional(),
   bitrix_deal_id: z.string().optional(),
-  price_final: z.coerce.number().optional(),
+  price_final: z.coerce.number({ invalid_type_error: 'Укажите цену' }).positive('Цена должна быть больше 0'),
   is_partner: z.boolean().default(false),
   source: z.string().optional(),
   source_referrer: z.string().optional(),
@@ -104,8 +104,8 @@ const schema = z.object({
   design_status: z.string().default('provided'),
   mockup_path: z.string().optional(),
   stickers_per_pack: z.coerce.number().optional(),
-  client_name: z.string().optional(),
-  deadline: z.string().optional(),
+  client_name: z.string().trim().min(1, 'Укажите заказчика'),
+  deadline: z.string().min(1, 'Укажите срок сдачи'),
   is_urgent: z.boolean().default(false),
   notes: z.string().optional(),
   bopp_bag: z.boolean().default(false),
@@ -295,8 +295,9 @@ export default function CreateOrderPage() {
                 <FieldError error={errors.qty} />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Срок сдачи</label>
-                <Input type="date" {...register('deadline')} />
+                <label className="block text-sm font-medium mb-1">Срок сдачи <span className="text-danger">*</span></label>
+                <Input type="date" aria-invalid={!!errors.deadline} className={errors.deadline ? 'border-danger ring-1 ring-danger/30' : ''} {...register('deadline')} />
+                <FieldError error={errors.deadline} />
               </div>
             </div>
 
@@ -354,12 +355,15 @@ export default function CreateOrderPage() {
             {/* Заказчик + Срочность */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">Заказчик</label>
+                <label className="block text-sm font-medium mb-1">Заказчик <span className="text-danger">*</span></label>
                 <Input
                   type="text"
                   placeholder="Имя или название компании"
+                  aria-invalid={!!errors.client_name}
+                  className={errors.client_name ? 'border-danger ring-1 ring-danger/30' : ''}
                   {...register('client_name')}
                 />
+                <FieldError error={errors.client_name} />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Срочность</label>
@@ -475,8 +479,16 @@ export default function CreateOrderPage() {
         <div className="space-y-4">
           {canSeeFinance && (
             <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-              <label className="block text-sm font-medium mb-1">Стоимость (бюджет), руб.</label>
-              <Input type="number" step="0.01" placeholder="0" {...register('price_final')} />
+              <label className="block text-sm font-medium mb-1">Стоимость (бюджет), руб. <span className="text-danger">*</span></label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0"
+                aria-invalid={!!errors.price_final}
+                className={errors.price_final ? 'border-danger ring-1 ring-danger/30' : ''}
+                {...register('price_final')}
+              />
+              <FieldError error={errors.price_final} />
             </div>
           )}
 

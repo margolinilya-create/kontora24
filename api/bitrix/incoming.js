@@ -2,6 +2,13 @@ import { createClient } from '@supabase/supabase-js'
 
 // Vercel serverless function — receives webhook from Bitrix24
 // POST /api/bitrix/incoming
+//
+// Политика обязательных полей (R-апдейт 12.05):
+// Ручное создание через CreateOrderPage требует price_final, client_name, deadline.
+// Webhook ВПРАВЕ создавать заказ БЕЗ этих полей — Bitrix часто присылает
+// неполные данные. Менеджер увидит такой заказ в списке с бэйджем
+// «Требует дозаполнения» и сможет дозаполнить через AdminOrderEditor.
+// TODO: добавить is_draft флаг или вычислять «черновик» по наличию полей.
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,

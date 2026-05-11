@@ -278,6 +278,7 @@ export default function OrdersPage() {
                       <th className="px-4 py-2 font-medium text-right">Тираж</th>
                       <th className="px-4 py-2 font-medium">Этап</th>
                       <th className="px-4 py-2 font-medium">Срок</th>
+                      {isAdmin && <th className="px-2 py-2 font-medium w-10 sr-only">Действия</th>}
                     </tr>
                   </thead>
                   <tbody>

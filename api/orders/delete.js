@@ -6,8 +6,9 @@ import { createClient } from '@supabase/supabase-js'
 // Удаляет заказ из k24_orders. FK ON DELETE CASCADE снимает:
 //   k24_order_status_history, k24_order_comments, k24_order_attachments,
 //   k24_production_logs, k24_order_audit, k24_pack_designs.
-// integration_log.order_id (без ON DELETE) перед удалением обнуляется,
-// файлы attachments удаляются из storage bucket 'order-files'.
+// FK без ON DELETE (k24_integration_log.order_id, k24_material_transactions.order_id)
+// перед удалением обнуляются — историю списаний материалов терять нельзя.
+// Файлы attachments удаляются из storage bucket 'order-files'.
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -59,11 +60,13 @@ export default async function handler(req, res) {
       await supabase.storage.from('order-files').remove(filePaths)
     }
 
-    // integration_log.order_id без ON DELETE → обнуляем чтобы не упереться в FK
-    await supabase
-      .from('k24_integration_log')
-      .update({ order_id: null })
-      .eq('order_id', orderId)
+    // FK без ON DELETE → обнуляем чтобы не упереться в constraint.
+    // k24_material_transactions — историю списаний терять нельзя (склад собьётся),
+    // просто отвязываем от заказа.
+    await Promise.all([
+      supabase.from('k24_integration_log').update({ order_id: null }).eq('order_id', orderId),
+      supabase.from('k24_material_transactions').update({ order_id: null }).eq('order_id', orderId),
+    ])
 
     // Удаление заказа — каскад на 6 связанных таблиц
     const { error: deleteError } = await supabase

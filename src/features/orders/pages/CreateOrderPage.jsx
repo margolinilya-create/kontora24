@@ -15,6 +15,8 @@ import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import { findOrCreateClientByName } from '@/features/clients/hooks/useClients'
 import { formatOrderNumber } from '@/shared/lib/utils'
+import { uploadAttachment, validatePreviewFile } from '@/features/orders/lib/order-attachments'
+import { captureError } from '@/shared/lib/sentry'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
@@ -119,10 +121,33 @@ const schema = z.object({
 
 export default function CreateOrderPage() {
   const navigate = useNavigate()
-  const { hasRole } = useAuth()
+  const { hasRole, profile } = useAuth()
   const [submitting, setSubmitting] = useState(false)
   const [activePreset, setActivePreset] = useState(null)
+  const [previewFile, setPreviewFile] = useState(null)
+  const [previewBlobUrl, setPreviewBlobUrl] = useState(null)
+  const [previewDragOver, setPreviewDragOver] = useState(false)
+  const previewInputRef = useRef(null)
   const canSeeFinance = hasRole(['admin', 'manager'])
+
+  function selectPreviewFile(file) {
+    if (!file) return
+    const err = validatePreviewFile(file)
+    if (err) { toast.error(err); return }
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl)
+    setPreviewFile(file)
+    setPreviewBlobUrl(URL.createObjectURL(file))
+  }
+
+  function clearPreviewFile(e) {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl)
+    setPreviewFile(null)
+    setPreviewBlobUrl(null)
+  }
+
+  useEffect(() => () => { if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl) }, [previewBlobUrl])
 
   const formRef = useRef(null)
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
@@ -220,6 +245,20 @@ export default function CreateOrderPage() {
         delivery_address: values.delivery_address || null,
         delivery_notes: values.delivery_notes || null,
       })
+
+      // Загружаем превью после успешного создания заказа (нужен order.id).
+      // Если падает — заказ всё равно создан, показываем мягкое предупреждение.
+      if (previewFile) {
+        try {
+          await uploadAttachment(order.id, previewFile, profile?.id, { pathPrefix: 'tech-preview' })
+        } catch (uploadErr) {
+          captureError(uploadErr, {
+            tags: { source: 'CreateOrderPage.uploadPreview' },
+            extra: { orderId: order.id, fileName: previewFile.name },
+          })
+          toast.error('Заказ создан, но превью не загрузилось — добавьте на странице заказа')
+        }
+      }
 
       toast.success(`Заказ ${formatOrderNumber(order)} создан`)
       navigate(`/orders/${order.id}`)
@@ -492,24 +531,88 @@ export default function CreateOrderPage() {
             </div>
           )}
 
-          <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-            <label className="block text-sm font-medium mb-2">Ссылка на макет</label>
-            <Input type="text" placeholder="https://... или путь на сервере" {...register('mockup_path')} />
-            <div className="mt-3">
-              {isMockupImage ? (
-                <img
-                  src={mockupPath}
-                  alt="Превью макета"
-                  loading="lazy"
-                  className="w-full max-h-[280px] object-contain rounded-xl border border-border bg-surface-dim"
-                  onError={(e) => { e.currentTarget.style.display = 'none' }}
-                />
-              ) : mockupPath ? (
-                <p className="text-xs text-text-muted">Ссылка не на изображение — будет открыта по клику в карточке.</p>
-              ) : (
-                <div className="h-[180px] flex items-center justify-center text-text-muted text-sm bg-surface-dim rounded-xl border border-dashed border-border">
-                  Превью появится при вводе ссылки на JPEG/PNG
-                </div>
+          <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-2">Ссылка на макет</label>
+              <Input type="text" placeholder="https://... или путь на сервере" {...register('mockup_path')} />
+              {mockupPath && !isMockupImage && (
+                <p className="text-xs text-text-muted mt-1">Ссылка не на изображение — будет открыта по клику в карточке.</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-medium mb-2">Превью макета</p>
+              <div
+                onClick={() => !previewFile && previewInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setPreviewDragOver(true) }}
+                onDragLeave={() => setPreviewDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setPreviewDragOver(false)
+                  selectPreviewFile(e.dataTransfer?.files?.[0])
+                }}
+                className={`relative rounded-xl flex items-center justify-center transition-all overflow-hidden ${
+                  previewBlobUrl
+                    ? 'bg-surface-dim border border-border'
+                    : `border-2 border-dashed cursor-pointer ${previewDragOver ? 'border-info bg-info/5' : 'border-border bg-surface-dim hover:border-info/60'}`
+                }`}
+                style={{ minHeight: 180, maxHeight: 320 }}
+              >
+                {previewBlobUrl ? (
+                  <>
+                    <img
+                      src={previewBlobUrl}
+                      alt="Превью макета"
+                      className="w-full max-h-[300px] object-contain"
+                    />
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); previewInputRef.current?.click() }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-surface/95 border border-border hover:bg-surface shadow-sm"
+                      >
+                        Заменить
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearPreviewFile}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-surface/95 border border-danger/40 text-danger hover:bg-danger/10 shadow-sm"
+                      >
+                        × Удалить
+                      </button>
+                    </div>
+                  </>
+                ) : isMockupImage ? (
+                  <img
+                    src={mockupPath}
+                    alt="Превью макета"
+                    loading="lazy"
+                    className="w-full max-h-[300px] object-contain"
+                    onError={(e) => { e.currentTarget.style.display = 'none' }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-text-muted p-6 text-center">
+                    <div className="text-3xl mb-2">📎</div>
+                    <div className="text-sm font-medium">Перетащите файл сюда</div>
+                    <div className="text-xs mt-1">или кликните для выбора</div>
+                    <div className="text-xs mt-2 opacity-70">JPG / PNG / WEBP · до 2 МБ</div>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={previewInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(e) => {
+                  selectPreviewFile(e.target.files?.[0])
+                  e.target.value = ''
+                }}
+              />
+              {previewFile && (
+                <p className="text-xs text-text-muted mt-2">
+                  Загрузится после создания заказа: {previewFile.name}
+                </p>
               )}
             </div>
           </div>

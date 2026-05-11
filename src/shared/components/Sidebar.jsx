@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useThemeStore } from '@/shared/stores/theme-store'
 import { useSidebarStore } from '@/shared/stores/sidebar-store'
@@ -167,9 +167,12 @@ export function Sidebar({ collapsed }) {
       'fixed left-0 top-0 h-screen bg-sidebar text-white flex flex-col transition-all duration-200 z-40 safe-area-top safe-area-left',
       collapsed ? 'w-16' : 'w-60'
     )}>
-      {/* Logo — Onder all-caps overflows the sidebar, so the wordmark sits on
-          Guidy. The yellow K mark carries the brand. */}
-      <div className="flex items-center gap-3 px-4 h-14 border-b border-white/8">
+      {/* Logo — клик ведёт на главную (стандартный паттерн для веб-сайтов). */}
+      <Link
+        to="/"
+        aria-label="На главную"
+        className="flex items-center gap-3 px-4 h-14 border-b border-white/8 hover:bg-white/5 transition-colors"
+      >
         <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-accent flex items-center justify-center font-bold text-sm text-on-accent">
           K
         </div>
@@ -178,7 +181,7 @@ export function Sidebar({ collapsed }) {
             Kontora<span className="text-accent">24</span>
           </span>
         )}
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav aria-label="Основная навигация" className="flex-1 overflow-y-auto py-1.5 px-2">

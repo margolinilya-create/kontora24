@@ -22,10 +22,14 @@ self.addEventListener('activate', (event) => {
       await self.registration.unregister()
       const clients = await self.clients.matchAll({ type: 'window' })
       for (const client of clients) {
-        try { client.navigate(client.url) } catch (_) {}
+        try {
+          client.navigate(client.url)
+        } catch {
+          // navigate может бросить на cross-origin вкладках — пропускаем
+        }
       }
-    } catch (_) {
-      // best-effort, не критично
+    } catch {
+      // best-effort: если активация не прошла полностью — всё равно ничего не ломаем
     }
   })())
 })

@@ -203,22 +203,6 @@ export async function createOrder(orderData) {
   })
   if (historyError) throw historyError
 
-  // Reserve materials for the new order
-  const { error: reserveError } = await supabase.rpc('reserve_materials', {
-    p_order_id: data.id,
-    p_changed_by: user.id,
-  })
-  if (reserveError) {
-    // Order is already inserted in DB. Rollback is complex and could fail too.
-    // Log with partialState flag and propagate — caller will toast user.
-    // TODO: atomic create_order_with_reserve RPC (Phase B).
-    captureError(reserveError, {
-      tags: { source: 'createOrder.reserve' },
-      extra: { orderId: data.id, partialState: true },
-    })
-    throw reserveError
-  }
-
   return data
 }
 
@@ -293,21 +277,13 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   })
   if (historyError) throw historyError
 
-  // Auto-deduct materials when entering "print"
+  // Auto-deduct ink on print stage (по нормативу 50 мл/м²).
+  // Плёнка/ламинация/смола списываются триггером deduct_materials_from_log
+  // по фактическим цифрам из k24_production_logs (см. миграцию 021).
   if (toStatus === 'print') {
     await safeRpc('auto_deduct_materials',
       { p_order_id: orderId, p_changed_by: user.id },
       { source: 'updateOrderStatus.deduct', extra: { orderId, fromStatus, toStatus } })
-    await safeRpc('consume_reservations',
-      { p_order_id: orderId, p_changed_by: user.id },
-      { source: 'updateOrderStatus.consume', extra: { orderId, fromStatus, toStatus } })
-  }
-
-  // Release reservations when order is cancelled
-  if (toStatus === 'cancelled') {
-    await safeRpc('release_materials',
-      { p_order_id: orderId, p_changed_by: user.id },
-      { source: 'updateOrderStatus.release', extra: { orderId, fromStatus, toStatus } })
   }
 
   // Notify Bitrix24 about status change (non-blocking with retry)

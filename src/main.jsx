@@ -19,21 +19,17 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>
 )
 
-// Register service worker for offline support + handle updates
+// Service worker отключён 2026-05-12.
+// История: SW делал cache-first для /assets/*.js и не апдейтил сам себя при
+// чанк-хеш-смене → после каждого деплоя пользователи зависали на stale-чанках
+// с «Приложение обновилось». Для 6 человек в цеху на wifi оффлайн-режим
+// PWA того не стоит. Сейчас: пассивно унрегистрируем любой существующий SW
+// и чистим все кэши — на следующей загрузке всё будет приходить с CDN.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((registration) => {
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing
-        if (!newWorker) return
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
-            // New version available — notify user
-            const shouldRefresh = window.confirm('Доступна новая версия. Обновить?')
-            if (shouldRefresh) window.location.reload()
-          }
-        })
-      })
-    }).catch(() => {})
-  })
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((r) => r.unregister())
+  }).catch(() => {})
+  if ('caches' in window) {
+    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {})
+  }
 }

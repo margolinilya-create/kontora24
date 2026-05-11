@@ -6,6 +6,7 @@ import { MaterialForm } from '../components/MaterialForm'
 import { ConsumptionChart } from '../components/ConsumptionChart'
 import { MaterialsTable } from '../components/MaterialsTable'
 import { TransactionsHistory } from '../components/TransactionsHistory'
+import { InventoryTab } from '../components/InventoryTab'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
@@ -67,6 +68,7 @@ export default function WarehousePage() {
         items={[
           { key: 'stock', label: 'Виджеты' },
           { key: 'table', label: 'Список' },
+          { key: 'inventory', label: 'Инвентаризация' },
           { key: 'history', label: 'История операций' },
           { key: 'analytics', label: 'Расход и прогноз' },
         ]}
@@ -78,6 +80,8 @@ export default function WarehousePage() {
         <ConsumptionChart />
       ) : tab === 'table' ? (
         <MaterialsTable materials={materials} onSelect={setSelectedMaterial} />
+      ) : tab === 'inventory' ? (
+        <InventoryTab materials={materials} onSaved={refetch} />
       ) : tab === 'history' ? (
         <TransactionsHistory />
       ) : (

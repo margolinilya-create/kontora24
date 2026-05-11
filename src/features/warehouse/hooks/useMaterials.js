@@ -112,6 +112,36 @@ export async function addMaterialTransaction({ materialId, delta, reason, orderI
   }
 }
 
+/**
+ * Массовая инвентаризация: для каждого материала устанавливаем фактический остаток.
+ * Для каждой записи создаётся material_transaction с дельтой (factual - current)
+ * и reason='Инвентаризация'. Если delta=0 — пропускаем (не пишем нулевую транзакцию).
+ *
+ * @param {Array<{ materialId: string, currentQty: number, factualQty: number }>} items
+ * @returns {Promise<{ updated: number, skipped: number }>}
+ */
+export async function bulkInventory(items) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  let updated = 0, skipped = 0
+  for (const item of items) {
+    const fact = Number(item.factualQty)
+    const current = Number(item.currentQty) || 0
+    if (isNaN(fact) || fact < 0) { skipped++; continue }
+    const delta = fact - current
+    if (Math.abs(delta) < 0.0001) { skipped++; continue }
+
+    await addMaterialTransaction({
+      materialId: item.materialId,
+      delta,
+      reason: 'Инвентаризация',
+    })
+    updated++
+  }
+  return { updated, skipped }
+}
+
 export async function createMaterial({ type, name, unit, stockQty, minQty, pricePerUnit }) {
   const { data, error } = await supabase
     .from('k24_materials')

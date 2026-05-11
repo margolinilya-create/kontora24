@@ -278,9 +278,9 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   })
   if (historyError) throw historyError
 
-  // Auto-deduct ink on print stage (по нормативу 50 мл/м²).
+  // Auto-deduct ink on print stage (12 мл/м², миграция 022; идемпотентно — 024).
   // Плёнка/ламинация/смола списываются триггером deduct_materials_from_log
-  // по фактическим цифрам из k24_production_logs (см. миграцию 021).
+  // по фактическим цифрам из k24_production_logs (миграции 021 + 025).
   if (toStatus === 'print') {
     await safeRpc('auto_deduct_materials',
       { p_order_id: orderId, p_changed_by: user.id },

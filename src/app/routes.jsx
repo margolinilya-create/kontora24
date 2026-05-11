@@ -35,8 +35,6 @@ const Assembly3dQueuePage = lazy(() => import('@/features/production/pages/Assem
 const PackagingQueuePage = lazy(() => import('@/features/production/pages/PackagingQueuePage'))
 const OtkQueuePage = lazy(() => import('@/features/production/pages/OtkQueuePage'))
 const WarehousePage = lazy(() => import('@/features/warehouse/pages/WarehousePage'))
-const ClientsPage = lazy(() => import('@/features/clients/pages/ClientsPage'))
-const ClientDetailPage = lazy(() => import('@/features/clients/pages/ClientDetailPage'))
 const AnalyticsPage = lazy(() => import('@/features/analytics/pages/AnalyticsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'))
 const CabinetPage = lazy(() => import('@/features/cabinet/pages/CabinetPage'))
@@ -70,8 +68,6 @@ export const routes = [
       { path: 'production/packaging', element: <AuthGuard permission="stage:packaging"><ErrorBoundary><PackagingQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/otk', element: <AuthGuard permission="stage:otk"><ErrorBoundary><OtkQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'warehouse', element: <AuthGuard permission="view:warehouse"><ErrorBoundary><WarehousePage /></ErrorBoundary></AuthGuard> },
-      { path: 'clients', element: <AuthGuard permission="view:clients"><ErrorBoundary><ClientsPage /></ErrorBoundary></AuthGuard> },
-      { path: 'clients/:id', element: <AuthGuard permission="view:clients"><ErrorBoundary><ClientDetailPage /></ErrorBoundary></AuthGuard> },
       { path: 'analytics', element: <AuthGuard permission="view:analytics"><ErrorBoundary><AnalyticsPage /></ErrorBoundary></AuthGuard> },
       { path: 'cabinet', element: <ErrorBoundary><CabinetPage /></ErrorBoundary> },
       { path: 'reports', element: <AuthGuard permission="view:reports"><ErrorBoundary><ReportsPage /></ErrorBoundary></AuthGuard> },

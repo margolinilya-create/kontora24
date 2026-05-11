@@ -97,7 +97,7 @@ export const PERMISSIONS = {
   ],
   views: [
     'view:dashboard', 'view:analytics', 'view:finance',
-    'view:warehouse', 'view:clients', 'view:reports', 'view:settings',
+    'view:warehouse', 'view:reports', 'view:settings',
   ],
   actions: [
     'order:create', 'order:edit', 'order:cancel',
@@ -120,7 +120,6 @@ export const PERMISSION_LABELS = {
   'view:analytics': 'Видеть «Аналитика»',
   'view:finance': 'Видеть финансы (цены, маржа)',
   'view:warehouse': 'Видеть «Склад»',
-  'view:clients': 'Видеть «Клиенты»',
   'view:reports': 'Видеть «Отчёты»',
   'view:settings': 'Видеть «Настройки»',
   'order:create': 'Создавать заказы',
@@ -513,7 +512,6 @@ export const NAV_ITEMS = [
   { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'], permission: 'stage:otk' },
   { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ALL_ROLES }, // личный кабинет — всем
   { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: MANAGER_ROLES, permission: 'view:warehouse' },
-  { path: '/clients', label: 'Клиенты', icon: 'Users', roles: MANAGER_ROLES, permission: 'view:clients' },
   { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: MANAGER_ROLES, permission: 'view:analytics' },
   { path: '/reports', label: 'Отчёты', icon: 'FileText', roles: ['admin'], permission: 'view:reports' },
   { path: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'], permission: 'view:settings' },

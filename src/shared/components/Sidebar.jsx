@@ -37,7 +37,7 @@ const PRODUCTION_QUEUE_PATHS = ['/production/design', '/production/prepress', '/
 const NAV_GROUPS = [
   { id: 'manage', label: 'Управление', paths: ['/', '/orders'] },
   { id: 'production', label: 'Производство', paths: ['/production', ...PRODUCTION_QUEUE_PATHS], headerPath: '/production' },
-  { id: 'resources', label: 'Ресурсы', paths: ['/warehouse', '/clients', '/analytics'] },
+  { id: 'resources', label: 'Ресурсы', paths: ['/warehouse', '/analytics'] },
   { id: 'system', label: 'Система', paths: ['/cabinet', '/reports', '/settings', '/help'] },
 ]
 

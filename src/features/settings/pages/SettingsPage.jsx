@@ -5,11 +5,13 @@ import { CreateUser } from '../components/CreateUser'
 import { BitrixSettings } from '../components/BitrixSettings'
 import { IntegrationLog } from '../components/IntegrationLog'
 import { SheetsImport } from '../components/SheetsImport'
+import { RolePermissionsTable } from '../components/RolePermissionsTable'
 import Tabs from '@/shared/components/Tabs'
 
 const SETTINGS_TABS = [
   { key: 'profile', label: 'Профиль' },
   { key: 'users', label: 'Пользователи' },
+  { key: 'permissions', label: 'Права ролей' },
   { key: 'bitrix', label: 'Bitrix24' },
   { key: 'logs', label: 'Логи' },
   { key: 'import', label: 'Импорт' },
@@ -34,6 +36,7 @@ export default function SettingsPage() {
           <CreateUser />
         </>
       )}
+      {activeTab === 'permissions' && <RolePermissionsTable />}
       {activeTab === 'bitrix' && <BitrixSettings />}
       {activeTab === 'logs' && <IntegrationLog />}
       {activeTab === 'import' && <SheetsImport />}

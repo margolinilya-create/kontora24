@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/shared/lib/supabase'
+import { useRolePermissionsStore } from './role-permissions-store'
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -22,6 +23,8 @@ export const useAuthStore = create((set, get) => ({
           set({ user: null, profile: null, loading: false })
         } else {
           set({ user: session.user, profile, loading: false })
+          // Загружаем динамические права (L2 RBAC) — параллельно, не блокируя UI
+          useRolePermissionsStore.getState().load()
         }
       } else {
         set({ user: null, profile: null, loading: false })
@@ -63,6 +66,10 @@ export const useAuthStore = create((set, get) => ({
             return
           }
           set({ user: session.user, profile })
+          // Подгружаем права при первом профиле или смене юзера
+          if (!useRolePermissionsStore.getState().loaded) {
+            useRolePermissionsStore.getState().load()
+          }
         } catch {
           // swallow — keep existing state
         }
@@ -103,6 +110,7 @@ export const useAuthStore = create((set, get) => ({
   signOut: async () => {
     await supabase.auth.signOut()
     set({ user: null, profile: null })
+    useRolePermissionsStore.getState().reset()
   },
 
   hasRole: (roles) => {

@@ -22,6 +22,7 @@ import {
   ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { toast } from '@/shared/stores/toast-store'
 import { formatOrderNumber } from '@/shared/lib/utils'
 
@@ -263,8 +264,9 @@ function OverviewTab({ order, onUpdated }) {
 export default function OrderDetailPage() {
   const { id } = useParams()
   const { order, history, loading, refetch } = useOrderDetail(id)
-  const { hasRole } = useAuth()
-  const isFinance = hasRole(['admin', 'manager'])
+  useAuth() // keep mount for legacy stores
+  const isFinance = useCanDo('view:finance')
+  const canEdit = useCanDo('order:edit')
 
   const [tab, setTab] = useState('overview')
   const [editorOpen, setEditorOpen] = useState(false)
@@ -325,7 +327,7 @@ export default function OrderDetailPage() {
         {/* Left: number + meta */}
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <EditableOrderNumber order={order} canEdit={isFinance} onUpdated={refetch} />
+            <EditableOrderNumber order={order} canEdit={canEdit} onUpdated={refetch} />
             {order.priority && order.priority !== 'normal' && (
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
                 {PRIORITIES[order.priority]?.label}
@@ -333,7 +335,7 @@ export default function OrderDetailPage() {
             )}
           </div>
           <p className="text-text-muted text-sm mt-2">
-            <EditableClientName order={order} canEdit={isFinance} onUpdated={refetch} />
+            <EditableClientName order={order} canEdit={canEdit} onUpdated={refetch} />
             {' · '}{managerName} · {orderDate}
             {deadlineDate && <> · <span className="text-text">сдача {deadlineDate}</span></>}
           </p>
@@ -343,7 +345,7 @@ export default function OrderDetailPage() {
         <div className="flex items-center gap-2 ml-auto">
           <StatusOverride order={order} onUpdated={refetch} />
           <StatusSwitcher order={order} onUpdated={refetch} />
-          {isFinance && (
+          {canEdit && (
             <button
               onClick={() => setEditorOpen(true)}
               aria-label="Редактировать заказ"

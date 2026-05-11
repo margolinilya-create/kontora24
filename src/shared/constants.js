@@ -86,6 +86,52 @@ export function isStageAllowed(order, stage) {
   return getOrderRoute(order).includes(stage)
 }
 
+// --- L2 RBAC: динамические разрешения (через k24_role_permissions) ---
+// Полный список доступных прав. Используется в UI редактора и для валидации.
+// Значения соответствуют записям в k24_role_permissions.
+export const PERMISSIONS = {
+  stages: [
+    'stage:design', 'stage:prepress', 'stage:print', 'stage:lamination',
+    'stage:cutting', 'stage:pouring', 'stage:selection_pouring',
+    'stage:assembly_3d', 'stage:packaging', 'stage:otk',
+  ],
+  views: [
+    'view:dashboard', 'view:analytics', 'view:finance',
+    'view:warehouse', 'view:clients', 'view:reports', 'view:settings',
+  ],
+  actions: [
+    'order:create', 'order:edit', 'order:cancel',
+    'material:manage', 'user:manage',
+  ],
+}
+
+export const PERMISSION_LABELS = {
+  'stage:design': 'Продвигать «Дизайн»',
+  'stage:prepress': 'Продвигать «Препресс»',
+  'stage:print': 'Продвигать «Печать»',
+  'stage:lamination': 'Продвигать «Ламинация»',
+  'stage:cutting': 'Продвигать «Резка»',
+  'stage:pouring': 'Продвигать «Заливка»',
+  'stage:selection_pouring': 'Продвигать «Выборка/Заливка»',
+  'stage:assembly_3d': 'Продвигать «Сборка 3D»',
+  'stage:packaging': 'Продвигать «Упаковка»',
+  'stage:otk': 'Продвигать «ОТК»',
+  'view:dashboard': 'Видеть «Главная»',
+  'view:analytics': 'Видеть «Аналитика»',
+  'view:finance': 'Видеть финансы (цены, маржа)',
+  'view:warehouse': 'Видеть «Склад»',
+  'view:clients': 'Видеть «Клиенты»',
+  'view:reports': 'Видеть «Отчёты»',
+  'view:settings': 'Видеть «Настройки»',
+  'order:create': 'Создавать заказы',
+  'order:edit': 'Редактировать заказы',
+  'order:cancel': 'Отменять заказы',
+  'material:manage': 'Управлять складом',
+  'user:manage': 'Управлять пользователями',
+}
+
+// Legacy: hard-coded fallback. Используется до загрузки динамических прав
+// и в местах где невозможен async-вызов (например, server-side seed).
 // Role permissions: which roles can advance FROM a given status
 export const ROLE_STAGE_PERMISSIONS = {
   admin: true, // admin can advance any stage
@@ -437,27 +483,27 @@ export const NOTIFY_ROLES = {
 const ALL_ROLES = ['admin', 'manager', 'designer', 'printer', 'post_printer']
 const MANAGER_ROLES = ['admin', 'manager']
 
+// NAV_ITEMS: `roles` — legacy fallback (до загрузки динамических прав).
+// `permission` — L2 RBAC проверка через k24_role_permissions (приоритет).
+// Если permission задан — Sidebar/AuthGuard используют canRoleDo(role, permission).
 export const NAV_ITEMS = [
-  // Главная и Аналитика — только для manager+admin (по ТЗ R8: рабочие сразу попадают на /orders)
-  { path: '/', label: 'Главная', icon: 'LayoutDashboard', roles: MANAGER_ROLES },
-  { path: '/orders', label: 'Заказы', icon: 'ShoppingCart', roles: ALL_ROLES },
-  // Страница /production оставлена для bookmarks, но скрыта из меню — её
-  // функционал дублирует канбан на странице заказов (уберём после R6).
-  { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'] },
-  { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'] },
-  { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'] },
-  { path: '/production/lamination', label: 'Ламинация', icon: 'Layers', roles: ['admin', 'manager', 'printer'] },
-  { path: '/production/cutting', label: 'Резка', icon: 'Scissors', roles: ['admin', 'manager', 'printer'] },
-  { path: '/production/pouring', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'] },
-  { path: '/production/selection', label: 'Выборка / Заливка', icon: 'Combine', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'] },
-  { path: '/production/assembly3d', label: 'Сборка 3D', icon: 'Hammer', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'] },
-  { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'] },
-  { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'] },
-  { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ALL_ROLES },
-  { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: MANAGER_ROLES },
-  { path: '/clients', label: 'Клиенты', icon: 'Users', roles: MANAGER_ROLES },
-  { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: MANAGER_ROLES },
-  { path: '/reports', label: 'Отчёты', icon: 'FileText', roles: ['admin'] },
-  { path: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'] },
+  { path: '/', label: 'Главная', icon: 'LayoutDashboard', roles: MANAGER_ROLES, permission: 'view:dashboard' },
+  { path: '/orders', label: 'Заказы', icon: 'ShoppingCart', roles: ALL_ROLES }, // доступен всем (без permission)
+  { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'], permission: 'stage:design' },
+  { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'], permission: 'stage:prepress' },
+  { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'], permission: 'stage:print' },
+  { path: '/production/lamination', label: 'Ламинация', icon: 'Layers', roles: ['admin', 'manager', 'printer'], permission: 'stage:lamination' },
+  { path: '/production/cutting', label: 'Резка', icon: 'Scissors', roles: ['admin', 'manager', 'printer'], permission: 'stage:cutting' },
+  { path: '/production/pouring', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:pouring' },
+  { path: '/production/selection', label: 'Выборка / Заливка', icon: 'Combine', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:selection_pouring' },
+  { path: '/production/assembly3d', label: 'Сборка 3D', icon: 'Hammer', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:assembly_3d' },
+  { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:packaging' },
+  { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'], permission: 'stage:otk' },
+  { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ALL_ROLES }, // личный кабинет — всем
+  { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: MANAGER_ROLES, permission: 'view:warehouse' },
+  { path: '/clients', label: 'Клиенты', icon: 'Users', roles: MANAGER_ROLES, permission: 'view:clients' },
+  { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: MANAGER_ROLES, permission: 'view:analytics' },
+  { path: '/reports', label: 'Отчёты', icon: 'FileText', roles: ['admin'], permission: 'view:reports' },
+  { path: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'], permission: 'view:settings' },
   { path: '/help', label: 'Справка', icon: 'HelpCircle', roles: ALL_ROLES },
 ]

@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useThemeStore } from '@/shared/stores/theme-store'
 import { useSidebarStore } from '@/shared/stores/sidebar-store'
 import { NAV_ITEMS } from '@/shared/constants'
+import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { cn } from '@/shared/lib/utils'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { RoleSwitcher } from '@/shared/components/RoleSwitcher'
@@ -129,6 +130,8 @@ export function Sidebar({ collapsed }) {
   const [openGroups, setOpenGroups] = useState(loadOpenGroups)
   const location = useLocation()
   const role = profile?.role || 'viewer'
+  const permissions = useRolePermissionsStore((s) => s.permissions)
+  const permsLoaded = useRolePermissionsStore((s) => s.loaded)
 
   const toggleGroup = useCallback((id) => {
     setOpenGroups((prev) => {
@@ -144,7 +147,15 @@ export function Sidebar({ collapsed }) {
     return () => clearInterval(interval)
   }, [fetchCounts])
 
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role))
+  // L2 RBAC: если у пункта есть permission — проверяем через k24_role_permissions.
+  // Иначе fallback на роли (legacy). До загрузки прав используем roles, чтобы
+  // меню не моргало пустым при первом рендере.
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (item.permission && permsLoaded) {
+      return permissions[role]?.has(item.permission) || false
+    }
+    return item.roles?.includes(role) ?? true
+  })
 
   const groupedNav = NAV_GROUPS.map((group) => ({
     ...group,

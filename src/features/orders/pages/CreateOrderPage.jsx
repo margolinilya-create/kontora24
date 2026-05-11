@@ -9,6 +9,7 @@ import {
   ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
@@ -121,14 +122,14 @@ const schema = z.object({
 
 export default function CreateOrderPage() {
   const navigate = useNavigate()
-  const { hasRole, profile } = useAuth()
+  const { profile } = useAuth()
   const [submitting, setSubmitting] = useState(false)
   const [activePreset, setActivePreset] = useState(null)
   const [previewFile, setPreviewFile] = useState(null)
   const [previewBlobUrl, setPreviewBlobUrl] = useState(null)
   const [previewDragOver, setPreviewDragOver] = useState(false)
   const previewInputRef = useRef(null)
-  const canSeeFinance = hasRole(['admin', 'manager'])
+  const canSeeFinance = useCanDo('view:finance')
 
   function selectPreviewFile(file) {
     if (!file) return

@@ -4,34 +4,44 @@ import { formatOrderNumberShort } from '@/shared/lib/utils'
 
 // 120×75 мм. 1 мм = 2.833 px при 72dpi → 340×213 px.
 const MM = 2.833
-const STICKER_W = 120 * MM
-const STICKER_H = 75 * MM
+const STICKER_W = 120 * MM // 340 px
+const STICKER_H = 75 * MM  // 213 px
 
-const LOGO_W = 118 * MM
-const LOGO_H = 16 * MM
-const SIDE_PAD = 1 * MM
+const SIDE_PAD = 2 * MM
 const TOP_PAD = 2 * MM
-const NUMBER_GAP_TOP = 6.5 * MM    // отступ от логотипа до номера
-const NUMBER_FONT_SIZE = 95 // pt — подобрано под высоту 75мм с учётом логотипа сверху
+const LOGO_H = 14 * MM            // высота логотипа (ширина — auto)
+const NUMBER_GAP_TOP = 4 * MM
+const RIGHT_COL_WIDTH = 48 * MM   // фиксированная ширина правого столбца ~48мм
+
+// Авто-fit размера шрифта номера по длине строки, чтобы вписался в 70мм ширины.
+function getNumberFontSize(text) {
+  const len = (text || '').length
+  if (len <= 4) return 60   // ORD-0001 → крупно
+  if (len <= 6) return 46   // 6 цифр
+  if (len <= 8) return 36   // «Тест-01» = 7 символов
+  if (len <= 12) return 28
+  return 22
+}
 
 /**
  * Универсальная наклейка 120×75 мм.
- * Структура (по ТЗ):
- *   1. Логотип Kontora (118 мм по ширине, сверху)
- *   2. Номер заказа (Modulord, выровнен по левому краю, отступ 6.5 мм от логотипа)
- *   3. Горизонтальное подчёркивание 120 мм, отступ 3 мм от номера
- *   4. Правый столбец (Guidy 16pt), выровнен по верху номера:
- *      - 'production' (на бокс):  Срок сдачи / Заказчик / Тираж
- *      - 'delivery'   (на выдачу): Производитель: KONTORA.SU / Заказчик / Тираж
+ *  - 'delivery'  (на выдачу): логотип сверху + правый столбец Производитель/Заказчик/Тираж
+ *  - 'production' (на бокс):  БЕЗ логотипа + правый столбец Срок сдачи/Заказчик/Тираж
+ *
+ * Шрифт номера — Modulord, авто-fit размера по длине.
+ * Правый столбец — Guidy, фиксированная ширина 48мм (чтобы не выдавливался номером).
+ * Нижнее подчёркивание — 120мм у самого низа стикера.
  */
 export const Sticker = forwardRef(function Sticker({ order, type = 'production' }, ref) {
   if (!order) return null
 
+  const isDelivery = type === 'delivery'
   const clientName = order.client?.name || '—'
   const number = formatOrderNumberShort(order)
   const deadline = order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'
+  const fontSize = getNumberFontSize(number)
 
-  const rightCol = type === 'delivery'
+  const rightCol = isDelivery
     ? [
         { label: 'Производитель', value: 'KONTORA.SU' },
         { label: 'Заказчик', value: clientName },
@@ -58,44 +68,55 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
         color: '#000000',
       }}
     >
-      {/* Логотип */}
-      <img
-        src={kontoraLogo}
-        alt="Контора"
-        style={{
-          width: LOGO_W,
-          maxHeight: LOGO_H,
-          height: 'auto',
-          objectFit: 'contain',
-          objectPosition: 'left',
-          display: 'block',
-        }}
-        crossOrigin="anonymous"
-      />
+      {/* Логотип — только для «На выдачу» */}
+      {isDelivery && (
+        <img
+          src={kontoraLogo}
+          alt="Контора"
+          style={{
+            height: LOGO_H,
+            width: 'auto',         // aspect ratio сохраняется
+            display: 'block',
+          }}
+          crossOrigin="anonymous"
+        />
+      )}
 
-      {/* Номер + правый столбец */}
+      {/* Номер слева + правый столбец справа.
+          Position absolute даёт точный контроль — flex иногда выдавливает столбец. */}
       <div style={{
-        marginTop: NUMBER_GAP_TOP,
+        position: 'absolute',
+        left: SIDE_PAD,
+        top: isDelivery ? TOP_PAD + LOGO_H + NUMBER_GAP_TOP : TOP_PAD + 2 * MM,
+        right: SIDE_PAD,
+        bottom: 6 * MM, // отступ от подчёркивания
         display: 'flex',
         alignItems: 'flex-start',
-        gap: 3 * MM,
+        gap: 2 * MM,
       }}>
+        {/* Номер заказа — занимает оставшееся пространство слева от правого столбца */}
         <div style={{
+          flex: 1,
+          minWidth: 0,
           fontFamily: "'Modulord', 'Onder', sans-serif",
-          fontSize: `${NUMBER_FONT_SIZE}pt`,
+          fontSize: `${fontSize}pt`,
           fontWeight: 700,
-          lineHeight: 0.82,
+          lineHeight: 0.92,
           letterSpacing: 0,
           color: '#000000',
-          flexShrink: 0,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'clip',
         }}>
           {number}
         </div>
 
+        {/* Правый столбец — фиксированная ширина */}
         <div style={{
-          flex: 1,
+          width: RIGHT_COL_WIDTH,
+          flexShrink: 0,
           fontFamily: "'Guidy', 'Inter', sans-serif",
-          fontSize: '11pt',
+          fontSize: '10pt',
           lineHeight: 1.15,
           paddingTop: 1 * MM,
         }}>
@@ -104,22 +125,23 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
               <div style={{
                 fontWeight: 700,
                 textTransform: 'uppercase',
-                fontSize: '9pt',
+                fontSize: '8pt',
                 letterSpacing: 0.3,
+                color: '#000000',
               }}>
                 {row.label}
               </div>
-              <div style={{ fontSize: '11pt' }}>{row.value}</div>
+              <div style={{ fontSize: '10pt' }}>{row.value}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Подчёркивание 120 мм, отступ 3 мм от номера */}
+      {/* Подчёркивание 120 мм у нижнего края */}
       <div style={{
         position: 'absolute',
         left: 0,
-        bottom: 4 * MM,
+        bottom: 3 * MM,
         width: 120 * MM,
         height: 1.5,
         backgroundColor: '#000000',

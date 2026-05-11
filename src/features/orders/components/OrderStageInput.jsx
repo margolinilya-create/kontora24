@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { ProductionLogForm } from '@/features/production/components/logs/ProductionLogForm'
 import { ProductionLogHistory } from '@/features/production/components/logs/ProductionLogHistory'
@@ -10,12 +11,14 @@ import { canWorkOnStage } from '@/shared/constants'
 
 export function OrderStageInput({ order, onUpdated }) {
   const { profile } = useAuth()
+  const dynamicPerms = useRolePermissionsStore((s) => s.permissions)
+  const dynamicLoaded = useRolePermissionsStore((s) => s.loaded)
   const stage = order.status
   const config = STAGE_FIELDS[stage]
   const { logs, getStageProgress, updateLog, softDeleteLog, error: logsError } = useProductionLogs(order.id, order.qty)
   const [showHistory, setShowHistory] = useState(false)
 
-  const canWork = profile && canWorkOnStage(profile.role, stage)
+  const canWork = profile && canWorkOnStage(profile.role, stage, dynamicLoaded ? dynamicPerms : null)
   const progress = config ? getStageProgress(stage) : null
   const stageLogs = logs.filter((l) => l.stage === stage)
 

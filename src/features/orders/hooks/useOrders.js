@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageAllowed } from '@/shared/constants'
+import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageAllowed, canAdvanceFrom } from '@/shared/constants'
+import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { safeRpc } from '@/shared/lib/safeRpc'
 import { captureError } from '@/shared/lib/sentry'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
@@ -235,6 +236,24 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
       const stageLabel = ORDER_STATUSES[toStatus]?.label || toStatus
       throw new Error(`Этап «${stageLabel}» не входит в маршрут заказа`)
     }
+
+    // L2 RBAC: если динамические права загружены — проверяем что у роли есть
+    // право продвигать этот этап (stage:${fromStatus}). Без права — отказ.
+    // Тесты и старт-апа (до load()) используют статический ROLE_STAGE_PERMISSIONS.
+    if (fromStatus) {
+      const { data: actorProfile } = await supabase
+        .from('k24_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      const role = actorProfile?.role
+      const store = useRolePermissionsStore.getState()
+      const dynamicPerms = store.loaded ? store.permissions : null
+      if (role && !canAdvanceFrom(role, fromStatus, dynamicPerms)) {
+        const stageLabel = ORDER_STATUSES[fromStatus]?.label || fromStatus
+        throw new Error(`У роли «${role}» нет права продвигать этап «${stageLabel}»`)
+      }
+    }
   }
 
   // Блокировка перехода вперёд без введённых данных на текущем этапе
@@ -391,9 +410,11 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
     // продолжать с потенциально некорректным значением
   }
 
-  // 3. Auto-advance if complete
+  // 3. Auto-advance if complete (с учётом динамических L2-прав, если стор загружен)
   if (isComplete && order) {
-    const nextStatus = getNextStatus(workerRole, order.status, order)
+    const store = useRolePermissionsStore.getState()
+    const dynamicPerms = store.loaded ? store.permissions : null
+    const nextStatus = getNextStatus(workerRole, order.status, order, dynamicPerms)
     if (nextStatus) {
       await updateOrderStatus(orderId, order.status, nextStatus)
     }

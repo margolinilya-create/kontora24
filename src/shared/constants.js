@@ -141,13 +141,25 @@ export const ROLE_STAGE_PERMISSIONS = {
   post_printer: ['selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'cutting', 'lamination', 'print'],
 }
 
-function canAdvanceFrom(role, status) {
+// L2 RBAC: если dynamicPerms передан (загружен из k24_role_permissions) — он
+// является источником правды и перекрывает статический ROLE_STAGE_PERMISSIONS.
+// Без него (в тестах / до загрузки стора) используется статика как fallback.
+// Формат dynamicPerms: { [role]: Set<permission> } (см. role-permissions-store.js).
+export function canAdvanceFrom(role, status, dynamicPerms = null) {
+  if (!role) return false
+  if (dynamicPerms && dynamicPerms[role]) {
+    return dynamicPerms[role].has(`stage:${status}`)
+  }
   const perms = ROLE_STAGE_PERMISSIONS[role]
   if (perms === true) return true
   return perms?.includes(status) || false
 }
 
-export function canWorkOnStage(role, stage) {
+export function canWorkOnStage(role, stage, dynamicPerms = null) {
+  if (!role) return false
+  if (dynamicPerms && dynamicPerms[role]) {
+    return dynamicPerms[role].has(`stage:${stage}`)
+  }
   const perms = ROLE_STAGE_PERMISSIONS[role]
   if (perms === true) return true
   return perms?.includes(stage) || false
@@ -156,9 +168,9 @@ export function canWorkOnStage(role, stage) {
 // Admin and manager can cancel from any status
 export const CAN_CANCEL_ROLES = ['admin', 'manager']
 
-export function getNextStatus(role, currentStatus, order) {
+export function getNextStatus(role, currentStatus, order, dynamicPerms = null) {
   if (currentStatus === 'done' || currentStatus === 'cancelled') return undefined
-  if (!canAdvanceFrom(role, currentStatus)) return undefined
+  if (!canAdvanceFrom(role, currentStatus, dynamicPerms)) return undefined
 
   const route = getOrderRoute(order)
   const idx = route.indexOf(currentStatus)

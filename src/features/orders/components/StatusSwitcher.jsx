@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { updateOrderStatus } from '../hooks/useOrders'
 import { ORDER_STATUSES, getNextStatus } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
@@ -8,13 +9,15 @@ import { translateError } from '@/shared/lib/error-translator'
 // "Отменить" удалили по ТЗ 2026-05. Откат на пройденные этапы будет в R3.
 export function StatusSwitcher({ order, onUpdated }) {
   const { profile } = useAuth()
+  const dynamicPerms = useRolePermissionsStore((s) => s.permissions)
+  const dynamicLoaded = useRolePermissionsStore((s) => s.loaded)
   const [loading, setLoading] = useState(false)
 
   if (!profile || !order) return null
 
   const role = profile.role
   const currentStatus = order.status
-  const nextStatus = getNextStatus(role, currentStatus, order)
+  const nextStatus = getNextStatus(role, currentStatus, order, dynamicLoaded ? dynamicPerms : null)
 
   if (!nextStatus) return null
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
 import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
+import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
@@ -192,8 +193,10 @@ export default function DashboardPage() {
     setBatchCompleting(true)
     try {
       let completed = 0
+      const store = useRolePermissionsStore.getState()
+      const dynamicPerms = store.loaded ? store.permissions : null
       for (const order of myTasks) {
-        const next = getNextStatus(profile.role, order.status, order)
+        const next = getNextStatus(profile.role, order.status, order, dynamicPerms)
         if (next) {
           await updateOrderStatus(order.id, order.status, next)
           completed++

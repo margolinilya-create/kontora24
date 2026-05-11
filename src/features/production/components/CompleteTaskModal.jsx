@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { getNextStatus, MS_PER_MINUTE } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
@@ -10,12 +11,14 @@ import Button from '@/shared/components/Button'
 
 export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
   const { profile } = useAuth()
+  const dynamicPerms = useRolePermissionsStore((s) => s.permissions)
+  const dynamicLoaded = useRolePermissionsStore((s) => s.loaded)
   const [materials, setMaterials] = useState([])
   const [consumption, setConsumption] = useState([]) // [{materialId, qty}]
   const [saving, setSaving] = useState(false)
   const [step, setStep] = useState('confirm') // 'confirm' | 'materials'
 
-  const nextStatus = getNextStatus(profile?.role, order?.status, order)
+  const nextStatus = getNextStatus(profile?.role, order?.status, order, dynamicLoaded ? dynamicPerms : null)
 
   useEffect(() => {
     if (!isOpen) return

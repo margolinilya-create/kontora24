@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
+import {
+  ORDER_TYPES, ORDER_STATUSES,
+  calculateActualMaterialsCost, calculateWorkerPayout,
+} from '@/shared/constants'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, subMonths, subWeeks, startOfWeek, format, differenceInHours, getISOWeek } from 'date-fns'
 
@@ -12,7 +15,9 @@ export const PERIODS = [
 ]
 
 export function useAnalyticsData(period) {
-  const [data, setData] = useState({ orders: [], statusHistory: [], materialTx: [], prevOrders: [] })
+  const [data, setData] = useState({
+    orders: [], statusHistory: [], materialTx: [], prevOrders: [], productionLogs: [],
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -25,22 +30,25 @@ export function useAnalyticsData(period) {
       const periodMs = Date.now() - startDate.getTime()
       const prevStart = new Date(startDate.getTime() - periodMs)
 
-      const [ordersRes, historyRes, matTxRes, prevOrdersRes] = await Promise.all([
-        supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', startDate.toISOString()).limit(1000),
+      const [ordersRes, historyRes, matTxRes, prevOrdersRes, logsRes] = await Promise.all([
+        supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', startDate.toISOString()).limit(1000),
         supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', startDate.toISOString()).limit(5000),
         supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', startDate.toISOString()).limit(5000),
         period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', startDate.toISOString()).limit(1000) : Promise.resolve({ data: [], error: null }),
+        supabase.from('k24_production_logs').select('id, order_id, stage, track, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, film_meters, film_type, lamination_meters, lamination_qty, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', startDate.toISOString()).limit(10000),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (historyRes.error) throw historyRes.error
       if (matTxRes.error) throw matTxRes.error
       if (prevOrdersRes.error) throw prevOrdersRes.error
+      if (logsRes.error) throw logsRes.error
 
       setData({
         orders: ordersRes.data || [],
         statusHistory: historyRes.data || [],
         materialTx: matTxRes.data || [],
         prevOrders: prevOrdersRes.data || [],
+        productionLogs: logsRes.data || [],
       })
     } catch (err) {
       setError(err)
@@ -53,12 +61,38 @@ export function useAnalyticsData(period) {
   useRefetchOnFocus(fetchData)
 
   const orders = data.orders
-  const doneOrders = useMemo(() => orders.filter((o) => o.status === 'done'), [orders])
+
+  // Группируем логи по order_id для расчёта фактической себестоимости и payroll
+  const logsByOrder = useMemo(() => {
+    const map = {}
+    for (const l of data.productionLogs) {
+      if (!map[l.order_id]) map[l.order_id] = []
+      map[l.order_id].push(l)
+    }
+    return map
+  }, [data.productionLogs])
+
+  // Заказы с расчётной себестоимостью (приоритет: фактическая, fallback — ручная)
+  const ordersEnriched = useMemo(() => orders.map((o) => {
+    const logs = logsByOrder[o.id] || []
+    const materials = calculateActualMaterialsCost(logs, o.film_type)
+    const payout = calculateWorkerPayout(logs)
+    const computedCost = materials.total + payout.total
+    const fallbackCost = Number(o.cost_total) || (Number(o.cost_materials) || 0) + (Number(o.cost_labor) || 0)
+    return {
+      ...o,
+      _computedCost: computedCost > 0 ? computedCost : fallbackCost,
+      _payout: payout.total,
+    }
+  }), [orders, logsByOrder])
+
+  const doneOrders = useMemo(() => ordersEnriched.filter((o) => o.status === 'done'), [ordersEnriched])
   const revenue = useMemo(() => doneOrders.reduce((s, o) => s + (Number(o.price_final) || 0), 0), [doneOrders])
-  const totalCost = useMemo(() => doneOrders.reduce((s, o) => s + (Number(o.cost_total) || 0), 0), [doneOrders])
+  const totalCost = useMemo(() => doneOrders.reduce((s, o) => s + (o._computedCost || 0), 0), [doneOrders])
+  const totalPayout = useMemo(() => doneOrders.reduce((s, o) => s + (o._payout || 0), 0), [doneOrders])
   const avgCheck = doneOrders.length > 0 ? revenue / doneOrders.length : 0
   const cancelledCount = orders.filter((o) => o.status === 'cancelled').length
-  const conversionRate = orders.length > 0 ? ((doneOrders.length / orders.length) * 100).toFixed(1) : 0
+  const conversionRate = orders.length > 0 ? ((doneOrders.length / orders.length) * 100).toFixed(1) : '—'
 
   const prevDone = (data.prevOrders || []).filter((o) => o.status === 'done')
   const prevRevenue = prevDone.reduce((s, o) => s + (Number(o.price_final) || 0), 0)
@@ -69,7 +103,7 @@ export function useAnalyticsData(period) {
     doneOrders.forEach((o) => {
       if (!byType[o.order_type]) byType[o.order_type] = { revenue: 0, count: 0, cost: 0 }
       byType[o.order_type].revenue += Number(o.price_final) || 0
-      byType[o.order_type].cost += Number(o.cost_total) || 0
+      byType[o.order_type].cost += o._computedCost || 0
       byType[o.order_type].count += 1
     })
     return Object.entries(byType).map(([type, d]) => ({
@@ -141,7 +175,24 @@ export function useAnalyticsData(period) {
     return Object.entries(workload).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
   }, [orders])
 
+  // Зарплата по работникам — из production_logs через WORKER_RATES
+  const payrollData = useMemo(() => {
+    const byWorker = {}
+    for (const log of data.productionLogs) {
+      if (!log.worker_id) continue
+      const name = log.worker?.display_name || 'Неизвестно'
+      const payout = calculateWorkerPayout([log])
+      if (!byWorker[name]) byWorker[name] = 0
+      byWorker[name] += payout.total
+    }
+    return Object.entries(byWorker)
+      .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
+      .filter((w) => w.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+  }, [data.productionLogs])
+
   const matData = useMemo(() => {
+    // 1) Из material_transactions (списания)
     const matConsumption = {}
     ;(data.materialTx || []).filter((t) => Number(t.delta) < 0).forEach((t) => {
       const name = t.material?.name || 'Неизвестно'
@@ -149,8 +200,20 @@ export function useAnalyticsData(period) {
       if (!matConsumption[name]) matConsumption[name] = { total: 0, unit }
       matConsumption[name].total += Math.abs(Number(t.delta))
     })
+    // 2) Plus из production_logs (плёнка, ламинация, смола — если транзакций нет)
+    let totalFilm = 0, totalLam = 0, totalResin = 0
+    for (const l of data.productionLogs) {
+      totalFilm += Number(l.film_meters) || 0
+      totalLam += Number(l.lamination_meters) || 0
+      totalResin += Number(l.resin_grams) || 0
+    }
+    if (totalFilm > 0 && !matConsumption['Плёнка (логи)']) {
+      matConsumption['Плёнка (по логам)'] = { total: totalFilm, unit: 'м' }
+    }
+    if (totalLam > 0) matConsumption['Ламинация (по логам)'] = { total: totalLam, unit: 'м' }
+    if (totalResin > 0) matConsumption['Смола (по логам)'] = { total: totalResin, unit: 'г' }
     return Object.entries(matConsumption).map(([name, d]) => ({ name, ...d }))
-  }, [data.materialTx])
+  }, [data.materialTx, data.productionLogs])
 
   const throughputData = useMemo(() => {
     const now = new Date()
@@ -169,14 +232,18 @@ export function useAnalyticsData(period) {
     return weeks
   }, [orders])
 
+  const isEmpty = !loading && orders.length === 0
+
   return {
     loading,
     error,
+    isEmpty,
     refetch: fetchData,
     orders,
     doneOrders,
     revenue,
     totalCost,
+    totalPayout,
     avgCheck,
     cancelledCount,
     conversionRate,
@@ -188,6 +255,7 @@ export function useAnalyticsData(period) {
     trendData,
     topClients,
     workloadData,
+    payrollData,
     matData,
     throughputData,
   }

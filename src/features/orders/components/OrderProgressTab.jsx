@@ -3,17 +3,16 @@ import { ProductionLogForm } from '@/features/production/components/logs/Product
 import { addProductionLogAndCheckAdvance } from '@/features/orders/hooks/useOrders'
 import { PackDesignsForm } from '@/features/production/components/PackDesignsForm'
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
+import { computeIncoming, computeStageProgress } from '@/features/production/lib/production-logs'
 import {
-  ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute,
+  ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK,
 } from '@/shared/constants'
 
-// Этапы где нет ручного учёта (worker не вводит данные).
 const NO_INPUT_STAGES = new Set(['new', 'design', 'prepress', 'otk', 'done', 'cancelled'])
 
-// Линии аналитики прогресса справа. Показываем только то, что входит в маршрут заказа.
 function getProgressLines(order) {
   const route = getOrderRoute(order)
-  const isPack3D = order.order_type === 'stickerpack3D'
+  const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const is3D = isPack3D || order.order_type === 'sticker3D'
   const lines = []
 
@@ -24,10 +23,10 @@ function getProgressLines(order) {
     }
   }
   if (route.includes('lamination')) {
-    lines.push({ key: 'lamination', stage: 'lamination', track: null, qtyField: 'lamination_meters', label: isPack3D ? 'Заламинировано фонов' : 'Заламинировано', unit: 'м' })
+    lines.push({ key: 'lamination_qty', stage: 'lamination', track: null, qtyField: 'lamination_qty', label: isPack3D ? 'Заламинировано фонов' : 'Заламинировано' })
   }
   if (route.includes('cutting')) {
-    lines.push({ key: 'cutting', stage: 'cutting', track: isPack3D ? 'stickers' : null, qtyField: 'qty_cut', label: 'Нарезано стикеров' })
+    lines.push({ key: 'cutting', stage: 'cutting', track: isPack3D ? 'stickers' : null, qtyField: 'qty_cut', label: isPack3D ? 'Нарезано стикеров' : 'Нарезано' })
     if (isPack3D) {
       lines.push({ key: 'cutting_bg', stage: 'cutting', track: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано фонов' })
     }
@@ -45,7 +44,6 @@ function getProgressLines(order) {
   if (route.includes('packaging')) {
     lines.push({ key: 'packaging', stage: 'packaging', track: null, qtyField: 'packs_packaged', label: is3D ? 'Упаковано стикеров' : 'Упаковано' })
   }
-
   return lines
 }
 
@@ -58,28 +56,28 @@ function aggregateLine(logs, line) {
 }
 
 // Расход плёнки сгруппированный по типу — для виджета на этапе печати.
-function aggregateFilmUsage(logs, fallbackFilmType) {
+// film_type больше не в логе → берём из заказа с учётом track для 3D-pack.
+function aggregateFilmUsage(logs, order) {
+  const isPack3D = IS_3D_STICKERPACK(order?.order_type)
   const byType = {}
   for (const l of logs) {
     if (l.stage !== 'print') continue
     const meters = Number(l.film_meters) || 0
     if (!meters) continue
-    const ft = l.film_type || fallbackFilmType
+    const ft = isPack3D && l.track === 'stickers'
+      ? (order.film_type_stickers || order.film_type)
+      : order.film_type
     if (!ft) continue
     byType[ft] = (byType[ft] || 0) + meters
   }
   return byType
 }
 
-/**
- * Левый виджет: ввод данных по текущему этапу.
- * На NO_INPUT_STAGES — статичная плашка. На остальных — ProductionLogForm.
- */
-function CurrentStageWidget({ order, getStageProgress, refetch, onUpdated }) {
+function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   const stage = order.status
-  const isPack3D = order.order_type === 'stickerpack3D'
+  const isPack3D = IS_3D_STICKERPACK(order.order_type)
+  const route = getOrderRoute(order)
 
-  // PackDesignsForm для stickerpack3D на этапах ввода стикеров (печать стикеров и заливка стикеров)
   const showPackDesigns = isPack3D && (stage === 'print' || stage === 'pouring' || stage === 'selection_pouring')
   const { designs, addProgress, updateName } = usePackDesigns(showPackDesigns ? order.id : null)
 
@@ -100,7 +98,22 @@ function CurrentStageWidget({ order, getStageProgress, refetch, onUpdated }) {
   }
 
   const stageLabel = ORDER_STATUSES[stage]?.label || stage
-  const progress = getStageProgress(stage)
+
+  // Прогресс по трекам (если dual-track) или общий
+  let progressProp, incomingProp
+  if (isPack3D && ['print', 'cutting', 'selection_pouring'].includes(stage)) {
+    progressProp = {
+      stickers: computeStageProgress(logs, stage, order.qty, 'stickers'),
+      backgrounds: computeStageProgress(logs, stage, order.qty, 'backgrounds'),
+    }
+    incomingProp = {
+      stickers: computeIncoming(logs, route, stage, order.qty, 'stickers'),
+      backgrounds: computeIncoming(logs, route, stage, order.qty, 'backgrounds'),
+    }
+  } else {
+    progressProp = computeStageProgress(logs, stage, order.qty)
+    incomingProp = computeIncoming(logs, route, stage, order.qty, null)
+  }
 
   return (
     <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
@@ -111,25 +124,21 @@ function CurrentStageWidget({ order, getStageProgress, refetch, onUpdated }) {
           <PackDesignsForm designs={designs} addProgress={addProgress} updateName={updateName} />
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-xs text-text-muted mb-2">Общий лог этапа</p>
-            <ProductionLogForm stage={stage} order={order} progress={progress} onSubmit={handleSubmit} />
+            <ProductionLogForm stage={stage} order={order} progress={progressProp} incoming={incomingProp} onSubmit={handleSubmit} />
           </div>
         </div>
       ) : (
-        <ProductionLogForm stage={stage} order={order} progress={progress} onSubmit={handleSubmit} />
+        <ProductionLogForm stage={stage} order={order} progress={progressProp} incoming={incomingProp} onSubmit={handleSubmit} />
       )}
     </div>
   )
 }
 
-/**
- * Правый виджет: список линий прогресса по этапам производства.
- * В правом верхнем углу каждой линии: красным — брак, серым — излишки.
- */
 function ProgressLinesWidget({ order, logs }) {
   const lines = getProgressLines(order)
   const target = order.qty
   const isOnPrint = order.status === 'print'
-  const filmUsage = isOnPrint ? aggregateFilmUsage(logs, order.film_type) : null
+  const filmUsage = isOnPrint ? aggregateFilmUsage(logs, order) : null
 
   return (
     <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
@@ -178,7 +187,6 @@ function ProgressLinesWidget({ order, logs }) {
         })}
       </div>
 
-      {/* Расход плёнки — только когда заказ на этапе печати */}
       {isOnPrint && filmUsage && Object.keys(filmUsage).length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
           <h3 className="font-semibold text-sm mb-2">Расход плёнки</h3>
@@ -197,7 +205,7 @@ function ProgressLinesWidget({ order, logs }) {
 }
 
 export function OrderProgressTab({ order, onUpdated }) {
-  const { logs, getStageProgress, refetch, error: logsError } = useProductionLogs(order.id, order.qty)
+  const { logs, refetch, error: logsError } = useProductionLogs(order.id, order.qty)
 
   return (
     <div className="space-y-6">
@@ -207,13 +215,11 @@ export function OrderProgressTab({ order, onUpdated }) {
         </div>
       )}
 
-      {/* Два виджета по горизонтали */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <CurrentStageWidget order={order} getStageProgress={getStageProgress} refetch={refetch} onUpdated={onUpdated} />
+        <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} />
         <ProgressLinesWidget order={order} logs={logs} />
       </div>
 
-      {/* Сводка фактического расхода — справочно */}
       <ActualCostSummary order={order} logs={logs} />
     </div>
   )

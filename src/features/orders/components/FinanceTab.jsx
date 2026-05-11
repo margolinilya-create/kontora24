@@ -1,4 +1,8 @@
-import { ORDER_SOURCES, PAYMENT_STATUSES, calculateActualMaterialsCost, getFilmCostPerMeter, FILM_TYPES } from '@/shared/constants'
+import {
+  ORDER_SOURCES, PAYMENT_STATUSES,
+  calculateActualMaterialsCost, getFilmCostPerMeter, FILM_TYPES,
+  calculateWorkerPayout,
+} from '@/shared/constants'
 import { formatPrice } from '@/shared/lib/utils'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { InfoField } from './InfoField'
@@ -6,22 +10,28 @@ import { InfoField } from './InfoField'
 /**
  * Финансы заказа: 3 крупных плитки (Итого / Себестоимость / Маржинальность),
  * детали ниже. Себестоимость материалов считается автоматически из production logs
- * (плёнка по типу × MATERIAL_COSTS, смола × RESIN_COST_PER_GRAM). Поле cost_labor
- * остаётся ручным (вводится через AdminOrderEditor). Доступ — только для admin/manager.
+ * (плёнка по типу × MATERIAL_COSTS, смола × RESIN_COST_PER_GRAM). Стоимость труда
+ * считается через calculateWorkerPayout — только пост-печатные операции (заливка,
+ * выборка, сборка, упаковка). На печать/ламинацию/резку — ручной cost_labor fallback.
+ * Доступ — только для admin/manager.
  */
 export function FinanceTab({ order }) {
   const { logs } = useProductionLogs(order.id, order.qty)
   const actual = calculateActualMaterialsCost(logs, order.film_type)
+  const payout = calculateWorkerPayout(logs)
 
   const total = Number(order.price_final) || 0
-  const labor = Number(order.cost_labor) || 0
-  // Если фактический расход уже есть — берём его, иначе берём ручной cost_materials.
+  const manualLabor = Number(order.cost_labor) || 0
+  const autoLabor = payout.total
+  const labor = autoLabor > 0 ? autoLabor : manualLabor
   const manualMaterials = Number(order.cost_materials) || 0
   const materials = actual.total > 0 ? actual.total : manualMaterials
   const cost = materials + labor
   const margin = total - cost
   const marginPct = total > 0 ? (margin / total) * 100 : 0
-  const pricePerUnit = order.qty > 0 ? total / order.qty : 0
+  const safeQty = order.qty > 0 ? order.qty : 1
+  const pricePerUnit = total / safeQty
+  const costPerUnit = cost / safeQty
 
   return (
     <div className="space-y-6">
@@ -38,7 +48,11 @@ export function FinanceTab({ order }) {
           <p className="text-sm text-text-muted">Себестоимость</p>
           <p className="text-3xl font-bold font-display tracking-tight mt-1">{formatPrice(cost)}</p>
           <p className="text-xs text-text-muted mt-1">
+            {formatPrice(costPerUnit)} / шт
+          </p>
+          <p className="text-xs text-text-muted mt-0.5">
             Материалы {formatPrice(materials)} + труд {formatPrice(labor)}
+            {autoLabor > 0 && <span className="ml-1 text-success">(авто)</span>}
           </p>
         </div>
         <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
@@ -86,13 +100,34 @@ export function FinanceTab({ order }) {
         </div>
       )}
 
+      {/* Payout breakdown — только пост-печать */}
+      {autoLabor > 0 && (
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+          <h2 className="font-semibold mb-3">Сдельная оплата (пост-печать)</h2>
+          <div className="divide-y divide-border text-sm">
+            {Object.entries(payout.breakdown).filter(([, v]) => v.count > 0).map(([k, v]) => (
+              <div key={k} className="py-2 flex items-center justify-between">
+                <span className="text-text-muted">
+                  {v.label} · {v.count} шт × {v.rate} ₽
+                </span>
+                <span className="font-medium tabular-nums">{formatPrice(v.amount)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-text-muted mt-3">
+            Печать / ламинация / резка / дизайн — не учитываются в сдельной оплате.
+          </p>
+        </div>
+      )}
+
       {/* Details */}
       <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
         <h2 className="font-semibold mb-4 text-lg">Детали</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <InfoField label="Материалы" value={formatPrice(materials)} />
           <InfoField label="Труд" value={formatPrice(labor)} />
-          <InfoField label="За штуку" value={formatPrice(pricePerUnit)} />
+          <InfoField label="Цена / шт" value={formatPrice(pricePerUnit)} />
+          <InfoField label="Себестоимость / шт" value={formatPrice(costPerUnit)} />
           <InfoField label="Наценка" value={order.markup ? `x${order.markup}` : '—'} />
           <InfoField label="Скидка" value={order.discount_pct ? `${Math.round(order.discount_pct * 100)}%` : '—'} />
         </div>

@@ -68,9 +68,13 @@ export function getOrderRoute(order) {
     route = route.filter(s => s !== 'lamination')
   }
   // Skip design when client provided the mockup (nothing to draw).
-  // 3D-only stages are already absent from non-3D ORDER_ROUTES — no extra filter needed.
   if (order?.design_status === 'provided') {
     route = route.filter(s => s !== 'design')
+  }
+  // Skip packaging — нужен только для БОПП или 3D-стикерпака (по ТЗ 11.05).
+  const needsPackaging = order?.bopp_bag === true || order?.order_type === 'stickerpack3D'
+  if (!needsPackaging) {
+    route = route.filter(s => s !== 'packaging')
   }
   return route
 }
@@ -149,6 +153,22 @@ export const FILM_TYPES = {
   Holo: { label: 'Голографическая' },
   Gold: { label: 'Золотая' },
   Chrome: { label: 'Хром' },
+}
+
+// «Человеческое» имя плёнки для тех-карты (соответствует строкам прайс-листа MATERIAL_COSTS).
+export const FILM_TYPE_TO_MATERIAL_NAME = {
+  G: 'Белая глянцевая (Duckson 1260)',
+  M: 'Белая матовая (Duckson 1260)',
+  Transparent_G: 'Прозрачная глянцевая (Dickson 1260)',
+  Transparent_M: 'Прозрачная матовая (Dickson 1260)',
+  Holo: 'Голография (1220)',
+  Gold: 'Oracal 352 Золото',
+  Chrome: 'Oracal 352 Серебро',
+}
+
+export function getFilmMaterialName(filmType) {
+  if (!filmType) return '—'
+  return FILM_TYPE_TO_MATERIAL_NAME[filmType] || FILM_TYPES[filmType]?.label || filmType
 }
 
 // --- Order sources ---

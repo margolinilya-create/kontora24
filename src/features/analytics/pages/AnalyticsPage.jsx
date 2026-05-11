@@ -49,6 +49,38 @@ export default function AnalyticsPage() {
     return <ErrorState error={analytics.error} onRetry={analytics.refetch} />
   }
 
+  if (analytics.isEmpty) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold font-display tracking-tight">Аналитика</h1>
+            <p className="text-text-muted">Финансы и производственные метрики</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {PERIODS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                  period === p.key
+                    ? 'bg-text text-bg shadow-card'
+                    : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-10 text-center">
+          <h2 className="text-lg font-semibold mb-2">Нет данных за выбранный период</h2>
+          <p className="text-sm text-text-muted">Создайте заказы или выберите более широкий период.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -113,11 +145,11 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Выручка" value={formatPrice(analytics.revenue)} sub={analytics.revenueDelta !== null ? `${analytics.revenueDelta > 0 ? '+' : ''}${analytics.revenueDelta}% к прошлому` : null} />
-        <StatCard label="Себестоимость" value={formatPrice(analytics.totalCost)} />
+        <StatCard label="Себестоимость" value={formatPrice(analytics.totalCost)} sub="из логов + WORKER_RATES" />
         <StatCard label="Маржа" value={formatPrice(analytics.revenue - analytics.totalCost)} accent />
         <StatCard label="Заказов" value={analytics.orders.length} sub={analytics.prevOrders?.length > 0 ? `было ${analytics.prevOrders.length}` : null} />
-        <StatCard label="Средний чек" value={formatPrice(analytics.avgCheck)} />
-        <StatCard label="Конверсия" value={`${analytics.conversionRate}%`} sub={`${analytics.cancelledCount} отмен`} />
+        <StatCard label="Сдельная (пост-печать)" value={formatPrice(analytics.totalPayout)} sub={analytics.payrollData?.length > 0 ? `${analytics.payrollData.length} работн.` : null} />
+        <StatCard label="Конверсия" value={`${analytics.conversionRate}${analytics.conversionRate === '—' ? '' : '%'}`} sub={`${analytics.cancelledCount} отмен`} />
       </div>
 
       <Tabs items={TABS} active={activeTab} onChange={setActiveTab} />

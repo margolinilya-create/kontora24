@@ -14,6 +14,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import { findOrCreateClientByName } from '@/features/clients/hooks/useClients'
+import { formatOrderNumber } from '@/shared/lib/utils'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
@@ -98,6 +99,7 @@ const schema = z.object({
   width_mm: z.coerce.number().min(1, 'Укажите ширину'),
   height_mm: z.coerce.number().min(1, 'Укажите высоту'),
   film_type: z.string().default('G'),
+  film_type_stickers: z.string().optional().nullable(),
   lam_type: z.string().optional(),
   design_status: z.string().default('provided'),
   mockup_path: z.string().optional(),
@@ -128,7 +130,8 @@ export default function CreateOrderPage() {
     defaultValues: {
       order_type: '', qty: 1, width_mm: 100, height_mm: 100,
       lam_type: '', is_urgent: false, bopp_bag: false,
-      film_type: 'G', is_partner: false, payment_status: 'not_paid',
+      film_type: 'G', film_type_stickers: 'G',
+      is_partner: false, payment_status: 'not_paid',
       design_status: 'provided', delivery_type: 'pickup',
       client_name: '',
     },
@@ -153,12 +156,17 @@ export default function CreateOrderPage() {
   const deliveryType = watch('delivery_type')
   const mockupPath = watch('mockup_path')
   const isStickerpack = orderType === 'stickerpack' || orderType === 'stickerpack3D'
+  const isStickerpack3D = orderType === 'stickerpack3D'
   const isMockupImage = mockupPath && IMAGE_RX.test(mockupPath)
 
-  // Smart defaults for 3D types
+  // Smart defaults: 3D-стикерпак → auto-BOPP; первый выбор 3D → плёнка G по дефолту.
   useEffect(() => {
     if (orderType === 'sticker3D' || orderType === 'stickerpack3D') {
       setValue('film_type', 'G')
+    }
+    if (orderType === 'stickerpack3D') {
+      setValue('bopp_bag', true)
+      setValue('film_type_stickers', 'G')
     }
   }, [orderType, setValue])
 
@@ -191,6 +199,7 @@ export default function CreateOrderPage() {
         need_lam: needLam,
         lam_type: needLam ? values.lam_type : null,
         film_type: values.film_type,
+        film_type_stickers: isStickerpack3D ? (values.film_type_stickers || values.film_type) : null,
         client_id: clientId,
         deadline: values.deadline || null,
         priority: values.is_urgent ? 'urgent' : 'normal',
@@ -212,7 +221,7 @@ export default function CreateOrderPage() {
         delivery_notes: values.delivery_notes || null,
       })
 
-      toast.success(`Заказ ORD-${String(order.number).padStart(4, '0')} создан`)
+      toast.success(`Заказ ${formatOrderNumber(order)} создан`)
       navigate(`/orders/${order.id}`)
     } catch (err) {
       toast.error(translateError(err).message)
@@ -299,16 +308,38 @@ export default function CreateOrderPage() {
               </div>
             )}
 
-            {/* Плёнка + Ламинация */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Плёнка</label>
-                <select {...register('film_type')} className={SELECT_CLASS}>
-                  {Object.entries(FILM_TYPES).map(([key, { label }]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
+            {/* Плёнка(и) + Ламинация */}
+            {isStickerpack3D ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Плёнка фонов</label>
+                  <select {...register('film_type')} className={SELECT_CLASS}>
+                    {Object.entries(FILM_TYPES).map(([key, { label }]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Плёнка стикеров</label>
+                  <select {...register('film_type_stickers')} className={SELECT_CLASS}>
+                    {Object.entries(FILM_TYPES).map(([key, { label }]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+            ) : null}
+            <div className="grid grid-cols-2 gap-3">
+              {!isStickerpack3D && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Плёнка</label>
+                  <select {...register('film_type')} className={SELECT_CLASS}>
+                    {Object.entries(FILM_TYPES).map(([key, { label }]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium mb-1">Ламинация</label>
                 <select {...register('lam_type')} className={SELECT_CLASS}>
@@ -341,9 +372,17 @@ export default function CreateOrderPage() {
 
             {/* БОПП + Дизайн макета */}
             <div className="grid grid-cols-2 gap-3">
-              <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
-                <input type="checkbox" {...register('bopp_bag')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
-                <span className="text-sm">Упаковка в БОПП-пакет</span>
+              <label className={`flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border ${isStickerpack3D ? 'opacity-70' : 'cursor-pointer hover:bg-surface-2'}`}>
+                <input
+                  type="checkbox"
+                  {...register('bopp_bag')}
+                  disabled={isStickerpack3D}
+                  className="w-5 h-5 rounded border-border text-accent focus:ring-accent"
+                />
+                <span className="text-sm">
+                  Упаковка в БОПП-пакет
+                  {isStickerpack3D && <span className="text-text-muted ml-1">(обязательно для 3D-пака)</span>}
+                </span>
               </label>
               <div>
                 <label className="block text-sm font-medium mb-1">Дизайн макета</label>

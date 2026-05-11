@@ -6,7 +6,7 @@
  */
 export async function exportAsPNG(element, filename, { scale = 2 } = {}) {
   const { default: html2canvas } = await import('html2canvas')
-  const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff' })
+  const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff', ignoreElements: (el) => el.classList?.contains('print-hide') })
   const link = document.createElement('a')
   link.download = `${filename}.png`
   link.href = canvas.toDataURL('image/png')
@@ -24,7 +24,7 @@ export async function exportAsPDF(element, filename, { scale = 2, orientation = 
     import('html2canvas'),
     import('jspdf'),
   ])
-  const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff' })
+  const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff', ignoreElements: (el) => el.classList?.contains('print-hide') })
   const imgData = canvas.toDataURL('image/png')
   const pdf = new jsPDF({ orientation, unit: 'mm', format })
   pdf.addImage(imgData, 'PNG', 0, 0, width, height)
@@ -38,7 +38,7 @@ export async function exportAsPDF(element, filename, { scale = 2, orientation = 
  */
 export async function printElement(element, { scale = 3, pageSize = '120mm 75mm', width = '120mm', height = '75mm' } = {}) {
   const { default: html2canvas } = await import('html2canvas')
-  const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff' })
+  const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff', ignoreElements: (el) => el.classList?.contains('print-hide') })
   const imgData = canvas.toDataURL('image/png')
   const printWindow = window.open('', '_blank')
   if (!printWindow) throw new Error('Попап заблокирован')

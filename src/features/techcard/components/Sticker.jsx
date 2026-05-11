@@ -1,25 +1,47 @@
 import { forwardRef } from 'react'
 import kontoraLogo from '@/assets/kontora-logo.png'
+import { formatOrderNumberShort } from '@/shared/lib/utils'
 
-// 120×75mm sticker. At 72dpi: 1mm = 2.833px → 340×213px
+// 120×75 мм. 1 мм = 2.833 px при 72dpi → 340×213 px.
 const MM = 2.833
-const STICKER_W = 120 * MM // ~340px
-const STICKER_H = 75 * MM  // ~213px
+const STICKER_W = 120 * MM
+const STICKER_H = 75 * MM
+
+const LOGO_W = 118 * MM
+const LOGO_H = 16 * MM
+const SIDE_PAD = 1 * MM
+const TOP_PAD = 2 * MM
+const NUMBER_GAP_TOP = 6.5 * MM    // отступ от логотипа до номера
+const NUMBER_FONT_SIZE = 95 // pt — подобрано под высоту 75мм с учётом логотипа сверху
 
 /**
- * Universal sticker — 120×75mm
- * @param {'production'|'delivery'} type
- *   production: first row = "Срок сдачи" / deadline
- *   delivery:   first row = "Производитель" / kontora.su
+ * Универсальная наклейка 120×75 мм.
+ * Структура (по ТЗ):
+ *   1. Логотип Kontora (118 мм по ширине, сверху)
+ *   2. Номер заказа (Modulord, выровнен по левому краю, отступ 6.5 мм от логотипа)
+ *   3. Горизонтальное подчёркивание 120 мм, отступ 3 мм от номера
+ *   4. Правый столбец (Guidy 16pt), выровнен по верху номера:
+ *      - 'production' (на бокс):  Срок сдачи / Заказчик / Тираж
+ *      - 'delivery'   (на выдачу): Производитель: KONTORA.SU / Заказчик / Тираж
  */
 export const Sticker = forwardRef(function Sticker({ order, type = 'production' }, ref) {
   if (!order) return null
 
   const clientName = order.client?.name || '—'
+  const number = formatOrderNumberShort(order)
+  const deadline = order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'
 
-  const firstRow = type === 'delivery'
-    ? { label: 'Производитель', value: 'kontora.su' }
-    : { label: 'Срок сдачи', value: order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—' }
+  const rightCol = type === 'delivery'
+    ? [
+        { label: 'Производитель', value: 'KONTORA.SU' },
+        { label: 'Заказчик', value: clientName },
+        { label: 'Тираж', value: `${order.qty || 0}` },
+      ]
+    : [
+        { label: 'Срок сдачи', value: deadline },
+        { label: 'Заказчик', value: clientName },
+        { label: 'Тираж', value: `${order.qty || 0}` },
+      ]
 
   return (
     <div
@@ -28,58 +50,78 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
         width: STICKER_W,
         height: STICKER_H,
         backgroundColor: '#ffffff',
-        fontFamily: "'Inter', sans-serif",
-        padding: `${3 * MM}px ${2 * MM}px`,
+        fontFamily: "'Guidy', 'Inter', sans-serif",
+        padding: `${TOP_PAD}px ${SIDE_PAD}px`,
         position: 'relative',
         overflow: 'hidden',
-        border: '1px solid #e5e7eb',
+        boxSizing: 'border-box',
+        color: '#000000',
       }}
     >
+      {/* Логотип */}
       <img
         src={kontoraLogo}
         alt="Контора"
-        style={{ width: 118 * MM, height: 'auto', maxHeight: 18 * MM, objectFit: 'contain', objectPosition: 'left' }}
+        style={{
+          width: LOGO_W,
+          maxHeight: LOGO_H,
+          height: 'auto',
+          objectFit: 'contain',
+          objectPosition: 'left',
+          display: 'block',
+        }}
         crossOrigin="anonymous"
       />
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', marginTop: 6.5 * MM, gap: 8 }}>
+      {/* Номер + правый столбец */}
+      <div style={{
+        marginTop: NUMBER_GAP_TOP,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 3 * MM,
+      }}>
         <div style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 72,
-          fontWeight: 400,
-          lineHeight: 0.85,
-          letterSpacing: 2,
+          fontFamily: "'Modulord', 'Onder', sans-serif",
+          fontSize: `${NUMBER_FONT_SIZE}pt`,
+          fontWeight: 700,
+          lineHeight: 0.82,
+          letterSpacing: 0,
           color: '#000000',
           flexShrink: 0,
         }}>
-          {String(order.number).padStart(4, '0')}
+          {number}
         </div>
 
-        <div style={{ fontSize: 11, lineHeight: 1.3, minWidth: 90, paddingTop: 2 }}>
-          <div>
-            <span style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{firstRow.label}</span>
-            <br />
-            <span>{firstRow.value}</span>
-          </div>
-          <div style={{ marginTop: 6 }}>
-            <span style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>Заказчик</span>
-            <br />
-            <span>{clientName}</span>
-          </div>
-          <div style={{ marginTop: 6 }}>
-            <span style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>Тираж</span>
-            <br />
-            <span>{order.qty}</span>
-          </div>
+        <div style={{
+          flex: 1,
+          fontFamily: "'Guidy', 'Inter', sans-serif",
+          fontSize: '11pt',
+          lineHeight: 1.15,
+          paddingTop: 1 * MM,
+        }}>
+          {rightCol.map((row) => (
+            <div key={row.label} style={{ marginBottom: 1.5 * MM }}>
+              <div style={{
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                fontSize: '9pt',
+                letterSpacing: 0.3,
+              }}>
+                {row.label}
+              </div>
+              <div style={{ fontSize: '11pt' }}>{row.value}</div>
+            </div>
+          ))}
         </div>
       </div>
 
+      {/* Подчёркивание 120 мм, отступ 3 мм от номера */}
       <div style={{
         position: 'absolute',
+        left: 0,
         bottom: 4 * MM,
-        left: 2 * MM,
-        width: 116 * MM,
-        height: 2,
+        width: 120 * MM,
+        height: 1.5,
         backgroundColor: '#000000',
       }} />
     </div>

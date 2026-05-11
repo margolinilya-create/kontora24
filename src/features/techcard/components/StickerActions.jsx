@@ -4,6 +4,7 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import { exportAsPNG, exportAsPDF, printElement } from '@/shared/lib/html-export'
+import { orderFileSlug } from '@/shared/lib/utils'
 
 /**
  * Renders a sticker with export buttons (PNG, PDF, Print).
@@ -14,7 +15,7 @@ export function StickerActions({ type, order }) {
   const stickerRef = useRef(null)
   const [exporting, setExporting] = useState(false)
 
-  const filename = `sticker-${type}-${order.number}`
+  const filename = `sticker-${type}-${orderFileSlug(order)}`
 
   async function handlePNG() {
     if (!stickerRef.current) return

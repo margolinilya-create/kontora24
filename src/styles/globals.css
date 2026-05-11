@@ -26,6 +26,20 @@
   font-style: normal;
   font-display: swap;
 }
+/* Modulord — для крупного номера заказа на стикерах (на бокс / на выдачу) */
+@font-face {
+  font-family: 'Modulord';
+  src: url('../assets/fonts/Modulord.otf') format('opentype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Элементы с классом .print-hide исключаются из html2canvas-снимков
+ * (см. shared/lib/html-export.js → ignoreElements) и не показываются при печати. */
+@media print {
+  .print-hide { display: none !important; }
+}
 
 @theme {
   /* Base */

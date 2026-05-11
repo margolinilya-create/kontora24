@@ -6,6 +6,7 @@ import { Sticker } from './Sticker'
 import { exportAsPNG, exportAsPDF, printElement } from '@/shared/lib/html-export'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { orderFileSlug } from '@/shared/lib/utils'
 
 const CONFIG = {
   techcard: {
@@ -35,13 +36,13 @@ const CONFIG = {
  * Universal print preview modal for tech card and stickers.
  * Renders preview at native size (scrollable on mobile) + PNG/PDF/Print actions.
  */
-export function PrintPreviewModal({ isOpen, onClose, type, order }) {
+export function PrintPreviewModal({ isOpen, onClose, type, order, onUpdated }) {
   const ref = useRef(null)
   const [exporting, setExporting] = useState(false)
   const cfg = CONFIG[type]
   if (!cfg || !order) return null
 
-  const filename = `${cfg.filenamePrefix}-${order.number}`
+  const filename = `${cfg.filenamePrefix}-${orderFileSlug(order)}`
 
   async function handlePNG() {
     if (!ref.current) return
@@ -75,7 +76,7 @@ export function PrintPreviewModal({ isOpen, onClose, type, order }) {
       <div className="overflow-auto bg-surface-dim rounded-xl p-3 mb-4">
         <div className="mx-auto" style={{ width: 'fit-content' }}>
           {type === 'techcard'
-            ? <TechCard ref={ref} order={order} />
+            ? <TechCard ref={ref} order={order} editable onUpdated={onUpdated} />
             : <Sticker ref={ref} order={order} type={type} />}
         </div>
       </div>

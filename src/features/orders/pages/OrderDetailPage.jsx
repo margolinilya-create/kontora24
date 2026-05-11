@@ -22,6 +22,7 @@ import {
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
+import { formatOrderNumber } from '@/shared/lib/utils'
 
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
 
@@ -40,28 +41,28 @@ function GearIcon({ className = '' }) {
 
 function EditableOrderNumber({ order, canEdit, onUpdated }) {
   const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(String(order.number))
+  const [value, setValue] = useState(order.custom_number || '')
   const [saving, setSaving] = useState(false)
-  const formatted = `ORD-${String(order.number).padStart(4, '0')}`
+  const formatted = formatOrderNumber(order)
+  const fallback = `ORD-${String(order.number).padStart(4, '0')}`
 
   async function save() {
     if (saving) return
-    const next = parseInt(value, 10)
-    if (isNaN(next) || next <= 0) {
-      toast.error('Номер должен быть положительным числом')
+    const trimmed = value.trim()
+    if (trimmed.length > 64) {
+      toast.error('Максимум 64 символа')
       return
     }
-    if (next === order.number) { setEditing(false); return }
+    const nextCustom = trimmed || null
+    if (nextCustom === (order.custom_number || null)) { setEditing(false); return }
     setSaving(true)
     try {
-      await updateOrder(order.id, { number: next })
-      toast.success(`Номер изменён на #${next}`)
+      await updateOrder(order.id, { custom_number: nextCustom })
+      toast.success(nextCustom ? `Номер изменён на ${nextCustom}` : `Сброшено к ${fallback}`)
       onUpdated?.()
       setEditing(false)
-    } catch (err) {
-      // PG код 23505 = unique_violation; либо ловим по тексту/code
-      const isDuplicate = err?.code === '23505' || /duplicate|unique/i.test(err?.message || '')
-      toast.error(isDuplicate ? 'Заказ с таким номером уже существует' : 'Не удалось изменить номер')
+    } catch {
+      toast.error('Не удалось изменить номер')
     } finally {
       setSaving(false)
     }
@@ -74,28 +75,30 @@ function EditableOrderNumber({ order, canEdit, onUpdated }) {
   }
   if (editing) {
     return (
-      <div className="flex items-center gap-2">
-        <span className="text-4xl sm:text-5xl font-bold font-display tracking-tight leading-none text-text-muted">ORD-</span>
+      <div className="flex items-center gap-2 flex-wrap">
         <input
           autoFocus
-          type="number"
+          type="text"
           value={value}
+          maxLength={64}
+          placeholder={fallback}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') save()
-            if (e.key === 'Escape') { setEditing(false); setValue(String(order.number)) }
+            if (e.key === 'Escape') { setEditing(false); setValue(order.custom_number || '') }
           }}
-          className="w-32 bg-surface-2 rounded px-2 py-1 text-3xl font-bold font-display tracking-tight focus:outline-none focus:ring-2 focus:ring-accent/40"
+          className="min-w-[200px] max-w-md bg-surface-2 rounded px-3 py-1 text-2xl sm:text-3xl font-bold font-display tracking-tight focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
         <button onClick={save} disabled={saving} className="text-xs px-2 py-1 rounded bg-accent text-on-accent font-medium disabled:opacity-50">{saving ? '…' : 'OK'}</button>
-        <button onClick={() => { setEditing(false); setValue(String(order.number)) }} className="text-xs px-2 py-1 text-text-muted hover:text-text">×</button>
+        <button onClick={() => { setEditing(false); setValue(order.custom_number || '') }} className="text-xs px-2 py-1 text-text-muted hover:text-text">×</button>
+        <span className="text-xs text-text-muted">Пустое поле → {fallback}</span>
       </div>
     )
   }
   return (
     <button
       onClick={() => setEditing(true)}
-      title="Изменить номер заказа"
+      title={`Изменить номер заказа (по умолчанию ${fallback})`}
       className="text-4xl sm:text-5xl font-bold font-display tracking-tight leading-none hover:text-accent transition-colors text-left"
     >
       {formatted}
@@ -422,6 +425,7 @@ export default function OrderDetailPage() {
         onClose={() => setPrintType(null)}
         type={printType}
         order={order}
+        onUpdated={refetch}
       />
 
       {/* Edit modal (gear) */}

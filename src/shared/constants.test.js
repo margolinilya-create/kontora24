@@ -33,10 +33,22 @@ describe('IS_3D_STICKERPACK', () => {
 })
 
 describe('getOrderRoute', () => {
-  it('regular order includes lamination when need_lam=true', () => {
-    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: true })
+  it('regular order includes lamination when need_lam=true (bopp_bag=true → packaging)', () => {
+    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: true, bopp_bag: true })
     expect(route).toContain('lamination')
     expect(route).toEqual(['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done'])
+  })
+
+  it('regular order without BOPP skips packaging', () => {
+    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: true, bopp_bag: false })
+    expect(route).not.toContain('packaging')
+    expect(route).toContain('cutting')
+    expect(route).toContain('otk')
+  })
+
+  it('3D stickerpack keeps packaging regardless of bopp_bag', () => {
+    const route = getOrderRoute({ order_type: 'stickerpack3D', bopp_bag: false })
+    expect(route).toContain('packaging')
   })
 
   it('regular order skips lamination when need_lam=false', () => {
@@ -83,8 +95,8 @@ describe('getOrderRoute', () => {
     expect(route).toContain('design')
   })
 
-  it('skips both design and lamination when both flags set', () => {
-    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: false, design_status: 'provided' })
+  it('skips both design and lamination when both flags set (bopp_bag for packaging)', () => {
+    const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: false, design_status: 'provided', bopp_bag: true })
     expect(route).not.toContain('design')
     expect(route).not.toContain('lamination')
     expect(route).toEqual(['new', 'prepress', 'print', 'cutting', 'packaging', 'otk', 'done'])
@@ -151,25 +163,25 @@ describe('isDualTrack', () => {
 })
 
 describe('getNextStatus', () => {
-  it('admin full path — regular order with lamination', () => {
-    const order = { order_type: 'sticker_cut', need_lam: true }
+  it('admin full path — regular order with lamination + BOPP', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true, bopp_bag: true }
     const path = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
     for (let i = 0; i < path.length - 1; i++) {
       expect(getNextStatus('admin', path[i], order)).toBe(path[i + 1])
     }
   })
 
-  it('admin full path — regular order without lamination', () => {
-    const order = { order_type: 'sticker_cut', need_lam: false }
-    const path = ['new', 'design', 'prepress', 'print', 'cutting', 'packaging', 'otk', 'done']
+  it('admin full path — regular order without lamination, without BOPP (skip packaging)', () => {
+    const order = { order_type: 'sticker_cut', need_lam: false, bopp_bag: false }
+    const path = ['new', 'design', 'prepress', 'print', 'cutting', 'otk', 'done']
     for (let i = 0; i < path.length - 1; i++) {
       expect(getNextStatus('admin', path[i], order)).toBe(path[i + 1])
     }
   })
 
-  it('admin full path — 3D sticker', () => {
-    const order = { order_type: 'sticker3D' }
-    const path = ['new', 'design', 'prepress', 'print', 'cutting', 'pouring', 'packaging', 'otk', 'done']
+  it('admin full path — 3D sticker (no BOPP, packaging skipped)', () => {
+    const order = { order_type: 'sticker3D', bopp_bag: false }
+    const path = ['new', 'design', 'prepress', 'print', 'cutting', 'pouring', 'otk', 'done']
     for (let i = 0; i < path.length - 1; i++) {
       expect(getNextStatus('admin', path[i], order)).toBe(path[i + 1])
     }
@@ -195,18 +207,19 @@ describe('getNextStatus', () => {
     expect(getNextStatus('designer', 'cutting', order)).toBeUndefined()
   })
 
-  it('printer can advance prepress through cutting', () => {
-    const order = { order_type: 'sticker_cut', need_lam: true }
+  it('printer can advance prepress through cutting (BOPP keeps packaging)', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true, bopp_bag: true }
     expect(getNextStatus('printer', 'prepress', order)).toBe('print')
     expect(getNextStatus('printer', 'print', order)).toBe('lamination')
     expect(getNextStatus('printer', 'lamination', order)).toBe('cutting')
     expect(getNextStatus('printer', 'cutting', order)).toBe('packaging')
   })
 
-  it('post_printer can advance pouring, selection_pouring, assembly_3d, packaging', () => {
-    const order3d = { order_type: 'sticker3D' }
-    expect(getNextStatus('post_printer', 'pouring', order3d)).toBe('packaging')
+  it('post_printer can advance through pouring → otk for 3D sticker (no BOPP)', () => {
+    const order3d = { order_type: 'sticker3D', bopp_bag: false }
+    expect(getNextStatus('post_printer', 'pouring', order3d)).toBe('otk')
 
+    // stickerpack3D — packaging всегда есть
     const orderPack = { order_type: 'stickerpack3D', need_lam: true }
     expect(getNextStatus('post_printer', 'selection_pouring', orderPack)).toBe('assembly_3d')
     expect(getNextStatus('post_printer', 'assembly_3d', orderPack)).toBe('packaging')
@@ -234,9 +247,8 @@ describe('getNextStatus', () => {
   })
 
   it('returns nearest forward status when current is outside route', () => {
-    // Заказ в pouring, но новый маршрут регулярный (без pouring) →
-    // должны вернуть ближайший статус впереди (packaging — order=9, у pouring order=7).
-    const order = { order_type: 'sticker_cut', need_lam: true, design_status: 'provided' }
+    // Заказ в pouring, но новый маршрут регулярный (без pouring). С BOPP — будет packaging.
+    const order = { order_type: 'sticker_cut', need_lam: true, design_status: 'provided', bopp_bag: true }
     expect(getNextStatus('admin', 'pouring', order)).toBe('packaging')
   })
 

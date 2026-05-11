@@ -44,6 +44,8 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       need_lam: !!order.need_lam,
       lam_type: order.lam_type || 'glossy',
       film_type: order.film_type || 'G',
+      film_type_stickers: order.film_type_stickers || order.film_type || 'G',
+      custom_number: order.custom_number || '',
       design_variants: order.design_variants ?? '',
       deadline: order.deadline ? order.deadline.split('T')[0] : '',
       priority: order.priority || 'normal',
@@ -130,6 +132,10 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         need_lam: form.need_lam,
         lam_type: form.need_lam ? form.lam_type : null,
         film_type: form.film_type || null,
+        film_type_stickers: form.order_type === 'stickerpack3D'
+          ? (form.film_type_stickers || form.film_type || null)
+          : null,
+        custom_number: form.custom_number?.trim() || null,
         design_variants: form.design_variants !== '' ? Number(form.design_variants) : null,
         deadline: form.deadline || null,
         priority: form.priority,
@@ -179,6 +185,14 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   }
 
   const isStickerpack = form.order_type === 'stickerpack' || form.order_type === 'stickerpack3D'
+  const isStickerpack3D = form.order_type === 'stickerpack3D'
+
+  // 3D-стикерпак → BOPP обязателен
+  useEffect(() => {
+    if (isStickerpack3D && !form.bopp_bag) {
+      setForm((prev) => ({ ...prev, bopp_bag: true }))
+    }
+  }, [isStickerpack3D, form.bopp_bag])
 
   return (
     <div className="space-y-6">
@@ -284,13 +298,22 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               ))}
             </select>
           </Field>
-          <Field label="Плёнка">
+          <Field label={isStickerpack3D ? 'Плёнка фонов' : 'Плёнка'}>
             <select value={form.film_type || 'G'} onChange={(e) => update('film_type', e.target.value)} className={SELECT_CLASS}>
               {Object.entries(FILM_TYPES).map(([k, { label }]) => (
                 <option key={k} value={k}>{label}</option>
               ))}
             </select>
           </Field>
+          {isStickerpack3D && (
+            <Field label="Плёнка стикеров">
+              <select value={form.film_type_stickers || form.film_type || 'G'} onChange={(e) => update('film_type_stickers', e.target.value)} className={SELECT_CLASS}>
+                {Object.entries(FILM_TYPES).map(([k, { label }]) => (
+                  <option key={k} value={k}>{label}</option>
+                ))}
+              </select>
+            </Field>
+          )}
           <Field label="Дизайн макета">
             <select value={form.design_status || 'provided'} onChange={(e) => update('design_status', e.target.value)} className={SELECT_CLASS}>
               {Object.entries(DESIGN_STATUSES).map(([k, { label }]) => (
@@ -350,9 +373,15 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
           </Field>
 
           <div className="sm:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            <label className={CHECKBOX_BOX}>
-              <input type="checkbox" checked={!!form.bopp_bag} onChange={(e) => update('bopp_bag', e.target.checked)} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
-              <span className="text-sm">БОПП пакет</span>
+            <label className={CHECKBOX_BOX + (isStickerpack3D ? ' opacity-70 cursor-not-allowed' : '')}>
+              <input
+                type="checkbox"
+                checked={!!form.bopp_bag}
+                disabled={isStickerpack3D}
+                onChange={(e) => update('bopp_bag', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-accent focus:ring-accent"
+              />
+              <span className="text-sm">БОПП пакет{isStickerpack3D ? ' (обязательно)' : ''}</span>
             </label>
             <label className={CHECKBOX_BOX}>
               <input type="checkbox" checked={!!form.is_urgent} onChange={(e) => update('is_urgent', e.target.checked)} className="w-5 h-5 rounded border-border text-danger focus:ring-danger accent-danger" />

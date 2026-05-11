@@ -3,6 +3,7 @@ import { TechCard } from './TechCard'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { exportAsPNG, exportAsPDF } from '@/shared/lib/html-export'
+import { orderFileSlug } from '@/shared/lib/utils'
 
 export function TechCardActions({ order, defaultOpen = false }) {
   const cardRef = useRef(null)
@@ -13,7 +14,7 @@ export function TechCardActions({ order, defaultOpen = false }) {
     if (!cardRef.current) return
     setExporting(true)
     try {
-      await exportAsPNG(cardRef.current, `techcard-${order.number}`, { scale: 2 })
+      await exportAsPNG(cardRef.current, `techcard-${orderFileSlug(order)}`, { scale: 2 })
     } catch (err) {
       toast.error(translateError(err).message)
     } finally {
@@ -25,7 +26,7 @@ export function TechCardActions({ order, defaultOpen = false }) {
     if (!cardRef.current) return
     setExporting(true)
     try {
-      await exportAsPDF(cardRef.current, `techcard-${order.number}`, { scale: 2, orientation: 'p', format: 'a4', width: 210, height: 297 })
+      await exportAsPDF(cardRef.current, `techcard-${orderFileSlug(order)}`, { scale: 2, orientation: 'p', format: 'a4', width: 210, height: 297 })
     } catch (err) {
       toast.error(translateError(err).message)
     } finally {

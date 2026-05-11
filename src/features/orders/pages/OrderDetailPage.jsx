@@ -13,6 +13,7 @@ import { OrderReportsTab } from '../components/OrderReportsTab'
 import { OrderHistoryTab } from '../components/OrderHistoryTab'
 import { FinanceTab } from '../components/FinanceTab'
 import { PrintPreviewModal } from '@/features/techcard/components/PrintPreviewModal'
+import { TechCardPreviewSlot } from '@/features/techcard/components/TechCardPreviewSlot'
 import { Skeleton } from '@/shared/components/Skeleton'
 import Button from '@/shared/components/Button'
 import Modal from '@/shared/components/Modal'
@@ -23,12 +24,6 @@ import {
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { formatOrderNumber } from '@/shared/lib/utils'
-
-const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
-
-function isImageUrl(url) {
-  return typeof url === 'string' && IMAGE_RX.test(url)
-}
 
 function GearIcon({ className = '' }) {
   return (
@@ -228,7 +223,7 @@ function SourceFilesRow({ order, onUpdated, onCopy }) {
   )
 }
 
-function OverviewTab({ order }) {
+function OverviewTab({ order, onUpdated }) {
   const isPack = order.order_type === 'stickerpack' || order.order_type === 'stickerpack3D'
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -259,31 +254,8 @@ function OverviewTab({ order }) {
         )}
       </div>
 
-      {/* Right: preview */}
-      <div className="bg-surface rounded-2xl border border-border shadow-card p-4">
-        <p className="text-xs text-text-muted uppercase mb-2">Превью макета</p>
-        {order.mockup_path && isImageUrl(order.mockup_path) ? (
-          <img
-            src={order.mockup_path}
-            alt="Макет"
-            loading="lazy"
-            className="w-full max-h-[420px] object-contain rounded-xl border border-border bg-surface-dim"
-          />
-        ) : order.mockup_path ? (
-          <a
-            href={order.mockup_path}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-text hover:text-accent underline decoration-text-muted/40 hover:decoration-accent transition-colors break-all"
-          >
-            {order.mockup_path}
-          </a>
-        ) : (
-          <div className="h-[200px] flex items-center justify-center text-text-muted text-sm bg-surface-dim rounded-xl border border-dashed border-border">
-            Нет макета
-          </div>
-        )}
-      </div>
+      {/* Right: preview — drag-and-drop, попадает в тех-карту автоматически */}
+      <TechCardPreviewSlot order={order} onUpdated={onUpdated} />
     </div>
   )
 }
@@ -401,7 +373,7 @@ export default function OrderDetailPage() {
 
       {/* Tab content */}
       <div>
-        {tab === 'overview' && <OverviewTab order={order} />}
+        {tab === 'overview' && <OverviewTab order={order} onUpdated={refetch} />}
         {tab === 'progress' && (
           <OrderProgressTab order={order} history={history} onUpdated={refetch} />
         )}

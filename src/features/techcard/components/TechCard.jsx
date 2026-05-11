@@ -39,9 +39,15 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
   const previewUrl = previewAttachment ? getAttachmentUrl(previewAttachment.file_path) : null
 
   const designVariants = Math.max(1, Math.min(8, Number(order.design_variants) || 1))
-  const stickerCells = Array.from({ length: designVariants })
 
   const lamLabel = order.need_lam ? (order.lam_type === 'matte' ? 'Матовая' : order.lam_type === 'glossy' ? 'Глянцевая' : 'Да') : 'Нет'
+
+  // Автоматически уменьшаем размер шрифта если номер длинный
+  const numberText = formatOrderNumber(order)
+  const numberFontSize = numberText.length <= 8 ? 42
+    : numberText.length <= 12 ? 32
+    : numberText.length <= 16 ? 26
+    : 22
 
   const block3H = PAGE_H - HEADER_H - BLOCK1_H - BLOCK2_H - (5 * MM)
 
@@ -53,12 +59,13 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
         width: PAGE_W,
         height: PAGE_H,
         fontFamily: "'Guidy', 'Inter', sans-serif",
-        fontSize: '12pt',
+        fontSize: 12,
         position: 'relative',
         overflow: 'hidden',
+        boxSizing: 'border-box',
       }}
     >
-      {/* Header — чёрная заливка 210×20 мм впритык к верху, номер шрифтом Onder 34pt */}
+      {/* Header — чёрная заливка 210×20 мм впритык к верху, номер шрифтом Onder */}
       <div style={{
         width: PAGE_W,
         height: HEADER_H,
@@ -66,16 +73,20 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
         display: 'flex',
         alignItems: 'center',
         paddingLeft: 8 * MM,
+        paddingRight: 8 * MM,
+        overflow: 'hidden',
+        boxSizing: 'border-box',
       }}>
         <span style={{
           color: '#ffffff',
           fontFamily: "'Onder', sans-serif",
           fontWeight: 700,
-          fontSize: '34pt',
+          fontSize: numberFontSize,
           lineHeight: 1,
           letterSpacing: 1,
+          whiteSpace: 'nowrap',
         }}>
-          {formatOrderNumber(order)}
+          {numberText}
         </span>
       </div>
 
@@ -83,83 +94,89 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
       <div style={{
         margin: `${2 * MM}px ${MARGIN}px 0`,
         height: BLOCK1_H,
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: '1fr 130px',
         gap: 2 * MM,
-        alignItems: 'stretch',
+        boxSizing: 'border-box',
       }}>
         {/* Левая часть — 3 ряда полей */}
         <div style={{
-          flex: 1,
           border: '1px solid #d1d5db',
           borderRadius: RADIUS,
           padding: `${3 * MM}px ${4 * MM}px`,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
+          display: 'grid',
+          gridTemplateRows: '1fr 1fr 1fr',
+          rowGap: 4,
+          overflow: 'hidden',
+          boxSizing: 'border-box',
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 3 * MM }}>
-            <Field label="Комментарий заказчика" value={order.client_brief || order.notes || '—'} clip />
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 3 * MM, minHeight: 0 }}>
+            <Field label="Комментарий заказчика" value={order.client_brief || order.notes || '—'} />
             <Field label="Заказчик" value={order.client?.name || '—'} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM, minHeight: 0 }}>
             <Field label="Тираж" value={`${order.qty || 0} шт`} />
             <Field label="Формат" value={`${order.width_mm || 0}×${order.height_mm || 0} мм`} />
             <Field label="Кол-во видов" value={order.design_variants || 1} />
             <Field label="Вид сдачи" value={formatOrderType(order.order_type)} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isPack3D ? 'repeat(4, 1fr)' : 'repeat(4, 1fr)', gap: 3 * MM }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM, minHeight: 0 }}>
             {isPack3D ? (
               <>
-                <Field label="Материал фонов" value={getFilmMaterialName(order.film_type)} />
-                <Field label="Материал стикеров" value={getFilmMaterialName(order.film_type_stickers || order.film_type)} />
+                <Field label="Плёнка фонов" value={getFilmMaterialName(order.film_type)} />
+                <Field label="Плёнка стикеров" value={getFilmMaterialName(order.film_type_stickers || order.film_type)} />
+                <Field label="Ламинация" value={lamLabel} />
+                <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
               </>
             ) : (
-              <Field label="Материал" value={getFilmMaterialName(order.film_type)} />
+              <>
+                <Field label="Материал" value={getFilmMaterialName(order.film_type)} />
+                <Field label="Ламинация" value={lamLabel} />
+                <Field label="3D смола" value={is3D ? 'Да' : 'Нет'} />
+                <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
+              </>
             )}
-            <Field label="Ламинация" value={lamLabel} />
-            <Field label="3D смола" value={is3D ? 'Да' : 'Нет'} />
-            <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
           </div>
         </div>
 
         {/* Правая колонка — Срок сдачи */}
         <div style={{
-          width: 50 * MM,
           border: '1px solid #d1d5db',
           borderRadius: RADIUS,
-          padding: `${3 * MM}px ${4 * MM}px`,
+          padding: `${3 * MM}px ${3 * MM}px`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'flex-end',
           textAlign: 'right',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
         }}>
           <div style={{
-            fontSize: '10pt',
+            fontSize: 10,
             color: '#e94560',
             fontWeight: 700,
             textTransform: 'uppercase',
-            letterSpacing: 1,
+            letterSpacing: 0.5,
             fontFamily: "'Onder', sans-serif",
+            lineHeight: 1.1,
           }}>
             Срок сдачи
           </div>
           <div style={{
-            fontSize: '17pt',
+            fontSize: 16,
             fontWeight: 700,
             color: '#e94560',
-            marginTop: 2 * MM,
+            marginTop: 4,
             textDecoration: 'underline',
             fontFamily: "'Onder', sans-serif",
+            lineHeight: 1.1,
+            whiteSpace: 'nowrap',
           }}>
             {deadlineDate ? deadlineDate.toLocaleDateString('ru-RU') : '—'}
           </div>
           {dayOfWeek && (
-            <div style={{
-              fontSize: '10pt',
-              color: '#9ca3af',
-              marginTop: 1.5 * MM,
-            }}>
+            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>
               {dayOfWeek}
             </div>
           )}
@@ -173,24 +190,25 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
         border: '1px solid #d1d5db',
         borderRadius: RADIUS,
         overflow: 'hidden',
+        boxSizing: 'border-box',
       }}>
-        {/* Строка 1: «Напечатано листов стик.» + 8 ячеек */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: `30mm repeat(${isPack3D ? 8 : 8}, 1fr)`,
+          gridTemplateColumns: `${30 * MM}px repeat(8, 1fr)`,
           height: isPack3D ? '50%' : '100%',
           borderBottom: isPack3D ? '1px solid #d1d5db' : 'none',
         }}>
           <div style={{
             backgroundColor: '#f3f4f6',
             padding: `${1.5 * MM}px ${2 * MM}px`,
-            fontSize: '9pt',
+            fontSize: 9,
             fontWeight: 600,
             color: '#374151',
             textTransform: 'uppercase',
             display: 'flex',
             alignItems: 'center',
             borderRight: '1px solid #d1d5db',
+            lineHeight: 1.15,
           }}>
             Напечатано<br/>листов стик.
           </div>
@@ -198,38 +216,32 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
             <div key={i} style={{
               borderRight: i < 7 ? '1px solid #e5e7eb' : 'none',
               position: 'relative',
-              backgroundColor: i < stickerCells.length ? '#ffffff' : '#f9fafb',
+              backgroundColor: i < designVariants ? '#ffffff' : '#f9fafb',
             }}>
-              <span style={{
-                position: 'absolute',
-                top: 2,
-                left: 4,
-                fontSize: '7pt',
-                color: '#9ca3af',
-              }}>
+              <span style={{ position: 'absolute', top: 2, left: 4, fontSize: 7, color: '#9ca3af' }}>
                 {i + 1}
               </span>
             </div>
           ))}
         </div>
-        {/* Строка 2: только для 3D-стикерпака — «Напечатано фонов» + «Выбрано фонов» */}
         {isPack3D && (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '30mm 1fr 30mm 1fr',
+            gridTemplateColumns: `${30 * MM}px 1fr ${30 * MM}px 1fr`,
             height: '50%',
             borderTop: '1px solid #d1d5db',
           }}>
             <div style={{
               backgroundColor: '#f3f4f6',
               padding: `${1.5 * MM}px ${2 * MM}px`,
-              fontSize: '9pt',
+              fontSize: 9,
               fontWeight: 600,
               color: '#374151',
               textTransform: 'uppercase',
               display: 'flex',
               alignItems: 'center',
               borderRight: '1px solid #d1d5db',
+              lineHeight: 1.15,
             }}>
               Напечатано<br/>фонов
             </div>
@@ -237,13 +249,14 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
             <div style={{
               backgroundColor: '#f3f4f6',
               padding: `${1.5 * MM}px ${2 * MM}px`,
-              fontSize: '9pt',
+              fontSize: 9,
               fontWeight: 600,
               color: '#374151',
               textTransform: 'uppercase',
               display: 'flex',
               alignItems: 'center',
               borderRight: '1px solid #d1d5db',
+              lineHeight: 1.15,
             }}>
               Выбрано<br/>фонов
             </div>
@@ -259,6 +272,7 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: 2 * MM,
+        boxSizing: 'border-box',
       }}>
         <PreviewBox
           order={order}
@@ -274,7 +288,7 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
           padding: `${3 * MM}px ${4 * MM}px`,
         }}>
           <div style={{
-            fontSize: '8pt',
+            fontSize: 9,
             color: '#9ca3af',
             fontWeight: 600,
             textTransform: 'uppercase',
@@ -288,25 +302,27 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
   )
 })
 
-function Field({ label, value, clip = false }) {
+function Field({ label, value }) {
   return (
-    <div>
+    <div style={{ minWidth: 0, overflow: 'hidden' }}>
       <div style={{
-        fontSize: '8pt',
+        fontSize: 8,
         color: '#9ca3af',
         fontWeight: 500,
         textTransform: 'uppercase',
         letterSpacing: 0.3,
+        lineHeight: 1.1,
       }}>
         {label}
       </div>
       <div style={{
         fontWeight: 600,
-        fontSize: '12pt',
-        marginTop: 1 * MM,
-        overflow: clip ? 'hidden' : 'visible',
-        textOverflow: clip ? 'ellipsis' : 'clip',
-        whiteSpace: clip ? 'nowrap' : 'normal',
+        fontSize: 11,
+        marginTop: 2,
+        lineHeight: 1.2,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
       }}>
         {value}
       </div>
@@ -315,11 +331,10 @@ function Field({ label, value, clip = false }) {
 }
 
 /**
- * Плашка «Превью макета».
- * Если editable=true и роль admin/manager — рендерим drop-zone (на печать скрывается).
- * Иначе — просто <img> или белое поле (через placeholder).
+ * Плашка «Превью макета» — общий компонент, экспортируется отдельно для
+ * использования на странице заказа (TechCardPreviewBox).
  */
-function PreviewBox({ order, previewUrl, previewAttachment, canEdit, uploadedBy, onUpdated }) {
+export function PreviewBox({ order, previewUrl, previewAttachment, canEdit, uploadedBy, onUpdated, height = null }) {
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -330,9 +345,8 @@ function PreviewBox({ order, previewUrl, previewAttachment, canEdit, uploadedBy,
     if (err) { toast.error(err); return }
     setUploading(true)
     try {
-      // Если уже было превью — удаляем старое (только привязанное к тех-карте)
       if (previewAttachment) {
-        try { await deleteAttachment(previewAttachment) } catch { /* не блокируем загрузку */ }
+        try { await deleteAttachment(previewAttachment) } catch { /* не блокируем */ }
       }
       await uploadAttachment(order.id, file, uploadedBy, { pathPrefix: 'tech-preview' })
       toast.success('Превью обновлено')
@@ -398,10 +412,12 @@ function PreviewBox({ order, previewUrl, previewAttachment, canEdit, uploadedBy,
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: dragOver ? 'rgba(10,132,255,0.05)' : 'transparent',
+        height: height || 'auto',
+        boxSizing: 'border-box',
       }}
     >
       <div style={{
-        fontSize: '8pt',
+        fontSize: 9,
         color: '#9ca3af',
         fontWeight: 600,
         textTransform: 'uppercase',
@@ -412,7 +428,7 @@ function PreviewBox({ order, previewUrl, previewAttachment, canEdit, uploadedBy,
       </div>
 
       {previewUrl ? (
-        <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           <img
             src={previewUrl}
             alt="Превью макета"
@@ -433,7 +449,7 @@ function PreviewBox({ order, previewUrl, previewAttachment, canEdit, uploadedBy,
                 onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
                 disabled={uploading}
                 style={{
-                  fontSize: '9pt',
+                  fontSize: 11,
                   padding: '4px 8px',
                   backgroundColor: 'rgba(255,255,255,0.9)',
                   border: '1px solid #d1d5db',
@@ -449,7 +465,7 @@ function PreviewBox({ order, previewUrl, previewAttachment, canEdit, uploadedBy,
                 onClick={handleDelete}
                 disabled={uploading}
                 style={{
-                  fontSize: '9pt',
+                  fontSize: 11,
                   padding: '4px 8px',
                   backgroundColor: 'rgba(255,255,255,0.9)',
                   border: '1px solid #ef4444',
@@ -475,18 +491,20 @@ function PreviewBox({ order, previewUrl, previewAttachment, canEdit, uploadedBy,
           textAlign: 'center',
         }}>
           {uploading ? (
-            <div style={{ fontSize: '10pt' }}>Загрузка…</div>
+            <div style={{ fontSize: 12 }}>Загрузка…</div>
           ) : (
             <>
-              <div style={{ fontSize: '14pt', marginBottom: 1 * MM }}>📎</div>
-              <div style={{ fontSize: '10pt', fontWeight: 600 }}>Перетащите файл сюда</div>
-              <div style={{ fontSize: '9pt', marginTop: 1 * MM }}>или кликните</div>
-              <div style={{ fontSize: '8pt', marginTop: 2 * MM, opacity: 0.7 }}>JPG / PNG / WEBP · до 2 МБ</div>
+              <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Перетащите файл сюда</div>
+              <div style={{ fontSize: 11, marginTop: 2 }}>или кликните</div>
+              <div style={{ fontSize: 10, marginTop: 6, opacity: 0.7 }}>JPG / PNG / WEBP · до 2 МБ</div>
             </>
           )}
         </div>
       ) : (
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 11 }}>
+          Нет макета
+        </div>
       )}
 
       {canEdit && (

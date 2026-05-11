@@ -95,5 +95,26 @@ export function useUsers() {
     fetchUsers()
   }
 
-  return { users, loading, error, updateUserRole, updateUser, refetch: fetchUsers }
+  async function deleteUser(userId) {
+    const accessToken = await getFreshAccessToken()
+    const res = await fetch('/api/users/delete', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ userId }),
+    })
+    const result = await res.json()
+    if (!res.ok) {
+      const msg = result.detail
+        ? `${result.error} — ${result.detail}`
+        : result.error
+      throw new Error(msg)
+    }
+    toast.success('Пользователь удалён')
+    fetchUsers()
+  }
+
+  return { users, loading, error, updateUserRole, updateUser, deleteUser, refetch: fetchUsers }
 }

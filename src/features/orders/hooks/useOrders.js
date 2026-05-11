@@ -4,6 +4,7 @@ import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageA
 import { safeRpc } from '@/shared/lib/safeRpc'
 import { captureError } from '@/shared/lib/sentry'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
+import { getFreshAccessToken } from '@/shared/lib/auth-token'
 
 /** Этапы, на которых заказ нельзя двигать вперёд без введённых данных. */
 const STAGES_REQUIRING_COMPLETION = new Set([
@@ -407,5 +408,27 @@ export async function updateOrder(orderId, updates) {
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', orderId)
   if (error) throw error
+}
+
+/**
+ * Удалить заказ полностью (только admin).
+ * Идёт через /api/orders/delete — service_role-эндпоинт, который проверяет роль,
+ * чистит файлы вложений и обнуляет integration_log.order_id перед DELETE.
+ */
+export async function deleteOrder(orderId) {
+  const accessToken = await getFreshAccessToken()
+  const res = await fetch('/api/orders/delete', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ orderId }),
+  })
+  const result = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const msg = result.detail ? `${result.error} — ${result.detail}` : result.error || 'Ошибка удаления'
+    throw new Error(msg)
+  }
 }
 

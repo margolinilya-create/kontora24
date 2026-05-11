@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { useOrders } from '../hooks/useOrders'
+import { useOrders, deleteOrder } from '../hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { StatusBadge } from '../components/StatusBadge'
 import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
@@ -13,8 +13,11 @@ import { DateRangeFilter } from '../components/DateRangeFilter'
 import { SavedFilters } from '../components/SavedFilters'
 import SearchInput from '@/shared/components/SearchInput'
 import Tabs from '@/shared/components/Tabs'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
 import { stageDotClass } from '@/shared/lib/department-mapping'
+import { toast } from '@/shared/stores/toast-store'
+import { formatOrderNumber } from '@/shared/lib/utils'
 
 const ACTIVE_STATUSES = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
 const ARCHIVED_STATUSES = ['done', 'cancelled']
@@ -32,6 +35,7 @@ const ORDER_GROUPS = [
 export default function OrdersPage() {
   const { hasRole } = useAuth()
   const isManager = hasRole(['admin', 'manager'])
+  const isAdmin = hasRole(['admin'])
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('deadline')
   const [sortAsc, setSortAsc] = useState(true)
@@ -42,6 +46,8 @@ export default function OrdersPage() {
   const [deadlineFrom, setDeadlineFrom] = useState(null)
   const [deadlineTo, setDeadlineTo] = useState(null)
   const [collapsedGroups, setCollapsedGroups] = useState({})
+  const [deletingOrder, setDeletingOrder] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const toggleGroup = useCallback((id) => {
     setCollapsedGroups((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -76,7 +82,7 @@ export default function OrdersPage() {
       ? [...ACTIVE_STATUSES, ...ARCHIVED_STATUSES]
       : ACTIVE_STATUSES
 
-  const { orders, totalCount, loading, error } = useOrders({
+  const { orders, totalCount, loading, error, refetch } = useOrders({
     statuses: effectiveStatuses,
     search: debouncedSearch,
     sortBy,
@@ -86,6 +92,21 @@ export default function OrdersPage() {
     deadlineFrom,
     deadlineTo,
   })
+
+  async function handleConfirmDelete() {
+    if (!deletingOrder) return
+    setDeleting(true)
+    try {
+      await deleteOrder(deletingOrder.id)
+      toast.success(`Заказ ${formatOrderNumber(deletingOrder)} удалён`)
+      setDeletingOrder(null)
+      refetch()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // Группировка orders по статусу→группе
   const grouped = useMemo(() => {
@@ -206,6 +227,19 @@ export default function OrdersPage() {
 
       {viewMode === 'calendar' && <ProductionCalendar />}
 
+      <ConfirmDialog
+        isOpen={!!deletingOrder}
+        onClose={() => (!deleting ? setDeletingOrder(null) : null)}
+        onConfirm={handleConfirmDelete}
+        title="Удалить заказ?"
+        message={
+          deletingOrder
+            ? `Заказ ${formatOrderNumber(deletingOrder)} «${deletingOrder.client?.name || 'без клиента'}» будет удалён без возможности восстановления. Вместе с ним пропадут история, комментарии, вложения и производственные логи.`
+            : ''
+        }
+        confirmText={deleting ? 'Удаление…' : 'Удалить'}
+      />
+
       {(viewMode === 'list' || viewMode === 'flat') && (
         loading ? (
           <div className="bg-surface rounded-2xl border border-border overflow-hidden">
@@ -230,7 +264,7 @@ export default function OrdersPage() {
             <section className="bg-surface rounded-2xl border border-border shadow-card overflow-hidden">
               {/* Mobile cards */}
               <ul className="sm:hidden divide-y divide-border">
-                {orders.map((o) => <MobileRow key={o.id} order={o} />)}
+                {orders.map((o) => <MobileRow key={o.id} order={o} isAdmin={isAdmin} onDelete={setDeletingOrder} />)}
               </ul>
               {/* Desktop table */}
               <div className="hidden sm:block overflow-x-auto">
@@ -247,7 +281,7 @@ export default function OrdersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((o) => <DesktopRow key={o.id} order={o} />)}
+                    {orders.map((o) => <DesktopRow key={o.id} order={o} isAdmin={isAdmin} onDelete={setDeletingOrder} />)}
                   </tbody>
                 </table>
               </div>
@@ -281,7 +315,7 @@ export default function OrdersPage() {
                     <>
                       {/* Mobile cards */}
                       <ul className="sm:hidden divide-y divide-border">
-                        {group.orders.map((o) => <MobileRow key={o.id} order={o} />)}
+                        {group.orders.map((o) => <MobileRow key={o.id} order={o} isAdmin={isAdmin} onDelete={setDeletingOrder} />)}
                       </ul>
 
                       {/* Desktop table */}
@@ -299,7 +333,7 @@ export default function OrdersPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {group.orders.map((o) => <DesktopRow key={o.id} order={o} />)}
+                            {group.orders.map((o) => <DesktopRow key={o.id} order={o} isAdmin={isAdmin} onDelete={setDeletingOrder} />)}
                           </tbody>
                         </table>
                       </div>
@@ -316,11 +350,11 @@ export default function OrdersPage() {
   )
 }
 
-function MobileRow({ order }) {
+function MobileRow({ order, isAdmin, onDelete }) {
   const dotCls = getDeadlineDotClass(order.deadline)
   const textCls = getDeadlineClasses(order.deadline) || 'text-text-muted'
   return (
-    <li>
+    <li className="relative">
       <Link
         to={`/orders/${order.id}`}
         className="flex flex-col gap-1 px-4 py-3 hover:bg-surface-2 transition-colors active:bg-surface-dim"
@@ -336,7 +370,7 @@ function MobileRow({ order }) {
             )}
           </div>
           {order.deadline && (
-            <span className={`text-xs whitespace-nowrap shrink-0 ${textCls}`}>
+            <span className={`text-xs whitespace-nowrap shrink-0 ${textCls} ${isAdmin ? 'mr-9' : ''}`}>
               {new Date(order.deadline).toLocaleDateString('ru-RU')}
             </span>
           )}
@@ -351,11 +385,22 @@ function MobileRow({ order }) {
           <StatusBadge status={order.status} />
         </div>
       </Link>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(order) }}
+          aria-label={`Удалить заказ #${order.number}`}
+          title="Удалить заказ"
+          className="absolute top-2 right-2 text-text-muted hover:text-danger transition-colors rounded-lg p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/50"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+        </button>
+      )}
     </li>
   )
 }
 
-function DesktopRow({ order }) {
+function DesktopRow({ order, isAdmin, onDelete }) {
   const deadlineLevel = getDeadlineLevel(order.deadline)
   const dotCls = getDeadlineDotClass(order.deadline)
   const borderCls = getDeadlineBorderClass(order.deadline) || 'border-l-transparent'
@@ -392,6 +437,19 @@ function DesktopRow({ order }) {
       <td className={`px-4 py-2.5 whitespace-nowrap text-xs ${textCls} ${deadlineLevel === 'urgent' ? 'font-semibold' : ''}`}>
         {order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'}
       </td>
+      {isAdmin && (
+        <td className="px-2 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => onDelete(order)}
+            aria-label={`Удалить заказ #${order.number}`}
+            title="Удалить заказ"
+            className="text-text-muted hover:text-danger transition-colors rounded-lg p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/50"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+          </button>
+        </td>
+      )}
     </tr>
   )
 }

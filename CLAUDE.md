@@ -26,7 +26,7 @@ CRM — Bitrix24 (интеграция через webhooks, пока не под
 | Деплой | Vercel (auto) |
 | CI/CD | GitHub Actions |
 
-**Supabase project:** `pulzirakjqehsulmjhdj` (eu-west-1) — shared с PinheadOS, таблицы с префиксом `k24_`.
+**Supabase project:** `pulzirakjqehsulmjhdj` (eu-west-1) — dedicated с 2026-05-11 (PinheadOS отделён в `glhwbktsokphgksdvcxj`). Таблицы с префиксом `k24_` (исторически — был период shared, префикс сохраняем).
 
 ## Роли
 
@@ -263,17 +263,13 @@ supabase/
   seed.sql                # Начальные материалы + настройки
 ```
 
-## Supabase — SHARED DATABASE (2 проекта!)
+## Supabase — DEDICATED (с 2026-05-11)
 
-**ВАЖНО:** Supabase проект `pulzirakjqehsulmjhdj` делят 2 приложения. НЕ ТРОГАТЬ чужие таблицы!
+С 2026-05-11 проект `pulzirakjqehsulmjhdj` принадлежит **только Kontora24**. PinheadOS переехал в отдельный проект `glhwbktsokphgksdvcxj` (`pinhead-os-v2`), legacy-таблицы `pinhead_users`, `catalog_config`, `app_config` дропнуты. Префикс `k24_` исторический — оставлен чтобы не переименовывать 17 таблиц и не править весь код; можно одной миграцией снять, если понадобится.
 
-| Проект | Префикс | Таблицы |
-|--------|---------|---------|
-| **Kontora24** | `k24_` | `k24_profiles`, `k24_orders`, `k24_clients`, `k24_materials`, `k24_material_transactions`, `k24_settings`, `k24_order_status_history`, `k24_order_comments`, `k24_order_attachments`, `k24_time_entries` (legacy, не пишется), `k24_production_logs` (с `deleted_at`), `k24_shift_entries`, `k24_integration_log`, `k24_order_audit`, `k24_order_templates`, `k24_pack_designs` (виды стикеров в паке), `k24_user_filters` (личные пресеты фильтров) |
-| **PinheadOS** | нет/`pinhead_` | `pinhead_users`, `catalog_config`, `app_config` |
-| **Общее** | — | `auth.users` (Supabase Auth, разделить нельзя) |
+Таблицы (17): `k24_profiles`, `k24_orders`, `k24_clients`, `k24_materials`, `k24_material_transactions`, `k24_settings`, `k24_order_status_history`, `k24_order_comments`, `k24_order_attachments`, `k24_time_entries` (legacy, не пишется), `k24_production_logs` (с `deleted_at`), `k24_shift_entries`, `k24_integration_log`, `k24_order_audit`, `k24_order_templates`, `k24_pack_designs`, `k24_user_filters`.
 
-**Изоляция auth:** При логине Kontora24 проверяет наличие записи в `k24_profiles`. Если нет — "Нет доступа к Kontora24". Триггер `handle_new_user` создаёт `k24_profiles` только для пользователей с `display_name` в метаданных.
+**Auth:** `auth.users` теперь Kontora24-only (9 человек). Триггер `handle_new_user` создаёт `k24_profiles` для всех новых пользователей.
 
 Storage bucket: `order-files`
 

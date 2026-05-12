@@ -7,12 +7,14 @@ test.describe('Orders page (R6+R7)', () => {
     await page.waitForLoadState('networkidle')
   })
 
-  test('страница имеет 3 view-таба: Список / Канбан / Календарь', async ({ page }) => {
+  test('страница имеет view-табы: По отделам / Канбан / Календарь / Все заказы', async ({ page }) => {
     await page.goto('/orders')
     await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('tab', { name: 'Список' })).toBeVisible({ timeout: 10000 })
+    // R7 (8.05): добавлены табы "По отделам" (вместо "Список") и "Все заказы"
+    await expect(page.getByRole('tab', { name: 'По отделам' })).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole('tab', { name: 'Канбан' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Календарь' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Все заказы' })).toBeVisible()
   })
 
   test('список — таблица с группировкой по отделам', async ({ page }) => {

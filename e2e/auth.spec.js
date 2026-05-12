@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, ensureSidebarOpen, expandSidebarGroup } from './helpers'
+import { login, ensureSidebarOpen, expandSidebarGroup, visibleSidebar } from './helpers'
 
 test.describe('Authentication', () => {
   test('login page shows form', async ({ page }) => {
@@ -39,10 +39,9 @@ test.describe('Authentication', () => {
 
     // Click "Выйти" in sidebar (mobile — открыть burger)
     await ensureSidebarOpen(page)
-    const sidebar = page.locator('aside')
-    await sidebar.getByText('Выйти').click()
+    await visibleSidebar(page).getByRole('button', { name: 'Выйти' }).click()
     // Confirm dialog appears — click red "Выйти" button inside the dialog
-    const dialog = page.locator('[role="dialog"], [class*="modal"], div.fixed')
+    const dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: /выйти/i }).click()
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
   })
@@ -55,13 +54,13 @@ test.describe('Authentication', () => {
 
     // Группы по умолчанию свёрнуты — раскрываем нужные
     await expandSidebarGroup(page, 'Управление')
-    const sidebar = page.locator('aside')
+    const sidebar = visibleSidebar(page)
     await expect(sidebar.getByRole('link', { name: 'Заказы' })).toBeVisible()
     await expect(sidebar.getByRole('link', { name: 'Главная', exact: true })).toBeVisible()
 
     await expandSidebarGroup(page, 'Ресурсы')
     await expect(sidebar.getByRole('link', { name: 'Аналитика' })).toBeVisible()
-    await expect(sidebar.getByText('Выйти')).toBeVisible()
+    await expect(sidebar.getByRole('button', { name: 'Выйти' })).toBeVisible()
   })
 
   test('protected pages return to login with redirect', async ({ page }) => {

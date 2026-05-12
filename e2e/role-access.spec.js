@@ -2,8 +2,10 @@ import { test, expect } from '@playwright/test'
 import { login, ensureSidebarOpen, expandSidebarGroup, emulateRole } from './helpers'
 
 // admin (mib@pnhd.ru) с эмуляцией ролей через RoleSwitcher.
-// По R8: рабочие сразу попадают на /orders (HomeRoute), главная и аналитика
-// скрыты в сайдбаре, /orders открыт всем ролям.
+// Главная (/) для не-менеджеров редиректит на /cabinet (см. HomeRoute в routes.jsx,
+// «по аудиту R5 от 8.05»). В сайдбаре «Главная» и «Аналитика» скрыты у рабочих,
+// «Заказы» доступен всем ролям. Импersonation персистится в sessionStorage —
+// переживает reload, поэтому page.goto() из тестов больше не сбрасывает роль.
 
 test.describe('Role-Based Access Control (R8)', () => {
   test.beforeEach(async ({ page }) => {
@@ -44,12 +46,12 @@ test.describe('Role-Based Access Control (R8)', () => {
     await expect(financeTab).not.toBeVisible()
   })
 
-  test('worker (post_printer) попадает на /orders, не на главную', async ({ page }) => {
+  test('worker (post_printer) при заходе на «/» попадает в кабинет', async ({ page }) => {
     await emulateRole(page, 'Постпечатник')
     await page.goto('/')
-    // HomeRoute редиректит worker на /orders
-    await page.waitForURL(/\/orders$/, { timeout: 10000 })
-    await expect(page).toHaveURL(/\/orders$/)
+    // HomeRoute редиректит не-менеджера на /cabinet (R5 8.05)
+    await page.waitForURL(/\/cabinet$/, { timeout: 10000 })
+    await expect(page).toHaveURL(/\/cabinet$/)
   })
 
   test('worker видит Заказы в сайдбаре, не видит Главную/Аналитику', async ({ page }) => {

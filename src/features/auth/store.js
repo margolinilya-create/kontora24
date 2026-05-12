@@ -95,7 +95,7 @@ export const useAuthStore = create((set, get) => ({
     // Verify this user has a Kontora24 profile
     const { data: profile } = await supabase
       .from('k24_profiles')
-      .select('id')
+      .select('*')
       .eq('id', data.user.id)
       .single()
 
@@ -103,6 +103,12 @@ export const useAuthStore = create((set, get) => ({
       await supabase.auth.signOut()
       throw new Error('Нет доступа к Kontora24')
     }
+
+    // Сразу проставляем store, чтобы LoginForm.navigate('/') не упал в AuthGuard
+    // на user=null: onAuthStateChange может ещё не успеть отстрелять SIGNED_IN
+    // к моменту следующего рендера, и AuthGuard кикнет обратно на /login.
+    set({ user: data.user, profile, loading: false })
+    useRolePermissionsStore.getState().load()
 
     return data
   },

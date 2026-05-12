@@ -39,22 +39,23 @@ export function cn(...classes) {
 }
 
 // Отображаемый номер заказа: custom_number перекрывает числовой.
-// «ORD-0123» по умолчанию, либо произвольный текст из k24_orders.custom_number.
+// Без префиксов и padding — просто число (или произвольный текст из custom_number).
 export function formatOrderNumber(order) {
   const custom = order?.custom_number?.trim?.()
   if (custom) return custom
-  return `ORD-${String(order?.number ?? 0).padStart(4, '0')}`
+  return String(order?.number ?? 0)
 }
 
-// Короткая форма для стикеров (без префикса ORD-).
+// Алиас для совместимости со старым кодом, который вызывал короткую форму
+// для стикеров. Возвращает то же самое, что formatOrderNumber.
 export function formatOrderNumberShort(order) {
-  const custom = order?.custom_number?.trim?.()
-  if (custom) return custom
-  return String(order?.number ?? 0).padStart(4, '0')
+  return formatOrderNumber(order)
 }
 
-// Slug-safe для имён файлов экспорта (PDF/PNG).
+// Slug-safe для имён файлов экспорта (PDF/PNG). Сохраняем ORD- префикс
+// чтобы имена файлов оставались осмысленными (PDF/PNG-экспорт).
 export function orderFileSlug(order) {
-  const raw = formatOrderNumber(order)
+  const custom = order?.custom_number?.trim?.()
+  const raw = custom || `ORD-${String(order?.number ?? 0).padStart(4, '0')}`
   return raw.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
 }

@@ -35,8 +35,13 @@ export function TechCardActions({ order, defaultOpen = false }) {
   }
 
   function handlePrint() {
+    // Гарантируем что preview рендерится, потом даём браузеру дорисовать и зовём print.
     setShowPreview(true)
-    setTimeout(() => window.print(), 100)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try { window.print() } catch { toast.error('Не удалось открыть диалог печати') }
+      })
+    })
   }
 
   return (
@@ -86,9 +91,10 @@ export function TechCardActions({ order, defaultOpen = false }) {
 
       <style>{`
         @media print {
-          body > * { display: none !important; }
-          #tech-card-print { display: block !important; position: fixed; top: 0; left: 0; }
-          #tech-card-print * { display: revert !important; }
+          /* visibility вместо display чтобы layout не ломался и tech-card-print действительно рендерился */
+          body * { visibility: hidden !important; }
+          #tech-card-print, #tech-card-print * { visibility: visible !important; }
+          #tech-card-print { position: fixed !important; top: 0 !important; left: 0 !important; box-shadow: none !important; }
           @page { size: A4; margin: 0; }
         }
       `}</style>

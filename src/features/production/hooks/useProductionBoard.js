@@ -6,6 +6,7 @@ import { ORDER_STATUSES, getOrderRoute, PRIORITIES, isStageAllowed } from '@/sha
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
+import { formatOrderNumber } from '@/shared/lib/utils'
 import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
@@ -114,7 +115,7 @@ export function useProductionBoard({ includeArchived = false } = {}) {
     // (без дизайна / без 3D / без ламинации). Откат разрешён через StatusOverride.
     if (!isStageAllowed(order, targetStatus)) {
       const stageLabel = ORDER_STATUSES[targetStatus]?.label || targetStatus
-      toast.error(`Этап «${stageLabel}» не нужен для заказа #${order.number}`)
+      toast.error(`Этап «${stageLabel}» не нужен для заказа #${formatOrderNumber(order)}`)
       return
     }
 
@@ -157,7 +158,7 @@ export function useProductionBoard({ includeArchived = false } = {}) {
         await updateOrderStatus(orderId, order.status, targetStatus)
       }
 
-      toast.success(`Заказ #${order.number} → ${ORDER_STATUSES[targetStatus]?.label}`)
+      toast.success(`Заказ #${formatOrderNumber(order)} → ${ORDER_STATUSES[targetStatus]?.label}`)
     } catch (err) {
       toast.error(translateError(err).message)
     } finally {

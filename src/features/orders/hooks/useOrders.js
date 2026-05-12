@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageAllowed, canAdvanceFrom } from '@/shared/constants'
 import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
-import { safeRpc } from '@/shared/lib/safeRpc'
+// safeRpc убран вместе с auto_deduct_materials (12.05)
 import { captureError } from '@/shared/lib/sentry'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { getFreshAccessToken } from '@/shared/lib/auth-token'
@@ -297,14 +297,10 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   })
   if (historyError) throw historyError
 
-  // Auto-deduct ink on print stage (12 мл/м², миграция 022; идемпотентно — 024).
+  // Авто-расход краски отключён 12.05 по запросу менеджера.
   // Плёнка/ламинация/смола списываются триггером deduct_materials_from_log
   // по фактическим цифрам из k24_production_logs (миграции 021 + 025).
-  if (toStatus === 'print') {
-    await safeRpc('auto_deduct_materials',
-      { p_order_id: orderId, p_changed_by: user.id },
-      { source: 'updateOrderStatus.deduct', extra: { orderId, fromStatus, toStatus } })
-  }
+  // Краска теперь учитывается только вручную через инвентаризацию.
 
   // Notify Bitrix24 about status change (non-blocking with retry)
   try {

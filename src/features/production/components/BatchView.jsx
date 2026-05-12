@@ -1,4 +1,5 @@
 import { ORDER_TYPES } from '@/shared/constants'
+import { formatOrderNumber } from '@/shared/lib/utils'
 import { Link } from 'react-router-dom'
 
 export function BatchView({ orders }) {
@@ -50,7 +51,7 @@ export function BatchView({ orders }) {
               <div key={order.id} className="flex items-center justify-between py-2 px-3 bg-surface-dim rounded-lg text-sm">
                 <div className="flex items-center gap-3">
                   <Link to={`/orders/${order.id}`} className="font-semibold text-accent hover:underline">
-                    #{order.number}
+                    #{formatOrderNumber(order)}
                   </Link>
                   <span className="text-text-muted">{order.qty} шт</span>
                   {order.client?.name && <span className="text-text-muted">· {order.client.name}</span>}

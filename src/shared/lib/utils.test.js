@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatDate, formatDateTime, formatPrice, formatNumber, cn } from './utils'
+import { formatDate, formatDateTime, formatPrice, formatNumber, cn, formatOrderNumber, formatOrderNumberShort, orderFileSlug } from './utils'
 
 describe('formatDate', () => {
   it('formats a valid date string', () => {
@@ -117,5 +117,52 @@ describe('cn', () => {
     const isActive = true
     const isHidden = false
     expect(cn('base', isActive && 'active', isHidden && 'hidden')).toBe('base active')
+  })
+})
+
+describe('formatOrderNumber', () => {
+  it('returns just number without prefix (no ORD-)', () => {
+    expect(formatOrderNumber({ number: 307 })).toBe('307')
+  })
+
+  it('returns custom_number when set', () => {
+    expect(formatOrderNumber({ number: 1, custom_number: 'Тест-42' })).toBe('Тест-42')
+  })
+
+  it('ignores empty custom_number', () => {
+    expect(formatOrderNumber({ number: 5, custom_number: '   ' })).toBe('5')
+    expect(formatOrderNumber({ number: 5, custom_number: '' })).toBe('5')
+  })
+
+  it('handles null/undefined order safely', () => {
+    expect(formatOrderNumber(null)).toBe('0')
+    expect(formatOrderNumber(undefined)).toBe('0')
+    expect(formatOrderNumber({})).toBe('0')
+  })
+
+  it('does not pad with leading zeros', () => {
+    expect(formatOrderNumber({ number: 1 })).toBe('1')
+    expect(formatOrderNumber({ number: 42 })).toBe('42')
+  })
+})
+
+describe('formatOrderNumberShort', () => {
+  it('is an alias of formatOrderNumber', () => {
+    expect(formatOrderNumberShort({ number: 307 })).toBe('307')
+    expect(formatOrderNumberShort({ number: 1, custom_number: 'X' })).toBe('X')
+  })
+})
+
+describe('orderFileSlug', () => {
+  it('keeps ORD- prefix for file names (slug нужен осмысленный)', () => {
+    expect(orderFileSlug({ number: 7 })).toBe('ORD-0007')
+  })
+
+  it('sanitizes custom_number for file system', () => {
+    expect(orderFileSlug({ number: 1, custom_number: 'Заказ #42!' })).toMatch(/^[-A-Za-z0-9_]+$/)
+  })
+
+  it('strips trailing dashes', () => {
+    expect(orderFileSlug({ number: 1, custom_number: '---test---' })).toBe('test')
   })
 })

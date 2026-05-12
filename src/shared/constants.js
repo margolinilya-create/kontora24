@@ -364,7 +364,7 @@ export const MATERIAL_TYPES = {
   film: { label: 'Плёнка', unit: 'm2' },
   ink: { label: 'Краска', unit: 'ml' },
   lam_film: { label: 'Ламинация', unit: 'm2' },
-  resin: { label: 'Смола / химия', unit: 'g' },
+  resin: { label: 'Смола (с отвердителем)', unit: 'g' },
   packaging_bag: { label: 'Упаковочный пакет', unit: 'шт' },
   box: { label: 'Коробка', unit: 'шт' },
   utensils: { label: 'Утварь', unit: 'шт' },
@@ -436,10 +436,22 @@ export const WORKER_RATES = {
 
 /**
  * Подсчитать заработок работника из массива production logs.
- * Возвращает разбивку по операциям и общую сумму.
+ *
+ * @param {Array} logs — записи k24_production_logs (могут содержать связанный order через order_id/order)
+ * @param {object} [opts]
+ * @param {object} [opts.ordersById] — карта { [order_id]: order } чтобы достать stickers_per_pack
+ * @returns {{ breakdown: object, total: number }}
+ *
+ * Формула сборки 3D обновлена 12.05: packs_assembled × stickers_per_pack × 0,5 ₽
+ * (раньше была фиксированная ставка за пак).
  */
-export function calculateWorkerPayout(logs) {
-  let pouring = 0, selection = 0, assembly = 0, packaging = 0
+export function calculateWorkerPayout(logs, opts = {}) {
+  let pouring = 0, selection = 0, packaging = 0
+  // Сборку считаем в «стикерах в собранных паках», чтобы умножить на ставку 0.5 ₽/стикер.
+  let assemblyStickers = 0
+  // Для отчётности храним и кол-во паков
+  let assemblyPacks = 0
+
   for (const l of logs || []) {
     if (l.stage === 'pouring') {
       pouring += Number(l.stickers_good) || 0
@@ -449,17 +461,21 @@ export function calculateWorkerPayout(logs) {
       pouring += Number(l.stickers_good) || 0
     }
     if (l.stage === 'assembly_3d') {
-      assembly += Number(l.packs_assembled) || 0
+      const packs = Number(l.packs_assembled) || 0
+      assemblyPacks += packs
+      const order = opts.ordersById?.[l.order_id] || l.order || null
+      const perPack = Number(order?.stickers_per_pack) || 1
+      assemblyStickers += packs * perPack
     }
     if (l.stage === 'packaging') {
       packaging += Number(l.packs_packaged) || 0
     }
   }
   const breakdown = {
-    pouring:    { count: pouring,   rate: WORKER_RATES.pouring_per_sticker, amount: pouring   * WORKER_RATES.pouring_per_sticker, label: 'Заливка стикеров' },
-    selection:  { count: selection, rate: WORKER_RATES.selection_per_bg,    amount: selection * WORKER_RATES.selection_per_bg,    label: 'Выборка фонов' },
-    assembly:   { count: assembly,  rate: WORKER_RATES.assembly_per_pack,   amount: assembly  * WORKER_RATES.assembly_per_pack,   label: 'Сборка паков' },
-    packaging:  { count: packaging, rate: WORKER_RATES.packaging_per_pack,  amount: packaging * WORKER_RATES.packaging_per_pack,  label: 'Упаковка паков' },
+    pouring:    { count: pouring,          rate: WORKER_RATES.pouring_per_sticker, amount: pouring          * WORKER_RATES.pouring_per_sticker, label: 'Заливка стикеров' },
+    selection:  { count: selection,        rate: WORKER_RATES.selection_per_bg,    amount: selection        * WORKER_RATES.selection_per_bg,    label: 'Выборка фонов' },
+    assembly:   { count: assemblyStickers, rate: WORKER_RATES.assembly_per_pack,   amount: assemblyStickers * WORKER_RATES.assembly_per_pack,   label: 'Сборка 3D-паков', packs: assemblyPacks },
+    packaging:  { count: packaging,        rate: WORKER_RATES.packaging_per_pack,  amount: packaging        * WORKER_RATES.packaging_per_pack,  label: 'Упаковка паков' },
   }
   const total = breakdown.pouring.amount + breakdown.selection.amount + breakdown.assembly.amount + breakdown.packaging.amount
   return { breakdown, total }

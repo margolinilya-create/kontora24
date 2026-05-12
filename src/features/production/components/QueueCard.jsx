@@ -4,7 +4,7 @@ import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { StageProgressBar } from './logs/StageProgressBar'
 import { useProductionLogs } from '../hooks/useProductionLogs'
 import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
-import { formatDate } from '@/shared/lib/utils'
+import { formatDate, formatOrderNumber } from '@/shared/lib/utils'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
 
 const PRIORITY_BORDER = {
@@ -31,7 +31,7 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
       {/* Header: #number · client | priority */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-base font-semibold text-text shrink-0">#{order.number}</span>
+          <span className="text-base font-semibold text-text shrink-0">#{formatOrderNumber(order)}</span>
           {order.client?.name && (
             <>
               <span className="text-text-muted">·</span>

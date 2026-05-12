@@ -78,7 +78,8 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const route = getOrderRoute(order)
 
-  const showPackDesigns = isPack3D && (stage === 'print' || stage === 'pouring' || stage === 'selection_pouring')
+  const showPackDesigns = isPack3D && ['print', 'cutting', 'pouring', 'selection_pouring'].includes(stage)
+  const packMode = stage === 'print' ? 'print' : stage === 'cutting' ? 'cutting' : 'pouring'
   const { designs, addProgress, updateName } = usePackDesigns(showPackDesigns ? order.id : null)
 
   async function handleSubmit(s, data) {
@@ -121,7 +122,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
       {showPackDesigns && designs.length > 0 ? (
         <div className="mb-4">
           <p className="text-xs text-text-muted mb-2">По каждому виду стикеров — отдельно</p>
-          <PackDesignsForm designs={designs} addProgress={addProgress} updateName={updateName} />
+          <PackDesignsForm designs={designs} addProgress={addProgress} updateName={updateName} mode={packMode} />
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-xs text-text-muted mb-2">Общий лог этапа</p>
             <ProductionLogForm stage={stage} order={order} progress={progressProp} incoming={incomingProp} onSubmit={handleSubmit} />

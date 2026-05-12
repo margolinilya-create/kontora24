@@ -21,7 +21,7 @@ export const STAGE_FIELDS = {
         label: 'Стикеры',
         accent: 'bg-dept-pouring/10 border-dept-pouring/30',
         fields: [
-          { key: 'stickers_printed', label: 'Стикеров напечатано', unit: 'шт' },
+          { key: 'stickers_printed', label: 'Напечатано', unit: 'шт' },
           { key: 'film_meters', label: 'Плёнка стикеров', unit: 'м', step: '0.1', filmFrom: 'stickers' },
         ],
       },
@@ -30,13 +30,13 @@ export const STAGE_FIELDS = {
         label: 'Фоны',
         accent: 'bg-dept-print/10 border-dept-print/30',
         fields: [
-          { key: 'backgrounds_printed', label: 'Фонов напечатано', unit: 'шт' },
+          { key: 'backgrounds_printed', label: 'Напечатано фонов', unit: 'шт' },
           { key: 'film_meters', label: 'Плёнка фонов', unit: 'м', step: '0.1', filmFrom: 'backgrounds' },
         ],
       },
     ],
     fields: [
-      { key: 'stickers_printed', label: 'Стикеров напечатано', unit: 'шт' },
+      { key: 'stickers_printed', label: 'Напечатано', unit: 'шт' },
       { key: 'film_meters', label: 'Плёнка', unit: 'м', step: '0.1', filmFrom: 'backgrounds' },
     ],
   },
@@ -45,11 +45,11 @@ export const STAGE_FIELDS = {
     label: 'Ламинация',
     quantityField: 'lamination_qty',
     enforceTargetLimit: true,
-    // По ТЗ: «Заламинировано (шт)» слева + «Брак (шт)» справа + «Ламинация (м)» как расход.
+    // «Заламинировано (шт)» + «Брак (шт)» + «Ламинация (м)» с авто-лейблом плёнки заказа.
     fields: [
       { key: 'lamination_qty', label: 'Заламинировано', unit: 'шт' },
       { key: 'defects', label: 'Брак', unit: 'шт' },
-      { key: 'lamination_meters', label: 'Ламинация (расход)', unit: 'м', step: '0.1' },
+      { key: 'lamination_meters', label: 'Ламинация (расход)', unit: 'м', step: '0.1', appendFilm: 'backgrounds' },
     ],
   },
 
@@ -216,8 +216,11 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
     if (!prevQtyField) continue
     let stageLogs = logs.filter((l) => l.stage === prev)
     if (track) stageLogs = stageLogs.filter((l) => !l.track || l.track === track)
-    const total = stageLogs.reduce((sum, l) => sum + (Number(l[prevQtyField]) || 0), 0)
-    if (total > 0) return { total, source: prev }
+    const produced = stageLogs.reduce((sum, l) => sum + (Number(l[prevQtyField]) || 0), 0)
+    // Из «поступило» вычитаем брак на предыдущем этапе — нельзя пустить дальше больше чем годных.
+    const prevDefects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
+    const total = Math.max(0, produced - prevDefects)
+    if (produced > 0) return { total, source: prev, produced, defects: prevDefects }
   }
   return { total: targetQty, source: null }
 }
@@ -258,14 +261,16 @@ export function validateLogEntry(stage, data, options = {}) {
     }
   }
 
-  // Лимит по приходу с предыдущего этапа (по ТЗ — нельзя ввести больше чем поступило)
+  // Лимит по приходу с предыдущего этапа: «нельзя продвинуть дальше больше, чем поступило годных».
+  // incoming.total — это уже годные с прошлого этапа (произведено − брак прошлого этапа).
   if (options.incoming && config.quantityField && !options.allowOvershoot) {
     const incoming = Number(data[config.quantityField] || 0)
     const defects = Number(data.defects || 0)
-    const incomingPlusDefects = incoming + defects
-    const remaining = Math.max(0, options.incoming.total - options.progress?.total || 0)
-    if (incomingPlusDefects > options.incoming.total - (options.progress?.total || 0)) {
-      return `На этап поступило ${options.incoming.total} шт. Осталось: ${remaining}`
+    const newDelta = incoming + defects
+    const alreadyConsumed = Number(options.progress?.total || 0)
+    const available = Math.max(0, Number(options.incoming.total || 0) - alreadyConsumed)
+    if (newDelta > available) {
+      return `На этап поступило ${options.incoming.total} шт. Доступно ещё: ${available}`
     }
   }
 

@@ -40,7 +40,7 @@ function EditableOrderNumber({ order, canEdit, onUpdated }) {
   const [value, setValue] = useState(order.custom_number || '')
   const [saving, setSaving] = useState(false)
   const formatted = formatOrderNumber(order)
-  const fallback = `ORD-${String(order.number).padStart(4, '0')}`
+  const fallback = String(order.number)
 
   async function save() {
     if (saving) return

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { captureError } from '@/shared/lib/sentry'
+import { formatOrderNumber } from '@/shared/lib/utils'
 
 export function useDeadlineAlerts() {
   const hasChecked = useRef(false)
@@ -18,7 +19,7 @@ export function useDeadlineAlerts() {
 
         const { data } = await supabase
           .from('k24_orders')
-          .select('number, deadline, status')
+          .select('number, custom_number, deadline, status')
           .lte('deadline', tomorrow.toISOString().split('T')[0])
           .not('status', 'in', '("done","cancelled")')
           .order('deadline')
@@ -40,10 +41,10 @@ export function useDeadlineAlerts() {
         const upcoming = urgent.filter((o) => new Date(o.deadline) >= new Date())
 
         if (overdue.length > 0) {
-          toast.error(`Просрочено: ${overdue.map((o) => `#${o.number}`).join(', ')}`)
+          toast.error(`Просрочено: ${overdue.map((o) => `#${formatOrderNumber(o)}`).join(', ')}`)
         }
         if (upcoming.length > 0) {
-          toast.info(`Дедлайн сегодня/завтра: ${upcoming.map((o) => `#${o.number}`).join(', ')}`)
+          toast.info(`Дедлайн сегодня/завтра: ${upcoming.map((o) => `#${formatOrderNumber(o)}`).join(', ')}`)
         }
 
         // Mark as shown today

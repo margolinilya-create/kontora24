@@ -363,7 +363,7 @@ function MobileRow({ order, isAdmin, onDelete }) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             {dotCls && <span className={`w-2 h-2 rounded-full shrink-0 ${dotCls}`} aria-hidden="true" />}
-            <span className="font-semibold text-text">#{order.number}</span>
+            <span className="font-semibold text-text">#{formatOrderNumber(order)}</span>
             {order.priority && order.priority !== 'normal' && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${PRIORITIES[order.priority]?.color}`}>
                 {PRIORITIES[order.priority]?.label}
@@ -390,7 +390,7 @@ function MobileRow({ order, isAdmin, onDelete }) {
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(order) }}
-          aria-label={`Удалить заказ #${order.number}`}
+          aria-label={`Удалить заказ #${formatOrderNumber(order)}`}
           title="Удалить заказ"
           className="absolute top-2 right-2 text-text-muted hover:text-danger transition-colors rounded-lg p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/50"
         >
@@ -419,7 +419,7 @@ function DesktopRow({ order, isAdmin, onDelete }) {
             onClick={(e) => e.stopPropagation()}
             className="font-medium text-text hover:text-accent transition-colors"
           >
-            #{order.number}
+            #{formatOrderNumber(order)}
           </Link>
           {order.priority && order.priority !== 'normal' && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${PRIORITIES[order.priority]?.color}`}>
@@ -443,7 +443,7 @@ function DesktopRow({ order, isAdmin, onDelete }) {
           <button
             type="button"
             onClick={() => onDelete(order)}
-            aria-label={`Удалить заказ #${order.number}`}
+            aria-label={`Удалить заказ #${formatOrderNumber(order)}`}
             title="Удалить заказ"
             className="text-text-muted hover:text-danger transition-colors rounded-lg p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/50"
           >

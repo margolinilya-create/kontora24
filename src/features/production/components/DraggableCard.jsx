@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { OperationChecklist } from './OperationChecklist'
 import { ORDER_TYPES, PRIORITIES, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
+import { formatOrderNumber } from '@/shared/lib/utils'
 import { supabase } from '@/shared/lib/supabase'
 
 const PRIORITY_BORDER = {
@@ -40,7 +41,7 @@ const CardContent = memo(function CardContent({ order, isOverlay = false }) {
       {/* Header: number (left) + deadline (right top corner per ТЗ R6.2) */}
       <div className="flex items-start justify-between gap-2">
         {isOverlay ? (
-          <span className="font-bold text-text">#{order.number}</span>
+          <span className="font-bold text-text">#{formatOrderNumber(order)}</span>
         ) : (
           <Link
             to={`/orders/${order.id}`}
@@ -48,7 +49,7 @@ const CardContent = memo(function CardContent({ order, isOverlay = false }) {
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            #{order.number}
+            #{formatOrderNumber(order)}
           </Link>
         )}
         {order.deadline && (
@@ -71,15 +72,16 @@ const CardContent = memo(function CardContent({ order, isOverlay = false }) {
         <p className="text-xs text-text-muted mt-0.5">
           {order.width_mm} x {order.height_mm} мм · {order.qty} шт
         </p>
+        {/* Заказчик виден всегда — нужен и работникам цеха */}
+        {order.client?.name && (
+          <p className="text-xs text-text-muted mt-0.5 truncate">{order.client.name}</p>
+        )}
       </div>
 
-      {/* Secondary details — always visible on desktop, expandable on mobile */}
+      {/* Secondary details — превью только на desktop, или после expand на mobile */}
       {!isOverlay && (
         <div className={`flex flex-col gap-2.5 ${expanded ? '' : 'hidden sm:flex'}`}>
           <AttachmentThumbnail attachments={order.attachments} />
-          {order.client?.name && (
-            <p className="text-xs text-text-muted truncate">{order.client.name}</p>
-          )}
         </div>
       )}
       {!isOverlay && !expanded && (

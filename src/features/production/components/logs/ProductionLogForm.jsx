@@ -59,12 +59,19 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit }
   function clearAll() { setForms({}) }
 
   function fieldLabel(field, _trackKey) {
+    function resolveFilmLabel(source) {
+      const filmType = source === 'stickers'
+        ? (order?.film_type_stickers || order?.film_type)
+        : order?.film_type
+      return FILM_TYPES[filmType]?.label || filmType || ''
+    }
     if (field.filmFrom && order) {
-      const filmType = field.filmFrom === 'stickers'
-        ? (order.film_type_stickers || order.film_type)
-        : order.film_type
-      const filmLabel = FILM_TYPES[filmType]?.label || filmType || ''
+      const filmLabel = resolveFilmLabel(field.filmFrom)
       return filmLabel ? `Плёнка ${filmLabel}` : field.label
+    }
+    if (field.appendFilm && order) {
+      const filmLabel = resolveFilmLabel(field.appendFilm)
+      return filmLabel ? `${field.label} · ${filmLabel}` : field.label
     }
     return field.label
   }

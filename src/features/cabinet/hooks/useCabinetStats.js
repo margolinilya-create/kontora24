@@ -16,7 +16,7 @@ export function useCabinetStats(period = '30') {
   const { profile } = useAuth()
   const [stats, setStats] = useState({
     byAction: [], byOrder: [], totalItems: 0, totalHours: 0,
-    headline: { poured: 0, selected: 0, packaged: 0, printed: 0, defects: 0 },
+    headline: { poured: 0, selected: 0, packaged: 0, assembled: 0, printed: 0, defects: 0 },
     byMonth: [],
   })
   const [loading, setLoading] = useState(true)
@@ -36,7 +36,7 @@ export function useCabinetStats(period = '30') {
       const [logsRes, shiftsRes, monthlyRes] = await Promise.all([
         supabase
           .from('k24_production_logs')
-          .select('*, order:k24_orders!order_id(number, order_type, qty)')
+          .select('*, order:k24_orders!order_id(number, custom_number, order_type, qty, stickers_per_pack)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', since)
@@ -50,7 +50,7 @@ export function useCabinetStats(period = '30') {
           .order('started_at', { ascending: false }),
         supabase
           .from('k24_production_logs')
-          .select('stage, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, defects, created_at')
+          .select('stage, order_id, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, defects, created_at, order:k24_orders!order_id(stickers_per_pack)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', sixMonthsAgo),
@@ -77,13 +77,16 @@ export function useCabinetStats(period = '30') {
       })
 
       // Headline counters (за выбранный период)
-      const headline = { poured: 0, selected: 0, packaged: 0, printed: 0, defects: 0 }
+      const headline = { poured: 0, selected: 0, packaged: 0, assembled: 0, printed: 0, defects: 0 }
       logs.forEach((l) => {
         if (l.stage === 'pouring' || l.stage === 'selection_pouring') {
           headline.poured += Number(l.stickers_good) || 0
         }
         if (l.stage === 'selection_pouring') {
           headline.selected += Number(l.qty_selected) || 0
+        }
+        if (l.stage === 'assembly_3d') {
+          headline.assembled += Number(l.packs_assembled) || 0
         }
         if (l.stage === 'packaging') {
           headline.packaged += Number(l.packs_packaged) || 0
@@ -113,21 +116,58 @@ export function useCabinetStats(period = '30') {
         orderMap[key].totalEntries += 1
       })
 
-      // By month — для графика (6 месяцев)
+      // By month — для графика (6 месяцев). Каждая метрика отдельной кривой.
       const monthBuckets = new Map()
+      const orderIdsByMonth = {}
       for (let i = 5; i >= 0; i--) {
         const d = subMonths(new Date(), i)
         const key = format(d, 'yyyy-MM')
-        monthBuckets.set(key, { key, label: format(d, 'LLL', { locale: ru }), produced: 0, defects: 0 })
+        monthBuckets.set(key, {
+          key,
+          label: format(d, 'LLL', { locale: ru }),
+          orders: 0,         // обработано заказов (unique order_ids)
+          poured: 0,         // залито стикеров
+          selected: 0,       // выбрано фонов
+          assembled: 0,      // собрано паков
+          packaged: 0,       // упаковано
+          earnings: 0,       // ₽ за месяц по сдельной формуле
+        })
+        orderIdsByMonth[key] = new Set()
       }
       monthly.forEach((l) => {
         const key = format(new Date(l.created_at), 'yyyy-MM')
         const b = monthBuckets.get(key)
         if (!b) return
-        const produced = (Number(l.stickers_good) || 0) + (Number(l.packs_packaged) || 0) + (Number(l.qty_cut) || 0) + (Number(l.qty_selected) || 0) + (Number(l.packs_assembled) || 0)
-        b.produced += produced
-        b.defects += Number(l.defects) || 0
+        if (l.order_id) orderIdsByMonth[key].add(l.order_id)
+        if (l.stage === 'pouring' || l.stage === 'selection_pouring') {
+          b.poured += Number(l.stickers_good) || 0
+        }
+        if (l.stage === 'selection_pouring') {
+          b.selected += Number(l.qty_selected) || 0
+        }
+        if (l.stage === 'assembly_3d') {
+          b.assembled += Number(l.packs_assembled) || 0
+        }
+        if (l.stage === 'packaging') {
+          b.packaged += Number(l.packs_packaged) || 0
+        }
       })
+      // Заработок: применяем calculateWorkerPayout на логи каждого месяца
+      const monthlyByKey = monthly.reduce((acc, l) => {
+        const key = format(new Date(l.created_at), 'yyyy-MM')
+        if (!acc[key]) acc[key] = []
+        acc[key].push(l)
+        return acc
+      }, {})
+      for (const [key, monthLogs] of Object.entries(monthlyByKey)) {
+        const b = monthBuckets.get(key)
+        if (!b) continue
+        b.earnings = calculateWorkerPayout(monthLogs).total
+      }
+      for (const [key, ids] of Object.entries(orderIdsByMonth)) {
+        const b = monthBuckets.get(key)
+        if (b) b.orders = ids.size
+      }
 
       const totalHours = shifts.reduce((sum, s) => sum + (s.duration_minutes || 0), 0) / 60
 

@@ -7,6 +7,7 @@ import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
+import { formatOrderNumber } from '@/shared/lib/utils'
 
 const CompleteTaskModal = lazy(() => import('@/features/production/components/CompleteTaskModal').then(m => ({ default: m.CompleteTaskModal })))
 import Button from '@/shared/components/Button'
@@ -25,7 +26,7 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, onUpdated }) {
   return (
     <div className="bg-surface rounded-2xl border border-border shadow-card p-5 mb-3">
       <div className="flex items-center justify-between mb-3">
-        <Link to={`/orders/${order.id}`} className="text-base font-bold text-text hover:text-accent transition-colors">#{order.number}</Link>
+        <Link to={`/orders/${order.id}`} className="text-base font-bold text-text hover:text-accent transition-colors">#{formatOrderNumber(order)}</Link>
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={() => setShowComplete(true)}>Готово</Button>
           <Suspense fallback={null}><CompleteTaskModal order={order} isOpen={showComplete} onClose={() => setShowComplete(false)} onCompleted={onUpdated} /></Suspense>
@@ -390,7 +391,7 @@ export default function DashboardPage() {
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             {dotClass && <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} aria-hidden="true" />}
-                            <span className="font-semibold text-sm text-text shrink-0">#{order.number}</span>
+                            <span className="font-semibold text-sm text-text shrink-0">#{formatOrderNumber(order)}</span>
                             <span className="text-sm text-text-muted truncate">{order.client?.name || ''}</span>
                           </div>
                           <StatusBadge status={order.status} />

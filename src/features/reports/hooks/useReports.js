@@ -105,7 +105,7 @@ export function useBonusReport(period = '30') {
     try {
       const [logsRes, ratesRes] = await Promise.all([
         supabase.from('k24_production_logs')
-          .select('worker_id, stage, stickers_printed, stickers_good, packs_assembled, packs_packaged, packs_selected, worker:k24_profiles!worker_id(display_name)')
+          .select('worker_id, stage, order_id, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack)')
           .gte('created_at', getSince(period)).limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
@@ -114,19 +114,23 @@ export function useBonusReport(period = '30') {
       if (ratesRes.error && ratesRes.error.code !== 'PGRST116') throw ratesRes.error
 
       const rates = ratesRes.data?.value || {
-        print: 0.5, pouring: 1, assembly_3d: 2, packaging: 1, selection: 0.5,
+        pouring: 1, assembly_3d: 0.5, packaging: 1.5, selection: 0.5,
       }
 
       const byWorker = {}
       ;(logsRes.data || []).forEach((l) => {
         const name = l.worker?.display_name || 'Неизвестный'
-        if (!byWorker[name]) byWorker[name] = { name, print: 0, resin: 0, assembly: 0, packaging: 0, selection: 0, total: 0 }
+        if (!byWorker[name]) byWorker[name] = { name, resin: 0, assembly: 0, packaging: 0, selection: 0, total: 0 }
 
-        if (l.stickers_printed) { byWorker[name].print += l.stickers_printed; byWorker[name].total += l.stickers_printed * (rates.print || 0) }
         if (l.stickers_good) { byWorker[name].resin += l.stickers_good; byWorker[name].total += l.stickers_good * (rates.pouring || 0) }
-        if (l.packs_assembled) { byWorker[name].assembly += l.packs_assembled; byWorker[name].total += l.packs_assembled * (rates.assembly_3d || 0) }
+        if (l.packs_assembled) {
+          // Сборка 3D: packs × stickers_per_pack × ставка (фидбэк 12.05)
+          const perPack = Number(l.order?.stickers_per_pack) || 1
+          byWorker[name].assembly += l.packs_assembled
+          byWorker[name].total += l.packs_assembled * perPack * (rates.assembly_3d || 0)
+        }
         if (l.packs_packaged) { byWorker[name].packaging += l.packs_packaged; byWorker[name].total += l.packs_packaged * (rates.packaging || 0) }
-        if (l.packs_selected) { byWorker[name].selection += l.packs_selected; byWorker[name].total += l.packs_selected * (rates.selection || 0) }
+        if (l.qty_selected) { byWorker[name].selection += l.qty_selected; byWorker[name].total += l.qty_selected * (rates.selection || 0) }
       })
 
       setData(Object.values(byWorker).sort((a, b) => b.total - a.total))

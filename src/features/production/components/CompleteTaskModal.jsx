@@ -6,6 +6,7 @@ import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { getNextStatus, MS_PER_MINUTE } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { formatOrderNumber } from '@/shared/lib/utils'
 import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
 
@@ -64,7 +65,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
           material_id: item.materialId,
           order_id: order.id,
           delta: -qty,
-          reason: `Заказ #${order.number}`,
+          reason: `Заказ #${formatOrderNumber(order)}`,
           created_by: profile.id,
         })
         if (txError) throw txError
@@ -80,7 +81,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
 
       // Haptic feedback on successful completion
       if (navigator.vibrate) navigator.vibrate(10)
-      toast.success(`Заказ #${order.number} — ${nextStatus === 'done' ? 'готово' : 'передан дальше'}`)
+      toast.success(`Заказ #${formatOrderNumber(order)} — ${nextStatus === 'done' ? 'готово' : 'передан дальше'}`)
       onCompleted?.()
       onClose()
     } catch (err) {
@@ -107,7 +108,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
   if (!isOpen || !order) return null
 
   return (
-    <Modal isOpen onClose={onClose} title={`Завершить задачу #${order.number}`} maxWidth="max-w-md">
+    <Modal isOpen onClose={onClose} title={`Завершить задачу #${formatOrderNumber(order)}`} maxWidth="max-w-md">
       {step === 'confirm' && (
         <div className="space-y-4">
           <p className="text-sm text-text-muted">

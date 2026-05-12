@@ -5,6 +5,7 @@ import { MATERIAL_TYPES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
+import { formatOrderNumber } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import Modal from '@/shared/components/Modal'
@@ -56,7 +57,7 @@ export function MaterialConsumption({ order }) {
         material_id: formData.materialId,
         order_id: order.id,
         delta: -Math.abs(qty),
-        reason: `Заказ #${order.number}`,
+        reason: `Заказ #${formatOrderNumber(order)}`,
         created_by: profile.id,
       })
       if (error) throw error

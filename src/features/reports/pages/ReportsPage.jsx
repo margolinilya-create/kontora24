@@ -10,7 +10,7 @@ import Spinner from '@/shared/components/Spinner'
 const REPORT_TABS = [
   { key: 'schedule', label: 'График работы' },
   { key: 'orders', label: 'Заказы' },
-  { key: 'bonus', label: 'Премии' },
+  { key: 'bonus', label: 'Сдельная оплата' },
   { key: 'quality', label: 'Качество' },
 ]
 
@@ -155,43 +155,41 @@ function OrdersCostReport({ period }) {
 function BonusReport({ period }) {
   const { data, loading, error } = useBonusReport(period)
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
-  if (error) return <ReportError text="Не удалось загрузить отчёт по премиям" />
-  if (data.length === 0) return <Empty text="Нет данных по премиям" />
+  if (error) return <ReportError text="Не удалось загрузить отчёт по сдельной оплате" />
+  if (data.length === 0) return <Empty text="Нет данных по сдельной оплате" />
 
   function handleExport() {
     const rows = data.map((w) => ({
-      'Сотрудник': w.name, 'Печать (шт)': w.print, 'Заливка (шт)': w.resin,
+      'Сотрудник': w.name, 'Заливка (шт)': w.resin,
       'Сборка (шт)': w.assembly, 'Упаковка (шт)': w.packaging, 'Выборка (шт)': w.selection,
-      'Премия': w.total.toFixed(0),
+      'Сумма': w.total.toFixed(0),
     }))
-    exportCSV(rows, 'премии')
+    exportCSV(rows, 'сдельная-оплата')
   }
 
   return (
     <div className="bg-surface rounded-xl border border-border p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold">Премии по сотрудникам</h2>
+        <h2 className="font-semibold">Сдельная оплата по сотрудникам</h2>
         <Button variant="secondary" size="sm" onClick={handleExport}>CSV</Button>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <caption className="sr-only">Расчёт премий</caption>
+          <caption className="sr-only">Расчёт сдельной оплаты</caption>
           <thead>
             <tr className="border-b border-border">
               <th className="text-left py-2 font-medium text-text-muted">Сотрудник</th>
-              <th className="text-right py-2 font-medium text-text-muted">Печать</th>
               <th className="text-right py-2 font-medium text-text-muted">Заливка</th>
               <th className="text-right py-2 font-medium text-text-muted">Сборка</th>
               <th className="text-right py-2 font-medium text-text-muted">Упаковка</th>
               <th className="text-right py-2 font-medium text-text-muted">Выборка</th>
-              <th className="text-right py-2 font-medium text-accent">Премия</th>
+              <th className="text-right py-2 font-medium text-accent">Сумма</th>
             </tr>
           </thead>
           <tbody>
             {data.map((w) => (
               <tr key={w.name} className="border-b border-border last:border-0">
                 <td className="py-2 font-medium">{w.name}</td>
-                <td className="py-2 text-right">{w.print || '—'}</td>
                 <td className="py-2 text-right">{w.resin || '—'}</td>
                 <td className="py-2 text-right">{w.assembly || '—'}</td>
                 <td className="py-2 text-right">{w.packaging || '—'}</td>
@@ -202,7 +200,7 @@ function BonusReport({ period }) {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-text-muted mt-3">Ставки настраиваются в Настройки → ключ "bonus_rates"</p>
+      <p className="text-xs text-text-muted mt-3">Ставки настраиваются в Настройки → ключ "bonus_rates". Печать не входит в сдельную оплату.</p>
     </div>
   )
 }

@@ -478,22 +478,37 @@ describe('calculateWorkerPayout', () => {
     expect(r.total).toBe(30)
   })
 
-  it('assembly at 0.5₽ per pack', () => {
+  it('assembly: packs × stickers_per_pack × 0.5₽ (формула обновлена 12.05)', () => {
+    // 50 паков × 4 стикера/пак × 0.5 ₽ = 100 ₽
+    const logs = [{ stage: 'assembly_3d', packs_assembled: 50, order: { stickers_per_pack: 4 } }]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.assembly.count).toBe(200)   // stickers
+    expect(r.breakdown.assembly.packs).toBe(50)
+    expect(r.breakdown.assembly.amount).toBe(100)
+    expect(r.total).toBe(100)
+  })
+
+  it('assembly: default stickers_per_pack=1 if order missing', () => {
     const logs = [{ stage: 'assembly_3d', packs_assembled: 50 }]
     const r = calculateWorkerPayout(logs)
-    expect(r.breakdown.assembly.amount).toBe(25)
-    expect(r.total).toBe(25)
+    expect(r.breakdown.assembly.amount).toBe(25) // 50 × 1 × 0.5
+  })
+
+  it('assembly: ordersById fallback when no embed', () => {
+    const logs = [{ stage: 'assembly_3d', order_id: 'o1', packs_assembled: 10 }]
+    const r = calculateWorkerPayout(logs, { ordersById: { o1: { stickers_per_pack: 6 } } })
+    expect(r.breakdown.assembly.amount).toBe(10 * 6 * 0.5)
   })
 
   it('mixed stages aggregate correctly', () => {
     const logs = [
       { stage: 'pouring', stickers_good: 100 },
       { stage: 'selection_pouring', qty_selected: 50, stickers_good: 0 },
-      { stage: 'assembly_3d', packs_assembled: 20 },
+      { stage: 'assembly_3d', packs_assembled: 20, order: { stickers_per_pack: 4 } }, // 20×4×0.5 = 40
       { stage: 'packaging', packs_packaged: 10 },
     ]
     const r = calculateWorkerPayout(logs)
-    expect(r.total).toBe(100 + 25 + 10 + 15)
+    expect(r.total).toBe(100 + 25 + 40 + 15)
   })
 })
 

@@ -139,7 +139,7 @@ export function FinanceTab({ order }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
           {order.deal_name && <InfoField label="Название сделки" value={order.deal_name} />}
           {order.bitrix_deal_id && <InfoField label="Bitrix ID" value={order.bitrix_deal_id} />}
-          <InfoField label="Партнёрский" value={order.is_partner ? 'Да (-35%)' : 'Нет'} />
+          <InfoField label="Партнёрский" value={order.is_partner ? 'Да (-25%)' : 'Нет'} />
           <InfoField label="Источник" value={ORDER_SOURCES[order.source]?.label || '—'} />
           {order.source === 'referrer' && order.source_referrer && (
             <InfoField label="Референт" value={order.source_referrer} />

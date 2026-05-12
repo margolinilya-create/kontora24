@@ -139,7 +139,7 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
           </div>
         </div>
 
-        {/* Правая колонка — Срок сдачи */}
+        {/* Правая колонка — Срок сдачи (шрифт Guidy + перенос) */}
         <div style={{
           border: '1px solid #d1d5db',
           borderRadius: RADIUS,
@@ -158,7 +158,7 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
             fontWeight: 700,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
-            fontFamily: "'Onder', sans-serif",
+            fontFamily: "'Guidy', 'Inter', sans-serif",
             lineHeight: 1.1,
           }}>
             Срок сдачи
@@ -169,14 +169,14 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
             color: '#e94560',
             marginTop: 4,
             textDecoration: 'underline',
-            fontFamily: "'Onder', sans-serif",
+            fontFamily: "'Guidy', 'Inter', sans-serif",
             lineHeight: 1.1,
-            whiteSpace: 'nowrap',
+            wordBreak: 'break-word',
           }}>
             {deadlineDate ? deadlineDate.toLocaleDateString('ru-RU') : '—'}
           </div>
           {dayOfWeek && (
-            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>
+            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, fontFamily: "'Guidy', 'Inter', sans-serif" }}>
               {dayOfWeek}
             </div>
           )}

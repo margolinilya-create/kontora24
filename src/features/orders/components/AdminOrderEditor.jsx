@@ -241,7 +241,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
           <div className="flex items-end">
             <label className={CHECKBOX_BOX + ' w-full'}>
               <input type="checkbox" checked={!!form.is_partner} onChange={(e) => update('is_partner', e.target.checked)} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
-              <span className="text-sm">Партнёрский (-35%)</span>
+              <span className="text-sm">Партнёрский (-25%)</span>
             </label>
           </div>
         </div>

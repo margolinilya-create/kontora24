@@ -486,7 +486,7 @@ export default function CreateOrderPage() {
 
             <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
               <input type="checkbox" {...register('is_partner')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
-              <span className="text-sm">Партнёрский (-35%)</span>
+              <span className="text-sm">Партнёрский (-25%)</span>
             </label>
 
             {/* Отгрузка */}

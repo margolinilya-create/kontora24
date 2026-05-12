@@ -9,7 +9,9 @@ import { Link } from 'react-router-dom'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
+import Modal from '@/shared/components/Modal'
 import ErrorState from '@/shared/components/ErrorState'
+import { formatOrderNumber } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { differenceInMinutes, format, startOfDay, isSameDay } from 'date-fns'
@@ -126,30 +128,42 @@ export default function CabinetPage() {
           </div>
 
           {/* Personal production headline */}
-          {(stats.headline.poured > 0 || stats.headline.packaged > 0 || stats.headline.selected > 0 || stats.headline.printed > 0) && (
+          {(stats.headline.poured > 0 || stats.headline.packaged > 0 || stats.headline.selected > 0 || stats.headline.assembled > 0) && (
             <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
               <h2 className="font-semibold mb-4">Мой личный вклад</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className="bg-dept-print/10 rounded-xl p-3">
-                  <p className="text-2xl font-bold font-display tracking-tight text-dept-print">{stats.headline.printed}</p>
-                  <p className="text-xs text-text-muted">Напечатано</p>
-                </div>
-                <div className="bg-dept-pouring/10 rounded-xl p-3">
-                  <p className="text-2xl font-bold font-display tracking-tight text-dept-pouring">{stats.headline.poured}</p>
-                  <p className="text-xs text-text-muted">Залито хороших</p>
-                </div>
-                <div className="bg-dept-pouring/10 rounded-xl p-3">
-                  <p className="text-2xl font-bold font-display tracking-tight text-dept-pouring">{stats.headline.selected}</p>
-                  <p className="text-xs text-text-muted">Выбрано фонов</p>
-                </div>
-                <div className="bg-dept-finish/10 rounded-xl p-3">
-                  <p className="text-2xl font-bold font-display tracking-tight text-dept-finish">{stats.headline.packaged}</p>
-                  <p className="text-xs text-text-muted">Упаковано паков</p>
-                </div>
-                <div className="bg-danger/10 rounded-xl p-3">
-                  <p className="text-2xl font-bold font-display tracking-tight text-danger">{stats.headline.defects}</p>
-                  <p className="text-xs text-text-muted">Брак</p>
-                </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <ContributionTile
+                  bg="bg-dept-pouring/10"
+                  fg="text-dept-pouring"
+                  value={stats.headline.poured}
+                  label="Залито хороших"
+                  logs={stats.logs}
+                  filter={(l) => l.stage === 'pouring' || l.stage === 'selection_pouring'}
+                />
+                <ContributionTile
+                  bg="bg-dept-pouring/10"
+                  fg="text-dept-pouring"
+                  value={stats.headline.selected}
+                  label="Выбрано фонов"
+                  logs={stats.logs}
+                  filter={(l) => l.stage === 'selection_pouring'}
+                />
+                <ContributionTile
+                  bg="bg-dept-finish/10"
+                  fg="text-dept-finish"
+                  value={stats.headline.assembled}
+                  label="Собрано 3D-паков"
+                  logs={stats.logs}
+                  filter={(l) => l.stage === 'assembly_3d'}
+                />
+                <ContributionTile
+                  bg="bg-dept-finish/10"
+                  fg="text-dept-finish"
+                  value={stats.headline.packaged}
+                  label="Упаковано паков"
+                  logs={stats.logs}
+                  filter={(l) => l.stage === 'packaging'}
+                />
               </div>
             </div>
           )}
@@ -175,14 +189,14 @@ export default function CabinetPage() {
                 ))}
               </div>
               <p className="text-xs text-text-muted mt-3">
-                Расчёт за выбранный период по ставкам: заливка 1 ₽/шт, выборка 0,5 ₽/шт, сборка 0,5 ₽/пак, упаковка 1,5 ₽/пак.
+                Расчёт за выбранный период по ставкам: заливка 1 ₽/шт, выборка 0,5 ₽/шт, сборка 0,5 ₽/стикер в паке (паков × стикеров в паке × 0,5 ₽), упаковка 1,5 ₽/пак.
               </p>
             </div>
           )}
 
           {/* Monthly chart — last 6 months */}
           <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-            <h2 className="font-semibold mb-4">Производство по месяцам</h2>
+            <h2 className="font-semibold mb-4">Динамика за 6 месяцев</h2>
             <Suspense fallback={<Spinner />}>
               <MonthlyChart data={stats.byMonth} />
             </Suspense>
@@ -338,6 +352,82 @@ function ShiftHistory({ shifts, logs }) {
         })}
       </div>
     </div>
+  )
+}
+
+/**
+ * Кликабельная плитка вклада. По клику открывает попап со списком заказов,
+ * в которых работник делал эту операцию (агрегация по order_id).
+ */
+function ContributionTile({ bg, fg, value, label, logs, filter }) {
+  const [open, setOpen] = useState(false)
+
+  const ordersList = useMemo(() => {
+    if (!open) return []
+    const map = new Map()
+    for (const l of logs || []) {
+      if (!filter(l) || !l.order_id) continue
+      const cur = map.get(l.order_id) || {
+        orderId: l.order_id,
+        order: l.order,
+        count: 0,
+      }
+      // Сумма по полю-индикатору операции (используем количество в зависимости от stage)
+      const stageQty =
+        l.stage === 'assembly_3d' ? Number(l.packs_assembled) || 0 :
+        l.stage === 'packaging'   ? Number(l.packs_packaged) || 0 :
+        l.stage === 'selection_pouring' ? (Number(l.qty_selected) || 0) + (Number(l.stickers_good) || 0) :
+        l.stage === 'pouring'     ? Number(l.stickers_good) || 0 :
+        0
+      cur.count += stageQty
+      map.set(l.order_id, cur)
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count)
+  }, [open, logs, filter])
+
+  if (value === 0) {
+    return (
+      <div className={`${bg} rounded-xl p-3`}>
+        <p className={`text-2xl font-bold font-display tracking-tight ${fg}`}>0</p>
+        <p className="text-xs text-text-muted">{label}</p>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={`${bg} rounded-xl p-3 text-left transition-all hover:ring-2 hover:ring-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
+      >
+        <p className={`text-2xl font-bold font-display tracking-tight ${fg}`}>{value}</p>
+        <p className="text-xs text-text-muted">{label}</p>
+        <p className="text-[10px] text-text-muted mt-1 opacity-60">{ordersList.length || ''} {' '}— открыть</p>
+      </button>
+      {open && (
+        <Modal isOpen onClose={() => setOpen(false)} title={label} maxWidth="max-w-md">
+          {ordersList.length === 0 ? (
+            <p className="text-sm text-text-muted">Нет заказов за выбранный период</p>
+          ) : (
+            <ul className="space-y-1.5 text-sm">
+              {ordersList.map((o) => (
+                <li key={o.orderId} className="flex items-center justify-between gap-3 py-1.5 border-b border-border last:border-0">
+                  <Link
+                    to={`/orders/${o.orderId}`}
+                    className="font-medium text-text hover:text-accent"
+                    onClick={() => setOpen(false)}
+                  >
+                    #{formatOrderNumber(o.order)}
+                  </Link>
+                  <span className="text-text-muted tabular-nums">{o.count} шт</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
+      )}
+    </>
   )
 }
 

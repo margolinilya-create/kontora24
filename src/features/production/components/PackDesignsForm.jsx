@@ -4,10 +4,21 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 
 /**
- * Виджет "Заливка смолы по видам" для 3D-стикерпака.
- * Под каждый вид — строка ввода: залито + брак, прогресс-бар, опц. название.
+ * Виджет ввода по видам стикеров для 3D-стикерпака.
+ * Используется на печать / резка / заливка — лейблы зависят от mode.
+ *
+ *  mode='pouring' (default): «Залить» + «Брак»
+ *  mode='print':   «Напечатано» (без брака — печать не учитывает дефекты)
+ *  mode='cutting': «Нарезано» + «Брак»
  */
-export function PackDesignsForm({ designs, addProgress, updateName, readOnly = false }) {
+const MODE_LABELS = {
+  pouring:  { value: 'Залить', valueAria: 'Залить, шт', showDefects: true,  errorEmpty: 'Введите залито или брак' },
+  print:    { value: 'Напечатано', valueAria: 'Напечатано, шт', showDefects: false, errorEmpty: 'Введите кол-во напечатанных' },
+  cutting:  { value: 'Нарезано', valueAria: 'Нарезано, шт', showDefects: true,  errorEmpty: 'Введите нарезано или брак' },
+}
+
+export function PackDesignsForm({ designs, addProgress, updateName, readOnly = false, mode = 'pouring' }) {
+  const labels = MODE_LABELS[mode] || MODE_LABELS.pouring
   const [drafts, setDrafts] = useState({}) // { [designId]: { poured, defects } }
   const [savingId, setSavingId] = useState(null)
   const [editingNameId, setEditingNameId] = useState(null)
@@ -19,9 +30,9 @@ export function PackDesignsForm({ designs, addProgress, updateName, readOnly = f
   async function handleSubmit(designId) {
     const draft = drafts[designId] || {}
     const poured = Number(draft.poured || 0)
-    const defects = Number(draft.defects || 0)
+    const defects = labels.showDefects ? Number(draft.defects || 0) : 0
     if (poured === 0 && defects === 0) {
-      toast.error('Введите залито или брак')
+      toast.error(labels.errorEmpty)
       return
     }
     setSavingId(designId)
@@ -102,7 +113,7 @@ export function PackDesignsForm({ designs, addProgress, updateName, readOnly = f
             {!readOnly && !isComplete && (
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <label className="block text-xs text-text-muted mb-0.5">Залить, шт</label>
+                  <label className="block text-xs text-text-muted mb-0.5">{labels.valueAria}</label>
                   <input
                     type="number"
                     min="0"
@@ -112,17 +123,19 @@ export function PackDesignsForm({ designs, addProgress, updateName, readOnly = f
                     className="w-full rounded-md border border-border px-2 py-1.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
                   />
                 </div>
-                <div className="flex-1">
-                  <label className="block text-xs text-text-muted mb-0.5">Брак, шт</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={drafts[d.id]?.defects ?? ''}
-                    onChange={(e) => setField(d.id, 'defects', e.target.value)}
-                    placeholder="0"
-                    className="w-full rounded-md border border-border px-2 py-1.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
-                  />
-                </div>
+                {labels.showDefects && (
+                  <div className="flex-1">
+                    <label className="block text-xs text-text-muted mb-0.5">Брак, шт</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={drafts[d.id]?.defects ?? ''}
+                      onChange={(e) => setField(d.id, 'defects', e.target.value)}
+                      placeholder="0"
+                      className="w-full rounded-md border border-border px-2 py-1.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+                    />
+                  </div>
+                )}
                 <Button size="sm" loading={isSaving} onClick={() => handleSubmit(d.id)}>+</Button>
                 <span className="text-xs text-text-muted whitespace-nowrap pb-1.5">осталось {remaining}</span>
               </div>

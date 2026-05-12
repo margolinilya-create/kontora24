@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
-import { formatPrice, formatDate } from '@/shared/lib/utils'
+import { formatPrice, formatDate, formatOrderNumber } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 
@@ -21,7 +21,7 @@ export function OrderPdfExport({ order }) {
       doc.text('KONTORA24', 15, y)
       doc.setFontSize(12)
       doc.setFont('helvetica', 'normal')
-      doc.text(`Заказ #${order.number}`, W - 15, y, { align: 'right' })
+      doc.text(`Заказ #${formatOrderNumber(order)}`, W - 15, y, { align: 'right' })
       y += 5
       doc.setDrawColor(200)
       doc.line(15, y, W - 15, y)
@@ -115,7 +115,7 @@ export function OrderPdfExport({ order }) {
       // Footer
       doc.setFontSize(8)
       doc.setTextColor(150)
-      doc.text(`Kontora24 · Заказ #${order.number} · ${new Date().toLocaleDateString('ru-RU')}`, 15, 285)
+      doc.text(`Kontora24 · Заказ #${formatOrderNumber(order)} · ${new Date().toLocaleDateString('ru-RU')}`, 15, 285)
 
       doc.save(`order-${order.number}.pdf`)
       toast.success('PDF экспортирован')

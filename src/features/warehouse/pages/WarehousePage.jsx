@@ -11,6 +11,7 @@ import { MATERIAL_TYPES } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
+import DropdownMenu from '@/shared/components/DropdownMenu'
 import ErrorState from '@/shared/components/ErrorState'
 
 export default function WarehousePage() {
@@ -63,18 +64,22 @@ export default function WarehousePage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs
-        items={[
+      {/* Tabs (desktop) / Dropdown (mobile) */}
+      {(() => {
+        const tabItems = [
           { key: 'stock', label: 'Виджеты' },
           { key: 'table', label: 'Список' },
           { key: 'inventory', label: 'Инвентаризация' },
           { key: 'history', label: 'История операций' },
           { key: 'analytics', label: 'Расход и прогноз' },
-        ]}
-        active={tab}
-        onChange={setTab}
-      />
+        ]
+        return (
+          <>
+            <Tabs items={tabItems} active={tab} onChange={setTab} className="hidden md:inline-flex" />
+            <DropdownMenu items={tabItems} active={tab} onChange={setTab} className="md:hidden" align="left" />
+          </>
+        )
+      })()}
 
       {tab === 'analytics' ? (
         <ConsumptionChart />

@@ -18,6 +18,7 @@ import { Skeleton } from '@/shared/components/Skeleton'
 import Button from '@/shared/components/Button'
 import Modal from '@/shared/components/Modal'
 import Tabs from '@/shared/components/Tabs'
+import DropdownMenu from '@/shared/components/DropdownMenu'
 import {
   ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES,
 } from '@/shared/constants'
@@ -157,6 +158,55 @@ function EditableClientName({ order, canEdit, onUpdated }) {
   )
 }
 
+function EditableDeadline({ order, canEdit, onUpdated }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(order.deadline || '')
+  const [saving, setSaving] = useState(false)
+
+  const display = order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'
+
+  async function save() {
+    if (value === (order.deadline || '')) { setEditing(false); return }
+    setSaving(true)
+    try {
+      await updateOrder(order.id, { deadline: value || null })
+      toast.success('Срок обновлён')
+      onUpdated?.()
+      setEditing(false)
+    } catch {
+      toast.error('Не удалось обновить срок')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!canEdit) return <span className="text-text">сдача {display}</span>
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <input
+          autoFocus
+          type="date"
+          value={value || ''}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') { setEditing(false); setValue(order.deadline || '') }
+          }}
+          className="bg-surface-2 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+        />
+        <button onClick={save} disabled={saving} className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-on-accent font-medium disabled:opacity-50">{saving ? '…' : 'OK'}</button>
+        <button onClick={() => { setEditing(false); setValue(order.deadline || '') }} className="text-[10px] px-1.5 py-0.5 text-text-muted hover:text-text">×</button>
+      </span>
+    )
+  }
+  return (
+    <button onClick={() => setEditing(true)} title="Изменить срок сдачи" className="text-text hover:text-accent transition-colors underline decoration-text-muted/30 decoration-dotted underline-offset-2">
+      сдача {display}
+    </button>
+  )
+}
+
 function SourceFilesRow({ order, onUpdated, onCopy }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(order.mockup_path || '')
@@ -212,7 +262,8 @@ function SourceFilesRow({ order, onUpdated, onCopy }) {
           ) : (
             <span className="text-text-muted flex-1">Нет ссылки</span>
           )}
-          <button onClick={() => setEditing(true)} className="text-xs px-2 py-1 rounded text-text-muted hover:text-text hover:bg-surface-2 transition-colors">
+          {/* На mobile «Изменить» прячем — ссылка тапается, для правки нужен desktop (фидбэк 17.05) */}
+          <button onClick={() => setEditing(true)} className="hidden md:inline-block text-xs px-2 py-1 rounded text-text-muted hover:text-text hover:bg-surface-2 transition-colors">
             Изменить
           </button>
           <button onClick={onCopy} className="text-xs px-2 py-1 rounded text-text-muted hover:text-text hover:bg-surface-2 transition-colors">
@@ -305,7 +356,6 @@ export default function OrderDetailPage() {
 
   const managerName = order.creator?.display_name || '—'
   const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('ru-RU') : '—'
-  const deadlineDate = order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : null
 
   const tabs = [
     { key: 'overview', label: 'Обзор' },
@@ -337,7 +387,7 @@ export default function OrderDetailPage() {
           <p className="text-text-muted text-sm mt-2">
             <EditableClientName order={order} canEdit={canEdit} onUpdated={refetch} />
             {' · '}{managerName} · {orderDate}
-            {deadlineDate && <> · <span className="text-text">сдача {deadlineDate}</span></>}
+            {' · '}<EditableDeadline order={order} canEdit={canEdit} onUpdated={refetch} />
           </p>
         </div>
 
@@ -370,8 +420,11 @@ export default function OrderDetailPage() {
       {/* Source files link — компактная высота, инлайн-редактирование */}
       <SourceFilesRow order={order} onUpdated={refetch} onCopy={copySourceLink} />
 
-      {/* Tabs */}
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      {/* Tabs (desktop) / Dropdown (mobile) */}
+      <div className="flex justify-end md:block">
+        <Tabs items={tabs} active={tab} onChange={setTab} className="hidden md:inline-flex" />
+        <DropdownMenu items={tabs} active={tab} onChange={setTab} className="md:hidden" />
+      </div>
 
       {/* Tab content */}
       <div>

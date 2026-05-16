@@ -13,6 +13,7 @@ import { DateRangeFilter } from '../components/DateRangeFilter'
 import { SavedFilters } from '../components/SavedFilters'
 import SearchInput from '@/shared/components/SearchInput'
 import Tabs from '@/shared/components/Tabs'
+import DropdownMenu from '@/shared/components/DropdownMenu'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
 import { stageDotClass } from '@/shared/lib/department-mapping'
@@ -148,16 +149,20 @@ export default function OrdersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Tabs
-            items={[
+          {(() => {
+            const viewItems = [
               { key: 'list', label: 'По отделам' },
               { key: 'kanban', label: 'Канбан' },
               { key: 'calendar', label: 'Календарь' },
               { key: 'flat', label: 'Все заказы' },
-            ]}
-            active={viewMode}
-            onChange={setViewMode}
-          />
+            ]
+            return (
+              <>
+                <Tabs items={viewItems} active={viewMode} onChange={setViewMode} className="hidden md:inline-flex" />
+                <DropdownMenu items={viewItems} active={viewMode} onChange={setViewMode} className="md:hidden" />
+              </>
+            )
+          })()}
           {isManager && (
             <Link
               to="/orders/create"

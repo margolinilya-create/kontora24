@@ -130,11 +130,18 @@ export function OrderStepper({ order, history, onUpdated }) {
             ? `${formatDateTime(ts.created_at)}${ts.changed_by_profile?.display_name ? ` · ${ts.changed_by_profile.display_name}` : ''}`
             : isCurrent ? 'Текущий этап' : 'Не пройден'
 
+          // Mobile «Dock»: текущий этап крупнее, остальные мелкие без подписи.
+          // На md+ — обычный вид (точки одинаковые, подпись под каждой) — фидбэк 17.05.
+          const dotSizeCls = isCurrent
+            ? 'w-3.5 h-3.5 md:w-2.5 md:h-2.5'
+            : 'w-2 h-2 md:w-2.5 md:h-2.5'
+          const labelVisibilityCls = isCurrent ? '' : 'hidden md:inline'
+
           return (
             <li key={status} className="flex items-center gap-1.5">
               <div className="flex flex-col items-center gap-1" title={tooltip}>
                 <span
-                  className={`w-2.5 h-2.5 rounded-full transition-all ${
+                  className={`${dotSizeCls} rounded-full transition-all ${
                     isCurrent
                       ? `${dotCls} ring-4 ring-accent/25`
                       : isCompleted
@@ -143,14 +150,14 @@ export function OrderStepper({ order, history, onUpdated }) {
                   }`}
                   aria-hidden="true"
                 />
-                <span className={`text-[10px] leading-tight whitespace-nowrap ${
-                  isCurrent ? 'font-semibold text-text' : isCompleted ? 'text-text-muted' : 'text-text-muted/60'
+                <span className={`text-[10px] leading-tight whitespace-nowrap ${labelVisibilityCls} ${
+                  isCurrent ? 'font-semibold text-text text-[11px] md:text-[10px]' : isCompleted ? 'text-text-muted' : 'text-text-muted/60'
                 }`}>
                   {s?.label || status}
                 </span>
               </div>
               {i < route.length - 1 && (
-                <span className={`h-px w-4 sm:w-6 ${i < currentIdx ? 'bg-text-muted/40' : 'bg-border'}`} aria-hidden="true" />
+                <span className={`h-px w-3 sm:w-6 ${i < currentIdx ? 'bg-text-muted/40' : 'bg-border'}`} aria-hidden="true" />
               )}
             </li>
           )

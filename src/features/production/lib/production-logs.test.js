@@ -77,6 +77,28 @@ describe('computeStageProgress', () => {
     const result = computeStageProgress(logs, 'print', 100)
     expect(result.total).toBe(25)
   })
+
+  it('subtracts defects from total on whitelist stages (фидбэк 17.05)', () => {
+    // print/cutting/lamination/packaging — брак НЕ годное изделие, в шкале не учитывается
+    const logs = [{ stage: 'print', stickers_printed: 100, defects: 20 }]
+    expect(computeStageProgress(logs, 'print', 100).total).toBe(80)
+    expect(computeStageProgress([{ stage: 'cutting', qty_cut: 100, defects: 5 }], 'cutting', 100).total).toBe(95)
+    expect(computeStageProgress([{ stage: 'lamination', lamination_qty: 50, defects: 10 }], 'lamination', 100).total).toBe(40)
+    expect(computeStageProgress([{ stage: 'packaging', packs_packaged: 30, defects: 3 }], 'packaging', 100).total).toBe(27)
+  })
+
+  it('does NOT subtract defects on pouring/selection_pouring (stickers_good уже годные)', () => {
+    expect(computeStageProgress([{ stage: 'pouring', stickers_good: 50, defects: 10 }], 'pouring', 100).total).toBe(50)
+    expect(computeStageProgress(
+      [{ stage: 'selection_pouring', track: 'backgrounds', qty_selected: 40, defects: 5 }],
+      'selection_pouring', 100, 'backgrounds',
+    ).total).toBe(40)
+  })
+
+  it('clamps to zero when defects exceed produced', () => {
+    const logs = [{ stage: 'print', stickers_printed: 10, defects: 30 }]
+    expect(computeStageProgress(logs, 'print', 100).total).toBe(0)
+  })
 })
 
 describe('computeDualTrackProgress', () => {
@@ -260,6 +282,19 @@ describe('computeIncoming', () => {
   it('returns isStart when stage is not in route', () => {
     const result = computeIncoming([], ROUTE, 'pouring', 100, null)
     expect(result.isStart).toBe(true)
+  })
+
+  it('strict track filter — track="backgrounds" игнорирует логи без track и с track="stickers" (фидбэк 17.05)', () => {
+    // Раньше фильтр был `!l.track || l.track === track`. Теперь strict — только match.
+    const ROUTE_PACK3D = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'assembly_3d', 'packaging', 'otk', 'done']
+    const logs = [
+      { stage: 'print', track: 'backgrounds', backgrounds_printed: 50 },
+      { stage: 'print', track: 'stickers', stickers_printed: 30 },
+      { stage: 'print', stickers_printed: 5 }, // ошибочный лог без track — должен игнорироваться
+    ]
+    // backgrounds_printed суммируется только по track=backgrounds
+    const result = computeIncoming(logs, ROUTE_PACK3D, 'lamination', 100, 'backgrounds')
+    expect(result.total).toBe(50)
   })
 })
 

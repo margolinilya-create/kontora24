@@ -1,5 +1,6 @@
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { ProductionLogForm } from '@/features/production/components/logs/ProductionLogForm'
+import { ProductionLogHistory } from '@/features/production/components/logs/ProductionLogHistory'
 import { addProductionLogAndCheckAdvance } from '@/features/orders/hooks/useOrders'
 import { PackDesignsForm } from '@/features/production/components/PackDesignsForm'
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
@@ -49,11 +50,16 @@ function getProgressLines(order) {
   return lines
 }
 
+// Брак вычитается из total только для этапов из этого списка
+// (на pouring/selection_pouring stickers_good/qty_selected уже годные).
+const SUBTRACT_DEFECTS_STAGES = new Set(['print', 'cutting', 'lamination', 'packaging'])
+
 function aggregateLine(logs, line) {
   let stageLogs = logs.filter((l) => l.stage === line.stage)
   if (line.track) stageLogs = stageLogs.filter((l) => l.track === line.track)
-  const total = stageLogs.reduce((sum, l) => sum + (Number(l[line.qtyField]) || 0), 0)
+  const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[line.qtyField]) || 0), 0)
   const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
+  const total = SUBTRACT_DEFECTS_STAGES.has(line.stage) ? Math.max(0, totalRaw - defects) : totalRaw
   return { total, defects }
 }
 
@@ -120,7 +126,9 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
 
   const stageLabel = ORDER_STATUSES[stage]?.label || stage
 
-  // Прогресс по трекам (если dual-track) или общий
+  // Прогресс по трекам (если dual-track) или общий.
+  // На ламинации 3D-стикерпака ламинируются ТОЛЬКО фоны — incoming считаем
+  // по track='backgrounds' предыдущего этапа (фидбэк 17.05).
   let progressProp, incomingProp
   if (isPack3D && ['print', 'cutting', 'selection_pouring'].includes(stage)) {
     progressProp = {
@@ -131,6 +139,9 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
       stickers: computeIncoming(logs, route, stage, order.qty, 'stickers'),
       backgrounds: computeIncoming(logs, route, stage, order.qty, 'backgrounds'),
     }
+  } else if (isPack3D && stage === 'lamination') {
+    progressProp = computeStageProgress(logs, stage, order.qty)
+    incomingProp = computeIncoming(logs, route, stage, order.qty, 'backgrounds')
   } else {
     progressProp = computeStageProgress(logs, stage, order.qty)
     incomingProp = computeIncoming(logs, route, stage, order.qty, null)
@@ -146,7 +157,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
             designs={designs}
             logs={logs}
             stage={stage}
-            incoming={incomingProp?.stickers}
+            route={route}
             onSubmitDesign={handlePackDesignSubmit}
             updateName={updateName}
             mode={packMode}
@@ -241,7 +252,7 @@ function ProgressLinesWidget({ order, logs }) {
 }
 
 export function OrderProgressTab({ order, onUpdated }) {
-  const { logs, refetch, error: logsError } = useProductionLogs(order.id, order.qty)
+  const { logs, refetch, updateLog, softDeleteLog, error: logsError } = useProductionLogs(order.id, order.qty)
 
   return (
     <div className="space-y-6">
@@ -257,6 +268,11 @@ export function OrderProgressTab({ order, onUpdated }) {
       </div>
 
       <ActualCostSummary order={order} logs={logs} />
+
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+        <h2 className="font-semibold mb-3">История записей</h2>
+        <ProductionLogHistory logs={logs} onUpdateLog={updateLog} onDeleteLog={softDeleteLog} />
+      </div>
     </div>
   )
 }

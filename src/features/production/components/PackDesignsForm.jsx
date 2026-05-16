@@ -2,6 +2,7 @@ import { memo, useState, useEffect, useRef } from 'react'
 import Button from '@/shared/components/Button'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { computeIncomingPerDesign } from '../lib/production-logs'
 
 /**
  * Виджет ввода по видам стикеров для 3D-стикерпака.
@@ -36,7 +37,7 @@ function readDrafts(orderId, stage) {
   } catch { return {} }
 }
 
-function PackDesignsFormImpl({ designs, logs = [], stage, incoming, onSubmitDesign, updateName, readOnly = false, mode = 'pouring' }) {
+function PackDesignsFormImpl({ designs, logs = [], stage, incoming, route, onSubmitDesign, updateName, readOnly = false, mode = 'pouring' }) {
   const labels = MODE_LABELS[mode] || MODE_LABELS.pouring
   const orderId = designs?.[0]?.order_id || null
   const [drafts, setDrafts] = useState(() => readDrafts(orderId, stage))
@@ -93,16 +94,15 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming, onSubmitDesi
   }
 
   const grandTotal = designs.reduce((s, d) => s + designStats(d.design_index).value, 0)
-  const showIncoming = incoming && !incoming.isStart && incoming.total != null
 
   return (
     <div className="space-y-3">
-      {showIncoming && (
-        <p className="text-xs text-text-muted">Поступило на этап: {incoming.total} шт</p>
-      )}
-
       {designs.map((d) => {
         const { value, defects } = designStats(d.design_index)
+        const perDesignIncoming = route
+          ? computeIncomingPerDesign(logs, route, stage, d.design_index)
+          : null
+        const showPerIncoming = perDesignIncoming && !perDesignIncoming.isStart && perDesignIncoming.total != null
         const total = value + defects
         const pct = d.qty_target > 0 ? Math.min(100, Math.round((total / d.qty_target) * 100)) : 0
         const isComplete = total >= d.qty_target
@@ -111,6 +111,9 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming, onSubmitDesi
 
         return (
           <div key={d.id} className={`rounded-xl border p-3 space-y-2 ${isComplete ? 'border-success/30 bg-success/5' : 'border-border'}`}>
+            {showPerIncoming && (
+              <p className="text-[10px] text-text-muted">Поступило на этап: {perDesignIncoming.total} шт</p>
+            )}
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-sm font-semibold whitespace-nowrap">Вид #{d.design_index}</span>

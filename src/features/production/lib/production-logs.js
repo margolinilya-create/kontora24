@@ -142,7 +142,15 @@ export const STAGE_FIELDS = {
 }
 
 /**
+ * Этапы, на которых брак должен вычитаться из «годных» в шкале прогресса.
+ * Для pouring/selection_pouring брак НЕ вычитается — поле stickers_good /
+ * qty_selected уже представляет годные изделия (фидбэк менеджера 17.05).
+ */
+const SUBTRACT_DEFECTS_STAGES = new Set(['print', 'cutting', 'lamination', 'packaging'])
+
+/**
  * Compute progress for a given stage from production logs.
+ * Брак вычитается из total для этапов из SUBTRACT_DEFECTS_STAGES.
  */
 export function computeStageProgress(logs, stage, targetQty, track) {
   const config = STAGE_FIELDS[stage]
@@ -151,7 +159,9 @@ export function computeStageProgress(logs, stage, targetQty, track) {
   const qtyField = config.quantityField
   let stageLogs = logs.filter((l) => l.stage === stage)
   if (track) stageLogs = stageLogs.filter((l) => l.track === track)
-  const total = stageLogs.reduce((sum, l) => sum + (Number(l[qtyField]) || 0), 0)
+  const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[qtyField]) || 0), 0)
+  const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
+  const total = SUBTRACT_DEFECTS_STAGES.has(stage) ? Math.max(0, totalRaw - defects) : totalRaw
   const percentage = targetQty > 0 ? Math.min(100, Math.round((total / targetQty) * 100)) : 0
   return { total, target: targetQty, percentage, isComplete: total >= targetQty }
 }
@@ -172,7 +182,9 @@ export function computeDualTrackProgress(logs, stage, targetQty) {
   function computeTrack(trackName) {
     const field = trackFields[trackName]
     const trackLogs = logs.filter((l) => l.stage === stage && l.track === trackName)
-    const total = trackLogs.reduce((sum, l) => sum + (Number(l[field]) || 0), 0)
+    const totalRaw = trackLogs.reduce((sum, l) => sum + (Number(l[field]) || 0), 0)
+    const defects = trackLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
+    const total = SUBTRACT_DEFECTS_STAGES.has(stage) ? Math.max(0, totalRaw - defects) : totalRaw
     const percentage = targetQty > 0 ? Math.min(100, Math.round((total / targetQty) * 100)) : 0
     return { total, target: targetQty, percentage, isComplete: total >= targetQty }
   }
@@ -210,11 +222,17 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
     const prev = route[i]
     const cfg = STAGE_FIELDS[prev]
     if (!cfg) continue
-    // На предыдущем этапе считаем по его quantityField и трек-фильтру
-    const prevQtyField = cfg.quantityField
+    // На предыдущем этапе считаем по его quantityField и трек-фильтру.
+    // Strict track filter — если track задан, ищем ИМЕННО его (фидбэк 17.05).
+    // Раньше пропускался `!l.track || l.track === track`, что случайно работало
+    // только потому что на dual-track-этапах все логи имели явный track.
+    // Для dual-track-этапов (print/cutting/selection_pouring) поле зависит от
+    // трека — берём из DUAL_TRACK_FIELDS, иначе fallback на quantityField.
+    const trackField = (track && DUAL_TRACK_FIELDS[prev]?.[track]) || null
+    const prevQtyField = trackField || cfg.quantityField
     if (!prevQtyField) continue
     let stageLogs = logs.filter((l) => l.stage === prev)
-    if (track) stageLogs = stageLogs.filter((l) => !l.track || l.track === track)
+    if (track) stageLogs = stageLogs.filter((l) => l.track === track)
     const produced = stageLogs.reduce((sum, l) => sum + (Number(l[prevQtyField]) || 0), 0)
     // Из «поступило» вычитаем брак на предыдущем этапе — нельзя пустить дальше больше чем годных.
     const prevDefects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
@@ -222,6 +240,38 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
     if (produced > 0) return { total, source: prev, produced, defects: prevDefects }
   }
   // Не нашли предыдущего этапа с количественным логом → это стартовый этап производства.
+  return { total: null, source: null, isStart: true }
+}
+
+/**
+ * Поэвидовой incoming на 3D-стикерпаке: сколько стикеров вида `designIndex`
+ * пришло с предыдущего этапа маршрута. Считаем строго по track='stickers' +
+ * design_index, поле берём из DUAL_TRACK_FIELDS[prev].stickers (производимое
+ * предыдущим этапом количественное поле для трека стикеров).
+ *
+ * Если предыдущего количественного этапа нет (стартовый stage, напр. print) —
+ * возвращаем { isStart: true, total: null }.
+ *
+ * @returns {{ total: number|null, source: string|null, isStart?: boolean }}
+ */
+export function computeIncomingPerDesign(logs, route, stage, designIndex) {
+  if (!route || !route.includes(stage)) return { total: null, source: null, isStart: true }
+  const idx = route.indexOf(stage)
+  if (idx <= 0) return { total: null, source: null, isStart: true }
+
+  for (let i = idx - 1; i >= 0; i--) {
+    const prev = route[i]
+    const field = DUAL_TRACK_FIELDS[prev]?.stickers
+    if (!field) continue
+    const stageLogs = logs.filter(
+      (l) => l.stage === prev && l.track === 'stickers' && l.design_index === designIndex,
+    )
+    const produced = stageLogs.reduce((s, l) => s + (Number(l[field]) || 0), 0)
+    const defects = stageLogs.reduce((s, l) => s + (Number(l.defects) || 0), 0)
+    if (produced > 0) {
+      return { total: Math.max(0, produced - defects), source: prev, produced, defects }
+    }
+  }
   return { total: null, source: null, isStart: true }
 }
 

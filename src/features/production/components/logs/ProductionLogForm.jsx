@@ -162,16 +162,27 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   function renderField(field, trackKey) {
     const formKey = trackKey || 'single'
     const value = getForm(formKey)[field.key] ?? ''
+    // Десятичные поля (с step содержащим точку) — текстовый input с поддержкой запятой
+    // и numeric-клавиатурой на мобильнике (фидбэк менеджера 17.05).
+    const isDecimal = !!field.step && /\./.test(field.step)
     return (
       <Input
         key={`${formKey}-${field.key}`}
         id={`log-${formKey}-${field.key}`}
         label={`${fieldLabel(field, trackKey)}${field.unit ? ` (${field.unit})` : ''}`}
-        type="number"
+        type={isDecimal ? 'text' : 'number'}
+        inputMode={isDecimal ? 'decimal' : 'numeric'}
         value={value}
-        onChange={(e) => updateField(formKey, field.key, e.target.value)}
-        min="0"
-        step={field.step || '1'}
+        onChange={(e) => {
+          const raw = e.target.value
+          if (isDecimal) {
+            if (raw !== '' && !/^[\d.,]*$/.test(raw)) return
+            updateField(formKey, field.key, raw.replace(',', '.'))
+          } else {
+            updateField(formKey, field.key, raw)
+          }
+        }}
+        {...(isDecimal ? {} : { min: '0', step: field.step || '1' })}
         placeholder="0"
       />
     )
@@ -231,11 +242,14 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
             <Input
               id="log-resin"
               label={`${config.resinExtra.label} (${config.resinExtra.unit})`}
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={getForm('_root').resin_grams ?? ''}
-              onChange={(e) => updateRoot('resin_grams', e.target.value)}
-              min="0"
-              step={config.resinExtra.step || '0.1'}
+              onChange={(e) => {
+                const raw = e.target.value
+                if (raw !== '' && !/^[\d.,]*$/.test(raw)) return
+                updateRoot('resin_grams', raw.replace(',', '.'))
+              }}
               placeholder="0"
             />
           </div>

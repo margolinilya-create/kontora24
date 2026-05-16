@@ -86,17 +86,29 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
             <div key={log.id} className="border border-accent/40 rounded-lg p-3 space-y-2">
               <div className="text-xs text-text-muted">{config.label} — редактирование</div>
               <div className="grid grid-cols-2 gap-2">
-                {config.fields.map((f) => (
-                  <label key={f.key} className="text-xs text-text-muted block">
-                    {f.label}{f.unit ? ` (${f.unit})` : ''}
-                    <input
-                      type={f.type || 'number'}
-                      value={editDraft[f.key] ?? ''}
-                      onChange={(e) => setEditDraft((p) => ({ ...p, [f.key]: e.target.value }))}
-                      className="w-full mt-0.5 rounded-md border border-border px-2 py-1 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
-                    />
-                  </label>
-                ))}
+                {config.fields.map((f) => {
+                  const isDecimal = !!f.step && /\./.test(f.step)
+                  return (
+                    <label key={f.key} className="text-xs text-text-muted block">
+                      {f.label}{f.unit ? ` (${f.unit})` : ''}
+                      <input
+                        type={isDecimal ? 'text' : (f.type || 'number')}
+                        inputMode={isDecimal ? 'decimal' : 'numeric'}
+                        value={editDraft[f.key] ?? ''}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          if (isDecimal) {
+                            if (raw !== '' && !/^[\d.,]*$/.test(raw)) return
+                            setEditDraft((p) => ({ ...p, [f.key]: raw.replace(',', '.') }))
+                          } else {
+                            setEditDraft((p) => ({ ...p, [f.key]: raw }))
+                          }
+                        }}
+                        className="w-full mt-0.5 rounded-md border border-border px-2 py-1 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+                      />
+                    </label>
+                  )
+                })}
               </div>
               <div className="flex justify-end gap-2">
                 <button onClick={() => { setEditingId(null); setEditDraft({}) }} className="text-xs text-text-muted hover:text-text px-2 py-1">Отмена</button>

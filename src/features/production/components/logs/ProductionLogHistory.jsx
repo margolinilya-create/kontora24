@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
+import { ProductionLogAuditModal } from './ProductionLogAuditModal'
 
 /**
  * Список записей производственных логов.
@@ -14,6 +15,7 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
   const [editingId, setEditingId] = useState(null)
   const [editDraft, setEditDraft] = useState({})
   const [deleteId, setDeleteId] = useState(null)
+  const [auditLog, setAuditLog] = useState(null) // { id, stage } | null
   const [busy, setBusy] = useState(false)
 
   const filtered = stage ? logs.filter((l) => l.stage === stage) : logs
@@ -146,6 +148,15 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
                   {canEdit && (
                     <button onClick={() => startEdit(log)} className="text-[11px] text-text-muted hover:text-text px-1.5 py-0.5 rounded hover:bg-surface-2">Изм.</button>
                   )}
+                  {isPrivileged && (
+                    <button
+                      onClick={() => setAuditLog({ id: log.id, stage: log.stage })}
+                      title="История правок"
+                      className="text-[11px] text-text-muted hover:text-text px-1.5 py-0.5 rounded hover:bg-surface-2"
+                    >
+                      История
+                    </button>
+                  )}
                   {canDelete && (
                     <button onClick={() => setDeleteId(log.id)} className="text-[11px] text-danger hover:bg-danger/10 px-1.5 py-0.5 rounded">Удал.</button>
                   )}
@@ -165,6 +176,14 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
         confirmText="Удалить"
         variant="danger"
       />
+
+      {auditLog && (
+        <ProductionLogAuditModal
+          logId={auditLog.id}
+          stage={auditLog.stage}
+          onClose={() => setAuditLog(null)}
+        />
+      )}
     </div>
   )
 }

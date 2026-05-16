@@ -9,6 +9,7 @@ import { useDeadlineAlerts } from '@/shared/hooks/useDeadlineAlerts'
 import { useStageNotifications } from '@/shared/hooks/useStageNotifications'
 import { NAV_ITEMS } from '@/shared/constants'
 import { RoleEmulationBanner } from './RoleEmulationBanner'
+import { ShiftReminderModal } from '@/features/production/components/ShiftReminderModal'
 
 const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map(item => [item.path, item.label]))
 
@@ -74,6 +75,7 @@ export function Layout() {
         </main>
       </div>
       <RoleEmulationBanner />
+      <ShiftReminderModal />
     </div>
   )
 }

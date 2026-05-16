@@ -18,7 +18,7 @@ import { InfoField } from './InfoField'
 export function FinanceTab({ order }) {
   const { logs } = useProductionLogs(order.id, order.qty)
   const actual = calculateActualMaterialsCost(logs, order.film_type)
-  const payout = calculateWorkerPayout(logs)
+  const payout = calculateWorkerPayout(logs, { ordersById: { [order.id]: order } })
 
   const total = Number(order.price_final) || 0
   const manualLabor = Number(order.cost_labor) || 0

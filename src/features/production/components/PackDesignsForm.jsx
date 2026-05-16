@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState, useEffect, useRef } from 'react'
 import Button from '@/shared/components/Button'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -18,16 +18,38 @@ import { translateError } from '@/shared/lib/error-translator'
  * сотрудник может довносить количество (фидбэк менеджера 14.05).
  */
 const MODE_LABELS = {
-  pouring:  { value: 'Залить', valueAria: 'Залить, шт',     valueField: 'stickers_good',    showDefects: true,  errorEmpty: 'Введите залито или брак' },
+  pouring:  { value: 'Залито', valueAria: 'Залито, шт',     valueField: 'stickers_good',    showDefects: true,  errorEmpty: 'Введите залито или брак' },
   print:    { value: 'Напечатано', valueAria: 'Напечатано, шт', valueField: 'stickers_printed', showDefects: false, errorEmpty: 'Введите кол-во напечатанных' },
   cutting:  { value: 'Нарезано', valueAria: 'Нарезано, шт',  valueField: 'qty_cut',          showDefects: true,  errorEmpty: 'Введите нарезано или брак' },
 }
 
-export function PackDesignsForm({ designs, logs = [], stage, incoming, onSubmitDesign, updateName, readOnly = false, mode = 'pouring' }) {
+// sessionStorage-bridge: drafts переживают unmount/remount компонента,
+// чтобы при сохранении одного вида другие введённые числа не пропадали
+// (фидбэк менеджера 17.05).
+function draftsStorageKey(orderId, stage) {
+  return `pack-drafts:${orderId || 'noid'}:${stage || 'nostage'}`
+}
+function readDrafts(orderId, stage) {
+  try {
+    const raw = sessionStorage.getItem(draftsStorageKey(orderId, stage))
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function PackDesignsFormImpl({ designs, logs = [], stage, incoming, onSubmitDesign, updateName, readOnly = false, mode = 'pouring' }) {
   const labels = MODE_LABELS[mode] || MODE_LABELS.pouring
-  const [drafts, setDrafts] = useState({}) // { [designIndex]: { value, defects } }
+  const orderId = designs?.[0]?.order_id || null
+  const [drafts, setDrafts] = useState(() => readDrafts(orderId, stage))
   const [savingIndex, setSavingIndex] = useState(null)
   const [editingNameId, setEditingNameId] = useState(null)
+
+  // Persist drafts to sessionStorage по (orderId, stage). При смене заказа/этапа
+  // — другой ключ, старые drafts остаются в storage (изолированно) до закрытия вкладки.
+  const storageKeyRef = useRef(draftsStorageKey(orderId, stage))
+  useEffect(() => { storageKeyRef.current = draftsStorageKey(orderId, stage) }, [orderId, stage])
+  useEffect(() => {
+    try { sessionStorage.setItem(storageKeyRef.current, JSON.stringify(drafts)) } catch { /* quota */ }
+  }, [drafts])
 
   function setField(idx, key, value) {
     setDrafts((prev) => ({ ...prev, [idx]: { ...prev[idx], [key]: value } }))
@@ -171,3 +193,5 @@ export function PackDesignsForm({ designs, logs = [], stage, incoming, onSubmitD
     </div>
   )
 }
+
+export const PackDesignsForm = memo(PackDesignsFormImpl)

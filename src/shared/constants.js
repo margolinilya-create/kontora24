@@ -429,8 +429,8 @@ export function getStockStatus(material) {
 // на основе production logs.
 export const WORKER_RATES = {
   pouring_per_sticker:  1.0,  // заливка одного стикера (хорошего)
-  selection_per_bg:     0.5,  // выборка одного фона
-  assembly_per_pack:    0.5,  // сборка одного пака
+  selection_per_sticker: 0.5, // выборка фона, оплачивается как qty_selected × stickers_per_pack × 0.5 (фидбэк 17.05)
+  assembly_per_pack:    0.5,  // сборка одного пака, считаем по стикерам в паке
   packaging_per_pack:   1.5,  // упаковка одного пака
 }
 
@@ -442,14 +442,18 @@ export const WORKER_RATES = {
  * @param {object} [opts.ordersById] — карта { [order_id]: order } чтобы достать stickers_per_pack
  * @returns {{ breakdown: object, total: number }}
  *
- * Формула сборки 3D обновлена 12.05: packs_assembled × stickers_per_pack × 0,5 ₽
- * (раньше была фиксированная ставка за пак).
+ * Формула сборки 3D обновлена 12.05: packs_assembled × stickers_per_pack × 0,5 ₽.
+ * Формула выборки фонов обновлена 17.05: qty_selected × stickers_per_pack × 0,5 ₽
+ * (раньше была фиксированная ставка за фон без учёта что к каждому фону относятся
+ * stickers_per_pack стикеров).
  */
 export function calculateWorkerPayout(logs, opts = {}) {
-  let pouring = 0, selection = 0, packaging = 0
-  // Сборку считаем в «стикерах в собранных паках», чтобы умножить на ставку 0.5 ₽/стикер.
+  let pouring = 0, packaging = 0
+  // Выборку и сборку считаем в «стикерах», чтобы умножить на ставку 0.5 ₽/стикер.
+  let selectionStickers = 0
   let assemblyStickers = 0
-  // Для отчётности храним и кол-во паков
+  // Для отчётности храним сырые counts тоже
+  let selectionBgs = 0
   let assemblyPacks = 0
 
   for (const l of logs || []) {
@@ -457,7 +461,11 @@ export function calculateWorkerPayout(logs, opts = {}) {
       pouring += Number(l.stickers_good) || 0
     }
     if (l.stage === 'selection_pouring') {
-      selection += Number(l.qty_selected) || 0
+      const bgs = Number(l.qty_selected) || 0
+      selectionBgs += bgs
+      const order = opts.ordersById?.[l.order_id] || l.order || null
+      const perPack = Number(order?.stickers_per_pack) || 1
+      selectionStickers += bgs * perPack
       pouring += Number(l.stickers_good) || 0
     }
     if (l.stage === 'assembly_3d') {
@@ -472,10 +480,10 @@ export function calculateWorkerPayout(logs, opts = {}) {
     }
   }
   const breakdown = {
-    pouring:    { count: pouring,          rate: WORKER_RATES.pouring_per_sticker, amount: pouring          * WORKER_RATES.pouring_per_sticker, label: 'Заливка стикеров' },
-    selection:  { count: selection,        rate: WORKER_RATES.selection_per_bg,    amount: selection        * WORKER_RATES.selection_per_bg,    label: 'Выборка фонов' },
-    assembly:   { count: assemblyStickers, rate: WORKER_RATES.assembly_per_pack,   amount: assemblyStickers * WORKER_RATES.assembly_per_pack,   label: 'Сборка 3D-паков', packs: assemblyPacks },
-    packaging:  { count: packaging,        rate: WORKER_RATES.packaging_per_pack,  amount: packaging        * WORKER_RATES.packaging_per_pack,  label: 'Упаковка паков' },
+    pouring:    { count: pouring,           rate: WORKER_RATES.pouring_per_sticker,   amount: pouring           * WORKER_RATES.pouring_per_sticker,   label: 'Заливка стикеров' },
+    selection:  { count: selectionStickers, rate: WORKER_RATES.selection_per_sticker, amount: selectionStickers * WORKER_RATES.selection_per_sticker, label: 'Выборка фонов', bgs: selectionBgs },
+    assembly:   { count: assemblyStickers,  rate: WORKER_RATES.assembly_per_pack,     amount: assemblyStickers  * WORKER_RATES.assembly_per_pack,     label: 'Сборка 3D-паков', packs: assemblyPacks },
+    packaging:  { count: packaging,         rate: WORKER_RATES.packaging_per_pack,    amount: packaging         * WORKER_RATES.packaging_per_pack,    label: 'Упаковка паков' },
   }
   const total = breakdown.pouring.amount + breakdown.selection.amount + breakdown.assembly.amount + breakdown.packaging.amount
   return { breakdown, total }

@@ -130,7 +130,12 @@ export function useBonusReport(period = '30') {
           byWorker[name].total += l.packs_assembled * perPack * (rates.assembly_3d || 0)
         }
         if (l.packs_packaged) { byWorker[name].packaging += l.packs_packaged; byWorker[name].total += l.packs_packaged * (rates.packaging || 0) }
-        if (l.qty_selected) { byWorker[name].selection += l.qty_selected; byWorker[name].total += l.qty_selected * (rates.selection || 0) }
+        if (l.qty_selected) {
+          // Выборка фонов: bgs × stickers_per_pack × ставка (фидбэк 17.05 — каждый фон = N стикеров)
+          const perPack = Number(l.order?.stickers_per_pack) || 1
+          byWorker[name].selection += l.qty_selected
+          byWorker[name].total += l.qty_selected * perPack * (rates.selection || 0)
+        }
       })
 
       setData(Object.values(byWorker).sort((a, b) => b.total - a.total))

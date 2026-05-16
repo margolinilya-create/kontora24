@@ -72,11 +72,18 @@ export function useAnalyticsData(period) {
     return map
   }, [data.productionLogs])
 
+  // ordersById — для calculateWorkerPayout (нужен stickers_per_pack для выборки и сборки 3D)
+  const ordersById = useMemo(() => {
+    const m = {}
+    for (const o of orders) m[o.id] = o
+    return m
+  }, [orders])
+
   // Заказы с расчётной себестоимостью (приоритет: фактическая, fallback — ручная)
   const ordersEnriched = useMemo(() => orders.map((o) => {
     const logs = logsByOrder[o.id] || []
     const materials = calculateActualMaterialsCost(logs, o.film_type)
-    const payout = calculateWorkerPayout(logs)
+    const payout = calculateWorkerPayout(logs, { ordersById })
     const computedCost = materials.total + payout.total
     const fallbackCost = Number(o.cost_total) || (Number(o.cost_materials) || 0) + (Number(o.cost_labor) || 0)
     return {
@@ -84,7 +91,7 @@ export function useAnalyticsData(period) {
       _computedCost: computedCost > 0 ? computedCost : fallbackCost,
       _payout: payout.total,
     }
-  }), [orders, logsByOrder])
+  }), [orders, logsByOrder, ordersById])
 
   const doneOrders = useMemo(() => ordersEnriched.filter((o) => o.status === 'done'), [ordersEnriched])
   const revenue = useMemo(() => doneOrders.reduce((s, o) => s + (Number(o.price_final) || 0), 0), [doneOrders])
@@ -181,7 +188,7 @@ export function useAnalyticsData(period) {
     for (const log of data.productionLogs) {
       if (!log.worker_id) continue
       const name = log.worker?.display_name || 'Неизвестно'
-      const payout = calculateWorkerPayout([log])
+      const payout = calculateWorkerPayout([log], { ordersById })
       if (!byWorker[name]) byWorker[name] = 0
       byWorker[name] += payout.total
     }

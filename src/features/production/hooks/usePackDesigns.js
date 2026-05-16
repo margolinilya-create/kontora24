@@ -13,6 +13,9 @@ import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
  * Поэтому хук больше не пишет qty_poured/qty_defects и не отдаёт totals/allComplete.
  */
 export function usePackDesigns(orderId) {
+  // Keep-prev-on-refetch: при перезагрузке (тот же orderId) НЕ сбрасываем designs в [],
+  // иначе родитель размонтирует PackDesignsForm и потеряет локальный state drafts
+  // (фидбэк 17.05 — теряются введённые числа в других видах при сохранении одного).
   const [designs, setDesigns] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

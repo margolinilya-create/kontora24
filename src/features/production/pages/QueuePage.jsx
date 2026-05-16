@@ -1,12 +1,17 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useSubtaskQueue } from '../hooks/useSubtaskQueue'
 import { QueueCard } from '../components/QueueCard'
 import { BatchView } from '../components/BatchView'
 import { playNotificationSound } from '@/shared/lib/sound'
 import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
+
+// Этапы на которых stickerpack3D показывается как отдельные подзадачи
+// (фоны/стикеры идут параллельно) — фидбэк менеджера 17.05.
+const SUBTASK_ENABLED_STAGES = new Set(['lamination', 'cutting', 'selection_pouring'])
 
 const QUEUE_CONFIG = {
   design: { title: 'Дизайн', subtitle: 'Разработка макетов', status: 'design' },
@@ -56,24 +61,44 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
   const config = QUEUE_CONFIG[queueType]
   const { profile } = useAuth()
   const { orders: allOrders, loading, refetch } = useOrders({ statuses: [config.status] })
+  const useSubtasks = SUBTASK_ENABLED_STAGES.has(config.status)
+  const { items: subtaskItems, loading: subtasksLoading, refetch: refetchSubtasks } = useSubtaskQueue(useSubtasks ? config.status : null)
   const [showMine, setShowMine] = useState(false)
   const [sortBy, setSortBy] = useState('deadline')
   const [viewMode, setViewMode] = useState('list')
 
-  const orders = useMemo(() => {
-    let filtered = allOrders
+  // Виртуальные элементы очереди: обычные заказы + 3D-pack подзадачи.
+  // На subtask-этапах 3D-pack заказы СКРЫВАЕМ из allOrders (показываем по подзадачам),
+  // иначе будет дубль (одна общая карточка + 2 карточки треков).
+  const queueItems = useMemo(() => {
+    const regular = useSubtasks
+      ? allOrders.filter((o) => o.order_type !== 'stickerpack3D')
+      : allOrders
+    const items = regular.map((o) => ({ key: o.id, order: o, track: null, deadline: o.deadline, priority: o.priority, created_at: o.created_at, assigned_to: o.assigned_to }))
+    if (useSubtasks) {
+      for (const it of subtaskItems) {
+        items.push({ key: `${it.order.id}-${it.track}`, order: it.order, track: it.track, deadline: it.order.deadline, priority: it.order.priority, created_at: it.order.created_at, assigned_to: it.order.assigned_to })
+      }
+    }
+    return items
+  }, [allOrders, subtaskItems, useSubtasks])
+
+  const items = useMemo(() => {
+    let filtered = queueItems
     if (showMine && profile) {
-      filtered = filtered.filter((o) => o.assigned_to === profile.id)
+      filtered = filtered.filter((it) => it.assigned_to === profile.id)
     }
     return sortOrders(filtered, sortBy)
-  }, [allOrders, showMine, profile, sortBy])
+  }, [queueItems, showMine, profile, sortBy])
 
-  const totalInQueue = allOrders.length
+  const totalInQueue = queueItems.length
 
   const myCount = useMemo(
-    () => profile ? allOrders.filter((o) => o.assigned_to === profile.id).length : 0,
-    [allOrders, profile]
+    () => profile ? queueItems.filter((it) => it.assigned_to === profile.id).length : 0,
+    [queueItems, profile]
   )
+
+  const handleRefetch = () => { refetch(); if (useSubtasks) refetchSubtasks() }
 
   // Sound notification when new orders appear in queue
   const prevCountRef = useRef(totalInQueue)
@@ -133,12 +158,12 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
       )}
 
       {enableBatchView && viewMode === 'batch' ? (
-        <BatchView orders={orders} />
-      ) : loading ? (
+        <BatchView orders={items.map((it) => it.order)} />
+      ) : loading || subtasksLoading ? (
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
-      ) : orders.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">
           <div className="text-4xl mb-3 text-text-muted/30" aria-hidden="true">
             {showMine ? '📋' : '✓'}
@@ -162,8 +187,8 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {orders.map((order) => (
-            <QueueCard key={order.id} order={order} onUpdated={refetch} />
+          {items.map((it) => (
+            <QueueCard key={it.key} order={it.order} track={it.track} onUpdated={handleRefetch} />
           ))}
         </div>
       )}

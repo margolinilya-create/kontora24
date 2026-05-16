@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { StageProgressBar } from './logs/StageProgressBar'
 import { useProductionLogs } from '../hooks/useProductionLogs'
-import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
+import { ORDER_TYPES, PRIORITIES, TRACK_LABELS } from '@/shared/constants'
 import { formatDate, formatOrderNumber } from '@/shared/lib/utils'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
 
@@ -12,7 +12,7 @@ const PRIORITY_BORDER = {
   high: 'border-l-dept-pouring',
 }
 
-export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
+export const QueueCard = memo(function QueueCard({ order, onUpdated, track = null }) {
   const { getStageProgress, error: logsError } = useProductionLogs(order.id, order.qty)
   const progress = getStageProgress(order.status)
 
@@ -28,10 +28,12 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated }) {
         priorityBorder ? ` border-l-[4px] ${priorityBorder}` : ''
       }`}
     >
-      {/* Header: #number · client | priority */}
+      {/* Header: #number[-Фон/-Стикер] · client | priority */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-base font-semibold text-text shrink-0">#{formatOrderNumber(order)}</span>
+          <span className="text-base font-semibold text-text shrink-0">
+            #{formatOrderNumber(order)}{track && `-${TRACK_LABELS[track] || track}`}
+          </span>
           {order.client?.name && (
             <>
               <span className="text-text-muted">·</span>

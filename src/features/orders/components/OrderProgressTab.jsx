@@ -5,6 +5,7 @@ import { ProductionLogHistory } from '@/features/production/components/logs/Prod
 import { addProductionLogAndCheckAdvance, updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { PackDesignsForm } from '@/features/production/components/PackDesignsForm'
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
+import { useOrderSubtasks } from '@/features/orders/hooks/useOrderSubtasks'
 import { computeIncoming, computeStageProgress } from '@/features/production/lib/production-logs'
 import { StageJumper } from './StageJumper'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
@@ -12,6 +13,7 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import {
   ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK,
+  getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS,
 } from '@/shared/constants'
 
 const NO_INPUT_STAGES = new Set(['new', 'design', 'prepress', 'otk', 'done', 'cancelled'])
@@ -95,13 +97,30 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   const packMode = stage === 'print' ? 'print' : stage === 'cutting' ? 'cutting' : 'pouring'
   const { designs, updateName } = usePackDesigns(showPackDesigns ? order.id : null)
 
+  // Подзадачи 3D-стикерпака (track-уровень) — миграция 032, фидбэк 17.05.
+  const { subtasks, advance: advanceSubtask } = useOrderSubtasks(order.id, isPack3D)
+
   // ConfirmDialog «Завершить этап?» вместо auto-advance (фидбэк 17.05).
   const [pendingAdvance, setPendingAdvance] = useState(null) // { to } | null
+  // ConfirmDialog «Отправить фоны/стикеры на N?» (R7 — параллельные подзадачи)
+  const [pendingSubtask, setPendingSubtask] = useState(null) // { track, from, to } | null
 
   async function handleSubmit(s, data) {
     const res = await addProductionLogAndCheckAdvance(order.id, s, data, order)
     refetch()
     onUpdated?.()
+
+    // Приоритет: трек-advance показываем раньше основного advance (для 3D-pack).
+    if (res?.completed_track && isPack3D) {
+      const sub = subtasks[res.completed_track]
+      if (sub) {
+        const next = getNextSubtaskStatus(res.completed_track, sub.status)
+        if (next) {
+          setPendingSubtask({ track: res.completed_track, from: sub.status, to: next })
+          return
+        }
+      }
+    }
     if (res?.is_complete && res?.next_status) {
       setPendingAdvance({ to: res.next_status })
     }
@@ -117,6 +136,23 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
       toast.error(translateError(err).message || err.message)
     } finally {
       setPendingAdvance(null)
+    }
+  }
+
+  async function confirmSubtaskAdvance() {
+    if (!pendingSubtask) return
+    try {
+      const res = await advanceSubtask(pendingSubtask.track, pendingSubtask.to)
+      toast.success(`${TRACK_LABELS[pendingSubtask.track]} → ${SUBTASK_STATUS_LABELS[pendingSubtask.to]}`)
+      onUpdated?.()
+      // both_ready=true → обе подзадачи готовы, можно перевести заказ на assembly_3d
+      if (res?.both_ready) {
+        setPendingAdvance({ to: 'assembly_3d' })
+      }
+    } catch (err) {
+      toast.error(translateError(err).message || err.message)
+    } finally {
+      setPendingSubtask(null)
     }
   }
 
@@ -215,6 +251,16 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
         confirmText="Завершить этап"
         variant="primary"
       />
+
+      <ConfirmDialog
+        isOpen={!!pendingSubtask}
+        onClose={() => setPendingSubtask(null)}
+        onConfirm={confirmSubtaskAdvance}
+        title={pendingSubtask ? `Отправить ${(TRACK_LABELS[pendingSubtask.track] || pendingSubtask.track).toLowerCase()}ы на ${(SUBTASK_STATUS_LABELS[pendingSubtask.to] || pendingSubtask.to).toLowerCase()}?` : ''}
+        message={pendingSubtask ? `Подзадача «${TRACK_LABELS[pendingSubtask.track]}» перейдёт на этап «${SUBTASK_STATUS_LABELS[pendingSubtask.to]}». Другая подзадача останется на текущем этапе.` : ''}
+        confirmText="Отправить дальше"
+        variant="primary"
+      />
     </div>
   )
 }
@@ -290,6 +336,28 @@ function ProgressLinesWidget({ order, logs }) {
   )
 }
 
+function SubtaskIndicator({ order }) {
+  const isPack3D = IS_3D_STICKERPACK(order.order_type)
+  const { subtasks } = useOrderSubtasks(order.id, isPack3D)
+  if (!isPack3D || !subtasks.backgrounds || !subtasks.stickers) return null
+  const trackBadge = (track, status) => (
+    <div className="flex items-center gap-2">
+      <span className={`text-xs px-2 py-0.5 rounded ${
+        track === 'backgrounds' ? 'bg-dept-print/15 text-dept-print' : 'bg-dept-pouring/15 text-dept-pouring'
+      } font-medium`}>{TRACK_LABELS[track]}</span>
+      <span className="text-sm text-text font-medium">{SUBTASK_STATUS_LABELS[status] || status}</span>
+    </div>
+  )
+  return (
+    <div className="bg-surface rounded-xl border border-border px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+      <span className="text-xs text-text-muted">Параллельные подзадачи:</span>
+      {trackBadge('backgrounds', subtasks.backgrounds.status)}
+      <span className="text-text-muted">·</span>
+      {trackBadge('stickers', subtasks.stickers.status)}
+    </div>
+  )
+}
+
 export function OrderProgressTab({ order, onUpdated }) {
   const { logs, refetch, updateLog, softDeleteLog, error: logsError } = useProductionLogs(order.id, order.qty)
 
@@ -300,6 +368,8 @@ export function OrderProgressTab({ order, onUpdated }) {
           Не удалось загрузить логи производства. Прогресс по этапам может быть неполным.
         </div>
       )}
+
+      <SubtaskIndicator order={order} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} />

@@ -416,7 +416,21 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
     nextStatus = getNextStatus(workerRole, order.status, order, dynamicPerms)
   }
 
-  return { is_complete: isComplete, next_status: nextStatus }
+  // 4. Для 3D-стикерпака — определить, завершился ли конкретный трек.
+  // UI откроет ConfirmDialog «Отправить фоны/стикеры на N?» (фидбэк 17.05, R7).
+  let completedTrack = null
+  if (order?.order_type === 'stickerpack3D' && logData.track) {
+    const { data: trackRes } = await supabase.rpc('check_stage_completion', {
+      p_order_id: orderId,
+      p_stage: stage,
+      p_track: logData.track,
+    })
+    if (trackRes?.is_complete) {
+      completedTrack = logData.track
+    }
+  }
+
+  return { is_complete: isComplete, next_status: nextStatus, completed_track: completedTrack }
 }
 
 export async function updateOrder(orderId, updates) {

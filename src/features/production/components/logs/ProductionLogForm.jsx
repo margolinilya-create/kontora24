@@ -5,6 +5,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import { isDualTrack, IS_3D_STICKERPACK, FILM_TYPES } from '@/shared/constants'
+import { usePackagingMaterials } from '../../hooks/usePackagingMaterials'
 
 function ProgressBar({ p }) {
   if (!p) return null
@@ -44,6 +45,8 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   const config = STAGE_FIELDS[stage]
   const isPack3D = !!order && IS_3D_STICKERPACK(order.order_type)
   const useTracks = !!config?.tracks && isPack3D && isDualTrack(stage, order)
+  const isPackaging = stage === 'packaging'
+  const { bags: packagingBags, boxes: packagingBoxes } = usePackagingMaterials()
   const activeTracks = useTracks
     ? config.tracks
         .map((t) => {
@@ -230,6 +233,58 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {config.fields.map((f) => renderField(f, null))}
+          </div>
+        )}
+
+        {isPackaging && (
+          <div className="rounded-xl border border-border bg-surface-2/40 p-3 space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+              Расход упаковки
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block text-sm">
+                <span className="block text-xs text-text-muted mb-1">БОПП-пакет</span>
+                <select
+                  value={getForm('single').packaging_bag_material_id ?? ''}
+                  onChange={(e) => updateField('single', 'packaging_bag_material_id', e.target.value || null)}
+                  className="w-full rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+                >
+                  <option value="">— без БОПП —</option>
+                  {packagingBags.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="block text-xs text-text-muted mb-1">Коробка</span>
+                <select
+                  value={getForm('single').box_material_id ?? ''}
+                  onChange={(e) => updateField('single', 'box_material_id', e.target.value || null)}
+                  className="w-full rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+                >
+                  <option value="">— без коробки —</option>
+                  {packagingBoxes.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {getForm('single').box_material_id && (
+              <Input
+                id="log-boxes-used"
+                label="Использовано коробок (шт)"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                value={getForm('single').boxes_used ?? ''}
+                onChange={(e) => updateField('single', 'boxes_used', e.target.value)}
+                placeholder="1"
+              />
+            )}
+            <p className="text-[11px] text-text-muted">
+              БОПП-пакеты списываются по количеству упакованного. Коробки — по введённому числу.
+            </p>
           </div>
         )}
 

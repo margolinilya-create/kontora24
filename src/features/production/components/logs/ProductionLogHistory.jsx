@@ -114,6 +114,7 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
                 <span className="text-text-muted text-xs">{config?.label}</span>
                 {log.track === 'backgrounds' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-dept-print/15 text-dept-print">Фоны</span>}
                 {log.track === 'stickers' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-dept-pouring/15 text-dept-pouring">Стикеры</span>}
+                {log.design_index != null && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-2 text-text-muted">Вид #{log.design_index}</span>}
               </div>
               <div className="flex items-center gap-3 text-xs text-text-muted mt-0.5 flex-wrap">
                 {mainQty > 0 && <span className="font-medium text-text">{mainQty} шт</span>}

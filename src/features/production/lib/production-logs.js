@@ -44,7 +44,6 @@ export const STAGE_FIELDS = {
   lamination: {
     label: 'Ламинация',
     quantityField: 'lamination_qty',
-    enforceTargetLimit: true,
     // «Заламинировано (шт)» + «Брак (шт)» + «Ламинация (м)» с авто-лейблом плёнки заказа.
     fields: [
       { key: 'lamination_qty', label: 'Заламинировано', unit: 'шт' },
@@ -56,7 +55,6 @@ export const STAGE_FIELDS = {
   cutting: {
     label: 'Резка',
     quantityField: 'qty_cut',
-    enforceTargetLimit: true,
     tracks: [
       {
         key: 'stickers',
@@ -86,7 +84,6 @@ export const STAGE_FIELDS = {
   pouring: {
     label: 'Заливка',
     quantityField: 'stickers_good',
-    enforceTargetLimit: true,
     fields: [
       { key: 'stickers_poured', label: 'Залито', unit: 'шт' },
       { key: 'stickers_good', label: 'Хороших', unit: 'шт' },
@@ -98,7 +95,6 @@ export const STAGE_FIELDS = {
   selection_pouring: {
     label: 'Выборка / Заливка',
     quantityField: 'qty_selected',
-    enforceTargetLimit: true,
     // По ТЗ: убран `defects`. Отдельно — расход смолы через resinOnly-трек.
     tracks: [
       {
@@ -129,7 +125,6 @@ export const STAGE_FIELDS = {
   assembly_3d: {
     label: 'Сборка 3D',
     quantityField: 'packs_assembled',
-    enforceTargetLimit: true,
     fields: [
       { key: 'packs_assembled', label: 'Собрано паков', unit: 'шт' },
     ],
@@ -194,17 +189,21 @@ export function computeDualTrackProgress(logs, stage, targetQty) {
  * Для линейных этапов считается по quantityField предыдущего этапа из ORDER_ROUTES.
  * Для dual-track этапов считается с учётом трека.
  *
+ * Если этап — первый количественный в маршруте (нет предыдущего этапа с qty-логом,
+ * напр. `print`), возвращается `{ isStart: true, total: null }` — лимита по приходу нет
+ * и подпись «Поступило на этап» не показывается: этот этап сам создаёт количество.
+ *
  * @param {Array} logs
  * @param {string[]} route — ORDER_ROUTES для заказа
  * @param {string} stage
  * @param {number} targetQty
  * @param {string|null} track
- * @returns {{ total: number, source: string|null }}
+ * @returns {{ total: number|null, source: string|null, isStart?: boolean }}
  */
 export function computeIncoming(logs, route, stage, targetQty, track) {
-  if (!route || !route.includes(stage)) return { total: targetQty, source: null }
+  if (!route || !route.includes(stage)) return { total: null, source: null, isStart: true }
   const idx = route.indexOf(stage)
-  if (idx <= 0) return { total: targetQty, source: null }
+  if (idx <= 0) return { total: null, source: null, isStart: true }
 
   // Идём назад по маршруту до ближайшего этапа с qty-логом (skip 'new'/'design'/'prepress')
   for (let i = idx - 1; i >= 0; i--) {
@@ -222,18 +221,24 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
     const total = Math.max(0, produced - prevDefects)
     if (produced > 0) return { total, source: prev, produced, defects: prevDefects }
   }
-  return { total: targetQty, source: null }
+  // Не нашли предыдущего этапа с количественным логом → это стартовый этап производства.
+  return { total: null, source: null, isStart: true }
 }
 
 /**
  * Validate a log entry for a given stage.
  *
+ * Лимита по тиражу заказа НЕТ (фидбэк менеджера 14.05): печать — стартовый этап,
+ * вводится без ограничений; последующие этапы ограничены только количеством,
+ * фактически поступившим на этап (`options.incoming`), а не тиражом `qty`.
+ *
  * @param {string} stage
  * @param {object} data
  * @param {object} [options]
- *   options.progress — {total, target} прогресс по quantityField
- *   options.incoming — {total} сколько пришло с предыдущего этапа (для проверки «не больше чем приходит»)
- *   options.allowOvershoot — для packaging, можно превышать тираж
+ *   options.progress — {total, target} прогресс по quantityField (используется для «осталось»)
+ *   options.incoming — {total, isStart} сколько пришло с предыдущего этапа.
+ *     Если isStart=true или total==null — лимита нет (стартовый этап).
+ *   options.allowOvershoot — снять лимит прихода (напр. для packaging)
  */
 export function validateLogEntry(stage, data, options = {}) {
   const config = STAGE_FIELDS[stage]
@@ -250,27 +255,18 @@ export function validateLogEntry(stage, data, options = {}) {
     }
   }
 
-  // Лимит по тиражу
-  if (config.enforceTargetLimit && options.progress && config.quantityField && !options.allowOvershoot) {
-    const incoming = Number(data[config.quantityField] || 0)
-    if (incoming > 0) {
-      const remaining = Math.max(0, options.progress.target - options.progress.total)
-      if (incoming > remaining) {
-        return `Превышен тираж (${options.progress.target} шт). Осталось внести: ${remaining}`
-      }
-    }
-  }
-
   // Лимит по приходу с предыдущего этапа: «нельзя продвинуть дальше больше, чем поступило годных».
   // incoming.total — это уже годные с прошлого этапа (произведено − брак прошлого этапа).
-  if (options.incoming && config.quantityField && !options.allowOvershoot) {
+  // Для стартового этапа (isStart / total==null) лимита нет вовсе.
+  const inc = options.incoming
+  if (inc && !inc.isStart && inc.total != null && config.quantityField && !options.allowOvershoot) {
     const incoming = Number(data[config.quantityField] || 0)
     const defects = Number(data.defects || 0)
     const newDelta = incoming + defects
     const alreadyConsumed = Number(options.progress?.total || 0)
-    const available = Math.max(0, Number(options.incoming.total || 0) - alreadyConsumed)
+    const available = Math.max(0, Number(inc.total || 0) - alreadyConsumed)
     if (newDelta > available) {
-      return `На этап поступило ${options.incoming.total} шт. Доступно ещё: ${available}`
+      return `На этап поступило ${inc.total} шт. Доступно ещё: ${available}`
     }
   }
 

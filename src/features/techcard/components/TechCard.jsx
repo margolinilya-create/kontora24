@@ -111,7 +111,7 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
           boxSizing: 'border-box',
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 3 * MM, minHeight: 0 }}>
-            <Field label="Комментарий заказчика" value={order.client_brief || order.notes || '—'} />
+            <Field label="Комментарий заказчика" value={order.client_brief || order.notes || '—'} valueFontSize={9} />
             <Field label="Заказчик" value={order.client?.name || '—'} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM, minHeight: 0 }}>
@@ -302,7 +302,7 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
   )
 })
 
-function Field({ label, value }) {
+function Field({ label, value, valueFontSize = 11 }) {
   return (
     <div style={{ minWidth: 0, overflow: 'hidden' }}>
       <div style={{
@@ -317,12 +317,13 @@ function Field({ label, value }) {
       </div>
       <div style={{
         fontWeight: 600,
-        fontSize: 11,
+        fontSize: valueFontSize,
         marginTop: 2,
         lineHeight: 1.2,
         overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
+        whiteSpace: 'normal',
       }}>
         {value}
       </div>

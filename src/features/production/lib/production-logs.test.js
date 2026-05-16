@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { computeStageProgress, computeDualTrackProgress, validateLogEntry, STAGE_FIELDS } from './production-logs'
+import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS } from './production-logs'
+
+const ROUTE = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
 
 describe('computeStageProgress', () => {
   it('returns zero progress when no logs', () => {
@@ -199,6 +201,65 @@ describe('validateLogEntry', () => {
   it('does not error on negative numbers for non-number fields', () => {
     // film_type is type: 'text', not number
     expect(validateLogEntry('print', { film_type: 'G' })).toBeNull()
+  })
+
+  it('no longer caps by order qty — print accepts more than target', () => {
+    // Печать — стартовый этап, вводится без ограничений (фидбэк 14.05).
+    expect(validateLogEntry('print', { stickers_printed: 5000 }, {
+      progress: { total: 0, target: 100 },
+      incoming: { isStart: true, total: null },
+    })).toBeNull()
+  })
+
+  it('no qty cap on later stages — only incoming caps', () => {
+    // lamination больше не ограничен тиражом, только фактическим приходом
+    expect(validateLogEntry('lamination', { lamination_qty: 300 }, {
+      progress: { total: 0, target: 100 },
+      incoming: { total: 500 },
+    })).toBeNull()
+  })
+
+  it('caps by incoming quantity on non-start stages', () => {
+    const err = validateLogEntry('lamination', { lamination_qty: 120 }, {
+      progress: { total: 0 },
+      incoming: { total: 100 },
+    })
+    expect(err).toMatch(/поступило 100/i)
+  })
+
+  it('ignores incoming cap when stage is start (isStart)', () => {
+    expect(validateLogEntry('print', { stickers_printed: 999 }, {
+      incoming: { isStart: true, total: null },
+    })).toBeNull()
+  })
+})
+
+describe('computeIncoming', () => {
+  it('returns isStart for the first quantity-producing stage (print)', () => {
+    const result = computeIncoming([], ROUTE, 'print', 100, null)
+    expect(result.isStart).toBe(true)
+    expect(result.total).toBeNull()
+  })
+
+  it('computes incoming from the previous quantity stage', () => {
+    const logs = [
+      { stage: 'print', stickers_printed: 80 },
+      { stage: 'print', stickers_printed: 10 },
+    ]
+    const result = computeIncoming(logs, ROUTE, 'lamination', 100, null)
+    expect(result.total).toBe(90)
+    expect(result.source).toBe('print')
+  })
+
+  it('subtracts previous-stage defects from incoming', () => {
+    const logs = [{ stage: 'print', stickers_printed: 100, defects: 15 }]
+    const result = computeIncoming(logs, ROUTE, 'lamination', 100, null)
+    expect(result.total).toBe(85)
+  })
+
+  it('returns isStart when stage is not in route', () => {
+    const result = computeIncoming([], ROUTE, 'pouring', 100, null)
+    expect(result.isStart).toBe(true)
   })
 })
 

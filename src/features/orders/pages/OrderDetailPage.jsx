@@ -248,9 +248,9 @@ function OverviewTab({ order, onUpdated }) {
         </div>
         {/* Row 3: highlighted comment from customer */}
         {order.notes && (
-          <div className="bg-accent/10 border border-accent/30 rounded-2xl p-4">
+          <div className="bg-accent/10 border border-accent/30 rounded-2xl p-4 min-w-0">
             <p className="text-xs font-medium text-accent uppercase mb-1.5">Комментарий заказчика</p>
-            <p className="text-sm whitespace-pre-wrap text-text">{order.notes}</p>
+            <p className="text-sm whitespace-pre-wrap break-words text-text">{order.notes}</p>
           </div>
         )}
       </div>

@@ -5,45 +5,60 @@ import { translateError } from '@/shared/lib/error-translator'
 
 /**
  * Виджет ввода по видам стикеров для 3D-стикерпака.
- * Используется на печать / резка / заливка — лейблы зависят от mode.
+ * Используется на печать / резка / заливка — лейблы и поле зависят от mode.
  *
- *  mode='pouring' (default): «Залить» + «Брак»
- *  mode='print':   «Напечатано» (без брака — печать не учитывает дефекты)
- *  mode='cutting': «Нарезано» + «Брак»
+ *  mode='pouring' (default): «Залить» + «Брак»  → stickers_good
+ *  mode='print':   «Напечатано» (без брака)     → stickers_printed
+ *  mode='cutting': «Нарезано» + «Брак»          → qty_cut
+ *
+ * Прогресс по виду считается из production_logs (props.logs), отфильтрованных по
+ * (stage, track='stickers', design_index) — единый источник правды с worker_id.
+ * Каждый «+» вызывает onSubmitDesign(designIndex, { value, defects }), который
+ * создаёт production_log. Поля ввода НЕ закрываются по достижении тиража —
+ * сотрудник может довносить количество (фидбэк менеджера 14.05).
  */
 const MODE_LABELS = {
-  pouring:  { value: 'Залить', valueAria: 'Залить, шт', showDefects: true,  errorEmpty: 'Введите залито или брак' },
-  print:    { value: 'Напечатано', valueAria: 'Напечатано, шт', showDefects: false, errorEmpty: 'Введите кол-во напечатанных' },
-  cutting:  { value: 'Нарезано', valueAria: 'Нарезано, шт', showDefects: true,  errorEmpty: 'Введите нарезано или брак' },
+  pouring:  { value: 'Залить', valueAria: 'Залить, шт',     valueField: 'stickers_good',    showDefects: true,  errorEmpty: 'Введите залито или брак' },
+  print:    { value: 'Напечатано', valueAria: 'Напечатано, шт', valueField: 'stickers_printed', showDefects: false, errorEmpty: 'Введите кол-во напечатанных' },
+  cutting:  { value: 'Нарезано', valueAria: 'Нарезано, шт',  valueField: 'qty_cut',          showDefects: true,  errorEmpty: 'Введите нарезано или брак' },
 }
 
-export function PackDesignsForm({ designs, addProgress, updateName, readOnly = false, mode = 'pouring' }) {
+export function PackDesignsForm({ designs, logs = [], stage, incoming, onSubmitDesign, updateName, readOnly = false, mode = 'pouring' }) {
   const labels = MODE_LABELS[mode] || MODE_LABELS.pouring
-  const [drafts, setDrafts] = useState({}) // { [designId]: { poured, defects } }
-  const [savingId, setSavingId] = useState(null)
+  const [drafts, setDrafts] = useState({}) // { [designIndex]: { value, defects } }
+  const [savingIndex, setSavingIndex] = useState(null)
   const [editingNameId, setEditingNameId] = useState(null)
 
-  function setField(id, key, value) {
-    setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], [key]: value } }))
+  function setField(idx, key, value) {
+    setDrafts((prev) => ({ ...prev, [idx]: { ...prev[idx], [key]: value } }))
   }
 
-  async function handleSubmit(designId) {
-    const draft = drafts[designId] || {}
-    const poured = Number(draft.poured || 0)
+  function designStats(designIndex) {
+    const dlogs = (logs || []).filter(
+      (l) => l.stage === stage && l.track === 'stickers' && l.design_index === designIndex && !l.deleted_at,
+    )
+    const value = dlogs.reduce((s, l) => s + (Number(l[labels.valueField]) || 0), 0)
+    const defects = dlogs.reduce((s, l) => s + (Number(l.defects) || 0), 0)
+    return { value, defects }
+  }
+
+  async function handleSubmit(designIndex) {
+    const draft = drafts[designIndex] || {}
+    const value = Number(draft.value || 0)
     const defects = labels.showDefects ? Number(draft.defects || 0) : 0
-    if (poured === 0 && defects === 0) {
+    if (value === 0 && defects === 0) {
       toast.error(labels.errorEmpty)
       return
     }
-    setSavingId(designId)
+    setSavingIndex(designIndex)
     try {
-      await addProgress(designId, { poured, defects })
+      await onSubmitDesign(designIndex, { value, defects })
       toast.success('Записано')
-      setDrafts((prev) => { const n = { ...prev }; delete n[designId]; return n })
+      setDrafts((prev) => { const n = { ...prev }; delete n[designIndex]; return n })
     } catch (err) {
       toast.error(translateError(err).message || err.message)
     } finally {
-      setSavingId(null)
+      setSavingIndex(null)
     }
   }
 
@@ -55,14 +70,21 @@ export function PackDesignsForm({ designs, addProgress, updateName, readOnly = f
     )
   }
 
+  const grandTotal = designs.reduce((s, d) => s + designStats(d.design_index).value, 0)
+  const showIncoming = incoming && !incoming.isStart && incoming.total != null
+
   return (
     <div className="space-y-3">
+      {showIncoming && (
+        <p className="text-xs text-text-muted">Поступило на этап: {incoming.total} шт</p>
+      )}
+
       {designs.map((d) => {
-        const total = d.qty_poured + d.qty_defects
-        const remaining = Math.max(0, d.qty_target - total)
+        const { value, defects } = designStats(d.design_index)
+        const total = value + defects
         const pct = d.qty_target > 0 ? Math.min(100, Math.round((total / d.qty_target) * 100)) : 0
         const isComplete = total >= d.qty_target
-        const isSaving = savingId === d.id
+        const isSaving = savingIndex === d.design_index
         const isEditingName = editingNameId === d.id
 
         return (
@@ -97,7 +119,7 @@ export function PackDesignsForm({ designs, addProgress, updateName, readOnly = f
                 )}
               </div>
               <span className={`text-xs ${isComplete ? 'text-success font-medium' : 'text-text-muted'}`}>
-                {d.qty_poured + d.qty_defects} / {d.qty_target} ({pct}%)
+                {total} / {d.qty_target} ({pct}%)
               </span>
             </div>
 
@@ -109,16 +131,16 @@ export function PackDesignsForm({ designs, addProgress, updateName, readOnly = f
               />
             </div>
 
-            {/* Inputs */}
-            {!readOnly && !isComplete && (
+            {/* Inputs — остаются видимыми даже после достижения тиража */}
+            {!readOnly && (
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <label className="block text-xs text-text-muted mb-0.5">{labels.valueAria}</label>
                   <input
                     type="number"
                     min="0"
-                    value={drafts[d.id]?.poured ?? ''}
-                    onChange={(e) => setField(d.id, 'poured', e.target.value)}
+                    value={drafts[d.design_index]?.value ?? ''}
+                    onChange={(e) => setField(d.design_index, 'value', e.target.value)}
                     placeholder="0"
                     className="w-full rounded-md border border-border px-2 py-1.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
                   />
@@ -129,20 +151,23 @@ export function PackDesignsForm({ designs, addProgress, updateName, readOnly = f
                     <input
                       type="number"
                       min="0"
-                      value={drafts[d.id]?.defects ?? ''}
-                      onChange={(e) => setField(d.id, 'defects', e.target.value)}
+                      value={drafts[d.design_index]?.defects ?? ''}
+                      onChange={(e) => setField(d.design_index, 'defects', e.target.value)}
                       placeholder="0"
                       className="w-full rounded-md border border-border px-2 py-1.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
                     />
                   </div>
                 )}
-                <Button size="sm" loading={isSaving} onClick={() => handleSubmit(d.id)}>+</Button>
-                <span className="text-xs text-text-muted whitespace-nowrap pb-1.5">осталось {remaining}</span>
+                <Button size="sm" loading={isSaving} onClick={() => handleSubmit(d.design_index)}>+</Button>
               </div>
             )}
           </div>
         )
       })}
+
+      <p className="text-xs text-text-muted pt-1 border-t border-border">
+        Итого по стикерам: <span className="font-medium text-text tabular-nums">{grandTotal} шт</span>
+      </p>
     </div>
   )
 }

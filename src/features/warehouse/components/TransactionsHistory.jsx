@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
-import { formatDateTime } from '@/shared/lib/utils'
+import { formatDateTime, formatOrderNumber } from '@/shared/lib/utils'
 import Spinner from '@/shared/components/Spinner'
 import ErrorState from '@/shared/components/ErrorState'
 
@@ -33,7 +33,7 @@ export function TransactionsHistory() {
     try {
       const { data, error: err } = await supabase
         .from('k24_material_transactions')
-        .select('*, material:k24_materials(name, type), created_by_profile:k24_profiles!created_by(display_name), order:k24_orders(number)')
+        .select('*, material:k24_materials(name, type), created_by_profile:k24_profiles!created_by(display_name), order:k24_orders(number, custom_number)')
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1)
       if (err) throw err
@@ -105,7 +105,7 @@ export function TransactionsHistory() {
                       <td className="px-4 py-2.5">
                         {t.order?.number ? (
                           <Link to={`/orders/${t.order_id}`} className="text-text hover:text-accent underline decoration-text-muted/40">
-                            #{t.order.number}
+                            #{formatOrderNumber(t.order)}
                           </Link>
                         ) : '—'}
                       </td>

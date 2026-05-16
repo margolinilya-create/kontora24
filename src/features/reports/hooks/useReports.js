@@ -58,7 +58,7 @@ export function useOrdersCostReport(period = '30') {
     setError(null)
     try {
       const [ordersRes, logsRes] = await Promise.all([
-        supabase.from('k24_orders').select('id, number, order_type, qty, price_final, cost_total, status, created_at')
+        supabase.from('k24_orders').select('id, number, custom_number, order_type, qty, price_final, cost_total, status, created_at')
           .gte('created_at', getSince(period)).order('created_at', { ascending: false }).limit(500),
         supabase.from('k24_production_logs').select('order_id, film_meters, resin_grams')
           .gte('created_at', getSince(period)).limit(5000),
@@ -157,7 +157,7 @@ export function useQualityReport(period = '30') {
     setError(null)
     try {
       const [ordersRes, logsRes] = await Promise.all([
-        supabase.from('k24_orders').select('id, number, qty, order_type')
+        supabase.from('k24_orders').select('id, number, custom_number, qty, order_type')
           .gte('created_at', getSince(period)).order('number').limit(500),
         supabase.from('k24_production_logs')
           .select('order_id, stickers_printed, stickers_poured, stickers_good')

@@ -6,6 +6,11 @@ import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 /**
  * Виды стикеров в паке (k24_pack_designs).
  * Создаются триггером при INSERT в k24_orders для типов stickerpack/stickerpack3D.
+ *
+ * С 14.05: таблица хранит ТОЛЬКО метаданные вида (design_index, name, qty_target).
+ * Прогресс по виду (напечатано / нарезано / залито) считается из k24_production_logs
+ * по (stage, track='stickers', design_index) — единый источник правды с учётом worker_id.
+ * Поэтому хук больше не пишет qty_poured/qty_defects и не отдаёт totals/allComplete.
  */
 export function usePackDesigns(orderId) {
   const [designs, setDesigns] = useState([])
@@ -56,26 +61,6 @@ export function usePackDesigns(orderId) {
     return () => { supabase.removeChannel(channel) }
   }, [orderId])
 
-  /**
-   * Increment qty_poured / qty_defects on a design (stage = заливка).
-   */
-  const addProgress = useCallback(async (designId, { poured = 0, defects = 0 }) => {
-    const current = designs.find((d) => d.id === designId)
-    if (!current) throw new Error('Вид не найден')
-    const newPoured = (current.qty_poured || 0) + Number(poured || 0)
-    const newDefects = (current.qty_defects || 0) + Number(defects || 0)
-    if (newPoured + newDefects > current.qty_target) {
-      const remaining = Math.max(0, current.qty_target - current.qty_poured - current.qty_defects)
-      throw new Error(`Превышен тираж по виду #${current.design_index}. Осталось внести: ${remaining}`)
-    }
-    const { error } = await supabase
-      .from('k24_pack_designs')
-      .update({ qty_poured: newPoured, qty_defects: newDefects })
-      .eq('id', designId)
-    if (error) throw error
-    await fetchDesigns()
-  }, [designs, fetchDesigns])
-
   const updateName = useCallback(async (designId, name) => {
     const { error } = await supabase
       .from('k24_pack_designs')
@@ -85,14 +70,5 @@ export function usePackDesigns(orderId) {
     await fetchDesigns()
   }, [fetchDesigns])
 
-  const totals = designs.reduce((acc, d) => {
-    acc.target += d.qty_target
-    acc.poured += d.qty_poured
-    acc.defects += d.qty_defects
-    return acc
-  }, { target: 0, poured: 0, defects: 0 })
-
-  const allComplete = designs.length > 0 && designs.every((d) => (d.qty_poured + d.qty_defects) >= d.qty_target)
-
-  return { designs, totals, allComplete, loading, error, addProgress, updateName, refetch: fetchDesigns }
+  return { designs, loading, error, updateName, refetch: fetchDesigns }
 }

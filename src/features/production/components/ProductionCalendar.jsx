@@ -12,6 +12,7 @@ import Sheet from '@/shared/components/Sheet'
 import { ORDER_TYPES, PRIORITIES, IS_3D_TYPE } from '@/shared/constants'
 import { stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { getDeadlineDotClass } from '@/shared/lib/deadline'
+import { formatOrderNumber } from '@/shared/lib/utils'
 
 const LOAD_COLORS = {
   empty: 'bg-surface',
@@ -49,7 +50,7 @@ export function ProductionCalendar() {
         const toDate = endOfWeek(monthEnd, { weekStartsOn: 1 })
         const { data, error: err } = await supabase
           .from('k24_orders')
-          .select('id, number, order_type, deadline, status, qty, priority, client:k24_clients(name)')
+          .select('id, number, custom_number, order_type, deadline, status, qty, priority, client:k24_clients(name)')
           .not('status', 'in', '("done","cancelled")')
           .not('deadline', 'is', null)
           .gte('deadline', fromDate.toISOString().split('T')[0])
@@ -141,7 +142,7 @@ export function ProductionCalendar() {
           <div className="flex flex-wrap gap-2">
             {overdue.map((o) => (
               <Link key={o.id} to={`/orders/${o.id}`} className="text-xs bg-danger/15 text-danger px-2 py-1 rounded-lg hover:bg-danger/25">
-                #{o.number} — {format(new Date(o.deadline), 'd MMM', { locale: ru })}
+                #{formatOrderNumber(o)} — {format(new Date(o.deadline), 'd MMM', { locale: ru })}
               </Link>
             ))}
           </div>
@@ -184,7 +185,7 @@ export function ProductionCalendar() {
                 {dayOrders.slice(0, 3).map((o) => (
                   <div key={o.id} className="text-[11px] truncate flex items-center gap-1">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${stageDotClass(o.status)}`} aria-hidden="true" />
-                    <span className="truncate">#{o.number}</span>
+                    <span className="truncate">#{formatOrderNumber(o)}</span>
                     {IS_3D_TYPE(o.order_type) && (
                       <span className="text-[9px] font-bold text-dept-pouring shrink-0" title="3D">3D</span>
                     )}
@@ -249,7 +250,7 @@ export function ProductionCalendar() {
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex items-center gap-2">
                     {dotCls && <span className={`w-2 h-2 rounded-full ${dotCls}`} aria-hidden="true" />}
-                    <span className="font-semibold text-sm">#{o.number}</span>
+                    <span className="font-semibold text-sm">#{formatOrderNumber(o)}</span>
                     <span className="text-xs text-text-muted truncate">{o.client?.name || ''}</span>
                   </div>
                   {o.priority && o.priority !== 'normal' && (

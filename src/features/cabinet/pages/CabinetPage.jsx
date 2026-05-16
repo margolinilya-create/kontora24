@@ -244,7 +244,7 @@ export default function CabinetPage() {
                       <tr key={o.orderId} className="border-b border-border last:border-0">
                         <td className="py-2">
                           <Link to={`/orders/${o.orderId}`} className="text-accent hover:underline font-medium">
-                            #{o.orderNumber}
+                            #{formatOrderNumber({ number: o.orderNumber, custom_number: o.customNumber })}
                           </Link>
                         </td>
                         <td className="py-2 text-text-muted">{ORDER_TYPES[o.orderType]?.label || o.orderType}</td>
@@ -336,7 +336,7 @@ function ShiftHistory({ shifts, logs }) {
                         <li key={l.id} className="flex items-start gap-2 text-xs">
                           <span className="text-text-muted mt-0.5">{format(new Date(l.created_at), 'HH:mm', { locale: ru })}</span>
                           <Link to={`/orders/${l.order_id}`} className="text-text font-medium hover:text-accent">
-                            #{l.order?.number}
+                            #{formatOrderNumber(l.order || {})}
                           </Link>
                           <span className="text-text-muted">·</span>
                           <span>{STAGE_FIELDS[l.stage]?.label || l.stage}</span>

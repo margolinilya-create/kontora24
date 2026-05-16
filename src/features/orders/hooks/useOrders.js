@@ -40,7 +40,7 @@ export function useOrders(filters = {}) {
     try {
       // Только поля, необходимые для списков/канбана/календаря/дашборда.
       // Полная карточка заказа подгружается через useOrderDetail.
-      const SELECT_LIST = `id, number, client_id, status, order_type, qty, width_mm, height_mm,
+      const SELECT_LIST = `id, number, custom_number, client_id, status, order_type, qty, width_mm, height_mm,
         film_type, lam_type, need_lam, design_status, priority, deadline, created_at, updated_at,
         assigned_to, created_by, bopp_bag, is_urgent, notes, deal_name, bitrix_deal_id, mockup_path,
         stickers_per_pack, design_variants, price_final, cost_total,

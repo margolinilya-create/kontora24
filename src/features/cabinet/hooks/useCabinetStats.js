@@ -106,6 +106,7 @@ export function useCabinetStats(period = '30') {
           orderMap[key] = {
             orderId: l.order_id,
             orderNumber: l.order?.number,
+            customNumber: l.order?.custom_number,
             orderType: l.order?.order_type,
             stages: {},
             totalEntries: 0,

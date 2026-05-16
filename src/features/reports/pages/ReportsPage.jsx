@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useWorkSchedule, useOrdersCostReport, useBonusReport, useQualityReport } from '../hooks/useReports'
 import { ORDER_TYPES } from '@/shared/constants'
-import { formatPrice } from '@/shared/lib/utils'
+import { formatPrice, formatOrderNumber } from '@/shared/lib/utils'
 import { exportCSV } from '@/shared/lib/export'
 import Tabs from '@/shared/components/Tabs'
 import Button from '@/shared/components/Button'
@@ -102,7 +102,7 @@ function OrdersCostReport({ period }) {
 
   function handleExport() {
     const rows = data.map((o) => ({
-      '#': o.number, 'Тип': ORDER_TYPES[o.order_type]?.label, 'Тираж': o.qty,
+      '#': formatOrderNumber(o), 'Тип': ORDER_TYPES[o.order_type]?.label, 'Тираж': o.qty,
       'Цена': o.price_final, 'Себестоимость': o.cost_total, 'Прибыль': o.profit,
       'Маржа %': o.margin_pct, 'Плёнка (м)': o.actual_film, 'Смола (г)': o.actual_resin,
     }))
@@ -134,7 +134,7 @@ function OrdersCostReport({ period }) {
           <tbody>
             {data.map((o) => (
               <tr key={o.id} className="border-b border-border last:border-0">
-                <td className="py-2 font-medium">{o.number}</td>
+                <td className="py-2 font-medium">{formatOrderNumber(o)}</td>
                 <td className="py-2 text-text-muted">{ORDER_TYPES[o.order_type]?.label}</td>
                 <td className="py-2 text-right">{o.qty}</td>
                 <td className="py-2 text-right">{formatPrice(o.price_final)}</td>
@@ -213,7 +213,7 @@ function QualityReport({ period }) {
 
   function handleExport() {
     const rows = data.map((o) => ({
-      '#': o.number, 'Тираж': o.qty, 'Напечатано': o.printed, 'Залито': o.poured,
+      '#': formatOrderNumber(o), 'Тираж': o.qty, 'Напечатано': o.printed, 'Залито': o.poured,
       'Хороших': o.good, 'Брак': o.rejected, 'Брак %': o.rejectPct,
       'Излишек': o.surplus, 'Излишек %': o.surplusPct,
     }))
@@ -244,7 +244,7 @@ function QualityReport({ period }) {
           <tbody>
             {data.map((o) => (
               <tr key={o.id} className="border-b border-border last:border-0">
-                <td className="py-2 font-medium">{o.number}</td>
+                <td className="py-2 font-medium">{formatOrderNumber(o)}</td>
                 <td className="py-2 text-right">{o.qty}</td>
                 <td className="py-2 text-right">{o.printed || '—'}</td>
                 <td className="py-2 text-right">{o.poured || '—'}</td>

@@ -39,14 +39,14 @@ export function FinanceTab({ order }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-accent text-on-accent rounded-2xl shadow-card p-5">
           <p className="text-sm opacity-70">Итоговая стоимость</p>
-          <p className="text-3xl font-bold font-display tracking-tight mt-1">{formatPrice(total)}</p>
+          <p className="text-[clamp(1.25rem,3.5vw,1.875rem)] font-bold font-display tracking-tight mt-1 break-words">{formatPrice(total)}</p>
           {order.qty > 0 && (
             <p className="text-xs opacity-70 mt-1">{formatPrice(pricePerUnit)} / шт</p>
           )}
         </div>
         <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <p className="text-sm text-text-muted">Себестоимость</p>
-          <p className="text-3xl font-bold font-display tracking-tight mt-1">{formatPrice(cost)}</p>
+          <p className="text-[clamp(1.25rem,3.5vw,1.875rem)] font-bold font-display tracking-tight mt-1 break-words">{formatPrice(cost)}</p>
           <p className="text-xs text-text-muted mt-1">
             {formatPrice(costPerUnit)} / шт
           </p>
@@ -57,7 +57,7 @@ export function FinanceTab({ order }) {
         </div>
         <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <p className="text-sm text-text-muted">Маржинальность</p>
-          <p className={`text-3xl font-bold font-display tracking-tight mt-1 ${margin > 0 ? 'text-success' : margin < 0 ? 'text-danger' : ''}`}>
+          <p className={`text-[clamp(1.25rem,3.5vw,1.875rem)] font-bold font-display tracking-tight mt-1 break-words ${margin > 0 ? 'text-success' : margin < 0 ? 'text-danger' : ''}`}>
             {formatPrice(margin)}
           </p>
           {total > 0 && (

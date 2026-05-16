@@ -35,11 +35,23 @@ function ProgressBar({ p }) {
  * — Этап selection_pouring имеет дополнительный «расход смолы» отдельным треком
  *   (без track-привязки) — submit отправит 3-й лог с resin_grams.
  * — Лейбл «Плёнка» автоматически берётся из заказа (film_type / film_type_stickers).
+ * — omitFields — { [trackKey]: [fieldKey, ...] } — поля, которые форма НЕ рендерит.
+ *   Используется для 3D-стикерпака: количество стикеров вводится поэвидово
+ *   (PackDesignsForm), поэтому трек «Стикеры» теряет количественные поля
+ *   (а если у трека не осталось полей — он скрывается целиком).
  */
-export function ProductionLogForm({ stage, order, progress, incoming, onSubmit }) {
+export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, omitFields }) {
   const config = STAGE_FIELDS[stage]
   const isPack3D = !!order && IS_3D_STICKERPACK(order.order_type)
   const useTracks = !!config?.tracks && isPack3D && isDualTrack(stage, order)
+  const activeTracks = useTracks
+    ? config.tracks
+        .map((t) => {
+          const omit = omitFields?.[t.key]
+          return omit ? { ...t, fields: t.fields.filter((f) => !omit.includes(f.key)) } : t
+        })
+        .filter((t) => t.fields.length > 0)
+    : []
 
   const [saving, setSaving] = useState(false)
   // Состояние формы — { [trackKey || 'single']: { fieldKey: value }, notes, resin }
@@ -89,7 +101,7 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit }
     if (useTracks) {
       // Собираем логи по трекам
       const trackEntries = []
-      for (const t of config.tracks) {
+      for (const t of activeTracks) {
         const data = getForm(t.key)
         if (isFormEmpty(data)) continue
         const validationErr = validateLogEntry(stage, data, {
@@ -165,29 +177,44 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit }
     )
   }
 
+  // «Поступило на этап» показываем только если это не стартовый этап (isStart) и есть число.
+  const singleIncoming = !useTracks && incoming && !incoming.isStart && incoming.total != null
+    ? incoming : null
+
   return (
     <div className="bg-surface rounded-xl border border-border p-5">
       <h3 className="font-semibold mb-2">{config.label}</h3>
 
       {!useTracks && <ProgressBar p={progress} />}
+      {singleIncoming && (
+        <p className="text-xs text-text-muted mb-3">
+          Поступило на этап: {singleIncoming.total} шт
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
         {useTracks ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {config.tracks.map((t) => (
-              <div key={t.key} className={`rounded-xl border p-3 ${t.accent || 'border-border'}`}>
-                <div className="text-xs font-semibold uppercase tracking-wide mb-2">{t.label}</div>
-                {progress?.[t.key] && <ProgressBar p={progress[t.key]} />}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {t.fields.map((f) => renderField(f, t.key))}
+          <div className={`grid grid-cols-1 gap-3 ${activeTracks.length > 1 ? 'lg:grid-cols-2' : ''}`}>
+            {activeTracks.map((t) => {
+              const trackIncoming = incoming?.[t.key] && !incoming[t.key].isStart && incoming[t.key].total != null
+                ? incoming[t.key] : null
+              return (
+                <div key={t.key} className={`rounded-xl border p-3 ${t.accent || 'border-border'}`}>
+                  <div className="text-xs font-semibold uppercase tracking-wide mb-2">{t.label}</div>
+                  {trackIncoming && (
+                    <p className="text-xs text-text-muted mb-2">
+                      Поступило на этап: {trackIncoming.total} шт
+                    </p>
+                  )}
+                  {progress?.[t.key] && t.fields.some((f) => f.unit === 'шт') && (
+                    <ProgressBar p={progress[t.key]} />
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {t.fields.map((f) => renderField(f, t.key))}
+                  </div>
                 </div>
-                {incoming?.[t.key] && (
-                  <p className="text-xs text-text-muted mt-2">
-                    Поступило на этап: {incoming[t.key].total} шт
-                  </p>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -212,12 +239,6 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit }
               placeholder="0"
             />
           </div>
-        )}
-
-        {incoming?.total && !useTracks && (
-          <p className="text-xs text-text-muted">
-            Поступило на этап: {incoming.total} шт
-          </p>
         )}
 
         <Input

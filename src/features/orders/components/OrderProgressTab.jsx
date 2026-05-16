@@ -14,10 +14,12 @@ function getProgressLines(order) {
   const route = getOrderRoute(order)
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const is3D = isPack3D || order.order_type === 'sticker3D'
+  // Для 3D-стикерпака стикеры вводятся поэвидово: всего нужно qty × кол-во видов.
+  const packStickerTarget = isPack3D ? order.qty * (order.stickers_per_pack || 1) : order.qty
   const lines = []
 
   if (route.includes('print')) {
-    lines.push({ key: 'print_stickers', stage: 'print', track: isPack3D ? 'stickers' : null, qtyField: 'stickers_printed', label: 'Напечатано стикеров' })
+    lines.push({ key: 'print_stickers', stage: 'print', track: isPack3D ? 'stickers' : null, qtyField: 'stickers_printed', label: 'Напечатано стикеров', target: isPack3D ? packStickerTarget : undefined })
     if (isPack3D) {
       lines.push({ key: 'print_backgrounds', stage: 'print', track: 'backgrounds', qtyField: 'backgrounds_printed', label: 'Напечатано фонов' })
     }
@@ -26,14 +28,14 @@ function getProgressLines(order) {
     lines.push({ key: 'lamination_qty', stage: 'lamination', track: null, qtyField: 'lamination_qty', label: isPack3D ? 'Заламинировано фонов' : 'Заламинировано' })
   }
   if (route.includes('cutting')) {
-    lines.push({ key: 'cutting', stage: 'cutting', track: isPack3D ? 'stickers' : null, qtyField: 'qty_cut', label: isPack3D ? 'Нарезано стикеров' : 'Нарезано' })
+    lines.push({ key: 'cutting', stage: 'cutting', track: isPack3D ? 'stickers' : null, qtyField: 'qty_cut', label: isPack3D ? 'Нарезано стикеров' : 'Нарезано', target: isPack3D ? packStickerTarget : undefined })
     if (isPack3D) {
       lines.push({ key: 'cutting_bg', stage: 'cutting', track: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано фонов' })
     }
   }
   if (route.includes('selection_pouring')) {
     lines.push({ key: 'selection', stage: 'selection_pouring', track: 'backgrounds', qtyField: 'qty_selected', label: 'Выбрано фонов' })
-    lines.push({ key: 'pouring_pack', stage: 'selection_pouring', track: 'stickers', qtyField: 'stickers_good', label: 'Залито стикеров' })
+    lines.push({ key: 'pouring_pack', stage: 'selection_pouring', track: 'stickers', qtyField: 'stickers_good', label: 'Залито стикеров', target: packStickerTarget })
   }
   if (route.includes('pouring')) {
     lines.push({ key: 'pouring', stage: 'pouring', track: null, qtyField: 'stickers_good', label: 'Залито стикеров (хороших)' })
@@ -78,14 +80,32 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const route = getOrderRoute(order)
 
-  const showPackDesigns = isPack3D && ['print', 'cutting', 'pouring', 'selection_pouring'].includes(stage)
+  const showPackDesigns = isPack3D && ['print', 'cutting', 'selection_pouring'].includes(stage)
   const packMode = stage === 'print' ? 'print' : stage === 'cutting' ? 'cutting' : 'pouring'
-  const { designs, addProgress, updateName } = usePackDesigns(showPackDesigns ? order.id : null)
+  const { designs, updateName } = usePackDesigns(showPackDesigns ? order.id : null)
 
   async function handleSubmit(s, data) {
     await addProductionLogAndCheckAdvance(order.id, s, data, order)
     refetch()
     onUpdated?.()
+  }
+
+  // Поэвидовой ввод стикеров для 3D-стикерпака — каждый «+» создаёт production_log
+  // с worker_id + design_index + track='stickers' (единый учёт, см. usePackDesigns).
+  const PACK_STICKER_FIELD = { print: 'stickers_printed', cutting: 'qty_cut', selection_pouring: 'stickers_good' }
+  // Количественные поля трека «стикеры» убираем из общей формы — они вводятся
+  // поэвидово. Для печати у трека остаётся «Плёнка стикеров», для резки/выборки
+  // трек «стикеры» исчезает целиком (полей не остаётся).
+  const PACK_OMIT_FIELDS = {
+    print: { stickers: ['stickers_printed'] },
+    cutting: { stickers: ['qty_cut', 'defects'] },
+    selection_pouring: { stickers: ['stickers_good'] },
+  }
+  async function handlePackDesignSubmit(designIndex, { value, defects }) {
+    const field = PACK_STICKER_FIELD[stage]
+    const data = { track: 'stickers', design_index: designIndex, [field]: value }
+    if (stage === 'cutting' && defects) data.defects = defects
+    await handleSubmit(stage, data)
   }
 
   if (NO_INPUT_STAGES.has(stage)) {
@@ -121,11 +141,25 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
       <h2 className="font-semibold mb-3">Текущий этап: {stageLabel}</h2>
       {showPackDesigns && designs.length > 0 ? (
         <div className="mb-4">
-          <p className="text-xs text-text-muted mb-2">По каждому виду стикеров — отдельно</p>
-          <PackDesignsForm designs={designs} addProgress={addProgress} updateName={updateName} mode={packMode} />
+          <p className="text-xs text-text-muted mb-2">Стикеры — по каждому виду отдельно</p>
+          <PackDesignsForm
+            designs={designs}
+            logs={logs}
+            stage={stage}
+            incoming={incomingProp?.stickers}
+            onSubmitDesign={handlePackDesignSubmit}
+            updateName={updateName}
+            mode={packMode}
+          />
           <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-xs text-text-muted mb-2">Общий лог этапа</p>
-            <ProductionLogForm stage={stage} order={order} progress={progressProp} incoming={incomingProp} onSubmit={handleSubmit} />
+            <ProductionLogForm
+              stage={stage}
+              order={order}
+              progress={progressProp}
+              incoming={incomingProp}
+              onSubmit={handleSubmit}
+              omitFields={PACK_OMIT_FIELDS[stage]}
+            />
           </div>
         </div>
       ) : (
@@ -148,10 +182,11 @@ function ProgressLinesWidget({ order, logs }) {
         {lines.map((line) => {
           const { total, defects } = aggregateLine(logs, line)
           const isQty = !line.unit
-          const targetForLine = isQty ? target : null
-          const overshoot = isQty && total > target ? total - target : 0
-          const percentage = isQty && target > 0 ? Math.min(100, Math.round((total / target) * 100)) : null
-          const isComplete = isQty ? total >= target : total > 0
+          const lineTarget = line.target ?? target
+          const targetForLine = isQty ? lineTarget : null
+          const overshoot = isQty && total > lineTarget ? total - lineTarget : 0
+          const percentage = isQty && lineTarget > 0 ? Math.min(100, Math.round((total / lineTarget) * 100)) : null
+          const isComplete = isQty ? total >= lineTarget : total > 0
           const unit = line.unit || 'шт'
 
           return (

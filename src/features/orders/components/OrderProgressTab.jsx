@@ -1,10 +1,15 @@
+import { useState } from 'react'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { ProductionLogForm } from '@/features/production/components/logs/ProductionLogForm'
 import { ProductionLogHistory } from '@/features/production/components/logs/ProductionLogHistory'
-import { addProductionLogAndCheckAdvance } from '@/features/orders/hooks/useOrders'
+import { addProductionLogAndCheckAdvance, updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { PackDesignsForm } from '@/features/production/components/PackDesignsForm'
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
 import { computeIncoming, computeStageProgress } from '@/features/production/lib/production-logs'
+import { StageJumper } from './StageJumper'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
+import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import {
   ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK,
 } from '@/shared/constants'
@@ -90,10 +95,29 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   const packMode = stage === 'print' ? 'print' : stage === 'cutting' ? 'cutting' : 'pouring'
   const { designs, updateName } = usePackDesigns(showPackDesigns ? order.id : null)
 
+  // ConfirmDialog «Завершить этап?» вместо auto-advance (фидбэк 17.05).
+  const [pendingAdvance, setPendingAdvance] = useState(null) // { to } | null
+
   async function handleSubmit(s, data) {
-    await addProductionLogAndCheckAdvance(order.id, s, data, order)
+    const res = await addProductionLogAndCheckAdvance(order.id, s, data, order)
     refetch()
     onUpdated?.()
+    if (res?.is_complete && res?.next_status) {
+      setPendingAdvance({ to: res.next_status })
+    }
+  }
+
+  async function confirmAdvance() {
+    if (!pendingAdvance) return
+    try {
+      await updateOrderStatus(order.id, order.status, pendingAdvance.to)
+      toast.success('Этап завершён')
+      onUpdated?.()
+    } catch (err) {
+      toast.error(translateError(err).message || err.message)
+    } finally {
+      setPendingAdvance(null)
+    }
   }
 
   // Поэвидовой ввод стикеров для 3D-стикерпака — каждый «+» создаёт production_log
@@ -119,7 +143,8 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     return (
       <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
         <h2 className="font-semibold mb-1">Текущий этап: {label}</h2>
-        <p className="text-sm text-text-muted mt-3">На данном этапе нет ручного учёта.</p>
+        <p className="text-sm text-text-muted mt-3 mb-4">На данном этапе нет ручного учёта.</p>
+        <StageJumper order={order} onUpdated={onUpdated} />
       </div>
     )
   }
@@ -176,6 +201,20 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
       ) : (
         <ProductionLogForm stage={stage} order={order} progress={progressProp} incoming={incomingProp} onSubmit={handleSubmit} />
       )}
+
+      <div className="mt-4 pt-4 border-t border-border">
+        <StageJumper order={order} onUpdated={onUpdated} />
+      </div>
+
+      <ConfirmDialog
+        isOpen={!!pendingAdvance}
+        onClose={() => setPendingAdvance(null)}
+        onConfirm={confirmAdvance}
+        title="Все данные заполнены, завершить этап?"
+        message={pendingAdvance ? `Заказ перейдёт на этап «${ORDER_STATUSES[pendingAdvance.to]?.label || pendingAdvance.to}». Если нужно дозаполнить — нажмите «Отмена».` : ''}
+        confirmText="Завершить этап"
+        variant="primary"
+      />
     </div>
   )
 }

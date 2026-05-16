@@ -325,11 +325,13 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
 }
 
 /**
- * Add a production log entry and auto-advance status if stage target is met.
- * Core of the v2 quantity-based production tracking model.
+ * Add a production log entry and CHECK (but do not perform) status advance.
  *
- * For stickerpack3D orders at dual-track stages (print, cutting, selection_pouring),
- * both tracks (backgrounds + stickers) must be complete before advancing.
+ * Возвращает { is_complete, next_status } — UI решает показывать ConfirmDialog
+ * «Завершить этап?» или нет (фидбэк менеджера 17.05: убрать авто-переход).
+ *
+ * Для stickerpack3D на dual-track этапах (print/cutting/selection_pouring)
+ * оба трека (backgrounds + stickers) должны быть завершены.
  */
 export async function addProductionLogAndCheckAdvance(orderId, stage, logData, order) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -406,17 +408,15 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
     // продолжать с потенциально некорректным значением
   }
 
-  // 3. Auto-advance if complete (с учётом динамических L2-прав, если стор загружен)
+  // 3. Compute next_status (но НЕ продвигаем). UI решает через ConfirmDialog.
+  let nextStatus = null
   if (isComplete && order) {
     const store = useRolePermissionsStore.getState()
     const dynamicPerms = store.loaded ? store.permissions : null
-    const nextStatus = getNextStatus(workerRole, order.status, order, dynamicPerms)
-    if (nextStatus) {
-      await updateOrderStatus(orderId, order.status, nextStatus)
-    }
+    nextStatus = getNextStatus(workerRole, order.status, order, dynamicPerms)
   }
 
-  return { is_complete: isComplete }
+  return { is_complete: isComplete, next_status: nextStatus }
 }
 
 export async function updateOrder(orderId, updates) {

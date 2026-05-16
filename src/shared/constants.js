@@ -60,6 +60,49 @@ export function isDualTrack(status, order) {
   return IS_3D_STICKERPACK(order?.order_type) && DUAL_TRACK_STAGES.includes(status)
 }
 
+// --- Параллельные подзадачи stickerpack3D (миграция 032) ---
+// Каждый stickerpack3D заказ имеет 2 подзадачи (track='backgrounds' + 'stickers')
+// с собственными маршрутами. Подзадачи продвигаются независимо через RPC
+// advance_subtask. Когда обе в 'ready' — основной заказ переходит на assembly_3d.
+export const SUBTASK_ROUTE_BACKGROUNDS = ['pending', 'printing', 'laminating', 'cutting', 'selecting', 'ready']
+export const SUBTASK_ROUTE_STICKERS = ['pending', 'printing', 'cutting', 'pouring', 'ready']
+
+// Маппинг подзадача-статус → этап производства (для UI очередей)
+export const SUBTASK_STATUS_TO_STAGE = {
+  pending: null,
+  printing: 'print',
+  laminating: 'lamination',
+  cutting: 'cutting',
+  selecting: 'selection_pouring',
+  pouring: 'selection_pouring',
+  ready: 'assembly_3d',
+  cancelled: 'cancelled',
+}
+
+export const SUBTASK_STATUS_LABELS = {
+  pending: 'Ожидание',
+  printing: 'Печать',
+  laminating: 'Ламинация',
+  cutting: 'Резка',
+  selecting: 'Выборка',
+  pouring: 'Заливка',
+  ready: 'Готово к сборке',
+  cancelled: 'Отменено',
+}
+
+export const TRACK_LABELS = {
+  backgrounds: 'Фон',
+  stickers: 'Стикер',
+}
+
+// Следующий статус подзадачи (для ConfirmDialog «Отправить фоны на N?»)
+export function getNextSubtaskStatus(track, currentStatus) {
+  const route = track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS
+  const idx = route.indexOf(currentStatus)
+  if (idx < 0 || idx >= route.length - 1) return null
+  return route[idx + 1]
+}
+
 // Get the route for an order based on its type
 export function getOrderRoute(order) {
   let route = ORDER_ROUTES[order?.order_type] || ROUTE_REGULAR

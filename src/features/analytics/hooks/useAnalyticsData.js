@@ -182,6 +182,42 @@ export function useAnalyticsData(period) {
     return Object.entries(workload).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
   }, [orders])
 
+  // Production widgets: общие счётчики 4 операций + breakdown по orders/workers.
+  // Используются в AnalyticsPage как кликабельные виджеты (фидбэк 17.05).
+  const productionTotals = useMemo(() => {
+    const tot = { poured: 0, selected: 0, assembled: 0, packaged: 0 }
+    const byOp = { poured: {}, selected: {}, assembled: {}, packaged: {} }      // { op: { order_id: count } }
+    const workersByOp = { poured: {}, selected: {}, assembled: {}, packaged: {} } // { op: { worker_id: { name, count } } }
+    const ordersByIdLocal = {}
+    for (const o of orders) ordersByIdLocal[o.id] = o
+    function bump(op, log, qty) {
+      if (!qty) return
+      tot[op] += qty
+      if (log.order_id) byOp[op][log.order_id] = (byOp[op][log.order_id] || 0) + qty
+      if (log.worker_id) {
+        const name = log.worker?.display_name || 'Неизвестно'
+        const w = workersByOp[op][log.worker_id] || { name, count: 0 }
+        w.count += qty
+        workersByOp[op][log.worker_id] = w
+      }
+    }
+    for (const log of data.productionLogs) {
+      if (log.stage === 'pouring' || log.stage === 'selection_pouring') {
+        bump('poured', log, Number(log.stickers_good) || 0)
+      }
+      if (log.stage === 'selection_pouring') {
+        bump('selected', log, Number(log.qty_selected) || 0)
+      }
+      if (log.stage === 'assembly_3d') {
+        bump('assembled', log, Number(log.packs_assembled) || 0)
+      }
+      if (log.stage === 'packaging') {
+        bump('packaged', log, Number(log.packs_packaged) || 0)
+      }
+    }
+    return { totals: tot, byOrder: byOp, byWorker: workersByOp, ordersById: ordersByIdLocal }
+  }, [data.productionLogs, orders])
+
   // Зарплата по работникам — из production_logs через WORKER_RATES
   const payrollData = useMemo(() => {
     const byWorker = {}
@@ -265,5 +301,6 @@ export function useAnalyticsData(period) {
     payrollData,
     matData,
     throughputData,
+    productionTotals,
   }
 }

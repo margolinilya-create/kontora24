@@ -4,6 +4,7 @@ import { StatCard } from '../components/StatCard'
 import { FinanceTab } from '../components/FinanceTab'
 import { ProductionTab } from '../components/ProductionTab'
 import { ResourcesTab } from '../components/ResourcesTab'
+import { ProductionWidgets } from '../components/ProductionWidgets'
 import { formatPrice } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -151,6 +152,8 @@ export default function AnalyticsPage() {
         <StatCard label="Сдельная (пост-печать)" value={formatPrice(analytics.totalPayout)} sub={analytics.payrollData?.length > 0 ? `${analytics.payrollData.length} работн.` : null} />
         <StatCard label="Конверсия" value={`${analytics.conversionRate}${analytics.conversionRate === '—' ? '' : '%'}`} sub={`${analytics.cancelledCount} отмен`} />
       </div>
+
+      <ProductionWidgets productionTotals={analytics.productionTotals} />
 
       <Tabs items={TABS} active={activeTab} onChange={setActiveTab} />
 

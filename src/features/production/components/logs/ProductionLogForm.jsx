@@ -269,19 +269,38 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
                 </select>
               </label>
             </div>
-            {getForm('single').box_material_id && (
-              <Input
-                id="log-boxes-used"
-                label="Использовано коробок (шт)"
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="1"
-                value={getForm('single').boxes_used ?? ''}
-                onChange={(e) => updateField('single', 'boxes_used', e.target.value)}
-                placeholder="1"
-              />
-            )}
+            {getForm('single').box_material_id && (() => {
+              const selectedBox = packagingBoxes.find((b) => b.id === getForm('single').box_material_id)
+              const packs = Number(getForm('single').packs_packaged) || 0
+              const capacity = Number(selectedBox?.capacity_per_box) || 0
+              const suggested = capacity > 0 && packs > 0 ? Math.ceil(packs / capacity) : null
+              const currentValue = getForm('single').boxes_used ?? ''
+              const showSuggestion = suggested !== null && String(suggested) !== String(currentValue)
+              return (
+                <div>
+                  <Input
+                    id="log-boxes-used"
+                    label="Использовано коробок (шт)"
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    step="1"
+                    value={currentValue}
+                    onChange={(e) => updateField('single', 'boxes_used', e.target.value)}
+                    placeholder={suggested ? String(suggested) : '1'}
+                  />
+                  {showSuggestion && (
+                    <button
+                      type="button"
+                      onClick={() => updateField('single', 'boxes_used', String(suggested))}
+                      className="mt-1 text-[11px] text-accent hover:underline"
+                    >
+                      Рекомендуется {suggested} шт ({packs} ÷ {capacity}) — применить
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
             <p className="text-[11px] text-text-muted">
               БОПП-пакеты списываются по количеству упакованного. Коробки — по введённому числу.
             </p>

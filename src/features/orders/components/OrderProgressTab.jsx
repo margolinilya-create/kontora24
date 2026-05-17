@@ -14,7 +14,9 @@ import { translateError } from '@/shared/lib/error-translator'
 import {
   ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK,
   getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS,
+  SUBTASK_ROUTE_BACKGROUNDS, SUBTASK_ROUTE_STICKERS,
 } from '@/shared/constants'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 
 const NO_INPUT_STAGES = new Set(['new', 'design', 'prepress', 'otk', 'done', 'cancelled'])
 
@@ -336,24 +338,73 @@ function ProgressLinesWidget({ order, logs }) {
   )
 }
 
-function SubtaskIndicator({ order }) {
-  const isPack3D = IS_3D_STICKERPACK(order.order_type)
-  const { subtasks } = useOrderSubtasks(order.id, isPack3D)
-  if (!isPack3D || !subtasks.backgrounds || !subtasks.stickers) return null
-  const trackBadge = (track, status) => (
+function SubtaskTrackRow({ track, status, advance, onUpdated, canJump }) {
+  const [target, setTarget] = useState('')
+  const [saving, setSaving] = useState(false)
+  const route = track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS
+  const otherOptions = route.filter((s) => s !== status)
+
+  async function handleJump() {
+    if (!target) return
+    setSaving(true)
+    try {
+      await advance(track, target)
+      toast.success(`${TRACK_LABELS[track]} → ${SUBTASK_STATUS_LABELS[target]}`)
+      setTarget('')
+      onUpdated?.()
+    } catch (err) {
+      toast.error(translateError(err).message || err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
     <div className="flex items-center gap-2">
       <span className={`text-xs px-2 py-0.5 rounded ${
         track === 'backgrounds' ? 'bg-dept-print/15 text-dept-print' : 'bg-dept-pouring/15 text-dept-pouring'
       } font-medium`}>{TRACK_LABELS[track]}</span>
       <span className="text-sm text-text font-medium">{SUBTASK_STATUS_LABELS[status] || status}</span>
+      {canJump && (
+        <div className="flex items-center gap-1">
+          <select
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            className="rounded border border-border px-1.5 py-0.5 text-[11px] bg-surface focus:outline-none focus:ring-1 focus:ring-accent/50"
+            aria-label={`Изменить статус ${TRACK_LABELS[track]}`}
+          >
+            <option value="">→ изменить</option>
+            {otherOptions.map((s) => (
+              <option key={s} value={s}>{SUBTASK_STATUS_LABELS[s] || s}</option>
+            ))}
+          </select>
+          {target && (
+            <button
+              onClick={handleJump}
+              disabled={saving}
+              className="text-[11px] px-2 py-0.5 rounded bg-accent text-on-accent font-medium disabled:opacity-50"
+            >
+              {saving ? '…' : 'OK'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
+}
+
+function SubtaskIndicator({ order, onUpdated }) {
+  const isPack3D = IS_3D_STICKERPACK(order.order_type)
+  const { hasRole } = useAuth()
+  const { subtasks, advance } = useOrderSubtasks(order.id, isPack3D)
+  if (!isPack3D || !subtasks.backgrounds || !subtasks.stickers) return null
+  const canJump = hasRole(['admin', 'manager'])
   return (
     <div className="bg-surface rounded-xl border border-border px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
       <span className="text-xs text-text-muted">Параллельные подзадачи:</span>
-      {trackBadge('backgrounds', subtasks.backgrounds.status)}
+      <SubtaskTrackRow track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} />
       <span className="text-text-muted">·</span>
-      {trackBadge('stickers', subtasks.stickers.status)}
+      <SubtaskTrackRow track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} />
     </div>
   )
 }
@@ -369,7 +420,7 @@ export function OrderProgressTab({ order, onUpdated }) {
         </div>
       )}
 
-      <SubtaskIndicator order={order} />
+      <SubtaskIndicator order={order} onUpdated={onUpdated} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} />

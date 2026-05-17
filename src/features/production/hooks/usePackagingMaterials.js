@@ -17,7 +17,7 @@ export function usePackagingMaterials() {
     async function load() {
       const { data, error: err } = await supabase
         .from('k24_materials')
-        .select('id, name, type, unit, stock_qty')
+        .select('id, name, type, unit, stock_qty, capacity_per_box')
         .in('type', ['packaging_bag', 'box'])
         .order('name')
       if (cancelled) return

@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 
 // Маппинг этапа очереди → допустимые subtask.status
 const STAGE_TO_SUBTASK_STATUSES = {
+  print: ['printing'],
   lamination: ['laminating'],
   cutting: ['cutting'],
   selection_pouring: ['selecting', 'pouring'],

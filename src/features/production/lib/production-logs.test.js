@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS } from './production-logs'
+import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog } from './production-logs'
 
 const ROUTE = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
 
@@ -313,5 +313,41 @@ describe('STAGE_FIELDS config', () => {
       const fieldKeys = config.fields.map(f => f.key)
       expect(fieldKeys).toContain(config.quantityField)
     }
+  })
+})
+
+describe('hasSubtaskLog (R7 advance gate)', () => {
+  it('возвращает true для pending/ready/cancelled (учёта на них нет)', () => {
+    expect(hasSubtaskLog([], 'backgrounds', 'pending')).toBe(true)
+    expect(hasSubtaskLog([], 'stickers', 'ready')).toBe(true)
+    expect(hasSubtaskLog([], 'backgrounds', 'cancelled')).toBe(true)
+  })
+
+  it('printing/laminating/cutting: использует track подзадачи', () => {
+    const logs = [{ stage: 'print', track: 'backgrounds', backgrounds_printed: 10 }]
+    expect(hasSubtaskLog(logs, 'backgrounds', 'printing')).toBe(true)
+    expect(hasSubtaskLog(logs, 'stickers', 'printing')).toBe(false)
+  })
+
+  it('selecting: ищет stage=selection_pouring + track=backgrounds (фиксированный track)', () => {
+    const logs = [{ stage: 'selection_pouring', track: 'backgrounds', qty_selected: 50 }]
+    // Даже если track подзадачи stickers — selecting всегда backgrounds-only
+    expect(hasSubtaskLog(logs, 'backgrounds', 'selecting')).toBe(true)
+  })
+
+  it('pouring: ищет stage=selection_pouring + track=stickers', () => {
+    const logs = [{ stage: 'selection_pouring', track: 'stickers', stickers_good: 30 }]
+    expect(hasSubtaskLog(logs, 'stickers', 'pouring')).toBe(true)
+    expect(hasSubtaskLog(logs, 'stickers', 'selecting')).toBe(false)
+  })
+
+  it('игнорирует soft-deleted логи (deleted_at != null)', () => {
+    const logs = [{ stage: 'print', track: 'stickers', stickers_printed: 5, deleted_at: '2026-05-18' }]
+    expect(hasSubtaskLog(logs, 'stickers', 'printing')).toBe(false)
+  })
+
+  it('пустые logs → false для активного status', () => {
+    expect(hasSubtaskLog([], 'backgrounds', 'printing')).toBe(false)
+    expect(hasSubtaskLog(null, 'stickers', 'cutting')).toBe(false)
   })
 })

@@ -6,7 +6,7 @@ import { addProductionLogAndCheckAdvance, updateOrderStatus } from '@/features/o
 import { PackDesignsForm } from '@/features/production/components/PackDesignsForm'
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
 import { useOrderSubtasks } from '@/features/orders/hooks/useOrderSubtasks'
-import { computeIncoming, computeStageProgress } from '@/features/production/lib/production-logs'
+import { computeIncoming, computeStageProgress, hasSubtaskLog } from '@/features/production/lib/production-logs'
 import { StageJumper } from './StageJumper'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
@@ -352,14 +352,22 @@ function ProgressLinesWidget({ order, logs }) {
   )
 }
 
-function SubtaskTrackRow({ track, status, advance, onUpdated, canJump }) {
+function SubtaskTrackRow({ track, status, advance, onUpdated, canJump, logs }) {
   const [target, setTarget] = useState('')
   const [saving, setSaving] = useState(false)
   const route = track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS
   const otherOptions = route.filter((s) => s !== status)
 
+  // Нельзя advance если для текущего status трека ещё нет ни одного production_log.
+  // Кроме pending/ready/cancelled — там учёта не бывает (hasSubtaskLog возвращает true).
+  const canAdvance = hasSubtaskLog(logs || [], track, status)
+
   async function handleJump() {
     if (!target) return
+    if (!canAdvance) {
+      toast.error(`Нельзя сменить этап ${TRACK_LABELS[track]}: сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»`)
+      return
+    }
     setSaving(true)
     try {
       await advance(track, target)
@@ -384,7 +392,7 @@ function SubtaskTrackRow({ track, status, advance, onUpdated, canJump }) {
           <select
             value={target}
             onChange={(e) => setTarget(e.target.value)}
-            className="rounded border border-border px-1.5 py-0.5 text-[11px] bg-surface focus:outline-none focus:ring-1 focus:ring-accent/50"
+            className="rounded-md border border-border px-2 py-1 text-xs bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
             aria-label={`Изменить статус ${TRACK_LABELS[track]}`}
           >
             <option value="">→ изменить</option>
@@ -395,8 +403,9 @@ function SubtaskTrackRow({ track, status, advance, onUpdated, canJump }) {
           {target && (
             <button
               onClick={handleJump}
-              disabled={saving}
-              className="text-[11px] px-2 py-0.5 rounded bg-accent text-on-accent font-medium disabled:opacity-50"
+              disabled={saving || !canAdvance}
+              title={!canAdvance ? `Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»` : ''}
+              className="text-xs px-2.5 py-1 rounded-md bg-accent text-on-accent font-medium disabled:opacity-50 hover:bg-accent-hover transition-colors"
             >
               {saving ? '…' : 'OK'}
             </button>
@@ -407,7 +416,7 @@ function SubtaskTrackRow({ track, status, advance, onUpdated, canJump }) {
   )
 }
 
-function SubtaskIndicator({ order, onUpdated }) {
+function SubtaskIndicator({ order, logs, onUpdated }) {
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const { hasRole } = useAuth()
   const { subtasks, advance } = useOrderSubtasks(order.id, isPack3D)
@@ -416,9 +425,9 @@ function SubtaskIndicator({ order, onUpdated }) {
   return (
     <div className="bg-surface rounded-xl border border-border px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
       <span className="text-xs text-text-muted">Параллельные подзадачи:</span>
-      <SubtaskTrackRow track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} />
+      <SubtaskTrackRow track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} />
       <span className="hidden sm:inline text-text-muted">·</span>
-      <SubtaskTrackRow track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} />
+      <SubtaskTrackRow track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} />
     </div>
   )
 }
@@ -434,7 +443,7 @@ export function OrderProgressTab({ order, onUpdated }) {
         </div>
       )}
 
-      <SubtaskIndicator order={order} onUpdated={onUpdated} />
+      <SubtaskIndicator order={order} logs={logs} onUpdated={onUpdated} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} />

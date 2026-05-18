@@ -322,3 +322,29 @@ export function validateLogEntry(stage, data, options = {}) {
 
   return null
 }
+
+// ============================================================================
+// Параллельные подзадачи 3D-стикерпака (R7) — gate на advance без production_log.
+// ============================================================================
+
+// Маппинг status подзадачи на (stage, track) для проверки наличия лога.
+// Если track в маппинге null — используется track самой подзадачи.
+const SUBTASK_STATUS_TO_STAGE = {
+  printing:   { stage: 'print',             track: null },
+  laminating: { stage: 'lamination',        track: null },
+  cutting:    { stage: 'cutting',           track: null },
+  selecting:  { stage: 'selection_pouring', track: 'backgrounds' },
+  pouring:    { stage: 'selection_pouring', track: 'stickers' },
+}
+
+/**
+ * Есть ли хотя бы один production_log для подзадачи в её текущем статусе?
+ * Возвращает true если можно advance, false если нужно сперва внести лог.
+ * Для статусов pending/ready/cancelled gate'а нет (учёта на них не бывает).
+ */
+export function hasSubtaskLog(logs, track, subtaskStatus) {
+  const map = SUBTASK_STATUS_TO_STAGE[subtaskStatus]
+  if (!map) return true
+  const requiredTrack = map.track || track
+  return (logs || []).some((l) => l.stage === map.stage && l.track === requiredTrack && !l.deleted_at)
+}

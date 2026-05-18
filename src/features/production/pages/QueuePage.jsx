@@ -10,8 +10,9 @@ import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 
 // Этапы на которых stickerpack3D показывается как отдельные подзадачи
-// (фоны/стикеры идут параллельно) — фидбэк менеджера 17.05.
-const SUBTASK_ENABLED_STAGES = new Set(['lamination', 'cutting', 'selection_pouring'])
+// (фоны/стикеры идут параллельно) — фидбэк менеджера 17.05, расширено 18.05
+// на все dual-track этапы (включая печать).
+const SUBTASK_ENABLED_STAGES = new Set(['print', 'lamination', 'cutting', 'selection_pouring'])
 
 const QUEUE_CONFIG = {
   design: { title: 'Дизайн', subtitle: 'Разработка макетов', status: 'design' },

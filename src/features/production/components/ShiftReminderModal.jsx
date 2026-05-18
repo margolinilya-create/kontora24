@@ -21,7 +21,7 @@ const TICK_MS = 5 * 60 * 1000               // проверка раз в 5 ми
  * (сбрасывается при перезагрузке вкладки — это намеренно).
  */
 export function ShiftReminderModal() {
-  const { profile, hasRole } = useAuth()
+  const { profile, hasRole: _hasRole } = useAuth()
   const { isOnShift, activeShift, loading, clockIn, clockOut } = useShiftTracker()
   const [showStart, setShowStart] = useState(false)
   const [showEnd, setShowEnd] = useState(false)

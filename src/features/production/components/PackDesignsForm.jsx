@@ -37,7 +37,7 @@ function readDrafts(orderId, stage) {
   } catch { return {} }
 }
 
-function PackDesignsFormImpl({ designs, logs = [], stage, incoming, route, onSubmitDesign, updateName, readOnly = false, mode = 'pouring' }) {
+function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, route, onSubmitDesign, updateName, readOnly = false, mode = 'pouring' }) {
   const labels = MODE_LABELS[mode] || MODE_LABELS.pouring
   const orderId = designs?.[0]?.order_id || null
   const [drafts, setDrafts] = useState(() => readDrafts(orderId, stage))

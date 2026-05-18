@@ -43,8 +43,12 @@ export function useProductionLogs(orderId, targetQty) {
 
   useEffect(() => {
     if (!orderId) return
+    // Уникальный channel name на монтирование — на странице очереди может быть
+    // несколько QueueCard для одного заказа (3D-pack подзадачи Фон+Стикер),
+    // и Supabase Realtime крашит .on() если канал уже подписан под тем же name.
+    const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
     const channel = supabase
-      .channel(`prod-logs-${orderId}`)
+      .channel(`prod-logs-${orderId}-${uid}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

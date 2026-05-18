@@ -35,10 +35,12 @@ export function OrderComments({ orderId }) {
 
   useEffect(() => { fetchComments() }, [fetchComments])
 
-  // Realtime
+  // Realtime — unique channel name per mount (защита от конфликта если
+  // компонент окажется на странице дважды).
   useEffect(() => {
+    const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
     const channel = supabase
-      .channel(`comments-${orderId}`)
+      .channel(`comments-${orderId}-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'k24_order_comments', filter: `order_id=eq.${orderId}` }, () => fetchComments())
       .subscribe()
     return () => { supabase.removeChannel(channel) }

@@ -52,8 +52,11 @@ export function usePackDesigns(orderId) {
 
   useEffect(() => {
     if (!orderId) return
+    // Уникальный channel name на монтирование — защита от конфликта если хук
+    // вызывается дважды на странице (см. useProductionLogs/useOrderSubtasks).
+    const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
     const channel = supabase
-      .channel(`pack-designs-${orderId}`)
+      .channel(`pack-designs-${orderId}-${uid}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

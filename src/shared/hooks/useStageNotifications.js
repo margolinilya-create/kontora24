@@ -12,8 +12,12 @@ export function useStageNotifications() {
   useEffect(() => {
     if (!profile) return
 
+    // Уникальный channel name на каждое монтирование — supabase.channel(name)
+    // переиспользует уже подписанный канал, и при HMR/двойном маунте
+    // .on() крашит «cannot add callbacks after subscribe()».
+    const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
     const channel = supabase
-      .channel('stage-notifications')
+      .channel(`stage-notifications-${uid}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

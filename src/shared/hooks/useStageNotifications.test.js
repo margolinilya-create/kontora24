@@ -43,7 +43,7 @@ describe('useStageNotifications', () => {
   it('subscribes to stage-notifications channel on mount', async () => {
     renderHook(() => useStageNotifications())
     const { supabase } = await import('@/shared/lib/supabase')
-    expect(supabase.channel).toHaveBeenCalledWith('stage-notifications')
+    expect(supabase.channel).toHaveBeenCalledWith(expect.stringMatching(/^stage-notifications-/))
     expect(mockChannel.subscribe).toHaveBeenCalled()
   })
 

@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { useMaterials } from '../hooks/useMaterials'
 import { MaterialCard } from '../components/MaterialCard'
 import { StockModal } from '../components/StockModal'
 import { MaterialForm } from '../components/MaterialForm'
-import { ConsumptionChart } from '../components/ConsumptionChart'
 import { MaterialsTable } from '../components/MaterialsTable'
 import { TransactionsHistory } from '../components/TransactionsHistory'
 import { InventoryTab } from '../components/InventoryTab'
@@ -13,6 +12,9 @@ import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
 import ErrorState from '@/shared/components/ErrorState'
+
+// Lazy: Recharts весит ~395 KB. Грузим только при открытии вкладки «Аналитика».
+const ConsumptionChart = lazy(() => import('../components/ConsumptionChart').then((m) => ({ default: m.ConsumptionChart })))
 
 export default function WarehousePage() {
   const { materials, loading, error, refetch } = useMaterials()
@@ -84,7 +86,9 @@ export default function WarehousePage() {
       })()}
 
       {tab === 'analytics' ? (
-        <ConsumptionChart />
+        <Suspense fallback={<Spinner />}>
+          <ConsumptionChart />
+        </Suspense>
       ) : tab === 'table' ? (
         <MaterialsTable materials={materials} onSelect={setSelectedMaterial} />
       ) : tab === 'inventory' ? (

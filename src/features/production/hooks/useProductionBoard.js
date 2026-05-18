@@ -10,6 +10,7 @@ import { formatOrderNumber } from '@/shared/lib/utils'
 import { playNotificationSound } from '@/shared/lib/sound'
 import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
+import { useDebounce } from '@/shared/hooks/useDebounce'
 
 const PRODUCTION_STATUSES = new Set(COLS)
 const ARCHIVED_STATUSES = new Set(['done', 'cancelled'])
@@ -19,6 +20,9 @@ export function useProductionBoard({ includeArchived = false } = {}) {
   const [showMine, setShowMine] = useState(false)
   const [sortBy, setSortBy] = useState('created')
   const [search, setSearch] = useState('')
+  // Debounce: каждое нажатие пересобирает 11 buckets на 100-300 заказах,
+  // на мобиле заметный лаг. Дебаунс 200ms — пользователь не успевает заметить.
+  const debouncedSearch = useDebounce(search, 200)
   const [activeId, setActiveId] = useState(null)
   const [pendingMove, setPendingMove] = useState(null)
   const [todayDone, setTodayDone] = useState(0)
@@ -61,8 +65,8 @@ export function useProductionBoard({ includeArchived = false } = {}) {
 
   const filterAndSort = useCallback((orders) => {
     let filtered = showMine && profile ? orders.filter((o) => o.assigned_to === profile.id) : orders
-    if (search) {
-      const s = search.toLowerCase()
+    if (debouncedSearch) {
+      const s = debouncedSearch.toLowerCase()
       filtered = filtered.filter((o) => String(o.number).includes(s))
     }
     filtered = [...filtered].sort((a, b) => {
@@ -77,7 +81,7 @@ export function useProductionBoard({ includeArchived = false } = {}) {
       return 0
     })
     return filtered
-  }, [showMine, profile, search, sortBy])
+  }, [showMine, profile, debouncedSearch, sortBy])
 
   const columns = useMemo(() => {
     const result = {}

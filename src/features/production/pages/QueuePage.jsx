@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSubtaskQueue } from '../hooks/useSubtaskQueue'
+import { useBatchProductionLogs } from '../hooks/useProductionLogs'
 import { QueueCard } from '../components/QueueCard'
 import { BatchView } from '../components/BatchView'
 import { playNotificationSound } from '@/shared/lib/sound'
@@ -91,6 +92,11 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
     }
     return sortOrders(filtered, sortBy)
   }, [queueItems, showMine, profile, sortBy])
+
+  // Page-level batch fetch для production_logs (был N+1: каждая QueueCard
+  // открывала свой SELECT + WS-канал). Дедуплицируем — 3D-pack идёт двумя items.
+  const orderIds = useMemo(() => [...new Set(items.map((it) => it.order.id))], [items])
+  const { getStageProgress, error: logsError } = useBatchProductionLogs(orderIds)
 
   const totalInQueue = queueItems.length
 
@@ -189,7 +195,14 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {items.map((it) => (
-            <QueueCard key={it.key} order={it.order} track={it.track} onUpdated={handleRefetch} />
+            <QueueCard
+              key={it.key}
+              order={it.order}
+              track={it.track}
+              onUpdated={handleRefetch}
+              progress={getStageProgress(it.order.id, it.order.status, it.order.qty, it.track)}
+              logsError={logsError}
+            />
           ))}
         </div>
       )}

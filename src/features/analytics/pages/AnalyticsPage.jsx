@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useAnalyticsData, PERIODS } from '../hooks/useAnalyticsData'
 import { StatCard } from '../components/StatCard'
-import { FinanceTab } from '../components/FinanceTab'
-import { ProductionTab } from '../components/ProductionTab'
 import { ResourcesTab } from '../components/ResourcesTab'
 import { ProductionWidgets } from '../components/ProductionWidgets'
 import { formatPrice } from '@/shared/lib/utils'
@@ -12,6 +10,10 @@ import Tabs from '@/shared/components/Tabs'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
 import ErrorState from '@/shared/components/ErrorState'
+
+// Lazy: оба таба тащат Recharts (~395 KB). Грузим только при открытии вкладки.
+const FinanceTab = lazy(() => import('../components/FinanceTab').then((m) => ({ default: m.FinanceTab })))
+const ProductionTab = lazy(() => import('../components/ProductionTab').then((m) => ({ default: m.ProductionTab })))
 
 const TABS = [
   { key: 'finance', label: 'Финансы' },
@@ -158,25 +160,29 @@ export default function AnalyticsPage() {
       <Tabs items={TABS} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'finance' && (
-        <FinanceTab
-          typeData={analytics.typeData}
-          trendData={analytics.trendData}
-          topClients={analytics.topClients}
-          chartColors={chartColors}
-        />
+        <Suspense fallback={<Spinner />}>
+          <FinanceTab
+            typeData={analytics.typeData}
+            trendData={analytics.trendData}
+            topClients={analytics.topClients}
+            chartColors={chartColors}
+          />
+        </Suspense>
       )}
 
       {activeTab === 'production' && (
-        <ProductionTab
-          statusData={analytics.statusData}
-          avgStageData={analytics.avgStageData}
-          workloadData={analytics.workloadData}
-          throughputData={analytics.throughputData}
-          orders={analytics.orders}
-          doneOrders={analytics.doneOrders}
-          conversionRate={analytics.conversionRate}
-          chartColors={chartColors}
-        />
+        <Suspense fallback={<Spinner />}>
+          <ProductionTab
+            statusData={analytics.statusData}
+            avgStageData={analytics.avgStageData}
+            workloadData={analytics.workloadData}
+            throughputData={analytics.throughputData}
+            orders={analytics.orders}
+            doneOrders={analytics.doneOrders}
+            conversionRate={analytics.conversionRate}
+            chartColors={chartColors}
+          />
+        </Suspense>
       )}
 
       {activeTab === 'resources' && (

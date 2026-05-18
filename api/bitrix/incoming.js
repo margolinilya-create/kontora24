@@ -35,25 +35,35 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields: order_type, width_mm, height_mm, qty' })
     }
 
-    // Find or create client
+    // Find or create client. RLS/FK ошибки больше не глотаем —
+    // PGRST116 (no rows) — нормальный случай, остальное — действительная проблема.
     let clientId = null
     if (body.client_name) {
-      const { data: existing } = await supabase
+      const { data: existing, error: searchErr } = await supabase
         .from('k24_clients')
         .select('id')
         .eq('name', body.client_name)
         .limit(1)
-        .single()
+        .maybeSingle()
+
+      if (searchErr && searchErr.code !== 'PGRST116') {
+        console.error('[bitrix/incoming] client search failed:', searchErr)
+        return res.status(500).json({ error: 'Client lookup failed', detail: searchErr.message })
+      }
 
       if (existing) {
         clientId = existing.id
       } else {
-        const { data: newClient } = await supabase
+        const { data: newClient, error: insertErr } = await supabase
           .from('k24_clients')
           .insert({ name: body.client_name, phone: body.client_phone || null, email: body.client_email || null })
           .select('id')
           .single()
-        if (newClient) clientId = newClient.id
+        if (insertErr) {
+          console.error('[bitrix/incoming] client insert failed:', insertErr)
+          return res.status(500).json({ error: 'Client create failed', detail: insertErr.message })
+        }
+        clientId = newClient.id
       }
     }
 
@@ -80,10 +90,15 @@ export default async function handler(req, res) {
 
     if (error) throw error
 
-    // Log status
-    await supabase.from('k24_order_status_history').insert({
+    // Log status — фейл в history ломает аудит-цепочку, не глотаем молча.
+    const { error: historyErr } = await supabase.from('k24_order_status_history').insert({
       order_id: order.id, from_status: null, to_status: 'new', changed_by: null,
     })
+    if (historyErr) {
+      console.error('[bitrix/incoming] status history insert failed:', historyErr)
+      // Заказ уже создан — возвращаем success, но логируем ошибку чтобы можно было
+      // допилить аудит вручную (не вызываем 500 чтобы Bitrix не зашёл в retry-петлю).
+    }
 
     return res.status(200).json({
       success: true,

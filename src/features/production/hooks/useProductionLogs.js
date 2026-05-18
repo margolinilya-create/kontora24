@@ -99,3 +99,81 @@ export function useProductionLogs(orderId, targetQty) {
 
   return { logs, loading, error, addLog, updateLog, softDeleteLog, getStageProgress, isStageComplete, refetch: fetchLogs }
 }
+
+/**
+ * Page-level batch hook: загружает production_logs для МНОЖЕСТВА заказов
+ * одним SELECT'ом и держит одну Realtime-подписку на всю страницу.
+ *
+ * Используется в QueuePage / OrdersKanban где раньше каждая QueueCard
+ * монтировала свой useProductionLogs → 15 карточек = 15 WS-каналов + 15 SELECT.
+ * Аудит 18.05: на mobile/MTS заметные тормоза и расход Realtime-квот.
+ *
+ * Возвращает getStageProgress(orderId, stage, targetQty, track) — то же что
+ * useProductionLogs, но по индексу orderId.
+ */
+export function useBatchProductionLogs(orderIds) {
+  const orderIdsKey = (orderIds || []).join(',')
+  const [logsByOrder, setLogsByOrder] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchLogs = useCallback(async () => {
+    if (!orderIds || orderIds.length === 0) {
+      setLogsByOrder({})
+      setLoading(false)
+      return
+    }
+    setError(null)
+    try {
+      const { data, error: err } = await supabase
+        .from('k24_production_logs')
+        .select('*, worker:k24_profiles!worker_id(display_name, role)')
+        .in('order_id', orderIds)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+      if (err) throw err
+      const grouped = {}
+      for (const log of data || []) {
+        if (!grouped[log.order_id]) grouped[log.order_id] = []
+        grouped[log.order_id].push(log)
+      }
+      setLogsByOrder(grouped)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- orderIdsKey is the serialized form of orderIds
+  }, [orderIdsKey])
+
+  useEffect(() => { fetchLogs() }, [fetchLogs])
+  useRefetchOnFocus(fetchLogs)
+
+  const fetchRef = useRef(fetchLogs)
+  useEffect(() => { fetchRef.current = fetchLogs }, [fetchLogs])
+
+  useEffect(() => {
+    if (!orderIdsKey) return
+    const orderSet = new Set(orderIdsKey.split(','))
+    // uuid-suffix для безопасной де-дупликации каналов между HMR/двойным mount.
+    const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
+    const channel = supabase
+      .channel(`batch-prod-logs-${uid}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'k24_production_logs',
+      }, (payload) => {
+        const id = payload.new?.order_id || payload.old?.order_id
+        if (id && orderSet.has(id)) fetchRef.current()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [orderIdsKey])
+
+  function getStageProgress(orderId, stage, targetQty, track) {
+    return computeStageProgress(logsByOrder[orderId] || [], stage, targetQty || 0, track)
+  }
+
+  return { logsByOrder, loading, error, getStageProgress, refetch: fetchLogs }
+}

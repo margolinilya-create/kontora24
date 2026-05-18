@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageAllowed, canAdvanceFrom } from '@/shared/constants'
-import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
+import { useRolePermissionsStore, canRoleDo } from '@/features/auth/role-permissions-store'
+import { useAuthStore } from '@/features/auth/store'
+import { useRoleSwitcherStore } from '@/shared/stores/role-switcher-store'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 // safeRpc убран вместе с auto_deduct_materials (12.05)
 import { captureError } from '@/shared/lib/sentry'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
@@ -11,6 +14,40 @@ import { getFreshAccessToken } from '@/shared/lib/auth-token'
 const STAGES_REQUIRING_COMPLETION = new Set([
   'print', 'lamination', 'cutting', 'pouring', 'selection_pouring', 'assembly_3d', 'packaging',
 ])
+
+// Финансовые поля k24_orders — видны только admin/manager (view:finance).
+// Аудит 18.05: воркеры получали price_final/cost_total через прямой SELECT
+// и могли увидеть их в DevTools, хотя в UI они скрыты. Фикс — фронт-условный
+// SELECT по эффективной роли. Серверная защита WRITE — триггер
+// k24_protect_order_columns (миграция 20260505_security_phase2).
+const LIST_FIELDS_BASE = `id, number, custom_number, client_id, status, order_type, qty, width_mm, height_mm,
+  film_type, lam_type, need_lam, design_status, priority, deadline, created_at, updated_at,
+  assigned_to, created_by, bopp_bag, is_urgent, notes, deal_name, bitrix_deal_id, mockup_path,
+  stickers_per_pack, design_variants`
+
+const LIST_FIELDS_FINANCE = `, price_final, cost_total`
+
+const LIST_RELATIONS = `,
+  client:k24_clients(name, phone),
+  assignee:k24_profiles!assigned_to(display_name, role),
+  attachments:k24_order_attachments(id, file_name, file_path, mime_type)`
+
+const DETAIL_FIELDS_BASE = `id, number, custom_number, client_id, order_type, status, width_mm, height_mm,
+  qty, design_variants, need_lam, lam_type, prod_days, assigned_to, created_by, deadline, notes,
+  created_at, updated_at, bitrix_deal_id, bitrix_url, priority, checklist, status_changed_at,
+  film_type, stickers_per_pack, is_3d, mockup_path, is_urgent, is_partner, needs_montage_film,
+  needs_individual_cut, printed_meters, resin_used, rejected_qty, printed_qty, deal_name,
+  source, source_referrer, design_status, delivery_type, delivery_city, delivery_address,
+  delivery_notes, bopp_bag, film_type_stickers, ink_deducted_at`
+
+const DETAIL_FIELDS_FINANCE = `, cost_materials, cost_labor, cost_total, markup, discount_pct,
+  price_final, price_per_unit, payment_status`
+
+const DETAIL_RELATIONS = `,
+  client:k24_clients(*),
+  assignee:k24_profiles!assigned_to(*),
+  creator:k24_profiles!created_by(*),
+  attachments:k24_order_attachments(id, file_name, file_path, mime_type)`
 
 async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
   for (let i = 0; i <= retries; i++) {
@@ -30,6 +67,7 @@ export function useOrders(filters = {}) {
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const canSeeFinance = useCanDo('view:finance')
 
   // Serialize statuses array to a primitive so the deps array stays stable.
   const statusesKey = filters.statuses?.join(',') ?? ''
@@ -40,13 +78,7 @@ export function useOrders(filters = {}) {
     try {
       // Только поля, необходимые для списков/канбана/календаря/дашборда.
       // Полная карточка заказа подгружается через useOrderDetail.
-      const SELECT_LIST = `id, number, custom_number, client_id, status, order_type, qty, width_mm, height_mm,
-        film_type, lam_type, need_lam, design_status, priority, deadline, created_at, updated_at,
-        assigned_to, created_by, bopp_bag, is_urgent, notes, deal_name, bitrix_deal_id, mockup_path,
-        stickers_per_pack, design_variants, price_final, cost_total,
-        client:k24_clients(name, phone),
-        assignee:k24_profiles!assigned_to(display_name, role),
-        attachments:k24_order_attachments(id, file_name, file_path, mime_type)`
+      const SELECT_LIST = `${LIST_FIELDS_BASE}${canSeeFinance ? LIST_FIELDS_FINANCE : ''}${LIST_RELATIONS}`
       let query = supabase
         .from('k24_orders')
         .select(SELECT_LIST, { count: 'exact' })
@@ -97,7 +129,7 @@ export function useOrders(filters = {}) {
       setLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- statusesKey is the serialized form of filters.statuses
-  }, [filters.status, statusesKey, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo])
+  }, [filters.status, statusesKey, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo, canSeeFinance])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
   useRefetchOnFocus(fetchOrders)
@@ -130,16 +162,18 @@ export function useOrderDetail(id) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const canSeeFinance = useCanDo('view:finance')
 
   const fetchDetail = useCallback(async () => {
     if (!id) return
     setLoading(true)
     setError(null)
     try {
+      const detailSelect = `${DETAIL_FIELDS_BASE}${canSeeFinance ? DETAIL_FIELDS_FINANCE : ''}${DETAIL_RELATIONS}`
       const [orderRes, historyRes] = await Promise.all([
         supabase
           .from('k24_orders')
-          .select('*, client:k24_clients(*), assignee:k24_profiles!assigned_to(*), creator:k24_profiles!created_by(*), attachments:k24_order_attachments(id, file_name, file_path, mime_type)')
+          .select(detailSelect)
           .eq('id', id)
           .single(),
         supabase
@@ -156,7 +190,7 @@ export function useOrderDetail(id) {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, canSeeFinance])
 
   useEffect(() => { fetchDetail() }, [fetchDetail])
   useRefetchOnFocus(fetchDetail)
@@ -241,11 +275,15 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
     // право продвигать этот этап (stage:${fromStatus}). Без права — отказ.
     // Тесты и старт-апа (до load()) используют статический ROLE_STAGE_PERMISSIONS.
     if (fromStatus) {
-      const { data: actorProfile } = await supabase
+      const { data: actorProfile, error: actorErr } = await supabase
         .from('k24_profiles')
         .select('role')
         .eq('id', user.id)
         .single()
+      if (actorErr) {
+        captureError(actorErr, { tags: { source: 'updateOrderStatus.actorProfile' }, extra: { userId: user.id } })
+        throw new Error('Не удалось проверить права. Обновите страницу и попробуйте снова.')
+      }
       const role = actorProfile?.role
       const store = useRolePermissionsStore.getState()
       const dynamicPerms = store.loaded ? store.permissions : null
@@ -302,9 +340,18 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   // по фактическим цифрам из k24_production_logs (миграции 021 + 025).
   // Краска теперь учитывается только вручную через инвентаризацию.
 
-  // Notify Bitrix24 about status change (non-blocking with retry)
+  // Notify Bitrix24 about status change (non-blocking with retry).
+  // Финансовые поля включаем в SELECT только для admin/manager — серверный
+  // endpoint использует их только при status='done' (UF_COST_TOTAL/UF_PRICE_FINAL),
+  // а до 'done' заказ доводит менеджер. Воркер price_final/cost_total не получает.
   try {
-    const { data: order } = await supabase.from('k24_orders').select('number, bitrix_deal_id, price_final, cost_total').eq('id', orderId).single()
+    const role = useRoleSwitcherStore.getState().impersonatedProfile?.role
+      ?? useAuthStore.getState().profile?.role
+    const canSeeFinance = canRoleDo(role, 'view:finance')
+    const notifySelect = canSeeFinance
+      ? 'number, bitrix_deal_id, price_final, cost_total'
+      : 'number, bitrix_deal_id'
+    const { data: order } = await supabase.from('k24_orders').select(notifySelect).eq('id', orderId).single()
     if (order?.bitrix_deal_id) {
       fetchWithRetry('/api/bitrix/status-update', {
         method: 'POST',
@@ -348,13 +395,19 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
 
   // 2. Check if stage is complete
 
-  // Get worker's actual role for permission check
-  const { data: workerProfile } = await supabase
+  // Get worker's actual role for permission check.
+  // Если профиль не нашёлся — НЕ дефолтим на 'post_printer' (это могло бы
+  // дать левые права при недоступности RLS). Без роли просто не считаем
+  // next_status (advance не произойдёт автоматически).
+  const { data: workerProfile, error: workerErr } = await supabase
     .from('k24_profiles')
     .select('role')
     .eq('id', user.id)
     .single()
-  const workerRole = workerProfile?.role || 'post_printer'
+  if (workerErr) {
+    captureError(workerErr, { tags: { source: 'addProductionLogAndCheckAdvance.workerProfile' }, extra: { userId: user.id } })
+  }
+  const workerRole = workerProfile?.role || null
 
   let isComplete = false
 
@@ -409,8 +462,10 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
   }
 
   // 3. Compute next_status (но НЕ продвигаем). UI решает через ConfirmDialog.
+  // Без workerRole next_status не считаем — пусть UI не покажет prompt,
+  // менеджер двинет статус вручную. Лучше чем дать левый advance.
   let nextStatus = null
-  if (isComplete && order) {
+  if (isComplete && order && workerRole) {
     const store = useRolePermissionsStore.getState()
     const dynamicPerms = store.loaded ? store.permissions : null
     nextStatus = getNextStatus(workerRole, order.status, order, dynamicPerms)

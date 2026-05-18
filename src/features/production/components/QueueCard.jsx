@@ -2,7 +2,6 @@ import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { StageProgressBar } from './logs/StageProgressBar'
-import { useProductionLogs } from '../hooks/useProductionLogs'
 import { ORDER_TYPES, PRIORITIES, TRACK_LABELS } from '@/shared/constants'
 import { formatDate, formatOrderNumber } from '@/shared/lib/utils'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
@@ -12,9 +11,11 @@ const PRIORITY_BORDER = {
   high: 'border-l-dept-pouring',
 }
 
-export const QueueCard = memo(function QueueCard({ order, onUpdated, track = null }) {
-  const { getStageProgress, error: logsError } = useProductionLogs(order.id, order.qty)
-  const progress = getStageProgress(order.status)
+/**
+ * `progress` и `logsError` передаются с page-level useBatchProductionLogs —
+ * одна подписка на всю страницу вместо одной на карточку.
+ */
+export const QueueCard = memo(function QueueCard({ order, onUpdated, track = null, progress, logsError }) {
 
   const deadlineLevel = getDeadlineLevel(order.deadline)
   const deadlineTextClass = getDeadlineClasses(order.deadline) || 'text-text-muted'

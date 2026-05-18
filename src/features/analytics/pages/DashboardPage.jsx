@@ -159,8 +159,11 @@ export default function DashboardPage() {
   // Debounced realtime — avoid cascading refetches on rapid changes
   const debounceRef = useRef(null)
   useEffect(() => {
+    // uuid-suffix чтобы supabase.channel() не переиспользовал уже подписанный
+    // канал при двух вкладках/HMR (crash «cannot add callbacks after subscribe()»).
+    const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
     const channel = supabase
-      .channel('dashboard-rt')
+      .channel(`dashboard-rt-${uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'k24_orders' }, () => {
         if (debounceRef.current) clearTimeout(debounceRef.current)
         debounceRef.current = setTimeout(() => { fetchData(); fetchWorkerStats() }, 2000)

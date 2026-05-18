@@ -422,7 +422,9 @@ export default function OrderDetailPage() {
 
       {/* Tabs (desktop) / Dropdown (mobile) */}
       <div className="flex justify-end md:block">
-        <Tabs items={tabs} active={tab} onChange={setTab} className="hidden md:inline-flex" />
+        <div className="hidden md:inline-block">
+          <Tabs items={tabs} active={tab} onChange={setTab} />
+        </div>
         <DropdownMenu items={tabs} active={tab} onChange={setTab} className="md:hidden" />
       </div>
 

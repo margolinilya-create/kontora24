@@ -325,7 +325,7 @@ function ProgressLinesWidget({ order, logs }) {
               {percentage !== null && (
                 <div className="h-1.5 bg-surface-dim rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${isComplete ? 'bg-success' : 'bg-accent'}`}
+                    className={`h-full rounded-full transition-all duration-500 ease-out ${isComplete ? 'bg-success' : 'bg-accent'}`}
                     style={{ width: `${percentage}%` }}
                   />
                 </div>

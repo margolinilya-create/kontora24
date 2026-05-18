@@ -112,7 +112,12 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming, route, onSub
         return (
           <div key={d.id} className={`rounded-xl border p-3 space-y-2 ${isComplete ? 'border-success/30 bg-success/5' : 'border-border'}`}>
             {showPerIncoming && (
-              <p className="text-[10px] text-text-muted">Поступило на этап: {perDesignIncoming.total} шт</p>
+              <p className="text-[10px] text-text-muted">
+                Поступило на этап: {perDesignIncoming.total} шт
+                {value >= perDesignIncoming.total && (
+                  <span className="ml-2 text-warning">· достигнут лимит, можно вносить брак</span>
+                )}
+              </p>
             )}
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 min-w-0">
@@ -151,7 +156,7 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming, route, onSub
             {/* Progress */}
             <div className="h-1.5 bg-surface-dim rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${isComplete ? 'bg-success' : 'bg-accent'}`}
+                className={`h-full rounded-full transition-all duration-500 ease-out ${isComplete ? 'bg-success' : 'bg-accent'}`}
                 style={{ width: `${pct}%` }}
               />
             </div>

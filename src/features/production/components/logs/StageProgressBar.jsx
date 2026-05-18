@@ -10,7 +10,7 @@ export function StageProgressBar({ progress, compact = false }) {
       <div className="flex items-center gap-2">
         <div className="flex-1 h-2.5 bg-surface-dim rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-300 ${progress.isComplete ? 'bg-success' : 'bg-accent'}`}
+            className={`h-full rounded-full transition-all duration-500 ease-out ${progress.isComplete ? 'bg-success' : 'bg-accent'}`}
             style={{ width: `${progress.percentage}%` }}
           />
         </div>
@@ -29,7 +29,7 @@ export function StageProgressBar({ progress, compact = false }) {
       </div>
       <div className="h-2 bg-surface-dim rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-500 ${progress.isComplete ? 'bg-success' : 'bg-accent'}`}
+          className={`h-full rounded-full transition-all duration-500 ease-out ${progress.isComplete ? 'bg-success' : 'bg-accent'}`}
           style={{ width: `${progress.percentage}%` }}
         />
       </div>

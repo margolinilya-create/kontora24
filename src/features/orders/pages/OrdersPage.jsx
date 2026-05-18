@@ -158,7 +158,9 @@ export default function OrdersPage() {
             ]
             return (
               <>
-                <Tabs items={viewItems} active={viewMode} onChange={setViewMode} className="hidden md:inline-flex" />
+                <div className="hidden md:inline-block">
+                  <Tabs items={viewItems} active={viewMode} onChange={setViewMode} />
+                </div>
                 <DropdownMenu items={viewItems} active={viewMode} onChange={setViewMode} className="md:hidden" />
               </>
             )

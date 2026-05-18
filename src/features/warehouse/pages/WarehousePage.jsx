@@ -75,7 +75,9 @@ export default function WarehousePage() {
         ]
         return (
           <>
-            <Tabs items={tabItems} active={tab} onChange={setTab} className="hidden md:inline-flex" />
+            <div className="hidden md:inline-block">
+              <Tabs items={tabItems} active={tab} onChange={setTab} />
+            </div>
             <DropdownMenu items={tabItems} active={tab} onChange={setTab} className="md:hidden" align="left" />
           </>
         )

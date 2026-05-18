@@ -254,6 +254,21 @@ describe('validateLogEntry', () => {
       incoming: { isStart: true, total: null },
     })).toBeNull()
   })
+
+  it('брак не учитывается в лимите incoming (фидбэк менеджера 18.05)', () => {
+    // value=100 (max = incoming) + defects=50 — должно ОК, брак свободный
+    expect(validateLogEntry('lamination', { lamination_qty: 100, defects: 50 }, {
+      progress: { total: 0 },
+      incoming: { total: 100 },
+    })).toBeNull()
+  })
+
+  it('брак сам по себе любого размера не вызывает ошибку даже если value=0', () => {
+    expect(validateLogEntry('lamination', { lamination_qty: 0, defects: 999 }, {
+      progress: { total: 0 },
+      incoming: { total: 100 },
+    })).toBeNull()
+  })
 })
 
 describe('computeIncoming', () => {

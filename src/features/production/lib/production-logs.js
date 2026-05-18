@@ -305,17 +305,17 @@ export function validateLogEntry(stage, data, options = {}) {
     }
   }
 
-  // Лимит по приходу с предыдущего этапа: «нельзя продвинуть дальше больше, чем поступило годных».
-  // incoming.total — это уже годные с прошлого этапа (произведено − брак прошлого этапа).
+  // Лимит по приходу с предыдущего этапа: «нельзя обработать больше, чем поступило».
+  // Проверяем ТОЛЬКО основное value (config.quantityField); defects могут быть
+  // любыми и не учитываются в лимите (фидбэк менеджера 18.05: «если введено
+  // максимальное, то брак может быть любой — он отнимается от учтённого»).
   // Для стартового этапа (isStart / total==null) лимита нет вовсе.
   const inc = options.incoming
   if (inc && !inc.isStart && inc.total != null && config.quantityField && !options.allowOvershoot) {
-    const incoming = Number(data[config.quantityField] || 0)
-    const defects = Number(data.defects || 0)
-    const newDelta = incoming + defects
+    const value = Number(data[config.quantityField] || 0)
     const alreadyConsumed = Number(options.progress?.total || 0)
     const available = Math.max(0, Number(inc.total || 0) - alreadyConsumed)
-    if (newDelta > available) {
+    if (value > available) {
       return `На этап поступило ${inc.total} шт. Доступно ещё: ${available}`
     }
   }

@@ -44,12 +44,13 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
 
   const lamLabel = order.need_lam ? (order.lam_type === 'matte' ? 'Матовая' : order.lam_type === 'glossy' ? 'Глянцевая' : 'Да') : 'Нет'
 
-  // Автоматически уменьшаем размер шрифта если номер длинный
+  // Размер шрифта номера. Уменьшен 18.05 после фидбэка — шрифт Onder
+  // высокий, при размере 42 верх букв обрезался в чёрной шапке 20мм.
   const numberText = formatOrderNumber(order)
-  const numberFontSize = numberText.length <= 8 ? 42
-    : numberText.length <= 12 ? 32
-    : numberText.length <= 16 ? 26
-    : 22
+  const numberFontSize = numberText.length <= 8 ? 34
+    : numberText.length <= 12 ? 28
+    : numberText.length <= 16 ? 22
+    : 18
 
   const block3H = PAGE_H - HEADER_H - BLOCK1_H - BLOCK2_H - (5 * MM)
 
@@ -84,9 +85,12 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
           fontFamily: "'Onder', sans-serif",
           fontWeight: 700,
           fontSize: numberFontSize,
-          lineHeight: 1,
+          // lineHeight 1.15 — Onder имеет высокую top-метрику, при 1.0
+          // верх букв «обрезается» в чёрной шапке. Запас даёт нормальное центрирование.
+          lineHeight: 1.15,
           letterSpacing: 1,
           whiteSpace: 'nowrap',
+          display: 'inline-block',
         }}>
           {numberText}
         </span>

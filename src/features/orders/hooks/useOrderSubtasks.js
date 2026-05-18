@@ -48,8 +48,13 @@ export function useOrderSubtasks(orderId, isPack3D) {
 
   useEffect(() => {
     if (!orderId || !isPack3D) return
+    // Уникальный channel name на каждое монтирование хука — иначе если
+    // useOrderSubtasks вызывается дважды на странице (SubtaskIndicator +
+    // CurrentStageWidget), supabase.channel() возвращает уже подписанный
+    // канал и .on() крашит «cannot add callbacks after subscribe()».
+    const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
     const channel = supabase
-      .channel(`order-subtasks-${orderId}`)
+      .channel(`order-subtasks-${orderId}-${uid}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

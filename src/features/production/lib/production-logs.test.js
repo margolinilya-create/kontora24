@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog } from './production-logs'
+import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog, compute3DPouringReport } from './production-logs'
 
 const ROUTE = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
 
@@ -349,5 +349,72 @@ describe('hasSubtaskLog (R7 advance gate)', () => {
   it('пустые logs → false для активного status', () => {
     expect(hasSubtaskLog([], 'backgrounds', 'printing')).toBe(false)
     expect(hasSubtaskLog(null, 'stickers', 'cutting')).toBe(false)
+  })
+})
+
+describe('compute3DPouringReport (CSV сводка по 3D-заливке)', () => {
+  it('фикстура из ТЗ менеджера: тираж 150, вид 1 — printed=224, good=111, defects=62', () => {
+    const order = { qty: 150, order_type: 'stickerpack3D' }
+    const designs = [{ design_index: 1, name: '' }]
+    const logs = [
+      { stage: 'print', track: 'stickers', design_index: 1, stickers_printed: 224 },
+      { stage: 'selection_pouring', track: 'stickers', design_index: 1, stickers_good: 111, defects: 62 },
+    ]
+    const rows = compute3DPouringReport(order, logs, designs)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      designIndex: 1,
+      qtyTarget: 150,
+      printed: 224,
+      target15: 173,
+      pouredRaw: 173,
+      defects: 62,
+      good: 111,
+      surplus: -39,
+    })
+    expect(rows[0].defectsPct).toBeCloseTo(35.84, 1)
+    expect(rows[0].surplusPct).toBeCloseTo(-26.00, 1)
+  })
+
+  it('вид с излишками (good > qty)', () => {
+    const order = { qty: 150, order_type: 'stickerpack3D' }
+    const designs = [{ design_index: 2, name: 'Cat' }]
+    const logs = [
+      { stage: 'print', track: 'stickers', design_index: 2, stickers_printed: 210 },
+      { stage: 'selection_pouring', track: 'stickers', design_index: 2, stickers_good: 160, defects: 13 },
+    ]
+    const rows = compute3DPouringReport(order, logs, designs)
+    expect(rows[0].surplus).toBe(10)
+    expect(rows[0].defectsPct).toBeCloseTo(7.51, 1)
+    expect(rows[0].surplusPct).toBeCloseTo(6.67, 1)
+    expect(rows[0].designName).toBe('Cat')
+  })
+
+  it('игнорирует deleted_at логи', () => {
+    const order = { qty: 100, order_type: 'stickerpack3D' }
+    const designs = [{ design_index: 1, name: '' }]
+    const logs = [
+      { stage: 'selection_pouring', track: 'stickers', design_index: 1, stickers_good: 50, defects: 0, deleted_at: '2026-05-18' },
+    ]
+    const rows = compute3DPouringReport(order, logs, designs)
+    expect(rows[0].good).toBe(0)
+    expect(rows[0].defectsPct).toBe(0)
+  })
+
+  it('игнорирует логи других треков и видов', () => {
+    const order = { qty: 100, order_type: 'stickerpack3D' }
+    const designs = [{ design_index: 1, name: '' }]
+    const logs = [
+      // фоны — игнор
+      { stage: 'print', track: 'backgrounds', design_index: 1, backgrounds_printed: 100 },
+      // другой вид — игнор
+      { stage: 'selection_pouring', track: 'stickers', design_index: 2, stickers_good: 50 },
+      // целевой
+      { stage: 'selection_pouring', track: 'stickers', design_index: 1, stickers_good: 80, defects: 20 },
+    ]
+    const rows = compute3DPouringReport(order, logs, designs)
+    expect(rows[0].good).toBe(80)
+    expect(rows[0].defects).toBe(20)
+    expect(rows[0].pouredRaw).toBe(100)
   })
 })

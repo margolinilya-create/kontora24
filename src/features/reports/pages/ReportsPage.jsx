@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useWorkSchedule, useOrdersCostReport, useBonusReport, useQualityReport } from '../hooks/useReports'
+import { ThreeDPouringTab } from '../components/ThreeDPouringTab'
 import { ORDER_TYPES } from '@/shared/constants'
 import { formatPrice, formatOrderNumber } from '@/shared/lib/utils'
 import { exportCSV } from '@/shared/lib/export'
@@ -12,6 +13,7 @@ const REPORT_TABS = [
   { key: 'orders', label: 'Заказы' },
   { key: 'bonus', label: 'Сдельная оплата' },
   { key: 'quality', label: 'Качество' },
+  { key: 'pouring3d', label: '3D-заливка' },
 ]
 
 const PERIOD_TABS = [
@@ -40,6 +42,7 @@ export default function ReportsPage() {
       {activeTab === 'orders' && <OrdersCostReport period={period} />}
       {activeTab === 'bonus' && <BonusReport period={period} />}
       {activeTab === 'quality' && <QualityReport period={period} />}
+      {activeTab === 'pouring3d' && <ThreeDPouringTab period={period} />}
     </div>
   )
 }

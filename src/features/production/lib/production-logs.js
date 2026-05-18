@@ -348,3 +348,53 @@ export function hasSubtaskLog(logs, track, subtaskStatus) {
   const requiredTrack = map.track || track
   return (logs || []).some((l) => l.stage === map.stage && l.track === requiredTrack && !l.deleted_at)
 }
+
+/**
+ * Сводка по 3D-заливке одного stickerpack3D заказа. По строке на каждый вид
+ * стикера (design_index). Источники данных:
+ *   - stage='print',             track='stickers' → stickers_printed
+ *   - stage='selection_pouring', track='stickers' → stickers_good (хорошие), defects (брак)
+ *
+ * Запас 15% — Math.ceil(qty * 1.15). Излишки = good − qty (отрицательное → недостача).
+ * % брака от произведённых = defects / (good + defects).
+ * % излишков = surplus / qty.
+ */
+export function compute3DPouringReport(order, logs, designs) {
+  const qty = Number(order?.qty || 0)
+  const target15 = Math.ceil(qty * 1.15)
+  const rows = []
+  for (const d of (designs || [])) {
+    const di = d.design_index
+    const printLogs = (logs || []).filter(
+      (l) => l.stage === 'print' && l.track === 'stickers' && l.design_index === di && !l.deleted_at,
+    )
+    const printed = printLogs.reduce((s, l) => s + Number(l.stickers_printed || 0), 0)
+
+    const pourLogs = (logs || []).filter(
+      (l) => l.stage === 'selection_pouring' && l.track === 'stickers' && l.design_index === di && !l.deleted_at,
+    )
+    const good = pourLogs.reduce((s, l) => s + Number(l.stickers_good || 0), 0)
+    const defects = pourLogs.reduce((s, l) => s + Number(l.defects || 0), 0)
+
+    const pouredRaw = good + defects
+    const surplus = good - qty
+    const denom = good + defects
+    const defectsPct = denom > 0 ? (defects / denom) * 100 : 0
+    const surplusPct = qty > 0 ? (surplus / qty) * 100 : 0
+
+    rows.push({
+      designIndex: di,
+      designName: d.name || '',
+      qtyTarget: qty,
+      printed,
+      target15,
+      pouredRaw,
+      defects,
+      good,
+      surplus,
+      defectsPct,
+      surplusPct,
+    })
+  }
+  return rows
+}

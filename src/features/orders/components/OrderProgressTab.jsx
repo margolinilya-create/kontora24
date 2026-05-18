@@ -8,6 +8,7 @@ import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
 import { useOrderSubtasks } from '@/features/orders/hooks/useOrderSubtasks'
 import { computeIncoming, computeStageProgress, hasSubtaskLog } from '@/features/production/lib/production-logs'
 import { StageJumper } from './StageJumper'
+import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -451,6 +452,10 @@ export function OrderProgressTab({ order, onUpdated }) {
       </div>
 
       <ActualCostSummary order={order} logs={logs} />
+
+      <div className="flex justify-end">
+        <ThreeDPouringExportButton order={order} logs={logs} />
+      </div>
 
       <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
         <h2 className="font-semibold mb-3">История записей</h2>

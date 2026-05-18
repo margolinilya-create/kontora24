@@ -121,9 +121,9 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
         }
 
         return (
-          <div key={log.id} className="flex items-start justify-between py-2 border-b border-border last:border-0 group">
+          <div key={log.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between py-2 border-b border-border last:border-0 group gap-1 sm:gap-0">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm flex-wrap">
                 <span className="font-medium">{log.worker?.display_name || 'Работник'}</span>
                 <span className="text-text-muted text-xs">{config?.label}</span>
                 {log.track === 'backgrounds' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-dept-print/15 text-dept-print">Фоны</span>}
@@ -139,12 +139,12 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
               </div>
               {log.notes && <p className="text-xs text-text-muted mt-1">{log.notes}</p>}
             </div>
-            <div className="flex items-center gap-2 shrink-0 ml-2">
+            <div className="flex items-center gap-2 sm:shrink-0 sm:ml-2 self-end sm:self-auto">
               <span className="text-[11px] text-text-muted">
                 {new Date(log.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
               </span>
               {(canEdit || canDelete) && (
-                <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-100 sm:opacity-60 sm:group-hover:opacity-100 transition-opacity">
                   {canEdit && (
                     <button onClick={() => startEdit(log)} className="text-[11px] text-text-muted hover:text-text px-1.5 py-0.5 rounded hover:bg-surface-2">Изм.</button>
                   )}

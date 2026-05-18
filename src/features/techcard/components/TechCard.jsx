@@ -16,7 +16,9 @@ const PAGE_W = 595
 const PAGE_H = 842
 const MARGIN = 5 * MM
 const HEADER_H = 20 * MM
-const BLOCK1_H = 64 * MM
+// BLOCK1_H увеличен с 64→78 мм после фидбэка 18.05 — значения полей (особенно
+// длинные названия плёнок «Белая матовая (Duckson 1260)») обрезались.
+const BLOCK1_H = 78 * MM
 const BLOCK2_H = 42 * MM
 const RADIUS = 3 * MM
 
@@ -99,38 +101,39 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
         gap: 2 * MM,
         boxSizing: 'border-box',
       }}>
-        {/* Левая часть — 3 ряда полей */}
+        {/* Левая часть — 3 ряда полей. auto rows, чтобы значения с переносом
+            не обрезались (фидбэк 18.05). BLOCK1_H увеличен — места хватит. */}
         <div style={{
           border: '1px solid #d1d5db',
           borderRadius: RADIUS,
           padding: `${3 * MM}px ${4 * MM}px`,
           display: 'grid',
-          gridTemplateRows: '1fr 1fr 1fr',
-          rowGap: 4,
-          overflow: 'hidden',
+          gridTemplateRows: 'auto auto auto',
+          rowGap: 3 * MM,
+          alignContent: 'start',
           boxSizing: 'border-box',
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 3 * MM, minHeight: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 3 * MM }}>
             <Field label="Комментарий заказчика" value={order.client_brief || order.notes || '—'} valueFontSize={9} />
             <Field label="Заказчик" value={order.client?.name || '—'} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM, minHeight: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
             <Field label="Тираж" value={`${order.qty || 0} шт`} />
             <Field label="Формат" value={`${order.width_mm || 0}×${order.height_mm || 0} мм`} />
             <Field label="Кол-во видов" value={order.design_variants || 1} />
             <Field label="Вид сдачи" value={formatOrderType(order.order_type)} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM, minHeight: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
             {isPack3D ? (
               <>
-                <Field label="Плёнка фонов" value={getFilmMaterialName(order.film_type)} />
-                <Field label="Плёнка стикеров" value={getFilmMaterialName(order.film_type_stickers || order.film_type)} />
+                <Field label="Плёнка фонов" value={getFilmMaterialName(order.film_type)} valueFontSize={9} />
+                <Field label="Плёнка стикеров" value={getFilmMaterialName(order.film_type_stickers || order.film_type)} valueFontSize={9} />
                 <Field label="Ламинация" value={lamLabel} />
                 <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
               </>
             ) : (
               <>
-                <Field label="Материал" value={getFilmMaterialName(order.film_type)} />
+                <Field label="Материал" value={getFilmMaterialName(order.film_type)} valueFontSize={9} />
                 <Field label="Ламинация" value={lamLabel} />
                 <Field label="3D смола" value={is3D ? 'Да' : 'Нет'} />
                 <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
@@ -303,8 +306,10 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
 })
 
 function Field({ label, value, valueFontSize = 11 }) {
+  // Убран overflow:hidden — значения с переносом теперь не обрезаются.
+  // Высота плашки BLOCK1 увеличена до 78мм чтобы хватило места (фидбэк 18.05).
   return (
-    <div style={{ minWidth: 0, overflow: 'hidden' }}>
+    <div style={{ minWidth: 0 }}>
       <div style={{
         fontSize: 8,
         color: '#9ca3af',
@@ -319,8 +324,7 @@ function Field({ label, value, valueFontSize = 11 }) {
         fontWeight: 600,
         fontSize: valueFontSize,
         marginTop: 2,
-        lineHeight: 1.2,
-        overflow: 'hidden',
+        lineHeight: 1.25,
         overflowWrap: 'anywhere',
         wordBreak: 'break-word',
         whiteSpace: 'normal',

@@ -408,10 +408,10 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Print group — sgrouped under common border */}
-      <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface p-1.5">
-        <Button variant="secondary" size="sm" onClick={() => setPrintType('techcard')}>Тех. карта</Button>
-        <Button variant="secondary" size="sm" onClick={() => setPrintType('production')}>На бокс</Button>
-        <Button variant="secondary" size="sm" onClick={() => setPrintType('delivery')}>На выдачу</Button>
+      <div className="inline-flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface p-1.5 max-w-full">
+        <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('techcard')}>Тех. карта</Button>
+        <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('production')}>На бокс</Button>
+        <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('delivery')}>На выдачу</Button>
       </div>
 
       {/* Stepper */}

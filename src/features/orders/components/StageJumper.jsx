@@ -54,25 +54,28 @@ export function StageJumper({ order, onUpdated }) {
   }
 
   return (
-    <div className="flex items-end gap-2">
-      <label className="flex-1 min-w-0">
-        <span className="block text-xs text-text-muted mb-1">Перейти на этап</span>
-        <select
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
-        >
-          <option value="">— выбрать —</option>
-          {options.map((o) => (
-            <option key={o.status} value={o.status}>
-              {o.direction === 'back' ? '↓' : '↑'} {ORDER_STATUSES[o.status]?.label || o.status}
-            </option>
-          ))}
-        </select>
-      </label>
-      <Button size="sm" disabled={!target} loading={saving} onClick={handleJump}>
-        Перейти
-      </Button>
+    <div>
+      <h2 className="font-semibold mb-3">Выбрать этап для учёта работы</h2>
+      <div className="flex items-end gap-2">
+        <label className="flex-1 min-w-0">
+          <span className="sr-only">Этап</span>
+          <select
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+          >
+            <option value="">— выбрать —</option>
+            {options.map((o) => (
+              <option key={o.status} value={o.status}>
+                {o.direction === 'back' ? '↓' : '↑'} {ORDER_STATUSES[o.status]?.label || o.status}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button size="sm" disabled={!target} loading={saving} onClick={handleJump}>
+          Перейти
+        </Button>
+      </div>
     </div>
   )
 }

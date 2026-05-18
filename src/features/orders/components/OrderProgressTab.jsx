@@ -179,10 +179,12 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   if (NO_INPUT_STAGES.has(stage)) {
     const label = ORDER_STATUSES[stage]?.label || stage
     return (
-      <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-        <h2 className="font-semibold mb-1">Текущий этап: {label}</h2>
-        <p className="text-sm text-text-muted mt-3 mb-4">На данном этапе нет ручного учёта.</p>
-        <StageJumper order={order} onUpdated={onUpdated} />
+      <div className="space-y-4">
+        <StageJumperBlock order={order} onUpdated={onUpdated} />
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+          <h2 className="font-semibold mb-1">Учёт работы на этапе: {label}</h2>
+          <p className="text-sm text-text-muted mt-3">На данном этапе нет ручного учёта.</p>
+        </div>
       </div>
     )
   }
@@ -211,37 +213,37 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   }
 
   return (
-    <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-      <h2 className="font-semibold mb-3">Текущий этап: {stageLabel}</h2>
-      {showPackDesigns && designs.length > 0 ? (
-        <div className="mb-4">
-          <p className="text-xs text-text-muted mb-2">Стикеры — по каждому виду отдельно</p>
-          <PackDesignsForm
-            designs={designs}
-            logs={logs}
-            stage={stage}
-            route={route}
-            onSubmitDesign={handlePackDesignSubmit}
-            updateName={updateName}
-            mode={packMode}
-          />
-          <div className="mt-4 pt-4 border-t border-border">
-            <ProductionLogForm
-              stage={stage}
-              order={order}
-              progress={progressProp}
-              incoming={incomingProp}
-              onSubmit={handleSubmit}
-              omitFields={PACK_OMIT_FIELDS[stage]}
-            />
-          </div>
-        </div>
-      ) : (
-        <ProductionLogForm stage={stage} order={order} progress={progressProp} incoming={incomingProp} onSubmit={handleSubmit} />
-      )}
+    <div className="space-y-4">
+      <StageJumperBlock order={order} onUpdated={onUpdated} />
 
-      <div className="mt-4 pt-4 border-t border-border">
-        <StageJumper order={order} onUpdated={onUpdated} />
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+        <h2 className="font-semibold mb-3">Учёт работы на этапе: {stageLabel}</h2>
+        {showPackDesigns && designs.length > 0 ? (
+          <div>
+            <p className="text-xs text-text-muted mb-2">Стикеры — по каждому виду отдельно</p>
+            <PackDesignsForm
+              designs={designs}
+              logs={logs}
+              stage={stage}
+              route={route}
+              onSubmitDesign={handlePackDesignSubmit}
+              updateName={updateName}
+              mode={packMode}
+            />
+            <div className="mt-4 pt-4 border-t border-border">
+              <ProductionLogForm
+                stage={stage}
+                order={order}
+                progress={progressProp}
+                incoming={incomingProp}
+                onSubmit={handleSubmit}
+                omitFields={PACK_OMIT_FIELDS[stage]}
+              />
+            </div>
+          </div>
+        ) : (
+          <ProductionLogForm stage={stage} order={order} progress={progressProp} incoming={incomingProp} onSubmit={handleSubmit} />
+        )}
       </div>
 
       <ConfirmDialog
@@ -263,6 +265,18 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
         confirmText="Отправить дальше"
         variant="primary"
       />
+    </div>
+  )
+}
+
+// Обёртка StageJumper в карточке. Не рендерит карточку если у пользователя нет
+// прав (StageJumper сам возвращает null) — чтобы не было пустого блока.
+function StageJumperBlock({ order, onUpdated }) {
+  const { hasRole } = useAuth()
+  if (!hasRole(['admin', 'manager'])) return null
+  return (
+    <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+      <StageJumper order={order} onUpdated={onUpdated} />
     </div>
   )
 }
@@ -403,7 +417,7 @@ function SubtaskIndicator({ order, onUpdated }) {
     <div className="bg-surface rounded-xl border border-border px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
       <span className="text-xs text-text-muted">Параллельные подзадачи:</span>
       <SubtaskTrackRow track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} />
-      <span className="text-text-muted">·</span>
+      <span className="hidden sm:inline text-text-muted">·</span>
       <SubtaskTrackRow track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} />
     </div>
   )

@@ -18,6 +18,7 @@ import { findOrCreateClientByName } from '@/features/clients/hooks/useClients'
 import { formatOrderNumber } from '@/shared/lib/utils'
 import { uploadAttachment, validatePreviewFile } from '@/features/orders/lib/order-attachments'
 import { captureError } from '@/shared/lib/sentry'
+import { MaterialForecast } from '../components/MaterialForecast'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
@@ -181,6 +182,11 @@ export default function CreateOrderPage() {
   const source = watch('source')
   const deliveryType = watch('delivery_type')
   const mockupPath = watch('mockup_path')
+  const widthMm = watch('width_mm')
+  const heightMm = watch('height_mm')
+  const qty = watch('qty')
+  const filmType = watch('film_type')
+  const boppBag = watch('bopp_bag')
   const isStickerpack = orderType === 'stickerpack' || orderType === 'stickerpack3D'
   const isStickerpack3D = orderType === 'stickerpack3D'
   const isMockupImage = mockupPath && IMAGE_RX.test(mockupPath)
@@ -515,7 +521,7 @@ export default function CreateOrderPage() {
           </div>
         </div>
 
-        {/* === RIGHT: Цена + Макет + Комментарий === */}
+        {/* === RIGHT: Цена + Расход материалов + Макет + Комментарий === */}
         <div className="space-y-4">
           {canSeeFinance && (
             <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
@@ -531,6 +537,16 @@ export default function CreateOrderPage() {
               <FieldError error={errors.price_final} />
             </div>
           )}
+
+          <MaterialForecast
+            orderType={orderType}
+            widthMm={widthMm}
+            heightMm={heightMm}
+            qty={qty}
+            filmType={filmType}
+            lamType={lamType}
+            boppBag={boppBag}
+          />
 
           <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-3">
             <div>

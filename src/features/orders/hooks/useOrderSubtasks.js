@@ -3,22 +3,28 @@ import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 
 /**
- * Подзадачи 3D-стикерпака — параллельные треки фоны/стикеры.
- * Каждый stickerpack3D заказ имеет 2 строки в k24_order_subtasks
- * (создаются триггером при INSERT). Продвижение — через RPC advance_subtask.
+ * Подзадачи заказа — параллельные треки.
  *
- * Возвращает { subtasks: { backgrounds, stickers }, advance(track, toStatus) }.
+ * 1) stickerpack3D: 2 треки фоны/стикеры (миграция 032).
+ * 2) Multi-variant заказы (R8.4c, миграция 040): по одной подзадаче на
+ *    каждый item из k24_order_items, track='variant', item_idx=1..N.
  *
- * Миграция 032 (фидбэк менеджера 17.05).
+ * Хук грузит обе категории подзадач сразу (если они есть) и возвращает:
+ *   { subtasks: { backgrounds, stickers }, variants: [array], advance(track, toStatus), advanceVariant(itemIdx, toStatus) }
+ *
+ * `isMulti` — режим: грузить ли подзадачи. Передаётся из вызывающего
+ * компонента (isPack3D || hasVariants).
  */
-export function useOrderSubtasks(orderId, isPack3D) {
+export function useOrderSubtasks(orderId, isMulti) {
   const [subtasks, setSubtasks] = useState({ backgrounds: null, stickers: null })
+  const [variants, setVariants] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const fetchSubtasks = useCallback(async () => {
-    if (!orderId || !isPack3D) {
+    if (!orderId || !isMulti) {
       setSubtasks({ backgrounds: null, stickers: null })
+      setVariants([])
       setLoading(false)
       return
     }
@@ -28,17 +34,23 @@ export function useOrderSubtasks(orderId, isPack3D) {
         .from('k24_order_subtasks')
         .select('*')
         .eq('order_id', orderId)
+        .order('item_idx', { ascending: true, nullsFirst: true })
       if (err) throw err
       const next = { backgrounds: null, stickers: null }
-      for (const row of data || []) next[row.track] = row
+      const vars = []
+      for (const row of data || []) {
+        if (row.track === 'variant') vars.push(row)
+        else next[row.track] = row
+      }
       setSubtasks(next)
+      setVariants(vars)
     } catch (err) {
       setError(err)
       captureError(err, { tags: { source: 'useOrderSubtasks.fetch' }, extra: { orderId } })
     } finally {
       setLoading(false)
     }
-  }, [orderId, isPack3D])
+  }, [orderId, isMulti])
 
   useEffect(() => { fetchSubtasks() }, [fetchSubtasks])
 
@@ -47,7 +59,7 @@ export function useOrderSubtasks(orderId, isPack3D) {
   useEffect(() => { fetchRef.current = fetchSubtasks }, [fetchSubtasks])
 
   useEffect(() => {
-    if (!orderId || !isPack3D) return
+    if (!orderId || !isMulti) return
     // Уникальный channel name на каждое монтирование хука — иначе если
     // useOrderSubtasks вызывается дважды на странице (SubtaskIndicator +
     // CurrentStageWidget), supabase.channel() возвращает уже подписанный
@@ -63,25 +75,35 @@ export function useOrderSubtasks(orderId, isPack3D) {
       }, () => fetchRef.current())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [orderId, isPack3D])
+  }, [orderId, isMulti])
 
-  /**
-   * Продвинуть подзадачу на следующий статус. Возвращает { ok, new_status, both_ready }.
-   * Если both_ready === true — обе подзадачи в 'ready', UI должен предложить
-   * перевести заказ на assembly_3d.
-   */
-  const advance = useCallback(async (track, toStatus) => {
-    const sub = subtasks[track]
-    if (!sub) throw new Error(`Подзадача "${track}" не найдена`)
+  const advanceById = useCallback(async (subtaskId, toStatus) => {
     const { data, error: err } = await supabase.rpc('advance_subtask', {
-      p_subtask_id: sub.id,
-      p_to_status: toStatus,
+      p_subtask_id: subtaskId, p_to_status: toStatus,
     })
     if (err) throw err
     if (data?.ok === false) throw new Error(data.error || 'Не удалось продвинуть подзадачу')
     await fetchSubtasks()
     return data
-  }, [subtasks, fetchSubtasks])
+  }, [fetchSubtasks])
 
-  return { subtasks, loading, error, refetch: fetchSubtasks, advance }
+  /**
+   * Продвинуть подзадачу bg/stickers (3D-pack) на toStatus.
+   */
+  const advance = useCallback(async (track, toStatus) => {
+    const sub = subtasks[track]
+    if (!sub) throw new Error(`Подзадача "${track}" не найдена`)
+    return advanceById(sub.id, toStatus)
+  }, [subtasks, advanceById])
+
+  /**
+   * Продвинуть подзадачу-вариант (multi-variant) на toStatus.
+   */
+  const advanceVariant = useCallback(async (itemIdx, toStatus) => {
+    const sub = variants.find((v) => v.item_idx === itemIdx)
+    if (!sub) throw new Error(`Подзадача вида ${itemIdx} не найдена`)
+    return advanceById(sub.id, toStatus)
+  }, [variants, advanceById])
+
+  return { subtasks, variants, loading, error, refetch: fetchSubtasks, advance, advanceVariant }
 }

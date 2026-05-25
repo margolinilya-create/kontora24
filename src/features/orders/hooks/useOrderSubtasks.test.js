@@ -5,6 +5,7 @@ const { mockSupabase, mockCaptureError } = vi.hoisted(() => {
   const mockQuery = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
     then: vi.fn((resolve) => resolve({ data: [], error: null })),
   }
 
@@ -39,6 +40,7 @@ function mockSelectResponse(data, error = null) {
     const q = mockSupabase._mockQuery
     q.select.mockReturnThis()
     q.eq.mockReturnThis()
+    q.order.mockReturnThis()
     q.then = vi.fn((resolve) => resolve({ data, error }))
     return q
   })

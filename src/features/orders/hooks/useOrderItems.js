@@ -49,6 +49,11 @@ export function useOrderItems(orderId) {
  * Используется при создании multi-variant заказа: удаляем дефолтный idx=1
  * (созданный триггером) и вставляем переданный массив.
  *
+ * Для multi-variant (items.length > 1) дополнительно вставляет подзадачи
+ * `track='variant', item_idx=1..N` (R8.4c) — каждая со стартовым статусом
+ * текущего order.status. Не пересоздаёт подзадачи если они уже есть
+ * (ON CONFLICT по уникальному индексу uq_subtasks_variant_item).
+ *
  * @param {string} orderId
  * @param {Array<{ width_mm:number, height_mm:number, qty:number }>} items
  */
@@ -74,4 +79,29 @@ export async function replaceOrderItems(orderId, items) {
   }))
   const { error: insErr } = await supabase.from('k24_order_items').insert(rows)
   if (insErr) throw insErr
+
+  // 3) Multi-variant subtasks (R8.4c). Только если действительно >1 видов.
+  if (rows.length > 1) {
+    const { data: order } = await supabase
+      .from('k24_orders').select('status').eq('id', orderId).single()
+    const startStatus = order?.status || 'new'
+    const subtaskRows = rows.map((r) => ({
+      order_id: orderId,
+      track: 'variant',
+      item_idx: r.idx,
+      status: startStatus,
+    }))
+    // PostgREST upsert через .upsert() невозможен на partial unique index,
+    // но INSERT не упадёт если индекс не нарушен. Сначала чистим существующие
+    // variant-подзадачи для этого заказа (replace-семантика).
+    await supabase.from('k24_order_subtasks')
+      .delete().eq('order_id', orderId).eq('track', 'variant')
+    const { error: stErr } = await supabase.from('k24_order_subtasks').insert(subtaskRows)
+    if (stErr) throw stErr
+  } else {
+    // items.length === 1 — гарантируем что variant-подзадач нет (мог быть
+    // случай: было 3 вида, теперь 1, лишние треки удаляем).
+    await supabase.from('k24_order_subtasks')
+      .delete().eq('order_id', orderId).eq('track', 'variant')
+  }
 }

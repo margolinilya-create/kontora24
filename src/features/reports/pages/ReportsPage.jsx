@@ -1,19 +1,31 @@
-import { useState } from 'react'
-import { useWorkSchedule, useOrdersCostReport, useBonusReport, useQualityReport } from '../hooks/useReports'
+import { useState, useMemo } from 'react'
+import { useOrdersCostReport, useEmployeeReport } from '../hooks/useReports'
+import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
 import { ThreeDPouringTab } from '../components/ThreeDPouringTab'
-import { ORDER_TYPES } from '@/shared/constants'
-import { formatPrice, formatOrderNumber } from '@/shared/lib/utils'
-import { exportCSV } from '@/shared/lib/export'
+import { buildCostMap, costForOrder } from '../lib/materials-cost'
+import { ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PAYMENT_STATUSES } from '@/shared/constants'
+import { formatPrice, formatOrderNumber, formatDate } from '@/shared/lib/utils'
+import { downloadXlsx } from '@/shared/lib/export-xlsx'
 import Tabs from '@/shared/components/Tabs'
+import DropdownMenu from '@/shared/components/DropdownMenu'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
+import Modal from '@/shared/components/Modal'
+import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 
+// 5 вкладок по брифу 25.05 (R8.5):
+// 1) Unit Economics — сводка по заказам с финансами и материалами
+// 2) Сотрудники — виджеты «часы + сдельная + цифры» + детальный попап
+// 3) 3D-отдел — per-design расход и брак (reuse ThreeDPouringTab)
+// 4) Расходы по заказам — фактический расход материалов с себестоимостью
+// 5) P&L — упрощённая сводка для управленческого учёта
 const REPORT_TABS = [
-  { key: 'schedule', label: 'График работы' },
-  { key: 'orders', label: 'Заказы' },
-  { key: 'bonus', label: 'Сдельная оплата' },
-  { key: 'quality', label: 'Качество' },
-  { key: 'pouring3d', label: '3D-заливка' },
+  { key: 'unit',     label: 'Unit Economics' },
+  { key: 'people',   label: 'Сотрудники' },
+  { key: 'team3d',   label: '3D отдел' },
+  { key: 'expenses', label: 'Расходы по заказам' },
+  { key: 'pnl',      label: 'P&L' },
 ]
 
 const PERIOD_TABS = [
@@ -23,7 +35,7 @@ const PERIOD_TABS = [
 ]
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState('schedule')
+  const [activeTab, setActiveTab] = useState('unit')
   const [period, setPeriod] = useState('30')
 
   return (
@@ -31,237 +43,413 @@ export default function ReportsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold font-display tracking-tight">Отчёты</h1>
-          <p className="text-text-muted text-sm">Аналитика по персоналу и производству</p>
+          <p className="text-text-muted text-sm">
+            Реал-тайм аналитика. Кнопки «xlsx» — выгрузка текущей таблицы.
+          </p>
         </div>
         <Tabs items={PERIOD_TABS} active={period} onChange={setPeriod} />
       </div>
 
-      <Tabs items={REPORT_TABS} active={activeTab} onChange={setActiveTab} />
+      <div className="hidden md:inline-block">
+        <Tabs items={REPORT_TABS} active={activeTab} onChange={setActiveTab} />
+      </div>
+      <DropdownMenu items={REPORT_TABS} active={activeTab} onChange={setActiveTab} className="md:hidden" align="left" />
 
-      {activeTab === 'schedule' && <WorkScheduleReport period={period} />}
-      {activeTab === 'orders' && <OrdersCostReport period={period} />}
-      {activeTab === 'bonus' && <BonusReport period={period} />}
-      {activeTab === 'quality' && <QualityReport period={period} />}
-      {activeTab === 'pouring3d' && <ThreeDPouringTab period={period} />}
+      {activeTab === 'unit'     && <UnitEconomicsTab period={period} />}
+      {activeTab === 'people'   && <EmployeesTab period={period} />}
+      {activeTab === 'team3d'   && <ThreeDPouringTab period={period} />}
+      {activeTab === 'expenses' && <ExpensesTab period={period} />}
+      {activeTab === 'pnl'      && <PnLTab period={period} />}
     </div>
   )
 }
 
-function WorkScheduleReport({ period }) {
-  const { data, loading, error } = useWorkSchedule(period)
-  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
-  if (error) return <ReportError text="Не удалось загрузить график" />
-  if (data.length === 0) return <Empty text="Нет данных по сменам" />
-
-  function handleExport() {
-    const rows = data.map((w) => ({
-      'Сотрудник': w.name,
-      'Часов всего': (w.totalMinutes / 60).toFixed(1),
-      ...Object.fromEntries(Object.entries(w.days).map(([day, min]) => [day, (min / 60).toFixed(1)])),
-    }))
-    exportCSV(rows, 'график-работы')
-  }
-
-  return (
-    <div className="bg-surface rounded-xl border border-border p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold">График работы</h2>
-        <Button variant="secondary" size="sm" onClick={handleExport}>CSV</Button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <caption className="sr-only">График работы персонала</caption>
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-2 font-medium text-text-muted">Сотрудник</th>
-              <th className="text-right py-2 font-medium text-text-muted">Часов</th>
-              {data[0] && Object.keys(data[0].days).map((day) => (
-                <th key={day} className="text-right py-2 font-medium text-text-muted text-xs">{day}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((w) => (
-              <tr key={w.name} className="border-b border-border last:border-0">
-                <td className="py-2 font-medium">{w.name}</td>
-                <td className="py-2 text-right font-semibold">{(w.totalMinutes / 60).toFixed(1)}</td>
-                {Object.values(w.days).map((min, i) => (
-                  <td key={i} className="py-2 text-right text-xs text-text-muted">{(min / 60).toFixed(1)}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function OrdersCostReport({ period }) {
+// ============================================================================
+// 1) Unit Economics Kontora
+// ============================================================================
+function UnitEconomicsTab({ period }) {
   const { data, loading, error } = useOrdersCostReport(period)
-  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
-  if (error) return <ReportError text="Не удалось загрузить отчёт по заказам" />
-  if (data.length === 0) return <Empty text="Нет заказов" />
+  const { materials } = useMaterials()
+  const costMap = useMemo(() => buildCostMap(materials), [materials])
+
+  if (loading) return <CenterSpinner />
+  if (error) return <ReportError text="Не удалось загрузить Unit Economics" />
+  if (data.length === 0) return <Empty text="Нет заказов за период" />
+
+  const rows = data.map((o) => {
+    const mat = costForOrder(o, costMap)
+    return {
+      ...o,
+      mat_film: mat.film,
+      mat_resin: mat.resin,
+      mat_total: mat.total,
+      total_cost_with_mat_labor: mat.total + (Number(o.cost_labor) || 0),
+    }
+  })
 
   function handleExport() {
-    const rows = data.map((o) => ({
-      '#': formatOrderNumber(o), 'Тип': ORDER_TYPES[o.order_type]?.label, 'Тираж': o.qty,
-      'Цена': o.price_final, 'Себестоимость': o.cost_total, 'Прибыль': o.profit,
-      'Маржа %': o.margin_pct, 'Плёнка (м)': o.actual_film, 'Смола (г)': o.actual_resin,
-    }))
-    exportCSV(rows, 'заказы-рентабельность')
+    const header = [
+      'ID', '№ заказа', 'Дата приёма', 'Дедлайн', 'Клиент', 'Продукт', '3D смола',
+      'Размер', 'Тираж', 'Стикеров в паке', 'Плёнка', 'Ламинация', 'Комментарий',
+      'Отгрузка', '% брака', '% излишков', 'Сумма заказа', 'Тип оплаты',
+      'Себест. плёнки, ₽', 'Себест. смолы, ₽', 'Себест. материалов, ₽',
+      'Оплата труда, ₽', 'Себест. итого (мат+труд), ₽',
+      'Маржинальность, ₽', 'Маржинальность, %',
+    ]
+    const aoa = [header, ...rows.map((o) => [
+      o.id, formatOrderNumber(o), formatDate(o.created_at), o.deadline || '—',
+      o.client_name || '—', ORDER_TYPES[o.order_type]?.label || o.order_type,
+      o.order_type === 'sticker3D' || o.order_type === 'stickerpack3D' ? 'Да' : 'Нет',
+      `${o.width_mm}×${o.height_mm}`, o.qty, o.stickers_per_pack || '—',
+      FILM_TYPES[o.film_type]?.label || o.film_type || '—',
+      o.need_lam ? (LAMINATION_TYPES[o.lam_type]?.label || 'Да') : 'Нет',
+      o.notes || '—',
+      DELIVERY_TYPES[o.delivery_type]?.label || '—',
+      `${o.reject_pct}%`, `${o.surplus_pct}%`,
+      o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
+      Math.round(o.mat_film), Math.round(o.mat_resin), Math.round(o.mat_total),
+      o.cost_labor || 0, Math.round(o.total_cost_with_mat_labor),
+      o.profit, `${o.margin_pct}%`,
+    ])]
+    downloadXlsx(`unit-economics-${period}`, 'Unit Economics', aoa)
+      .catch((err) => toast.error(translateError(err).message))
   }
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold">Заказы и рентабельность</h2>
-        <Button variant="secondary" size="sm" onClick={handleExport}>CSV</Button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <caption className="sr-only">Рентабельность заказов</caption>
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-2 font-medium text-text-muted">#</th>
-              <th className="text-left py-2 font-medium text-text-muted">Тип</th>
-              <th className="text-right py-2 font-medium text-text-muted">Тираж</th>
-              <th className="text-right py-2 font-medium text-text-muted">Цена</th>
-              <th className="text-right py-2 font-medium text-text-muted">С/С</th>
-              <th className="text-right py-2 font-medium text-text-muted">Прибыль</th>
-              <th className="text-right py-2 font-medium text-text-muted">Маржа</th>
-              <th className="text-right py-2 font-medium text-text-muted">Плёнка</th>
-              <th className="text-right py-2 font-medium text-text-muted">Смола</th>
+    <ReportFrame title="Unit Economics" onXlsx={handleExport}>
+      <table className="w-full text-xs">
+        <thead className="text-text-muted">
+          <tr className="border-b border-border">
+            <Th>№</Th><Th>Дата</Th><Th>Клиент</Th><Th>Продукт</Th>
+            <Th right>Размер</Th><Th right>Тираж</Th><Th>Плёнка</Th><Th>Лам.</Th>
+            <Th right>Брак%</Th><Th right>Излиш.%</Th>
+            <Th right>Сумма</Th><Th right>Плёнка ₽</Th><Th right>Смола ₽</Th>
+            <Th right>С/с итого</Th><Th right>Маржа ₽</Th><Th right>Маржа %</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o) => (
+            <tr key={o.id} className="border-b border-border last:border-0">
+              <Td bold>{formatOrderNumber(o)}</Td>
+              <Td>{formatDate(o.created_at)}</Td>
+              <Td>{o.client_name || '—'}</Td>
+              <Td>{ORDER_TYPES[o.order_type]?.label}</Td>
+              <Td right>{o.width_mm}×{o.height_mm}</Td>
+              <Td right>{o.qty}</Td>
+              <Td>{FILM_TYPES[o.film_type]?.label || '—'}</Td>
+              <Td>{o.need_lam ? (LAMINATION_TYPES[o.lam_type]?.label || 'Да') : '—'}</Td>
+              <Td right danger={o.reject_pct > 15}>{o.reject_pct}%</Td>
+              <Td right muted>{o.surplus_pct}%</Td>
+              <Td right>{formatPrice(o.price_final)}</Td>
+              <Td right muted>{Math.round(o.mat_film)}</Td>
+              <Td right muted>{Math.round(o.mat_resin)}</Td>
+              <Td right>{formatPrice(o.total_cost_with_mat_labor)}</Td>
+              <Td right success={o.profit > 0} danger={o.profit < 0}>{formatPrice(o.profit)}</Td>
+              <Td right>{o.margin_pct}%</Td>
             </tr>
-          </thead>
-          <tbody>
-            {data.map((o) => (
-              <tr key={o.id} className="border-b border-border last:border-0">
-                <td className="py-2 font-medium">{formatOrderNumber(o)}</td>
-                <td className="py-2 text-text-muted">{ORDER_TYPES[o.order_type]?.label}</td>
-                <td className="py-2 text-right">{o.qty}</td>
-                <td className="py-2 text-right">{formatPrice(o.price_final)}</td>
-                <td className="py-2 text-right text-text-muted">{formatPrice(o.cost_total)}</td>
-                <td className={`py-2 text-right font-medium ${o.profit >= 0 ? 'text-success' : 'text-danger'}`}>{formatPrice(o.profit)}</td>
-                <td className={`py-2 text-right ${o.margin_pct >= 50 ? 'text-success' : o.margin_pct >= 30 ? '' : 'text-danger'}`}>{o.margin_pct}%</td>
-                <td className="py-2 text-right text-text-muted">{o.actual_film > 0 ? `${o.actual_film.toFixed(1)}м` : '—'}</td>
-                <td className="py-2 text-right text-text-muted">{o.actual_resin > 0 ? `${o.actual_resin.toFixed(0)}г` : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          ))}
+        </tbody>
+      </table>
+    </ReportFrame>
+  )
+}
+
+// ============================================================================
+// 2) Сотрудники Конторы
+// ============================================================================
+function EmployeesTab({ period }) {
+  const { data, loading, error } = useEmployeeReport(period)
+  const [openWorker, setOpenWorker] = useState(null)
+
+  if (loading) return <CenterSpinner />
+  if (error) return <ReportError text="Не удалось загрузить сотрудников" />
+  if (data.length === 0) return <Empty text="Нет данных за период" />
+
+  function handleExport() {
+    const header = [
+      'Сотрудник', 'Отработанные часы', 'Заработок, ₽',
+      'Залито, шт', 'Выбрано, шт', 'Собрано паков', 'Упаковано',
+      'Напечатано', 'Заламинировано', 'Нарезано',
+    ]
+    const aoa = [header, ...data.map((w) => [
+      w.name, (w.totalMinutes / 60).toFixed(1), Math.round(w.payout),
+      w.poured, w.selected, w.assembled, w.packaged,
+      w.printed, w.laminated, w.cut,
+    ])]
+    downloadXlsx(`сотрудники-${period}`, 'Сотрудники', aoa)
+      .catch((err) => toast.error(translateError(err).message))
+  }
+
+  return (
+    <ReportFrame title="Учёт работы сотрудников" onXlsx={handleExport}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {data.map((w) => (
+          <button
+            key={w.worker_id}
+            onClick={() => setOpenWorker(w)}
+            className="text-left bg-surface-2 hover:bg-surface-dim border border-border rounded-xl p-4 transition-colors"
+          >
+            <p className="font-semibold text-sm">{w.name}</p>
+            <p className="text-2xl font-display font-bold mt-1 tabular-nums">
+              {(w.totalMinutes / 60).toFixed(1)}<span className="text-sm text-text-muted font-sans"> ч</span>
+            </p>
+            <p className="text-sm text-accent font-medium">{formatPrice(w.payout)}</p>
+            <div className="grid grid-cols-2 gap-1 mt-2 text-xs text-text-muted">
+              <span>Залито: <b className="text-text">{w.poured}</b></span>
+              <span>Выбрано: <b className="text-text">{w.selected}</b></span>
+              <span>Собрано: <b className="text-text">{w.assembled}</b></span>
+              <span>Упаковано: <b className="text-text">{w.packaged}</b></span>
+            </div>
+            <p className="text-xs text-accent mt-2">Подробнее →</p>
+          </button>
+        ))}
       </div>
+      {openWorker && <EmployeeDetailModal worker={openWorker} onClose={() => setOpenWorker(null)} />}
+    </ReportFrame>
+  )
+}
+
+function EmployeeDetailModal({ worker, onClose }) {
+  const days = Object.entries(worker.days).sort(([a], [b]) => a.localeCompare(b))
+  return (
+    <Modal isOpen={true} onClose={onClose} title={`${worker.name} — детально`} maxWidth="max-w-2xl">
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <Stat label="Часы всего" value={`${(worker.totalMinutes / 60).toFixed(1)} ч`} />
+          <Stat label="Заработок" value={formatPrice(worker.payout)} />
+          <Stat label="Залито стикеров" value={worker.poured} />
+          <Stat label="Выбрано фонов" value={worker.selected} />
+          <Stat label="Собрано паков" value={worker.assembled} />
+          <Stat label="Упаковано" value={worker.packaged} />
+          <Stat label="Напечатано" value={worker.printed} />
+          <Stat label="Заламинировано" value={worker.laminated} />
+          <Stat label="Нарезано" value={worker.cut} />
+        </div>
+        <div>
+          <h3 className="font-semibold text-sm mb-2">График по дням</h3>
+          <div className="bg-surface-2 rounded-xl divide-y divide-border max-h-96 overflow-y-auto">
+            {days.length === 0 && <p className="p-4 text-sm text-text-muted">Нет смен</p>}
+            {days.map(([day, min]) => (
+              <div key={day} className="flex items-center justify-between px-4 py-2 text-sm">
+                <span>{day}</span>
+                <span className="tabular-nums font-medium">{(min / 60).toFixed(1)} ч</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function Stat({ label, value }) {
+  return (
+    <div className="bg-surface-2 rounded-lg p-3">
+      <p className="text-xs text-text-muted">{label}</p>
+      <p className="text-lg font-bold tabular-nums">{value}</p>
     </div>
   )
 }
 
-function BonusReport({ period }) {
-  const { data, loading, error } = useBonusReport(period)
-  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
-  if (error) return <ReportError text="Не удалось загрузить отчёт по сдельной оплате" />
-  if (data.length === 0) return <Empty text="Нет данных по сдельной оплате" />
+// ============================================================================
+// 4) Расходы по заказам
+// ============================================================================
+function ExpensesTab({ period }) {
+  const { data, loading, error } = useOrdersCostReport(period)
+  const { materials } = useMaterials()
+  const costMap = useMemo(() => buildCostMap(materials), [materials])
+
+  if (loading) return <CenterSpinner />
+  if (error) return <ReportError text="Не удалось загрузить расходы" />
+  if (data.length === 0) return <Empty text="Нет заказов за период" />
+
+  const rows = data.map((o) => ({ ...o, cost: costForOrder(o, costMap) }))
 
   function handleExport() {
-    const rows = data.map((w) => ({
-      'Сотрудник': w.name, 'Заливка (шт)': w.resin,
-      'Сборка (шт)': w.assembly, 'Упаковка (шт)': w.packaging, 'Выборка (шт)': w.selection,
-      'Сумма': w.total.toFixed(0),
-    }))
-    exportCSV(rows, 'сдельная-оплата')
+    const header = [
+      '№ заказа', 'Клиент', 'Тираж',
+      'Плёнка, м', 'Себест. плёнки, ₽',
+      'Ламинация, м', 'Себест. лам., ₽',
+      'БОПП, шт', 'Себест. БОПП, ₽',
+      'Коробки, шт', 'Себест. коробок, ₽',
+      'Смола, г', 'Себест. смолы, ₽',
+      'Итого материалов, ₽',
+    ]
+    const aoa = [header, ...rows.map((o) => [
+      formatOrderNumber(o), o.client_name || '—', o.qty,
+      Number(o.actual_film || 0).toFixed(1), Math.round(o.cost.film),
+      Number(o.actual_lam || 0).toFixed(1), Math.round(o.cost.lam),
+      o.bopp_bags_used || 0, Math.round(o.cost.bopp),
+      o.boxes_used || 0, Math.round(o.cost.box),
+      Math.round(o.actual_resin), Math.round(o.cost.resin),
+      Math.round(o.cost.total),
+    ])]
+    downloadXlsx(`расходы-по-заказам-${period}`, 'Расходы', aoa)
+      .catch((err) => toast.error(translateError(err).message))
   }
 
   return (
-    <div className="bg-surface rounded-xl border border-border p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold">Сдельная оплата по сотрудникам</h2>
-        <Button variant="secondary" size="sm" onClick={handleExport}>CSV</Button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <caption className="sr-only">Расчёт сдельной оплаты</caption>
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-2 font-medium text-text-muted">Сотрудник</th>
-              <th className="text-right py-2 font-medium text-text-muted">Заливка</th>
-              <th className="text-right py-2 font-medium text-text-muted">Сборка</th>
-              <th className="text-right py-2 font-medium text-text-muted">Упаковка</th>
-              <th className="text-right py-2 font-medium text-text-muted">Выборка</th>
-              <th className="text-right py-2 font-medium text-accent">Сумма</th>
+    <ReportFrame title="Расходы по заказам — фактическое списание" onXlsx={handleExport}>
+      <table className="w-full text-xs">
+        <thead className="text-text-muted">
+          <tr className="border-b border-border">
+            <Th>№</Th><Th>Клиент</Th><Th right>Тираж</Th>
+            <Th right>Плёнка</Th><Th right>₽</Th>
+            <Th right>Лам.</Th><Th right>₽</Th>
+            <Th right>БОПП</Th><Th right>₽</Th>
+            <Th right>Кор.</Th><Th right>₽</Th>
+            <Th right>Смола</Th><Th right>₽</Th>
+            <Th right>Итого ₽</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o) => (
+            <tr key={o.id} className="border-b border-border last:border-0">
+              <Td bold>{formatOrderNumber(o)}</Td>
+              <Td>{o.client_name || '—'}</Td>
+              <Td right>{o.qty}</Td>
+              <Td right>{Number(o.actual_film || 0).toFixed(1)}м</Td>
+              <Td right muted>{Math.round(o.cost.film)}</Td>
+              <Td right>{Number(o.actual_lam || 0).toFixed(1)}м</Td>
+              <Td right muted>{Math.round(o.cost.lam)}</Td>
+              <Td right>{o.bopp_bags_used || 0}</Td>
+              <Td right muted>{Math.round(o.cost.bopp)}</Td>
+              <Td right>{o.boxes_used || 0}</Td>
+              <Td right muted>{Math.round(o.cost.box)}</Td>
+              <Td right>{Math.round(o.actual_resin)}г</Td>
+              <Td right muted>{Math.round(o.cost.resin)}</Td>
+              <Td right bold>{formatPrice(o.cost.total)}</Td>
             </tr>
-          </thead>
-          <tbody>
-            {data.map((w) => (
-              <tr key={w.name} className="border-b border-border last:border-0">
-                <td className="py-2 font-medium">{w.name}</td>
-                <td className="py-2 text-right">{w.resin || '—'}</td>
-                <td className="py-2 text-right">{w.assembly || '—'}</td>
-                <td className="py-2 text-right">{w.packaging || '—'}</td>
-                <td className="py-2 text-right">{w.selection || '—'}</td>
-                <td className="py-2 text-right font-bold text-accent">{formatPrice(w.total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          ))}
+        </tbody>
+      </table>
+    </ReportFrame>
+  )
+}
+
+// ============================================================================
+// 5) P&L
+// ============================================================================
+function PnLTab({ period }) {
+  const { data, loading, error } = useOrdersCostReport(period)
+  const { materials } = useMaterials()
+  const costMap = useMemo(() => buildCostMap(materials), [materials])
+
+  if (loading) return <CenterSpinner />
+  if (error) return <ReportError text="Не удалось загрузить P&L" />
+  if (data.length === 0) return <Empty text="Нет заказов за период" />
+
+  const rows = data.map((o) => {
+    const mat = costForOrder(o, costMap)
+    const matLabor = mat.total + (Number(o.cost_labor) || 0)
+    const profit = (Number(o.price_final) || 0) - matLabor
+    const marginPct = o.price_final > 0 ? Math.round((profit / o.price_final) * 100) : 0
+    return { ...o, mat_total: mat.total, total_cost_with_mat_labor: matLabor, real_profit: profit, real_margin: marginPct }
+  })
+
+  const totals = rows.reduce((acc, o) => {
+    acc.revenue += Number(o.price_final) || 0
+    acc.cost += o.total_cost_with_mat_labor
+    acc.profit += o.real_profit
+    return acc
+  }, { revenue: 0, cost: 0, profit: 0 })
+
+  function handleExport() {
+    const header = ['№ заказа', 'Клиент', 'Сумма заказа', 'Тип оплаты', 'Себестоимость', 'Оплата труда', 'Маржа ₽', 'Маржа %']
+    const aoa = [header, ...rows.map((o) => [
+      formatOrderNumber(o), o.client_name || '—',
+      o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
+      Math.round(o.mat_total), o.cost_labor || 0,
+      Math.round(o.real_profit), `${o.real_margin}%`,
+    ])]
+    aoa.push([])
+    aoa.push(['ИТОГО', '', totals.revenue, '', Math.round(totals.cost), '', Math.round(totals.profit),
+      totals.revenue > 0 ? `${Math.round((totals.profit / totals.revenue) * 100)}%` : '0%'])
+    downloadXlsx(`pnl-${period}`, 'P&L', aoa).catch((err) => toast.error(translateError(err).message))
+  }
+
+  return (
+    <ReportFrame title="P&L (прибыль и убытки)" onXlsx={handleExport}>
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <SummaryCard label="Выручка" value={formatPrice(totals.revenue)} />
+        <SummaryCard label="Себестоимость" value={formatPrice(totals.cost)} muted />
+        <SummaryCard label="Маржа"
+          value={formatPrice(totals.profit)}
+          sub={totals.revenue > 0 ? `${Math.round((totals.profit / totals.revenue) * 100)}%` : '0%'}
+          accent={totals.profit > 0}
+          danger={totals.profit < 0}
+        />
       </div>
-      <p className="text-xs text-text-muted mt-3">Ставки настраиваются в Настройки → ключ "bonus_rates". Печать не входит в сдельную оплату.</p>
+      <table className="w-full text-xs">
+        <thead className="text-text-muted">
+          <tr className="border-b border-border">
+            <Th>№</Th><Th>Клиент</Th><Th right>Сумма</Th><Th>Оплата</Th>
+            <Th right>Себест.</Th><Th right>Труд</Th><Th right>Маржа ₽</Th><Th right>Маржа %</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o) => (
+            <tr key={o.id} className="border-b border-border last:border-0">
+              <Td bold>{formatOrderNumber(o)}</Td>
+              <Td>{o.client_name || '—'}</Td>
+              <Td right>{formatPrice(o.price_final)}</Td>
+              <Td muted>{PAYMENT_STATUSES[o.payment_status]?.label || '—'}</Td>
+              <Td right muted>{formatPrice(o.mat_total)}</Td>
+              <Td right muted>{formatPrice(o.cost_labor)}</Td>
+              <Td right success={o.real_profit > 0} danger={o.real_profit < 0}>{formatPrice(o.real_profit)}</Td>
+              <Td right>{o.real_margin}%</Td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </ReportFrame>
+  )
+}
+
+// ============================================================================
+// Shared
+// ============================================================================
+function ReportFrame({ title, onXlsx, children }) {
+  return (
+    <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold">{title}</h2>
+        {onXlsx && <Button variant="secondary" size="sm" onClick={onXlsx}>xlsx</Button>}
+      </div>
+      <div className="overflow-x-auto">{children}</div>
     </div>
   )
 }
 
-function QualityReport({ period }) {
-  const { data, loading, error } = useQualityReport(period)
-  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
-  if (error) return <ReportError text="Не удалось загрузить отчёт по качеству" />
-  if (data.length === 0) return <Empty text="Нет данных по качеству" />
+function Th({ children, right }) {
+  return <th className={`py-2 px-2 font-medium ${right ? 'text-right' : 'text-left'}`}>{children}</th>
+}
 
-  function handleExport() {
-    const rows = data.map((o) => ({
-      '#': formatOrderNumber(o), 'Тираж': o.qty, 'Напечатано': o.printed, 'Залито': o.poured,
-      'Хороших': o.good, 'Брак': o.rejected, 'Брак %': o.rejectPct,
-      'Излишек': o.surplus, 'Излишек %': o.surplusPct,
-    }))
-    exportCSV(rows, 'качество')
-  }
+function Td({ children, right, bold, muted, success, danger }) {
+  const cls = [
+    'py-2 px-2',
+    right ? 'text-right tabular-nums' : '',
+    bold ? 'font-medium' : '',
+    muted ? 'text-text-muted' : '',
+    success ? 'text-success font-medium' : '',
+    danger ? 'text-danger font-medium' : '',
+  ].filter(Boolean).join(' ')
+  return <td className={cls}>{children}</td>
+}
 
+function SummaryCard({ label, value, sub, muted, accent, danger }) {
   return (
-    <div className="bg-surface rounded-xl border border-border p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold">Качество печати и заливки</h2>
-        <Button variant="secondary" size="sm" onClick={handleExport}>CSV</Button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <caption className="sr-only">Отчёт по качеству</caption>
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-2 font-medium text-text-muted">#</th>
-              <th className="text-right py-2 font-medium text-text-muted">Тираж</th>
-              <th className="text-right py-2 font-medium text-text-muted">Напечатано</th>
-              <th className="text-right py-2 font-medium text-text-muted">Залито</th>
-              <th className="text-right py-2 font-medium text-text-muted">Хороших</th>
-              <th className="text-right py-2 font-medium text-text-muted">Брак</th>
-              <th className="text-right py-2 font-medium text-text-muted">Брак %</th>
-              <th className="text-right py-2 font-medium text-text-muted">Излишек</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((o) => (
-              <tr key={o.id} className="border-b border-border last:border-0">
-                <td className="py-2 font-medium">{formatOrderNumber(o)}</td>
-                <td className="py-2 text-right">{o.qty}</td>
-                <td className="py-2 text-right">{o.printed || '—'}</td>
-                <td className="py-2 text-right">{o.poured || '—'}</td>
-                <td className="py-2 text-right">{o.good || '—'}</td>
-                <td className={`py-2 text-right ${o.rejected > 0 ? 'text-danger font-medium' : ''}`}>{o.rejected || '—'}</td>
-                <td className={`py-2 text-right ${o.rejectPct > 20 ? 'text-danger font-medium' : o.rejectPct > 10 ? 'text-warning' : ''}`}>{o.rejectPct > 0 ? `${o.rejectPct}%` : '—'}</td>
-                <td className="py-2 text-right text-text-muted">{o.surplus > 0 ? `+${o.surplus} (${o.surplusPct}%)` : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="bg-surface-2 rounded-xl border border-border p-3">
+      <p className="text-xs text-text-muted">{label}</p>
+      <p className={`text-xl font-bold tabular-nums ${accent ? 'text-success' : danger ? 'text-danger' : muted ? 'text-text-muted' : ''}`}>{value}</p>
+      {sub && <p className="text-xs text-text-muted mt-0.5">{sub}</p>}
     </div>
   )
+}
+
+function CenterSpinner() {
+  return <div className="flex justify-center py-12"><Spinner /></div>
 }
 
 function Empty({ text }) {

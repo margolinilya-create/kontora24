@@ -14,13 +14,14 @@ import { formatNumber } from '@/shared/lib/utils'
 export function MaterialForecast({
   orderType, widthMm, heightMm, qty,
   filmType, lamType, boppBag,
+  items, // [{widthMm, heightMm, qty}] для multi-variant — приоритет над одиночными полями
 }) {
   const { materials, loading } = useMaterials()
 
   const rows = useMemo(() => forecastMaterials({
     orderType, widthMm, heightMm, qty,
-    filmType, lamType, boppBag,
-  }), [orderType, widthMm, heightMm, qty, filmType, lamType, boppBag])
+    filmType, lamType, boppBag, items,
+  }), [orderType, widthMm, heightMm, qty, filmType, lamType, boppBag, items])
 
   const stockByCode = useMemo(() => {
     const map = {}

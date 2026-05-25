@@ -21,6 +21,7 @@ import { uploadAttachment, validatePreviewFile } from '@/features/orders/lib/ord
 import { captureError } from '@/shared/lib/sentry'
 import { MaterialForecast } from '../components/MaterialForecast'
 import { FilmSelect } from '../components/FilmSelect'
+import { replaceOrderItems } from '../hooks/useOrderItems'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
@@ -131,6 +132,26 @@ export default function CreateOrderPage() {
   const [previewFile, setPreviewFile] = useState(null)
   const [previewBlobUrl, setPreviewBlobUrl] = useState(null)
   const [previewDragOver, setPreviewDragOver] = useState(false)
+  // Multi-variant (R8.3): счётчик видов + массив доп.видов (idx>=2).
+  // Первый вид (idx=1) — основные width_mm/height_mm/qty из формы.
+  const [itemsCount, setItemsCount] = useState(1)
+  const [extraItems, setExtraItems] = useState([])
+
+  function updateItemsCount(n) {
+    const next = Math.max(1, Math.min(6, Number(n) || 1))
+    setItemsCount(next)
+    // Подгоняем массив доп.видов: либо обрезаем, либо добиваем пустыми.
+    setExtraItems((prev) => {
+      const targetLen = next - 1
+      const result = prev.slice(0, targetLen)
+      while (result.length < targetLen) result.push({ width_mm: '', height_mm: '', qty: '' })
+      return result
+    })
+  }
+
+  function updateExtraItem(idx, field, value) {
+    setExtraItems((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
+  }
   const previewInputRef = useRef(null)
   const canSeeFinance = useCanDo('view:finance')
 
@@ -255,6 +276,33 @@ export default function CreateOrderPage() {
         delivery_notes: values.delivery_notes || null,
       })
 
+      // Multi-variant: если выбрано больше одного вида — перезаписываем items.
+      // Триггер уже создал дефолтный idx=1; replaceOrderItems заменит на полный
+      // массив (idx=1 = основные width/height/qty, далее extraItems с idx=2..N).
+      if (itemsCount > 1 && extraItems.length > 0) {
+        const itemsToInsert = [
+          { width_mm: values.width_mm, height_mm: values.height_mm, qty: values.qty },
+          ...extraItems
+            .filter((it) => Number(it.width_mm) > 0 && Number(it.height_mm) > 0 && Number(it.qty) > 0)
+            .map((it) => ({
+              width_mm: Number(it.width_mm),
+              height_mm: Number(it.height_mm),
+              qty: Math.max(1, Math.floor(Number(it.qty))),
+            })),
+        ]
+        if (itemsToInsert.length > 1) {
+          try {
+            await replaceOrderItems(order.id, itemsToInsert)
+          } catch (itemsErr) {
+            captureError(itemsErr, {
+              tags: { source: 'CreateOrderPage.replaceOrderItems' },
+              extra: { orderId: order.id },
+            })
+            toast.error('Заказ создан, но доп. виды не сохранились — добавьте в редакторе заказа')
+          }
+        }
+      }
+
       // Загружаем превью после успешного создания заказа (нужен order.id).
       // Если падает — заказ всё равно создан, показываем мягкое предупреждение.
       if (previewFile) {
@@ -338,7 +386,10 @@ export default function CreateOrderPage() {
             {/* Тираж + Дедлайн */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">Тираж, шт <span className="text-danger">*</span></label>
+                <label className="block text-sm font-medium mb-1">
+                  Тираж, шт <span className="text-danger">*</span>
+                  {itemsCount > 1 && <span className="text-text-muted text-xs ml-1">(вида 1)</span>}
+                </label>
                 <Input type="number" inputMode="numeric" aria-invalid={!!errors.qty} className={errors.qty ? 'border-danger ring-1 ring-danger/30' : ''} {...register('qty')} />
                 <FieldError error={errors.qty} />
               </div>
@@ -348,6 +399,63 @@ export default function CreateOrderPage() {
                 <FieldError error={errors.deadline} />
               </div>
             </div>
+
+            {/* Кол-во видов изделий (R8.3 серии 25.05) */}
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="items_count">
+                Кол-во видов изделий
+              </label>
+              <select
+                id="items_count"
+                value={itemsCount}
+                onChange={(e) => updateItemsCount(e.target.value)}
+                className={SELECT_CLASS}
+              >
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              {itemsCount > 1 && (
+                <p className="text-xs text-text-muted mt-1">
+                  Каждый вид со своим размером и тиражом. Расход и тех-карта учитывают все виды.
+                </p>
+              )}
+            </div>
+
+            {/* Дополнительные виды изделий */}
+            {itemsCount > 1 && (
+              <div className="space-y-2 p-3 rounded-xl border border-border bg-surface-dim">
+                <p className="text-sm font-medium">Доп. виды изделий</p>
+                {extraItems.map((it, i) => (
+                  <div key={i} className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs text-text-muted mb-0.5">Вид {i + 2} · Ширина, мм</label>
+                      <Input
+                        type="number" inputMode="numeric" min="1"
+                        value={it.width_mm}
+                        onChange={(e) => updateExtraItem(i, 'width_mm', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-muted mb-0.5">Высота, мм</label>
+                      <Input
+                        type="number" inputMode="numeric" min="1"
+                        value={it.height_mm}
+                        onChange={(e) => updateExtraItem(i, 'height_mm', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-muted mb-0.5">Тираж, шт</label>
+                      <Input
+                        type="number" inputMode="numeric" min="1"
+                        value={it.qty}
+                        onChange={(e) => updateExtraItem(i, 'qty', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Стикеров в паке (только для пака) */}
             {isStickerpack && (
@@ -542,6 +650,18 @@ export default function CreateOrderPage() {
             filmType={filmType}
             lamType={lamType}
             boppBag={boppBag}
+            items={
+              itemsCount > 1
+                ? [
+                    { widthMm, heightMm, qty },
+                    ...extraItems.map((it) => ({
+                      widthMm: Number(it.width_mm) || 0,
+                      heightMm: Number(it.height_mm) || 0,
+                      qty: Math.max(0, Math.floor(Number(it.qty) || 0)),
+                    })),
+                  ]
+                : undefined
+            }
           />
 
           <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-3">

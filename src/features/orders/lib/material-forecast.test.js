@@ -161,4 +161,52 @@ describe('forecastMaterials', () => {
   it('пустые строки если ни одного валидного параметра', () => {
     expect(forecastMaterials({})).toEqual([])
   })
+
+  it('multi-variant: суммирует расход плёнки по items', () => {
+    const single = forecastMaterials({
+      orderType: 'sticker_cut',
+      widthMm: 105, heightMm: 148, qty: 100,
+      filmType: 'G',
+    })
+    const multi = forecastMaterials({
+      orderType: 'sticker_cut',
+      filmType: 'G',
+      items: [
+        { widthMm: 105, heightMm: 148, qty: 60 },
+        { widthMm: 105, heightMm: 148, qty: 40 },
+      ],
+    })
+    // Два прогона по 60 и 40 могут давать ≥ чем один проход на 100
+    // (из-за округления в кол-ве рядов). Проверяем что сумма items >= одиночного.
+    expect(multi[0].expected).toBeGreaterThanOrEqual(single[0].expected)
+  })
+
+  it('multi-variant: БОПП считает сумму тиражей', () => {
+    const rows = forecastMaterials({
+      orderType: 'stickerpack3D',
+      filmType: 'G',
+      boppBag: true,
+      items: [
+        { widthMm: 105, heightMm: 148, qty: 100 },
+        { widthMm: 74,  heightMm: 105, qty: 50 },
+      ],
+    })
+    const bopp = rows.find((r) => r.key === 'bopp')
+    expect(bopp.expected).toBe(150)
+  })
+
+  it('multi-variant: смола считает сумму по items с разными размерами', () => {
+    const rows = forecastMaterials({
+      orderType: 'sticker3D',
+      filmType: 'G',
+      items: [
+        { widthMm: 40, heightMm: 40, qty: 200 },
+        { widthMm: 60, heightMm: 60, qty: 100 },
+      ],
+    })
+    const resin = rows.find((r) => r.key === 'resin')
+    // (40*40/100)*0.1444*200 + (60*60/100)*0.1444*100
+    const expected = (16 * 0.1444 * 200) + (36 * 0.1444 * 100)
+    expect(resin.expected).toBeCloseTo(expected, 4)
+  })
 })

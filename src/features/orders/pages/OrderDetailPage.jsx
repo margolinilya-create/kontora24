@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail, updateOrder } from '../hooks/useOrders'
+import { useOrderItems } from '../hooks/useOrderItems'
 import { findOrCreateClientByName } from '@/features/clients/hooks/useClients'
 import { InfoField } from '../components/InfoField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
@@ -275,6 +276,28 @@ function SourceFilesRow({ order, onUpdated, onCopy }) {
   )
 }
 
+function OrderItemsList({ orderId }) {
+  const { items } = useOrderItems(orderId)
+  if (!items || items.length <= 1) return null
+  return (
+    <div className="bg-surface rounded-2xl border border-border shadow-card p-4">
+      <p className="text-xs font-medium text-text-muted uppercase mb-2">
+        Виды изделий ({items.length})
+      </p>
+      <div className="space-y-1 text-sm">
+        {items.map((it) => (
+          <div key={it.id} className="flex items-center justify-between gap-3 py-1 border-b border-border last:border-0">
+            <span className="text-text-muted">Вид {it.idx}</span>
+            <span className="font-medium tabular-nums">
+              {Number(it.width_mm)} × {Number(it.height_mm)} мм · {Number(it.qty)} шт
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function OverviewTab({ order, onUpdated }) {
   const isPack = order.order_type === 'stickerpack' || order.order_type === 'stickerpack3D'
   return (
@@ -297,6 +320,9 @@ function OverviewTab({ order, onUpdated }) {
           )}
           <InfoField label="Отгрузка" value={DELIVERY_TYPES[order.delivery_type]?.label || 'Самовывоз'} />
         </div>
+        {/* Виды изделий (multi-variant, R8.3 серии 25.05) */}
+        <OrderItemsList orderId={order.id} />
+
         {/* Row 3: highlighted comment from customer */}
         {order.notes && (
           <div className="bg-accent/10 border border-accent/30 rounded-2xl p-4 min-w-0">

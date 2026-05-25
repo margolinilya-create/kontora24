@@ -94,6 +94,10 @@ export function computeBoppQty({ qty, hasBopp }) {
  *   - lookup   — как искать остаток на складе:
  *       { by: 'code', value: 'G' }       — материал с material_code = value
  *       { by: 'type', value: 'packaging_bag' } — сумма stock_qty по type
+ *
+ * Поддерживает multi-variant (R8.3): если передан `items` — это массив
+ * { widthMm, heightMm, qty } по видам изделий, расход суммируется по всем.
+ * Если items не передан — используются widthMm/heightMm/qty (одиночный вид).
  */
 export function forecastMaterials({
   orderType,
@@ -103,29 +107,41 @@ export function forecastMaterials({
   filmType,
   lamType,
   boppBag,
+  items,
 }) {
   const rows = []
   const is3D = orderType === 'sticker3D' || orderType === 'stickerpack3D'
   const isStickerpack3D = orderType === 'stickerpack3D'
   const needLam = needsLamination(lamType)
 
-  // 1. Плёнка для печати
-  if (widthMm && heightMm && qty) {
-    const blockW = getPrintBlockWidth(filmType)
-    const filmMeters = computeFilmMeters({ widthMm, heightMm, qty, blockWidthMm: blockW })
-    const filmLabel = filmType ? (FILM_TYPES[filmType]?.label || filmType) : '—'
-    rows.push({
-      key: 'film',
-      label: `Плёнка${isStickerpack3D ? ' (фоны)' : ''}: ${filmLabel}`,
-      expected: filmMeters,
-      unit: 'м',
-      lookup: filmType ? { by: 'code', value: filmType } : null,
-    })
-  }
+  // Нормализуем items: либо переданный массив, либо одна позиция из основных
+  // полей. Отбрасываем строки без размера/тиража — они ничего не считают.
+  const itemList = (Array.isArray(items) && items.length > 0
+    ? items
+    : [{ widthMm, heightMm, qty }]
+  ).filter((it) => Number(it.widthMm) > 0 && Number(it.heightMm) > 0 && Math.floor(Number(it.qty) || 0) > 0)
+
+  if (itemList.length === 0) return rows
+
+  // 1. Плёнка для печати — суммируем по items
+  const blockW = getPrintBlockWidth(filmType)
+  const filmMeters = itemList.reduce((sum, it) => sum + computeFilmMeters({
+    widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty, blockWidthMm: blockW,
+  }), 0)
+  const filmLabel = filmType ? (FILM_TYPES[filmType]?.label || filmType) : '—'
+  rows.push({
+    key: 'film',
+    label: `Плёнка${isStickerpack3D ? ' (фоны)' : ''}: ${filmLabel}`,
+    expected: filmMeters,
+    unit: 'м',
+    lookup: filmType ? { by: 'code', value: filmType } : null,
+  })
 
   // 2. Плёнка для ламинации / переноса
-  if (needLam && widthMm && heightMm && qty) {
-    const lamMeters = computeLamMeters({ widthMm, heightMm, qty })
+  if (needLam) {
+    const lamMeters = itemList.reduce((sum, it) => sum + computeLamMeters({
+      widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty,
+    }), 0)
     rows.push({
       key: 'lam',
       label: `Ламинация / перенос: ${LAMINATION_TYPES[lamType]?.label || lamType}`,
@@ -136,8 +152,10 @@ export function forecastMaterials({
   }
 
   // 3. Смола
-  if (is3D && widthMm && heightMm && qty) {
-    const resinG = computeResinGrams({ orderType, widthMm, heightMm, qty })
+  if (is3D) {
+    const resinG = itemList.reduce((sum, it) => sum + computeResinGrams({
+      orderType, widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty,
+    }), 0)
     rows.push({
       key: 'resin',
       label: 'Смола (с отвердителем)',
@@ -147,15 +165,18 @@ export function forecastMaterials({
     })
   }
 
-  // 4. БОПП-пакет — тираж
-  if (boppBag && qty) {
-    rows.push({
-      key: 'bopp',
-      label: 'БОПП-пакет',
-      expected: computeBoppQty({ qty, hasBopp: true }),
-      unit: 'шт',
-      lookup: { by: 'type', value: 'packaging_bag' },
-    })
+  // 4. БОПП-пакет — суммарный тираж по items
+  if (boppBag) {
+    const totalQty = itemList.reduce((sum, it) => sum + Math.max(0, Math.floor(Number(it.qty) || 0)), 0)
+    if (totalQty > 0) {
+      rows.push({
+        key: 'bopp',
+        label: 'БОПП-пакет',
+        expected: totalQty,
+        unit: 'шт',
+        lookup: { by: 'type', value: 'packaging_bag' },
+      })
+    }
   }
 
   return rows

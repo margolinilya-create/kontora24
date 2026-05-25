@@ -22,6 +22,7 @@ import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
 import {
   ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES,
+  IS_3D_STICKERPACK,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
@@ -420,7 +421,12 @@ export default function OrderDetailPage() {
         {/* Right: status switch + rollback + edit gear */}
         <div className="flex items-center gap-2 ml-auto">
           <StatusOverride order={order} onUpdated={refetch} />
-          <StatusSwitcher order={order} onUpdated={refetch} />
+          {/* Для stickerpack3D на стадиях подзадач движение через SubtaskIndicator
+              (R8.4 серии 25.05) — основная кнопка StatusSwitcher скрыта чтобы
+              не было «двух способов одно и то же». */}
+          {!(IS_3D_STICKERPACK(order.order_type) && ['print','lamination','cutting','selection_pouring'].includes(order.status)) && (
+            <StatusSwitcher order={order} onUpdated={refetch} />
+          )}
           {canEdit && (
             <button
               onClick={() => setEditorOpen(true)}

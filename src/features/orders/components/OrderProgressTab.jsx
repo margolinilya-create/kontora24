@@ -353,20 +353,70 @@ function ProgressLinesWidget({ order, logs }) {
   )
 }
 
-function SubtaskTrackRow({ track, status, advance, onUpdated, canJump, logs }) {
+function MiniStepper({ route, status, accentClass }) {
+  const currentIdx = route.indexOf(status)
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {route.map((s, i) => {
+        const done = i < currentIdx
+        const current = i === currentIdx
+        return (
+          <span key={s} className="flex items-center gap-1">
+            <span
+              className={[
+                'inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold',
+                done ? `${accentClass} text-white` : current ? `${accentClass} text-white ring-2 ring-offset-1 ring-offset-surface ring-current` : 'bg-surface-dim text-text-muted border border-border',
+              ].join(' ')}
+              title={SUBTASK_STATUS_LABELS[s]}
+            >
+              {i + 1}
+            </span>
+            <span className={`text-xs ${current ? 'font-semibold' : 'text-text-muted'}`}>
+              {SUBTASK_STATUS_LABELS[s] || s}
+            </span>
+            {i < route.length - 1 && <span className="text-text-muted text-xs">·</span>}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+function SubtaskTrackBlock({ track, status, advance, onUpdated, canJump, logs }) {
   const [target, setTarget] = useState('')
   const [saving, setSaving] = useState(false)
   const route = track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS
   const otherOptions = route.filter((s) => s !== status)
+  const next = getNextSubtaskStatus(track, status)
 
   // Нельзя advance если для текущего status трека ещё нет ни одного production_log.
   // Кроме pending/ready/cancelled — там учёта не бывает (hasSubtaskLog возвращает true).
   const canAdvance = hasSubtaskLog(logs || [], track, status)
+  const accent = track === 'backgrounds' ? 'bg-dept-print' : 'bg-dept-pouring'
+  const tone = track === 'backgrounds' ? 'border-dept-print/30 bg-dept-print/5' : 'border-dept-pouring/30 bg-dept-pouring/5'
+
+  async function complete() {
+    if (!next) return
+    if (!canAdvance) {
+      toast.error(`Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»`)
+      return
+    }
+    setSaving(true)
+    try {
+      await advance(track, next)
+      toast.success(`${TRACK_LABELS[track]} → ${SUBTASK_STATUS_LABELS[next]}`)
+      onUpdated?.()
+    } catch (err) {
+      toast.error(translateError(err).message || err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function handleJump() {
     if (!target) return
     if (!canAdvance) {
-      toast.error(`Нельзя сменить этап ${TRACK_LABELS[track]}: сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»`)
+      toast.error(`Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»`)
       return
     }
     setSaving(true)
@@ -383,36 +433,55 @@ function SubtaskTrackRow({ track, status, advance, onUpdated, canJump, logs }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className={`text-xs px-2 py-0.5 rounded ${
-        track === 'backgrounds' ? 'bg-dept-print/15 text-dept-print' : 'bg-dept-pouring/15 text-dept-pouring'
-      } font-medium`}>{TRACK_LABELS[track]}</span>
-      <span className="text-sm text-text font-medium">{SUBTASK_STATUS_LABELS[status] || status}</span>
-      {canJump && (
-        <div className="flex items-center gap-1">
-          <select
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            className="rounded-md border border-border px-2 py-1 text-xs bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
-            aria-label={`Изменить статус ${TRACK_LABELS[track]}`}
+    <div className={`rounded-xl border p-3 space-y-2 ${tone}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded ${accent} text-white`}>
+          {TRACK_LABELS[track]}
+        </span>
+        <span className="text-sm font-medium text-text">{SUBTASK_STATUS_LABELS[status] || status}</span>
+      </div>
+
+      <MiniStepper route={route} status={status} accentClass={accent} />
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {next ? (
+          <button
+            onClick={complete}
+            disabled={saving || !canAdvance}
+            title={!canAdvance ? `Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»` : ''}
+            className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50 min-h-[40px] flex-1 sm:flex-none"
           >
-            <option value="">→ изменить</option>
-            {otherOptions.map((s) => (
-              <option key={s} value={s}>{SUBTASK_STATUS_LABELS[s] || s}</option>
-            ))}
-          </select>
-          {target && (
-            <button
-              onClick={handleJump}
-              disabled={saving || !canAdvance}
-              title={!canAdvance ? `Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»` : ''}
-              className="text-xs px-2.5 py-1 rounded-md bg-accent text-on-accent font-medium disabled:opacity-50 hover:bg-accent-hover transition-colors"
+            {saving ? '…' : `Завершить «${SUBTASK_STATUS_LABELS[status]}» → ${SUBTASK_STATUS_LABELS[next]}`}
+          </button>
+        ) : (
+          <span className="text-xs text-text-muted px-2 py-1">Трек завершён</span>
+        )}
+
+        {canJump && (
+          <div className="flex items-center gap-1 ml-auto">
+            <select
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              className="rounded-md border border-border px-2 py-1 text-xs bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+              aria-label={`Перейти на другой статус ${TRACK_LABELS[track]}`}
             >
-              {saving ? '…' : 'OK'}
-            </button>
-          )}
-        </div>
-      )}
+              <option value="">↺ откат / переход</option>
+              {otherOptions.map((s) => (
+                <option key={s} value={s}>{SUBTASK_STATUS_LABELS[s] || s}</option>
+              ))}
+            </select>
+            {target && (
+              <button
+                onClick={handleJump}
+                disabled={saving}
+                className="text-xs px-2.5 py-1 rounded-md bg-surface-dim border border-border font-medium disabled:opacity-50 hover:bg-surface-2 transition-colors"
+              >
+                {saving ? '…' : 'OK'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -424,11 +493,15 @@ function SubtaskIndicator({ order, logs, onUpdated }) {
   if (!isPack3D || !subtasks.backgrounds || !subtasks.stickers) return null
   const canJump = hasRole(['admin', 'manager'])
   return (
-    <div className="bg-surface rounded-xl border border-border px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-      <span className="text-xs text-text-muted">Параллельные подзадачи:</span>
-      <SubtaskTrackRow track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} />
-      <span className="hidden sm:inline text-text-muted">·</span>
-      <SubtaskTrackRow track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} />
+    <div className="bg-surface rounded-2xl border border-border shadow-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-sm">Подзадачи 3D-стикерпака</h3>
+        <span className="text-xs text-text-muted">объединяются на «Сборка 3D»</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <SubtaskTrackBlock track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} />
+        <SubtaskTrackBlock track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} />
+      </div>
     </div>
   )
 }

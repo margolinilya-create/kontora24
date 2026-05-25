@@ -96,8 +96,11 @@ ON CONFLICT (lower(name)) DO NOTHING;
 -- ===========================================================================
 -- 5. RLS: расширить update_stock на все production-роли.
 --    Бриф 25.05: «Возможность вносить приходы и расходы есть у всех ролей».
+--    DROP до CREATE — в проде функция была RETURNS NUMERIC (миграция 002),
+--    REPLACE не может сменить return type.
 -- ===========================================================================
-CREATE OR REPLACE FUNCTION update_stock(p_material_id uuid, p_delta numeric)
+DROP FUNCTION IF EXISTS update_stock(uuid, numeric);
+CREATE FUNCTION update_stock(p_material_id uuid, p_delta numeric)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER

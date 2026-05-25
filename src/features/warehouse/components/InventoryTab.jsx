@@ -6,6 +6,7 @@ import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { WarehouseFilterBar } from './WarehouseFilterBar'
 
 /**
  * Массовая инвентаризация остатков.
@@ -18,6 +19,7 @@ export function InventoryTab({ materials, onSaved }) {
   const [values, setValues] = useState({})
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('all')
 
   // Сгруппированные по категории (UI-категория из getMaterialCategory)
   const grouped = useMemo(() => {
@@ -28,6 +30,7 @@ export function InventoryTab({ materials, onSaved }) {
         if (!m.name?.toLowerCase().includes(q)) continue
       }
       const cat = getMaterialCategory(m) || 'utensils'
+      if (category !== 'all' && cat !== category) continue
       if (!groups[cat]) groups[cat] = []
       groups[cat].push(m)
     }
@@ -36,7 +39,7 @@ export function InventoryTab({ materials, onSaved }) {
       groups[cat].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     }
     return groups
-  }, [materials, search])
+  }, [materials, search, category])
 
   // Сколько строк изменено относительно текущих остатков
   const changedCount = useMemo(() => {
@@ -92,32 +95,34 @@ export function InventoryTab({ materials, onSaved }) {
 
   return (
     <div className="space-y-4">
-      {/* Header — search + actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-surface rounded-2xl border border-border shadow-card p-4">
-        <div className="flex-1">
-          <h2 className="font-semibold">Инвентаризация остатков</h2>
-          <p className="text-xs text-text-muted mt-0.5">
-            Введите фактические остатки по позициям и сохраните. Транзакции создаются с типом «Инвентаризация».
-            Пустые поля и неизменённые позиции игнорируются.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по названию"
-            className="w-full sm:w-64"
-          />
-          {Object.keys(values).length > 0 && (
-            <Button variant="secondary" size="sm" onClick={resetAll}>
-              Сбросить
+      {/* Header — поиск + категория + действия */}
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex-1">
+            <h2 className="font-semibold">Инвентаризация остатков</h2>
+            <p className="text-xs text-text-muted mt-0.5">
+              Введите фактические остатки по позициям и сохраните. Транзакции создаются с типом «Инвентаризация».
+              Пустые поля и неизменённые позиции игнорируются.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {Object.keys(values).length > 0 && (
+              <Button variant="secondary" size="sm" onClick={resetAll}>
+                Сбросить
+              </Button>
+            )}
+            <Button onClick={handleSave} loading={saving} disabled={changedCount === 0}>
+              Сохранить {changedCount > 0 && `(${changedCount})`}
             </Button>
-          )}
-          <Button onClick={handleSave} loading={saving} disabled={changedCount === 0}>
-            Сохранить {changedCount > 0 && `(${changedCount})`}
-          </Button>
+          </div>
         </div>
+        <WarehouseFilterBar
+          search={search}
+          onSearch={setSearch}
+          category={category}
+          onCategory={setCategory}
+          showStatus={false}
+        />
       </div>
 
       {/* Группы материалов */}

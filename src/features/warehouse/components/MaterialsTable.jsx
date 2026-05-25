@@ -1,26 +1,15 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { MATERIAL_CATEGORIES, getMaterialCategory, getStockStatus, MATERIAL_TYPES } from '@/shared/constants'
-
-const CATEGORY_OPTIONS = [
-  { value: 'all', label: 'Все категории' },
-  ...Object.entries(MATERIAL_CATEGORIES).map(([key, { label }]) => ({ value: key, label })),
-]
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'Все статусы' },
-  { value: 'empty', label: 'Закончилось' },
-  { value: 'low', label: 'Мало' },
-  { value: 'ok', label: 'Достаточно' },
-]
+import { formatPrice } from '@/shared/lib/utils'
+import { WarehouseFilterBar } from './WarehouseFilterBar'
 
 /**
  * Табличный вид склада с фильтрами по категории и статусу остатка.
  * При клике по строке — открывает StockModal для ручного прихода/расхода.
+ * Фильтр state приходит снаружи (page-level), чтобы быть общим с другими табами.
  */
-export function MaterialsTable({ materials, onSelect }) {
-  const [category, setCategory] = useState('all')
-  const [status, setStatus] = useState('all')
-  const [search, setSearch] = useState('')
+export function MaterialsTable({ materials, onSelect, filter, onFilter }) {
+  const { category = 'all', status = 'all', search = '' } = filter || {}
 
   const filtered = useMemo(() => {
     return materials.filter((m) => {
@@ -34,21 +23,14 @@ export function MaterialsTable({ materials, onSelect }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по названию"
-          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
-        />
-        <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-          {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-          {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </div>
+      <WarehouseFilterBar
+        search={search}
+        onSearch={(v) => onFilter({ ...filter, search: v })}
+        category={category}
+        onCategory={(v) => onFilter({ ...filter, category: v })}
+        status={status}
+        onStatus={(v) => onFilter({ ...filter, status: v })}
+      />
 
       {filtered.length === 0 ? (
         <div className="bg-surface rounded-2xl border border-border p-12 text-center text-text-muted text-sm">
@@ -64,6 +46,7 @@ export function MaterialsTable({ materials, onSelect }) {
                   <th className="px-4 py-2 font-medium">Категория</th>
                   <th className="px-4 py-2 font-medium text-right">Остаток</th>
                   <th className="px-4 py-2 font-medium text-right">Минимум</th>
+                  <th className="px-4 py-2 font-medium text-right">Себест.</th>
                   <th className="px-4 py-2 font-medium">Статус</th>
                   <th className="px-4 py-2 font-medium w-24"></th>
                 </tr>
@@ -86,6 +69,9 @@ export function MaterialsTable({ materials, onSelect }) {
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-text-muted">
                         {Number(m.min_qty) > 0 ? `${Number(m.min_qty).toFixed(1)} ${unit}` : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-text-muted">
+                        {Number(m.unit_cost) > 0 ? `${formatPrice(m.unit_cost)}/${unit}` : '—'}
                       </td>
                       <td className="px-4 py-2.5">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stStatus.color}`}>

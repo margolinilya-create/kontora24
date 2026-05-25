@@ -8,14 +8,14 @@ import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
 
 export function MaterialForm({ onClose, onCreated }) {
-  const [form, setForm] = useState({ type: 'film', name: '', unit: 'm2', stockQty: 0, minQty: 0, pricePerUnit: 0 })
+  const [form, setForm] = useState({ type: 'film', name: '', unit: 'm2', stockQty: 0, minQty: 0, unitCost: 0 })
   const [loading, setLoading] = useState(false)
 
   function update(k, v) { setForm((p) => ({ ...p, [k]: v })) }
 
   // Auto-set unit when type changes
   function handleTypeChange(type) {
-    const unitMap = { film: 'm2', ink: 'ml', lam_film: 'm2', resin: 'g' }
+    const unitMap = { film: 'm2', ink: 'ml', lam_film: 'm2', resin: 'g', blade: 'шт' }
     update('type', type)
     update('unit', unitMap[type] || 'm2')
   }
@@ -84,14 +84,17 @@ export function MaterialForm({ onClose, onCreated }) {
         </div>
 
         <Input
-          label="Цена за ед. (₽)"
-          id="mat-price"
+          label="Себестоимость 1 ед. (₽)"
+          id="mat-cost"
           type="number"
-          value={form.pricePerUnit}
-          onChange={(e) => update('pricePerUnit', Number(e.target.value))}
+          value={form.unitCost}
+          onChange={(e) => update('unitCost', Number(e.target.value))}
           min="0"
           step="any"
         />
+        <p className="text-xs text-text-muted -mt-2">
+          Стартовое значение. При следующих приходах с указанной стоимостью пересчитается автоматически.
+        </p>
 
         <Button type="submit" loading={loading} className="w-full">
           Добавить материал

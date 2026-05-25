@@ -1,5 +1,5 @@
 -- Seed initial materials
-INSERT INTO materials (type, name, stock_qty, unit, min_qty, price_per_unit) VALUES
+INSERT INTO materials (type, name, stock_qty, unit, min_qty, unit_cost) VALUES
   ('film', 'Плёнка для печати', 100, 'm2', 10, 180),
   ('ink', 'Краска (экосольвент)', 5000, 'ml', 500, 0.12),
   ('lam_film', 'Ламинация матовая', 50, 'm2', 5, 120),

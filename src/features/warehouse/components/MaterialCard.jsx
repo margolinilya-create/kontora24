@@ -40,7 +40,11 @@ export function MaterialCard({ material, onAddStock }) {
 
       <div className="flex items-center justify-between text-xs text-text-muted mt-2">
         <span>Мин: {formatNumber(material.min_qty, 1)} {material.unit}</span>
-        <span>{formatPrice(material.price_per_unit)}/{material.unit}</span>
+        <span>
+          Себест.: {Number(material.unit_cost) > 0
+            ? `${formatPrice(material.unit_cost)}/${material.unit}`
+            : '—'}
+        </span>
       </div>
 
       <button

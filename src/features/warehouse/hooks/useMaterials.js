@@ -87,9 +87,15 @@ export function useMaterialTransactions(materialId) {
   return { transactions, loading, error }
 }
 
-export async function addMaterialTransaction({ materialId, delta, reason, orderId }) {
+export async function addMaterialTransaction({ materialId, delta, reason, orderId, totalCost }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+
+  // totalCost: только на приходе. Триггер recalc_material_wac (migration 036)
+  // обновит k24_materials.unit_cost через weighted-average и заполнит NEW.unit_cost.
+  const totalCostValue = delta > 0 && totalCost !== undefined && totalCost !== null && totalCost !== ''
+    ? Number(totalCost)
+    : null
 
   const { data: txn, error } = await supabase.from('k24_material_transactions').insert({
     material_id: materialId,
@@ -97,6 +103,7 @@ export async function addMaterialTransaction({ materialId, delta, reason, orderI
     reason,
     order_id: orderId || null,
     created_by: user.id,
+    total_cost: totalCostValue,
   }).select('id').single()
   if (error) throw error
 
@@ -142,7 +149,7 @@ export async function bulkInventory(items) {
   return { updated, skipped }
 }
 
-export async function createMaterial({ type, name, unit, stockQty, minQty, pricePerUnit }) {
+export async function createMaterial({ type, name, unit, stockQty, minQty, unitCost }) {
   const { data, error } = await supabase
     .from('k24_materials')
     .insert({
@@ -151,7 +158,7 @@ export async function createMaterial({ type, name, unit, stockQty, minQty, price
       unit,
       stock_qty: stockQty || 0,
       min_qty: minQty || 0,
-      price_per_unit: pricePerUnit || 0,
+      unit_cost: unitCost || 0,
     })
     .select()
     .single()

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { addMaterialTransaction, useMaterialTransactions } from '../hooks/useMaterials'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
-import { formatNumber, formatDateTime } from '@/shared/lib/utils'
+import { formatNumber, formatDateTime, formatPrice } from '@/shared/lib/utils'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
@@ -11,6 +11,7 @@ import Spinner from '@/shared/components/Spinner'
 export function StockModal({ material, onClose, onDone }) {
   const [delta, setDelta] = useState('')
   const [reason, setReason] = useState('')
+  const [totalCost, setTotalCost] = useState('')
   const [isExpense, setIsExpense] = useState(false)
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState('form') // 'form' | 'history'
@@ -27,6 +28,7 @@ export function StockModal({ material, onClose, onDone }) {
         materialId: material.id,
         delta: isExpense ? -num : num,
         reason: reason || (isExpense ? 'Расход' : 'Приход'),
+        totalCost: !isExpense && totalCost !== '' ? totalCost : null,
       })
       toast.success(isExpense ? 'Списано' : 'Оприходовано')
       onDone()
@@ -109,6 +111,31 @@ export function StockModal({ material, onClose, onDone }) {
             )}
           </div>
 
+          {!isExpense && (
+            <div>
+              <Input
+                label="Стоимость всех поступивших единиц (₽)"
+                id="stock-total-cost"
+                type="number"
+                value={totalCost}
+                onChange={(e) => setTotalCost(e.target.value)}
+                min="0"
+                step="0.01"
+                placeholder="например, 14500"
+              />
+              {totalCost && delta && Number(delta) > 0 && Number(totalCost) > 0 && (
+                <p className="text-xs text-text-muted mt-1">
+                  Себест. за 1 {material.unit}: {formatPrice(Number(totalCost) / Number(delta))}
+                </p>
+              )}
+              {Number(material.unit_cost) > 0 && (
+                <p className="text-xs text-text-muted mt-1">
+                  Текущая средняя: {formatPrice(material.unit_cost)} / {material.unit}
+                </p>
+              )}
+            </div>
+          )}
+
           <Input
             label="Причина"
             id="stock-reason"
@@ -137,6 +164,11 @@ export function StockModal({ material, onClose, onDone }) {
                     <span className={`font-medium ${Number(t.delta) > 0 ? 'text-success' : 'text-danger'}`}>
                       {Number(t.delta) > 0 ? '+' : ''}{formatNumber(t.delta, 2)} {material.unit}
                     </span>
+                    {Number(t.total_cost) > 0 && (
+                      <span className="text-xs text-text-muted ml-2">
+                        ({formatPrice(t.total_cost)}, {formatPrice(t.unit_cost)}/{material.unit})
+                      </span>
+                    )}
                     {t.reason && <p className="text-xs text-text-muted">{t.reason}</p>}
                     {t.created_by_profile && <p className="text-xs text-text-muted">{t.created_by_profile.display_name}</p>}
                   </div>

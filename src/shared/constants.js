@@ -412,6 +412,7 @@ export const MATERIAL_TYPES = {
   box: { label: 'Коробка', unit: 'шт' },
   utensils: { label: 'Утварь', unit: 'шт' },
   household: { label: 'Хоз. товары', unit: 'шт' },
+  blade: { label: 'Нож для плоттера', unit: 'шт' },
 }
 
 // --- Material categories (UI группировка по аудиту 8.05) ---
@@ -422,6 +423,7 @@ export const MATERIAL_CATEGORIES = {
   film_lam: { label: 'Плёнка для ламинации' },
   chemicals: { label: 'Химические вещества' },
   utensils: { label: 'Утварь' },
+  blades: { label: 'Ножи для плоттера' },
   packaging: { label: 'Упаковка (коробки)' },
   bopp_wide: { label: 'БОПП пакеты ширина >100 мм' },
   bopp_narrow: { label: 'БОПП пакеты ширина ≤100 мм' },
@@ -440,6 +442,7 @@ export function getMaterialCategory(material) {
   if (type === 'lam_film') return 'film_lam'
   if (type === 'utensils') return 'utensils'
   if (type === 'household') return 'household'
+  if (type === 'blade' || /нож\s*(для\s*)?(summa|плоттер)/i.test(name)) return 'blades'
   if (type === 'resin' || type === 'ink' || /смола|отвердитель|клей|газ/i.test(name)) return 'chemicals'
   if (/шприц|стаканч|ватн.*палочк/i.test(name)) return 'utensils'
   if (type === 'box' || /короб/i.test(name)) return 'packaging'

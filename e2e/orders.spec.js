@@ -1,32 +1,36 @@
 import { test, expect } from '@playwright/test'
-import { login } from './helpers'
+import { login, clickViewTab, expectViewTabVisible, dismissShiftModal } from './helpers'
 
 test.describe('Orders page (R6+R7)', () => {
   test.beforeEach(async ({ page }) => {
     await login(page)
     await page.waitForLoadState('networkidle')
+    await dismissShiftModal(page)
   })
 
   test('страница имеет view-табы: По отделам / Канбан / Календарь / Все заказы', async ({ page }) => {
     await page.goto('/orders')
     await page.waitForLoadState('networkidle')
-    // R7 (8.05): добавлены табы "По отделам" (вместо "Список") и "Все заказы"
-    await expect(page.getByRole('tab', { name: 'По отделам' })).toBeVisible({ timeout: 10000 })
-    await expect(page.getByRole('tab', { name: 'Канбан' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Календарь' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Все заказы' })).toBeVisible()
+    // На desktop — <Tabs role=tab>, на mobile — <DropdownMenu> с role=option.
+    // expectViewTabVisible выбирает нужный локатор по видимости.
+    await expectViewTabVisible(page, 'По отделам')
+    await expectViewTabVisible(page, 'Канбан')
+    await expectViewTabVisible(page, 'Календарь')
+    await expectViewTabVisible(page, 'Все заказы')
   })
 
   test('список — таблица с группировкой по отделам', async ({ page }) => {
     await page.goto('/orders')
     await page.waitForLoadState('networkidle')
-    // Должна быть хотя бы одна группа (section) с заголовком и таблицей
-    const sections = page.locator('section').filter({ has: page.locator('table') })
+    // Группа = <section> с заголовком-кнопкой aria-expanded и таблицей внутри.
+    // На mobile вместо <table> — <ul>; ограничиваемся секцией.
+    const sections = page.locator('section').filter({ has: page.locator('button[aria-expanded]') })
     const count = await sections.count()
     if (count === 0) { test.skip(); return }
     await expect(sections.first()).toBeVisible()
-    // Заголовок группы — кнопка с aria-expanded
-    await expect(page.locator('button[aria-expanded]').first()).toBeVisible()
+    // Кнопка группы — внутри section, не DropdownMenu (тот listbox).
+    const groupBtn = sections.first().locator('button[aria-expanded]:not([aria-haspopup])').first()
+    await expect(groupBtn).toBeVisible()
   })
 
   test('toggle «Завершённые» переключает выборку', async ({ page }) => {
@@ -42,9 +46,8 @@ test.describe('Orders page (R6+R7)', () => {
   test('канбан показывает колонки этапов', async ({ page }) => {
     await page.goto('/orders')
     await page.waitForLoadState('networkidle')
-    await page.getByRole('tab', { name: 'Канбан' }).click()
+    await clickViewTab(page, 'Канбан')
     await page.waitForTimeout(800)
-    // Колонки канбана имеют data-col атрибут
     const cols = page.locator('[data-col]')
     const count = await cols.count()
     expect(count).toBeGreaterThan(0)
@@ -53,16 +56,19 @@ test.describe('Orders page (R6+R7)', () => {
   test('календарь показывает заголовок месяца', async ({ page }) => {
     await page.goto('/orders')
     await page.waitForLoadState('networkidle')
-    await page.getByRole('tab', { name: 'Календарь' }).click()
+    await clickViewTab(page, 'Календарь')
     await page.waitForTimeout(800)
-    // Заголовки дней Пн..Вс должны появиться
     await expect(page.getByText('Пн', { exact: true }).first()).toBeVisible({ timeout: 5000 })
     await expect(page.getByText('Вс', { exact: true }).first()).toBeVisible()
   })
 })
 
 test.describe('Order detail (R2+R3)', () => {
-  test.beforeEach(async ({ page }) => { await login(page); await page.waitForLoadState('networkidle') })
+  test.beforeEach(async ({ page }) => {
+    await login(page)
+    await page.waitForLoadState('networkidle')
+    await dismissShiftModal(page)
+  })
 
   test('открыть заказ — есть Stepper и 5 вкладок', async ({ page }) => {
     await page.goto('/orders')
@@ -71,11 +77,11 @@ test.describe('Order detail (R2+R3)', () => {
     if (!(await firstOrderLink.isVisible({ timeout: 5000 }).catch(() => false))) { test.skip(); return }
     await firstOrderLink.click()
     await page.waitForLoadState('networkidle')
-    // 5 вкладок (или 4 если non-admin)
-    await expect(page.getByRole('tab', { name: 'Обзор' })).toBeVisible({ timeout: 10000 })
-    await expect(page.getByRole('tab', { name: 'Прогресс' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Расход материалов' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'История' })).toBeVisible()
+    // На detail-странице тоже Tabs/DropdownMenu по viewport.
+    await expectViewTabVisible(page, 'Обзор')
+    await expectViewTabVisible(page, 'Прогресс')
+    await expectViewTabVisible(page, 'Расход материалов')
+    await expectViewTabVisible(page, 'История')
   })
 
   test('кнопки печати открывают попап', async ({ page }) => {
@@ -91,16 +97,20 @@ test.describe('Order detail (R2+R3)', () => {
 })
 
 test.describe('Create order (R7)', () => {
-  test.beforeEach(async ({ page }) => { await login(page); await page.waitForLoadState('networkidle') })
+  test.beforeEach(async ({ page }) => {
+    await login(page)
+    await page.waitForLoadState('networkidle')
+    await dismissShiftModal(page)
+  })
 
   test('форма на одном экране, нет collapsible', async ({ page }) => {
     await page.goto('/orders/create')
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'Новый заказ' })).toBeVisible()
-    // Нет accordion-кнопок открывающих секции
-    const collapsibles = page.locator('button[aria-expanded]')
+    // Накопительный счёт aria-expanded без listbox (исключаем DropdownMenu).
+    const collapsibles = page.locator('button[aria-expanded]:not([aria-haspopup="listbox"])')
     const count = await collapsibles.count()
-    expect(count).toBeLessThanOrEqual(2) // допускаем role-switcher и подобное
+    expect(count).toBeLessThanOrEqual(2)
   })
 
   test('кнопка «Заполнить из Bitrix» disabled', async ({ page }) => {

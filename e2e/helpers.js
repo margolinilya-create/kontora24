@@ -58,14 +58,54 @@ export async function getColumnCount(page, statusLabel) {
  * Модал автоматически показывается воркерам (printer/post_printer) при логине,
  * блокирует все клики backdrop'ом. Тесты, которые не про смены, должны
  * избавиться от модала перед другими действиями.
+ *
+ * Identifies shift-modal specifically by заголовок «Начать смену?» — чтобы не
+ * закрыть случайно другие модалы. Использует force: true (анимация Modal
+ * мешает stable-check). Idempotent — если не найдено, тихо выходит.
  */
 export async function dismissShiftModal(page) {
-  const cancelBtn = page.getByRole('button', { name: 'Отмена' })
-  if (await cancelBtn.isVisible({ timeout: 300 }).catch(() => false)) {
-    await cancelBtn.click()
-    // Ждём пока backdrop исчезнет
-    await page.locator('.bg-black\\/40').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+  const shiftTitle = page.getByText('Начать смену?', { exact: true })
+  if (!(await shiftTitle.isVisible({ timeout: 300 }).catch(() => false))) return
+
+  // Ищем «Отмена» внутри dialog, чтобы не зацепить кнопку из другого места
+  const cancelBtn = page.getByRole('dialog').getByRole('button', { name: 'Отмена' }).first()
+  await cancelBtn.click({ force: true, timeout: 3000 }).catch(() => {})
+  // Backdrop Modal — `.bg-black/40` (Tailwind escape: `\\/40`)
+  await page.locator('.bg-black\\/40').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+}
+
+/**
+ * Кликнуть view-таб («По отделам» / «Канбан» / «Календарь» / «Все заказы»).
+ * На desktop таб через role="tab", на mobile через DropdownMenu (button →
+ * role="option"). Локаторы выбираются по видимости — не работающие на текущем
+ * viewport автоматически отсекаются `:visible`.
+ */
+export async function clickViewTab(page, name) {
+  const desktopTab = page.locator('[role="tab"]:visible').filter({ hasText: name }).first()
+  if (await desktopTab.isVisible({ timeout: 500 }).catch(() => false)) {
+    await desktopTab.click()
+    return
   }
+  // Mobile: открыть DropdownMenu trigger (aria-haspopup="listbox")
+  await page.locator('button[aria-haspopup="listbox"]:visible').first().click()
+  await page.getByRole('option', { name }).click()
+}
+
+/**
+ * Универсальная проверка видимости view-таба: на desktop — role=tab,
+ * на mobile — option внутри открытого DropdownMenu (открываем сами).
+ */
+export async function expectViewTabVisible(page, name) {
+  // Try desktop first
+  const desktopTab = page.locator('[role="tab"]:visible').filter({ hasText: name }).first()
+  if (await desktopTab.isVisible({ timeout: 500 }).catch(() => false)) return desktopTab
+  // Mobile: открываем dropdown и проверяем option
+  await page.locator('button[aria-haspopup="listbox"]:visible').first().click()
+  const opt = page.getByRole('option', { name })
+  await opt.waitFor({ timeout: 3000 })
+  // Закрываем после проверки (клик в стороне)
+  await page.keyboard.press('Escape').catch(() => {})
+  return opt
 }
 
 /**

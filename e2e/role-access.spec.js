@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, ensureSidebarOpen, expandSidebarGroup, emulateRole } from './helpers'
+import { login, ensureSidebarOpen, expandSidebarGroup, emulateRole, dismissShiftModal, expectViewTabVisible } from './helpers'
 
 // admin (mib@pnhd.ru) с эмуляцией ролей через RoleSwitcher.
 // Главная (/) для не-менеджеров редиректит на /cabinet (см. HomeRoute в routes.jsx,
@@ -24,8 +24,9 @@ test.describe('Role-Based Access Control (R8)', () => {
 
     await firstOrderLink.click()
     await page.waitForLoadState('networkidle')
-    // Финансы — отдельная вкладка только для admin/manager
-    await expect(page.getByRole('tab', { name: 'Финансы' }).or(page.getByText('Финансы').first())).toBeVisible({ timeout: 10000 })
+    // Финансы — отдельная вкладка только для admin/manager.
+    // На mobile в DropdownMenu (role="option"), на desktop в Tabs (role="tab").
+    await expectViewTabVisible(page, 'Финансы')
   })
 
   test('printer (emulated) does NOT see Финансы tab', async ({ page }) => {
@@ -39,11 +40,13 @@ test.describe('Role-Based Access Control (R8)', () => {
     await emulateRole(page, 'Печатник')
     await page.goto(href)
     await page.waitForLoadState('networkidle')
+    await dismissShiftModal(page)
     await page.waitForTimeout(1500)
 
-    // У печатника во вкладках нет «Финансы»
-    const financeTab = page.getByRole('tab', { name: 'Финансы' })
-    await expect(financeTab).not.toBeVisible()
+    // У печатника во вкладках нет «Финансы» — проверяем оба роле-локатора
+    // (desktop tab + mobile dropdown option).
+    await expect(page.locator('[role="tab"]:visible').filter({ hasText: 'Финансы' })).toHaveCount(0)
+    await expect(page.locator('[role="option"]:visible').filter({ hasText: 'Финансы' })).toHaveCount(0)
   })
 
   test('worker (post_printer) при заходе на «/» попадает в кабинет', async ({ page }) => {

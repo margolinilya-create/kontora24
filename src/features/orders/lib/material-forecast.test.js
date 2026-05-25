@@ -127,6 +127,18 @@ describe('forecastMaterials', () => {
     expect(lam.lookup).toEqual({ by: 'code', value: 'matte' })
   })
 
+  it('lam_type=transfer добавляет строку «перенос на монтаж» с lookup code=transfer', () => {
+    const rows = forecastMaterials({
+      orderType: 'sticker_cut',
+      widthMm: 105, heightMm: 148, qty: 100,
+      filmType: 'G', lamType: 'transfer', boppBag: false,
+    })
+    const lam = rows.find((r) => r.key === 'lam')
+    expect(lam).toBeTruthy()
+    expect(lam.lookup).toEqual({ by: 'code', value: 'transfer' })
+    expect(lam.label).toContain('Монтажная')
+  })
+
   it('добавляет смолу для sticker3D и stickerpack3D', () => {
     const a = forecastMaterials({ orderType: 'sticker3D', widthMm: 40, heightMm: 40, qty: 100, filmType: 'G' })
     expect(a.find((r) => r.key === 'resin')).toBeTruthy()

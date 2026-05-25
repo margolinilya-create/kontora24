@@ -1,6 +1,6 @@
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { usePackagingMaterials } from '@/features/production/hooks/usePackagingMaterials'
-import { FILM_TYPES, calculateActualMaterialsCost } from '@/shared/constants'
+import { FILM_TYPES, LAMINATION_TYPES, calculateActualMaterialsCost } from '@/shared/constants'
 
 /**
  * Вкладка «Расход материалов».
@@ -68,12 +68,14 @@ export function OrderReportsTab({ order }) {
         )}
       </div>
 
-      {/* Плёнка для ламинации */}
+      {/* Плёнка для ламинации / переноса на монтаж */}
       {order.need_lam && (
         <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-          <h2 className="font-semibold mb-3">Расход плёнки для ламинации</h2>
+          <h2 className="font-semibold mb-3">
+            Расход {order.lam_type === 'transfer' ? 'монтажной плёнки' : 'плёнки для ламинации'}
+          </h2>
           <div className="flex items-center justify-between text-sm">
-            <span>{order.lam_type === 'matte' ? 'Матовая' : order.lam_type === 'glossy' ? 'Глянцевая' : 'Ламинация'}</span>
+            <span>{LAMINATION_TYPES[order.lam_type]?.label || 'Ламинация'}</span>
             <span className="font-medium tabular-nums">{lamMeters.toFixed(1)} м</span>
           </div>
         </div>

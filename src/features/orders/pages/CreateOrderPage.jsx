@@ -5,8 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createOrder } from '../hooks/useOrders'
 import {
-  ORDER_TYPES, LAMINATION_TYPES, FILM_TYPES,
+  ORDER_TYPES, LAMINATION_TYPES,
   ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
+  needsLamination,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
@@ -19,6 +20,7 @@ import { formatOrderNumber } from '@/shared/lib/utils'
 import { uploadAttachment, validatePreviewFile } from '@/features/orders/lib/order-attachments'
 import { captureError } from '@/shared/lib/sentry'
 import { MaterialForecast } from '../components/MaterialForecast'
+import { FilmSelect } from '../components/FilmSelect'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
@@ -177,7 +179,7 @@ export default function CreateOrderPage() {
   }, [])
 
   const lamType = watch('lam_type')
-  const needLam = lamType === 'matte' || lamType === 'glossy'
+  const needLam = needsLamination(lamType)
   const orderType = watch('order_type')
   const source = watch('source')
   const deliveryType = watch('delivery_type')
@@ -355,40 +357,34 @@ export default function CreateOrderPage() {
               </div>
             )}
 
-            {/* Плёнка(и) + Ламинация */}
+            {/* Плёнка(и) + Ламинация/перенос на монтаж */}
             {isStickerpack3D ? (
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Плёнка фонов</label>
-                  <select {...register('film_type')} className={SELECT_CLASS}>
-                    {Object.entries(FILM_TYPES).map(([key, { label }]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Плёнка стикеров</label>
-                  <select {...register('film_type_stickers')} className={SELECT_CLASS}>
-                    {Object.entries(FILM_TYPES).map(([key, { label }]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
+                <FilmSelect
+                  label="Плёнка фонов"
+                  id="film_type"
+                  value={filmType}
+                  onChange={(v) => setValue('film_type', v, { shouldDirty: true })}
+                />
+                <FilmSelect
+                  label="Плёнка стикеров"
+                  id="film_type_stickers"
+                  value={watch('film_type_stickers')}
+                  onChange={(v) => setValue('film_type_stickers', v, { shouldDirty: true })}
+                />
               </div>
             ) : null}
             <div className="grid grid-cols-2 gap-3">
               {!isStickerpack3D && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Плёнка</label>
-                  <select {...register('film_type')} className={SELECT_CLASS}>
-                    {Object.entries(FILM_TYPES).map(([key, { label }]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
+                <FilmSelect
+                  label="Плёнка"
+                  id="film_type"
+                  value={filmType}
+                  onChange={(v) => setValue('film_type', v, { shouldDirty: true })}
+                />
               )}
               <div>
-                <label className="block text-sm font-medium mb-1">Ламинация</label>
+                <label className="block text-sm font-medium mb-1">Ламинация / перенос на монтаж</label>
                 <select {...register('lam_type')} className={SELECT_CLASS}>
                   <option value="">Без ламинации</option>
                   {Object.entries(LAMINATION_TYPES).map(([key, { label }]) => (

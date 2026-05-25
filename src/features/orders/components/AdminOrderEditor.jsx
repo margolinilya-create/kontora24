@@ -8,10 +8,11 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
 import {
-  ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES,
+  ORDER_STATUSES, ORDER_TYPES, LAMINATION_TYPES,
   DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES,
   PRIORITIES, SIZE_PRESETS,
 } from '@/shared/constants'
+import { FilmSelect } from './FilmSelect'
 
 const SECTION_TITLE = 'text-xs uppercase tracking-wide text-text-muted font-medium'
 const FIELD_LABEL = 'block text-sm font-medium text-text mb-1.5'
@@ -299,19 +300,19 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
             </select>
           </Field>
           <Field label={isStickerpack3D ? 'Плёнка фонов' : 'Плёнка'}>
-            <select value={form.film_type || 'G'} onChange={(e) => update('film_type', e.target.value)} className={SELECT_CLASS}>
-              {Object.entries(FILM_TYPES).map(([k, { label }]) => (
-                <option key={k} value={k}>{label}</option>
-              ))}
-            </select>
+            <FilmSelect
+              value={form.film_type || 'G'}
+              onChange={(v) => update('film_type', v)}
+              includeOutOfStock
+            />
           </Field>
           {isStickerpack3D && (
             <Field label="Плёнка стикеров">
-              <select value={form.film_type_stickers || form.film_type || 'G'} onChange={(e) => update('film_type_stickers', e.target.value)} className={SELECT_CLASS}>
-                {Object.entries(FILM_TYPES).map(([k, { label }]) => (
-                  <option key={k} value={k}>{label}</option>
-                ))}
-              </select>
+              <FilmSelect
+                value={form.film_type_stickers || form.film_type || 'G'}
+                onChange={(v) => update('film_type_stickers', v)}
+                includeOutOfStock
+              />
             </Field>
           )}
           <Field label="Дизайн макета">
@@ -353,7 +354,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               <Input type="number" value={form.stickers_per_pack ?? ''} onChange={(e) => update('stickers_per_pack', e.target.value)} />
             </Field>
           )}
-          <Field label="Ламинация" className={isStickerpack ? '' : 'sm:col-span-2 lg:col-span-1'}>
+          <Field label="Ламинация / перенос на монтаж" className={isStickerpack ? '' : 'sm:col-span-2 lg:col-span-1'}>
             <div className="flex items-center gap-2 min-h-[44px]">
               <label className={CHECKBOX_BOX + ' flex-shrink-0'}>
                 <input type="checkbox" checked={!!form.need_lam} onChange={(e) => update('need_lam', e.target.checked)} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />

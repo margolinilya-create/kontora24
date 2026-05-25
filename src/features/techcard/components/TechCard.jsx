@@ -1,7 +1,7 @@
 import { forwardRef, memo, useRef, useState } from 'react'
 import { formatOrderType } from '../utils'
 import { formatOrderNumber } from '@/shared/lib/utils'
-import { getFilmMaterialName, IS_3D_TYPE, IS_3D_STICKERPACK } from '@/shared/constants'
+import { getFilmMaterialName, IS_3D_TYPE, IS_3D_STICKERPACK, LAMINATION_TYPES } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -42,7 +42,9 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
 
   const designVariants = Math.max(1, Math.min(8, Number(order.design_variants) || 1))
 
-  const lamLabel = order.need_lam ? (order.lam_type === 'matte' ? 'Матовая' : order.lam_type === 'glossy' ? 'Глянцевая' : 'Да') : 'Нет'
+  const lamLabel = order.need_lam
+    ? (LAMINATION_TYPES[order.lam_type]?.label || 'Да')
+    : 'Нет'
 
   // Размер шрифта номера. Уменьшен 18.05 после фидбэка — шрифт Onder
   // высокий, при размере 42 верх букв обрезался в чёрной шапке 20мм.

@@ -238,10 +238,21 @@ export const ORDER_TYPES = {
   big: { label: 'Большой формат' },
 }
 
-// --- Lamination types ---
+// --- Lamination types (включая перенос на монтажную плёнку — R8.2 серии 25.05) ---
+// Все три варианта проходят через стадию `lamination` производственного маршрута;
+// для `transfer` материал — «Монтажная плёнка 1.26 м» (material_code='transfer').
 export const LAMINATION_TYPES = {
   matte: { label: 'Матовая' },
   glossy: { label: 'Глянцевая' },
+  transfer: { label: 'Монтажная плёнка 1.26 м' },
+}
+
+/**
+ * Нужна ли стадия `lamination` в маршруте.
+ * Принимает значение поля order.lam_type (matte/glossy/transfer/null).
+ */
+export function needsLamination(lamType) {
+  return lamType != null && lamType !== '' && Object.prototype.hasOwnProperty.call(LAMINATION_TYPES, lamType)
 }
 
 // --- Film types ---

@@ -5,7 +5,7 @@
 // в единицах материала (метры для плёнки/ламинации, граммы для смолы,
 // штуки для БОПП-пакетов и коробок).
 
-import { FILM_TYPES, LAMINATION_TYPES } from '@/shared/constants'
+import { FILM_TYPES, LAMINATION_TYPES, needsLamination } from '@/shared/constants'
 
 // Ширина печатного блока по типу плёнки (мм) — из брифа.
 const PRINT_BLOCK_WIDTH_MM = {
@@ -107,7 +107,7 @@ export function forecastMaterials({
   const rows = []
   const is3D = orderType === 'sticker3D' || orderType === 'stickerpack3D'
   const isStickerpack3D = orderType === 'stickerpack3D'
-  const needLam = lamType === 'matte' || lamType === 'glossy'
+  const needLam = needsLamination(lamType)
 
   // 1. Плёнка для печати
   if (widthMm && heightMm && qty) {

@@ -54,10 +54,28 @@ export async function getColumnCount(page, statusLabel) {
 }
 
 /**
+ * Закрыть ShiftReminderModal («Начать смену?») если он открыт.
+ * Модал автоматически показывается воркерам (printer/post_printer) при логине,
+ * блокирует все клики backdrop'ом. Тесты, которые не про смены, должны
+ * избавиться от модала перед другими действиями.
+ */
+export async function dismissShiftModal(page) {
+  const cancelBtn = page.getByRole('button', { name: 'Отмена' })
+  if (await cancelBtn.isVisible({ timeout: 300 }).catch(() => false)) {
+    await cancelBtn.click()
+    // Ждём пока backdrop исчезнет
+    await page.locator('.bg-black\\/40').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+  }
+}
+
+/**
  * Открыть мобильный sidebar если он скрыт.
  * На <768px sidebar по умолчанию closed; кнопка-burger «Меню» в шапке.
+ * На обоих viewport'ах закрываем ShiftReminderModal (если открыт), иначе
+ * его backdrop перехватывает click.
  */
 export async function ensureSidebarOpen(page) {
+  await dismissShiftModal(page)
   const viewport = page.viewportSize()
   if (!viewport || viewport.width >= 768) return // на desktop sidebar постоянно виден
   const visible = await visibleSidebar(page).isVisible({ timeout: 500 }).catch(() => false)
@@ -108,4 +126,7 @@ export async function emulateRole(page, roleLabel) {
   // действительно проставлен в store. Без этого следующие действия (goto, click)
   // могут гонять с асинхронным обновлением профиля.
   await page.getByRole('button', { name: 'Вернуться' }).waitFor({ timeout: 5000 })
+  // После эмуляции воркера может всплыть ShiftReminderModal — убираем его,
+  // чтобы не блокировал последующие клики.
+  await dismissShiftModal(page)
 }

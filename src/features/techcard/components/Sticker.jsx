@@ -30,6 +30,9 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
   const rootRef = useRef(null)
   const numberRef = useRef(null)
   const [numberFontPt, setNumberFontPt] = useState(NUMBER_MAX_FONT_PT)
+  // R10.2 (фидбек 27.05): negative marginTop для компенсации top-bearing
+  // глифа Modulord. Вычисляется по Canvas TextMetrics при загрузке шрифта.
+  const [numberTopShift, setNumberTopShift] = useState(0)
 
   // Внешний ref для html2canvas — пересылаем DOM-узел корня.
   useImperativeHandle(ref, () => rootRef.current, [])
@@ -70,6 +73,37 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
       document.fonts.ready.then(() => fit()).catch(() => {})
     }
   }, [number, isDelivery])
+
+  // R10.2 (фидбек 27.05): меряем top-bearing Modulord и Guidy (uppercase 8pt
+  // у заголовков правой колонки) через Canvas TextMetrics. Цель — чтобы
+  // _верх глифа_ номера совпал с _верхом капительного глифа_ label, а не
+  // box-top. Сдвигаем номер вверх на разницу top-bearing'ов.
+  useLayoutEffect(() => {
+    if (typeof document === 'undefined' || !document.fonts?.ready) return
+    function bearing(fontString, sample) {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return 0
+      ctx.font = fontString
+      const m = ctx.measureText(sample)
+      const top = m.fontBoundingBoxAscent
+      const glyph = m.actualBoundingBoxAscent
+      if (!Number.isFinite(top) || !Number.isFinite(glyph)) return 0
+      return Math.max(0, top - glyph)
+    }
+    function measure() {
+      try {
+        const numPx = numberFontPt * 1.333
+        const labelPx = 8 * 1.333   // label uppercase 8pt
+        const modulordBearing = bearing(`700 ${numPx}px Modulord, Onder, sans-serif`, number || '0')
+        const guidyBearing = bearing(`700 ${labelPx}px Guidy, Inter, sans-serif`, 'СРОК')
+        const shiftPx = Math.max(0, modulordBearing - guidyBearing)
+        setNumberTopShift(shiftPx)
+      } catch { /* noop */ }
+    }
+    measure()
+    document.fonts.ready.then(measure).catch(() => {})
+  }, [number, numberFontPt])
 
   if (!order) return null
 
@@ -127,17 +161,22 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
         gap: 2 * MM,
       }}>
         {/* Номер заказа — занимает оставшееся пространство слева от правого столбца.
-            fontSize подбирается в useLayoutEffect через measureText. */}
+            fontSize подбирается в useLayoutEffect через measureText.
+            R10.2 (фидбек 27.05): Modulord имеет большой top-bearing внутри
+            font-box (глиф визуально сидит ~18% ниже верха box). Компенсируем
+            negative marginTop, чтобы верх цифр выровнялся с верхом правой
+            колонки. lineHeight=1 — чтобы box не был больше глифа. */}
         <div ref={numberRef} style={{
           flex: 1,
           minWidth: 0,
           fontFamily: "'Modulord', 'Onder', sans-serif",
           fontSize: `${numberFontPt}pt`,
           fontWeight: 700,
-          lineHeight: 0.92,
+          lineHeight: 1,
           letterSpacing: 0,
           color: '#000000',
           whiteSpace: 'nowrap',
+          marginTop: numberTopShift ? `-${numberTopShift.toFixed(2)}px` : 0,
         }}>
           {number}
         </div>
@@ -149,7 +188,7 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
           fontFamily: "'Guidy', 'Inter', sans-serif",
           fontSize: '10pt',
           lineHeight: 1.15,
-          paddingTop: 1 * MM,
+          paddingTop: 0,
         }}>
           {rightCol.map((row) => (
             <div key={row.label} style={{ marginBottom: 1.5 * MM }}>

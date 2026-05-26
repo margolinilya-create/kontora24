@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useLayoutEffect, useRef, useState, useImperativeHandle } from 'react'
 import kontoraLogo from '@/assets/kontora-logo.png'
 import { formatOrderNumberShort } from '@/shared/lib/utils'
 
@@ -13,15 +13,9 @@ const LOGO_H = 14 * MM            // высота логотипа (ширина
 const NUMBER_GAP_TOP = 4 * MM
 const RIGHT_COL_WIDTH = 48 * MM   // фиксированная ширина правого столбца ~48мм
 
-// Авто-fit размера шрифта номера по длине строки, чтобы вписался в 70мм ширины.
-function getNumberFontSize(text) {
-  const len = (text || '').length
-  if (len <= 4) return 60   // короткий номер → крупно
-  if (len <= 6) return 46   // 6 цифр
-  if (len <= 8) return 36   // «Тест-01» = 7 символов
-  if (len <= 12) return 28
-  return 22
-}
+// Стартовый размер для попыток fit — мы шагаем вниз пока scrollWidth не <= clientWidth.
+const NUMBER_MAX_FONT_PT = 56
+const NUMBER_MIN_FONT_PT = 12
 
 /**
  * Универсальная наклейка 120×75 мм.
@@ -33,13 +27,39 @@ function getNumberFontSize(text) {
  * Нижнее подчёркивание — 120мм у самого низа стикера.
  */
 export const Sticker = forwardRef(function Sticker({ order, type = 'production' }, ref) {
-  if (!order) return null
+  const rootRef = useRef(null)
+  const numberRef = useRef(null)
+  const [numberFontPt, setNumberFontPt] = useState(NUMBER_MAX_FONT_PT)
+
+  // Внешний ref для html2canvas — пересылаем DOM-узел корня.
+  useImperativeHandle(ref, () => rootRef.current, [])
 
   const isDelivery = type === 'delivery'
-  const clientName = order.client?.name || '—'
-  const number = formatOrderNumberShort(order)
-  const deadline = order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'
-  const fontSize = getNumberFontSize(number)
+  const clientName = order?.client?.name || '—'
+  const number = order ? formatOrderNumberShort(order) : ''
+  const deadline = order?.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'
+
+  // R10.1 (фидбек 26.05): Modulord — широкий шрифт, формула getNumberFontSize(len)
+  // даёт 60pt для 4-значных номеров и не помещается. Меряем реальный scrollWidth
+  // и шагаем размер вниз пока текст не впишется. useLayoutEffect — синхронно
+  // перед первым paint, чтобы html2canvas снял уже подогнанный размер.
+  useLayoutEffect(() => {
+    if (!numberRef.current) return
+    const container = numberRef.current.parentElement
+    if (!container) return
+    const maxWidth = container.clientWidth
+    if (!maxWidth) return
+
+    let pt = NUMBER_MAX_FONT_PT
+    numberRef.current.style.fontSize = `${pt}pt`
+    while (pt > NUMBER_MIN_FONT_PT && numberRef.current.scrollWidth > maxWidth) {
+      pt -= 2
+      numberRef.current.style.fontSize = `${pt}pt`
+    }
+    setNumberFontPt(pt)
+  }, [number, isDelivery])
+
+  if (!order) return null
 
   const rightCol = isDelivery
     ? [
@@ -55,7 +75,7 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
 
   return (
     <div
-      ref={ref}
+      ref={rootRef}
       style={{
         width: STICKER_W,
         height: STICKER_H,
@@ -94,19 +114,18 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
         alignItems: 'flex-start',
         gap: 2 * MM,
       }}>
-        {/* Номер заказа — занимает оставшееся пространство слева от правого столбца */}
-        <div style={{
+        {/* Номер заказа — занимает оставшееся пространство слева от правого столбца.
+            fontSize подбирается в useLayoutEffect через measureText. */}
+        <div ref={numberRef} style={{
           flex: 1,
           minWidth: 0,
           fontFamily: "'Modulord', 'Onder', sans-serif",
-          fontSize: `${fontSize}pt`,
+          fontSize: `${numberFontPt}pt`,
           fontWeight: 700,
           lineHeight: 0.92,
           letterSpacing: 0,
           color: '#000000',
-          overflow: 'hidden',
           whiteSpace: 'nowrap',
-          textOverflow: 'clip',
         }}>
           {number}
         </div>

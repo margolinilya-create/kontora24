@@ -39,24 +39,36 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
   const number = order ? formatOrderNumberShort(order) : ''
   const deadline = order?.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'
 
-  // R10.1 (фидбек 26.05): Modulord — широкий шрифт, формула getNumberFontSize(len)
-  // даёт 60pt для 4-значных номеров и не помещается. Меряем реальный scrollWidth
-  // и шагаем размер вниз пока текст не впишется. useLayoutEffect — синхронно
-  // перед первым paint, чтобы html2canvas снял уже подогнанный размер.
+  // R10.1 (фидбек 26.05): Modulord — широкий шрифт. Старая формула
+  // getNumberFontSize(len) давала 60pt для 4-значных номеров — не помещалось.
+  // Меряем реальный scrollWidth и шагаем размер вниз пока текст не впишется.
+  //
+  // ВАЖНО: первый проход в useLayoutEffect может произойти ДО загрузки
+  // @font-face Modulord — тогда измерение идёт на fallback (Inter), и после
+  // догрузки шрифта текст становится шире → снова обрежется. Поэтому
+  // дополнительно ждём document.fonts.ready и повторяем fit.
   useLayoutEffect(() => {
-    if (!numberRef.current) return
-    const container = numberRef.current.parentElement
-    if (!container) return
-    const maxWidth = container.clientWidth
-    if (!maxWidth) return
+    function fit() {
+      const el = numberRef.current
+      if (!el) return
+      const container = el.parentElement
+      if (!container) return
+      const maxWidth = container.clientWidth
+      if (!maxWidth) return
 
-    let pt = NUMBER_MAX_FONT_PT
-    numberRef.current.style.fontSize = `${pt}pt`
-    while (pt > NUMBER_MIN_FONT_PT && numberRef.current.scrollWidth > maxWidth) {
-      pt -= 2
-      numberRef.current.style.fontSize = `${pt}pt`
+      let pt = NUMBER_MAX_FONT_PT
+      el.style.fontSize = `${pt}pt`
+      while (pt > NUMBER_MIN_FONT_PT && el.scrollWidth > maxWidth) {
+        pt -= 2
+        el.style.fontSize = `${pt}pt`
+      }
+      setNumberFontPt(pt)
     }
-    setNumberFontPt(pt)
+
+    fit()
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      document.fonts.ready.then(() => fit()).catch(() => {})
+    }
   }, [number, isDelivery])
 
   if (!order) return null

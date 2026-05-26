@@ -5,6 +5,11 @@
 // 340px. Передаём explicit размеры, чтобы не обрезался текст по горизонтали.
 async function renderCanvas(element, { scale, pixelWidth, pixelHeight }) {
   const { default: html2canvas } = await import('html2canvas')
+  // R10.1: ждём загрузки @font-face (Modulord, Guidy, Bebas) — иначе html2canvas
+  // снимет с fallback-шрифтом и метрики не совпадут с тем, что видит пользователь.
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    try { await document.fonts.ready } catch { /* noop */ }
+  }
   const w = pixelWidth || element.scrollWidth
   const h = pixelHeight || element.scrollHeight
   return html2canvas(element, {

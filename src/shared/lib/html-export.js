@@ -1,17 +1,22 @@
 // Захватываем элемент с полным scrollHeight (даже если контейнер обрезает overflow)
 // + imageTimeout 15s для медленной загрузки превью из Supabase Storage.
-async function renderCanvas(element, { scale }) {
+// pixelWidth/pixelHeight (R9.4, бриф 26.05): для стикеров 120x75мм mobile-viewport
+// сжимает body, html2canvas видит scrollWidth = ширина viewport вместо настоящих
+// 340px. Передаём explicit размеры, чтобы не обрезался текст по горизонтали.
+async function renderCanvas(element, { scale, pixelWidth, pixelHeight }) {
   const { default: html2canvas } = await import('html2canvas')
+  const w = pixelWidth || element.scrollWidth
+  const h = pixelHeight || element.scrollHeight
   return html2canvas(element, {
     scale,
     useCORS: true,
     allowTaint: false,
     backgroundColor: '#ffffff',
     imageTimeout: 15000,
-    windowWidth: element.scrollWidth,
-    windowHeight: element.scrollHeight,
-    width: element.scrollWidth,
-    height: element.scrollHeight,
+    windowWidth: w,
+    windowHeight: h,
+    width: w,
+    height: h,
     ignoreElements: (el) => el.classList?.contains('print-hide'),
   })
 }
@@ -19,8 +24,8 @@ async function renderCanvas(element, { scale }) {
 /**
  * Export a DOM element as PNG and trigger download.
  */
-export async function exportAsPNG(element, filename, { scale = 2 } = {}) {
-  const canvas = await renderCanvas(element, { scale })
+export async function exportAsPNG(element, filename, { scale = 2, pixelWidth, pixelHeight } = {}) {
+  const canvas = await renderCanvas(element, { scale, pixelWidth, pixelHeight })
   const link = document.createElement('a')
   link.download = `${filename}.png`
   link.href = canvas.toDataURL('image/png')
@@ -30,11 +35,13 @@ export async function exportAsPNG(element, filename, { scale = 2 } = {}) {
 /**
  * Export a DOM element as PDF и trigger download.
  * Размеры canvas нормализуются под формат страницы PDF, чтобы текст не обрезался.
+ * pixelWidth/pixelHeight — explicit DOM-размеры для html2canvas; width/height —
+ * размеры страницы PDF в миллиметрах.
  */
-export async function exportAsPDF(element, filename, { scale = 2, orientation = 'p', format = 'a4' } = {}) {
+export async function exportAsPDF(element, filename, { scale = 2, orientation = 'p', format = 'a4', pixelWidth, pixelHeight } = {}) {
   const [{ jsPDF }, canvas] = await Promise.all([
     import('jspdf'),
-    renderCanvas(element, { scale }),
+    renderCanvas(element, { scale, pixelWidth, pixelHeight }),
   ])
   const imgData = canvas.toDataURL('image/png')
   const pdf = new jsPDF({ orientation, unit: 'mm', format })
@@ -55,9 +62,8 @@ export async function exportAsPDF(element, filename, { scale = 2, orientation = 
  * @param {HTMLElement} element
  * @param {{ scale?: number, pageSize?: string, width?: string, height?: string }} options
  */
-export async function printElement(element, { scale = 3, pageSize = '120mm 75mm', width = '120mm', height = '75mm' } = {}) {
-  const { default: html2canvas } = await import('html2canvas')
-  const canvas = await html2canvas(element, { scale, useCORS: true, backgroundColor: '#ffffff', ignoreElements: (el) => el.classList?.contains('print-hide') })
+export async function printElement(element, { scale = 3, pageSize = '120mm 75mm', width = '120mm', height = '75mm', pixelWidth, pixelHeight } = {}) {
+  const canvas = await renderCanvas(element, { scale, pixelWidth, pixelHeight })
   const imgData = canvas.toDataURL('image/png')
   const printWindow = window.open('', '_blank')
   if (!printWindow) throw new Error('Попап заблокирован')

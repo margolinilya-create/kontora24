@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { compute3DPouringReport } from '@/features/production/lib/production-logs'
-import { exportCSV } from '@/shared/lib/export'
+import { downloadXlsx } from '@/shared/lib/export-xlsx'
 import { formatOrderNumber } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
@@ -17,19 +17,10 @@ function rangeFromPeriod(period) {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
 }
 
-const CSV_COLUMNS = [
-  { key: 'orderNumber',  label: '№ заказа' },
-  { key: 'dealName',     label: 'Сделка' },
-  { key: 'qtyTarget',    label: 'Тираж' },
-  { key: 'designLabel',  label: 'Вид стикера' },
-  { key: 'printed',      label: 'Напечатано стикеров' },
-  { key: 'target15',     label: 'С учётом запаса 15%' },
-  { key: 'pouredRaw',    label: 'Итого зал. без учёта брака' },
-  { key: 'defects',      label: 'Забраковано' },
-  { key: 'good',         label: 'Итого хороших 3D' },
-  { key: 'surplus',      label: 'Излишки 3D' },
-  { key: 'defectsPct',   label: '% брака' },
-  { key: 'surplusPct',   label: '% излишков' },
+const COLUMN_LABELS = [
+  '№ заказа', 'Сделка', 'Тираж', 'Вид стикера',
+  'Напечатано стикеров', 'С учётом запаса 15%', 'Итого зал. без учёта брака',
+  'Забраковано', 'Итого хороших 3D', 'Излишки 3D', '% брака', '% излишков',
 ]
 
 export function ThreeDPouringTab({ period }) {
@@ -73,32 +64,37 @@ export function ThreeDPouringTab({ period }) {
     return () => { cancelled = true }
   }, [range.from, range.to])
 
-  function handleExportAll() {
-    const allRows = []
+  async function handleExportAll() {
+    // R9.2B (бриф 26.05): xlsx вместо CSV.
+    const aoa = [COLUMN_LABELS]
     for (const order of orders) {
       const olog = logs.filter((l) => l.order_id === order.id)
       const odes = (order.designs || []).sort((a, b) => a.design_index - b.design_index)
       const rows = compute3DPouringReport(order, olog, odes)
       const num = formatOrderNumber(order)
       for (const r of rows) {
-        allRows.push({
-          orderNumber: num,
-          dealName: order.deal_name || '',
-          qtyTarget: r.qtyTarget,
-          designLabel: r.designName ? `${r.designIndex} · ${r.designName}` : String(r.designIndex),
-          printed: r.printed,
-          target15: r.target15,
-          pouredRaw: r.pouredRaw,
-          defects: r.defects,
-          good: r.good,
-          surplus: r.surplus,
-          defectsPct: `${r.defectsPct.toFixed(2)}%`,
-          surplusPct: `${r.surplusPct.toFixed(2)}%`,
-        })
+        aoa.push([
+          num,
+          order.deal_name || '',
+          r.qtyTarget,
+          r.designName ? `${r.designIndex} · ${r.designName}` : String(r.designIndex),
+          r.printed,
+          r.target15,
+          r.pouredRaw,
+          r.defects,
+          r.good,
+          r.surplus,
+          Number(r.defectsPct.toFixed(2)),
+          Number(r.surplusPct.toFixed(2)),
+        ])
       }
     }
-    if (!allRows.length) { toast.error('Нет данных за период'); return }
-    exportCSV(allRows, CSV_COLUMNS, `3d-pouring-${range.from}_${range.to}.csv`)
+    if (aoa.length <= 1) { toast.error('Нет данных за период'); return }
+    try {
+      await downloadXlsx(`3d-pouring-${range.from}_${range.to}`, '3D-заливка', aoa)
+    } catch (err) {
+      toast.error(translateError(err).message || err.message)
+    }
   }
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
@@ -115,7 +111,7 @@ export function ThreeDPouringTab({ period }) {
     <div className="bg-surface rounded-xl border border-border p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold">Сводка по 3D-заливке</h2>
-        <Button variant="secondary" size="sm" onClick={handleExportAll}>CSV (все строки)</Button>
+        <Button variant="secondary" size="sm" onClick={handleExportAll}>Excel (все строки)</Button>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">

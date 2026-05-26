@@ -95,9 +95,23 @@ export const TRACK_LABELS = {
   stickers: 'Стикер',
 }
 
-// Следующий статус подзадачи (для ConfirmDialog «Отправить фоны на N?»)
-export function getNextSubtaskStatus(track, currentStatus) {
-  const route = track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS
+// Маршрут трека подзадач с учётом флагов заказа.
+// R9.5B (бриф 26.05): если order.need_lam=false — у трека backgrounds стадия
+// 'laminating' исключается, т.к. ламинация не нужна. Трек stickers не имеет
+// ламинации в принципе.
+export function getSubtaskRoute(track, order) {
+  const base = track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS
+  if (track === 'backgrounds' && !order?.need_lam) {
+    return base.filter((s) => s !== 'laminating')
+  }
+  return base
+}
+
+// Следующий статус подзадачи (для ConfirmDialog «Отправить фоны на N?»).
+// Принимает order чтобы корректно перешагнуть skip-стадии.
+export function getNextSubtaskStatus(track, currentStatus, order = null) {
+  const route = order ? getSubtaskRoute(track, order)
+    : (track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS)
   const idx = route.indexOf(currentStatus)
   if (idx < 0 || idx >= route.length - 1) return null
   return route[idx + 1]
@@ -205,6 +219,15 @@ export function canWorkOnStage(role, stage, dynamicPerms = null) {
   const perms = ROLE_STAGE_PERMISSIONS[role]
   if (perms === true) return true
   return perms?.includes(stage) || false
+}
+
+// R9.3C (бриф 26.05): запись лога открыта всем production-ролям. Роль определяет
+// только право продвинуть заказ на следующий этап (canWorkOnStage), но НЕ право
+// зафиксировать факт работы. Возвращает true для любого пользователя — селект
+// stage в ProductionLogForm/OrderStageInput строится из getOrderRoute(order),
+// а advance-кнопка скрывается через canWorkOnStage.
+export function canWriteLogForStage(role) {
+  return !!role
 }
 
 // Admin and manager can cancel from any status

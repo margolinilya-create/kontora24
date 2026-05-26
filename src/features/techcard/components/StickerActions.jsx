@@ -17,11 +17,16 @@ export function StickerActions({ type, order }) {
 
   const filename = `sticker-${type}-${orderFileSlug(order)}`
 
+  // R9.4 (бриф 26.05): explicit DOM-размеры стикера 120x75мм @ 72dpi = 340x213px.
+  // На mobile viewport scrollWidth схлопывается под ширину экрана и обрезает текст.
+  const PIXEL_W = 340
+  const PIXEL_H = 213
+
   async function handlePNG() {
     if (!stickerRef.current) return
     setExporting(true)
     try {
-      await exportAsPNG(stickerRef.current, filename, { scale: 3 })
+      await exportAsPNG(stickerRef.current, filename, { scale: 3, pixelWidth: PIXEL_W, pixelHeight: PIXEL_H })
       toast.success('PNG скачан')
     } catch {
       toast.error('Ошибка экспорта PNG')
@@ -34,7 +39,10 @@ export function StickerActions({ type, order }) {
     if (!stickerRef.current) return
     setExporting(true)
     try {
-      await exportAsPDF(stickerRef.current, filename, { scale: 3, orientation: 'l', format: [75, 120], width: 120, height: 75 })
+      await exportAsPDF(stickerRef.current, filename, {
+        scale: 3, orientation: 'l', format: [75, 120],
+        pixelWidth: PIXEL_W, pixelHeight: PIXEL_H,
+      })
       toast.success('PDF скачан')
     } catch {
       toast.error('Ошибка экспорта PDF')
@@ -46,7 +54,10 @@ export function StickerActions({ type, order }) {
   async function handlePrint() {
     if (!stickerRef.current) return
     try {
-      await printElement(stickerRef.current, { scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm' })
+      await printElement(stickerRef.current, {
+        scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm',
+        pixelWidth: PIXEL_W, pixelHeight: PIXEL_H,
+      })
     } catch (err) {
       toast.error(translateError(err).message)
     }

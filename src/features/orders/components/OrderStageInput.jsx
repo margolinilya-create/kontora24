@@ -1,24 +1,24 @@
 import { useState, useCallback } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { ProductionLogForm } from '@/features/production/components/logs/ProductionLogForm'
 import { ProductionLogHistory } from '@/features/production/components/logs/ProductionLogHistory'
 import { StageProgressBar } from '@/features/production/components/logs/StageProgressBar'
 import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
 import { addProductionLogAndCheckAdvance } from '@/features/orders/hooks/useOrders'
-import { canWorkOnStage } from '@/shared/constants'
+import { canWriteLogForStage } from '@/shared/constants'
 
 export function OrderStageInput({ order, onUpdated }) {
   const { profile } = useAuth()
-  const dynamicPerms = useRolePermissionsStore((s) => s.permissions)
-  const dynamicLoaded = useRolePermissionsStore((s) => s.loaded)
   const stage = order.status
   const config = STAGE_FIELDS[stage]
   const { logs, getStageProgress, updateLog, softDeleteLog, error: logsError } = useProductionLogs(order.id, order.qty)
   const [showHistory, setShowHistory] = useState(false)
 
-  const canWork = profile && canWorkOnStage(profile.role, stage, dynamicLoaded ? dynamicPerms : null)
+  // R9.3C (бриф 26.05): запись лога открыта всем ролям. Право на advance к next
+  // status проверяется внутри addProductionLogAndCheckAdvance — если у роли нет
+  // stage:N, лог сохранится, а заказ останется на текущей стадии.
+  const canWrite = profile && canWriteLogForStage(profile.role)
   const progress = config ? getStageProgress(stage) : null
   const stageLogs = logs.filter((l) => l.stage === stage)
 
@@ -51,7 +51,7 @@ export function OrderStageInput({ order, onUpdated }) {
         </div>
       )}
 
-      {canWork && !logsError && (
+      {canWrite && !logsError && (
         <ProductionLogForm
           stage={stage}
           order={order}

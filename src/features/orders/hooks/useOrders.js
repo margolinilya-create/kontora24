@@ -195,7 +195,10 @@ export function useOrderDetail(id) {
   useEffect(() => { fetchDetail() }, [fetchDetail])
   useRefetchOnFocus(fetchDetail)
 
-  return { order, history, loading, error, refetch: fetchDetail }
+  // setOrder экспортируем для optimistic updates (R9.3B): после save AdminOrderEditor
+  // вызывает setOrder(prev => ({...prev, ...updates})) вместо тяжёлого refetch.
+  // Это убирает «перезагрузку страницы» при сохранении (бриф 26.05).
+  return { order, history, loading, error, refetch: fetchDetail, setOrder }
 }
 
 export function useProfiles(role) {
@@ -489,11 +492,13 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
 }
 
 export async function updateOrder(orderId, updates) {
+  const patch = { ...updates, updated_at: new Date().toISOString() }
   const { error } = await supabase
     .from('k24_orders')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', orderId)
   if (error) throw error
+  return patch
 }
 
 /**

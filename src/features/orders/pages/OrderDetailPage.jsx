@@ -341,7 +341,7 @@ function OverviewTab({ order, onUpdated }) {
 
 export default function OrderDetailPage() {
   const { id } = useParams()
-  const { order, history, loading, refetch } = useOrderDetail(id)
+  const { order, history, loading, refetch, setOrder } = useOrderDetail(id)
   useAuth() // keep mount for legacy stores
   const isFinance = useCanDo('view:finance')
   const canEdit = useCanDo('order:edit')
@@ -493,7 +493,13 @@ export default function OrderDetailPage() {
       <Modal isOpen={editorOpen} onClose={() => setEditorOpen(false)} title="Редактирование заказа" maxWidth="max-w-5xl">
         <AdminOrderEditor
           order={order}
-          onSaved={() => { setEditorOpen(false); refetch() }}
+          onSaved={(patch) => {
+            setEditorOpen(false)
+            // R9.3B: optimistic merge без полного refetch — UI не «перезагружается».
+            // Безопасно: patch содержит только обновлённые поля + updated_at.
+            if (patch) setOrder((prev) => (prev ? { ...prev, ...patch } : prev))
+            else refetch()
+          }}
           onCancel={() => setEditorOpen(false)}
         />
       </Modal>

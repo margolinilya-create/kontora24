@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
+import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfMonth, format } from 'date-fns'
 
 function getSince(period) {
@@ -36,6 +37,7 @@ export function useWorkSchedule(period = '30') {
       })
       setData(Object.values(byWorker))
     } catch (err) {
+      captureError(err, { tags: { source: 'reports.useWorkSchedule' }, extra: { period } })
       setError(err)
     } finally {
       setLoading(false)
@@ -143,6 +145,7 @@ export function useOrdersCostReport(period = '30') {
       })
       setData(rows)
     } catch (err) {
+      captureError(err, { tags: { source: 'reports.useOrdersCostReport' }, extra: { period } })
       setError(err)
     } finally {
       setLoading(false)
@@ -201,6 +204,7 @@ export function useBonusReport(period = '30') {
 
       setData(Object.values(byWorker).sort((a, b) => b.total - a.total))
     } catch (err) {
+      captureError(err, { tags: { source: 'reports.useBonusReport' }, extra: { period } })
       setError(err)
     } finally {
       setLoading(false)
@@ -281,6 +285,7 @@ export function useEmployeeReport(period = '30') {
       const rows = Object.values(byWorker).sort((a, b) => b.totalMinutes - a.totalMinutes)
       setData(rows)
     } catch (err) {
+      captureError(err, { tags: { source: 'reports.useEmployeeReport' }, extra: { period } })
       setError(err)
     } finally {
       setLoading(false)
@@ -332,6 +337,7 @@ export function useQualityReport(period = '30') {
         })
       setData(rows)
     } catch (err) {
+      captureError(err, { tags: { source: 'reports.useQualityReport' }, extra: { period } })
       setError(err)
     } finally {
       setLoading(false)

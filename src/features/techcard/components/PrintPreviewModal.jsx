@@ -8,6 +8,9 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { orderFileSlug } from '@/shared/lib/utils'
 
+// pixelWidth/pixelHeight: explicit DOM-размеры (px) для html2canvas, чтобы
+// mobile-viewport не схлопывал scrollWidth и не обрезал текст стикеров (R9.4).
+// 120x75мм @ 72dpi = 340x213px.
 const CONFIG = {
   techcard: {
     title: 'Тех. карта',
@@ -18,15 +21,15 @@ const CONFIG = {
   },
   production: {
     title: 'Стикер «В производство»',
-    pdf: { scale: 3, orientation: 'l', format: [75, 120], width: 120, height: 75 },
-    print: { scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm' },
+    pdf: { scale: 3, orientation: 'l', format: [75, 120], pixelWidth: 340, pixelHeight: 213 },
+    print: { scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm', pixelWidth: 340, pixelHeight: 213 },
     filenamePrefix: 'sticker-production',
     maxWidth: 'max-w-md',
   },
   delivery: {
     title: 'Стикер «На выдачу»',
-    pdf: { scale: 3, orientation: 'l', format: [75, 120], width: 120, height: 75 },
-    print: { scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm' },
+    pdf: { scale: 3, orientation: 'l', format: [75, 120], pixelWidth: 340, pixelHeight: 213 },
+    print: { scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm', pixelWidth: 340, pixelHeight: 213 },
     filenamePrefix: 'sticker-delivery',
     maxWidth: 'max-w-md',
   },
@@ -48,7 +51,11 @@ export function PrintPreviewModal({ isOpen, onClose, type, order, onUpdated }) {
     if (!ref.current) return
     setExporting(true)
     try {
-      await exportAsPNG(ref.current, filename, { scale: cfg.pdf.scale })
+      await exportAsPNG(ref.current, filename, {
+        scale: cfg.pdf.scale,
+        pixelWidth: cfg.pdf.pixelWidth,
+        pixelHeight: cfg.pdf.pixelHeight,
+      })
       toast.success('PNG скачан')
     } catch (err) { toast.error(translateError(err).message) }
     finally { setExporting(false) }

@@ -73,7 +73,7 @@ function UnitEconomicsTab({ period }) {
   const costMap = useMemo(() => buildCostMap(materials), [materials])
 
   if (loading) return <CenterSpinner />
-  if (error) return <ReportError text="Не удалось загрузить Unit Economics" />
+  if (error) return <ReportError text="Не удалось загрузить Unit Economics" error={error} />
   if (data.length === 0) return <Empty text="Нет заказов за период" />
 
   const rows = data.map((o) => {
@@ -162,7 +162,7 @@ function EmployeesTab({ period }) {
   const [openWorker, setOpenWorker] = useState(null)
 
   if (loading) return <CenterSpinner />
-  if (error) return <ReportError text="Не удалось загрузить сотрудников" />
+  if (error) return <ReportError text="Не удалось загрузить сотрудников" error={error} />
   if (data.length === 0) return <Empty text="Нет данных за период" />
 
   function handleExport() {
@@ -260,7 +260,7 @@ function ExpensesTab({ period }) {
   const costMap = useMemo(() => buildCostMap(materials), [materials])
 
   if (loading) return <CenterSpinner />
-  if (error) return <ReportError text="Не удалось загрузить расходы" />
+  if (error) return <ReportError text="Не удалось загрузить расходы" error={error} />
   if (data.length === 0) return <Empty text="Нет заказов за период" />
 
   const rows = data.map((o) => ({ ...o, cost: costForOrder(o, costMap) }))
@@ -336,7 +336,7 @@ function PnLTab({ period }) {
   const costMap = useMemo(() => buildCostMap(materials), [materials])
 
   if (loading) return <CenterSpinner />
-  if (error) return <ReportError text="Не удалось загрузить P&L" />
+  if (error) return <ReportError text="Не удалось загрузить P&L" error={error} />
   if (data.length === 0) return <Empty text="Нет заказов за период" />
 
   const rows = data.map((o) => {
@@ -460,10 +460,17 @@ function Empty({ text }) {
   )
 }
 
-function ReportError({ text }) {
+function ReportError({ text, error }) {
+  // R9.2A (бриф 26.05): показываем сырой message ошибки, чтобы менеджер мог
+  // переслать точный текст. Расширенные детали — code/hint/details из PostgREST.
+  const detail = error?.message
+    || (typeof error === 'string' ? error : null)
+  const extra = [error?.code, error?.hint, error?.details].filter(Boolean).join(' · ')
   return (
     <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-6 text-center">
-      <p className="text-sm">{text}</p>
+      <p className="text-sm font-medium">{text}</p>
+      {detail && <p className="text-xs mt-2 font-mono break-words">{detail}</p>}
+      {extra && <p className="text-[11px] mt-1 opacity-70 font-mono break-words">{extra}</p>}
     </div>
   )
 }

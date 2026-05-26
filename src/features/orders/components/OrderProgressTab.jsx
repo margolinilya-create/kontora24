@@ -15,8 +15,7 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import {
   ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK,
-  getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS,
-  SUBTASK_ROUTE_BACKGROUNDS, SUBTASK_ROUTE_STICKERS,
+  getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS, getSubtaskRoute,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 
@@ -118,7 +117,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     if (res?.completed_track && isPack3D) {
       const sub = subtasks[res.completed_track]
       if (sub) {
-        const next = getNextSubtaskStatus(res.completed_track, sub.status)
+        const next = getNextSubtaskStatus(res.completed_track, sub.status, order)
         if (next) {
           setPendingSubtask({ track: res.completed_track, from: sub.status, to: next })
           return
@@ -383,12 +382,14 @@ function MiniStepper({ route, status, accentClass }) {
   )
 }
 
-function SubtaskTrackBlock({ track, status, advance, onUpdated, canJump, logs }) {
+function SubtaskTrackBlock({ track, status, advance, onUpdated, canJump, logs, order }) {
   const [target, setTarget] = useState('')
   const [saving, setSaving] = useState(false)
-  const route = track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS
+  // R9.5B (бриф 26.05): маршрут с учётом need_lam — у фонов нет 'laminating'
+  // если ламинация не нужна.
+  const route = getSubtaskRoute(track, order)
   const otherOptions = route.filter((s) => s !== status)
-  const next = getNextSubtaskStatus(track, status)
+  const next = getNextSubtaskStatus(track, status, order)
 
   // Нельзя advance если для текущего status трека ещё нет ни одного production_log.
   // Кроме pending/ready/cancelled — там учёта не бывает (hasSubtaskLog возвращает true).
@@ -648,8 +649,8 @@ function SubtaskIndicator({ order, logs, onUpdated }) {
         <span className="text-xs text-text-muted">объединяются на «Сборка 3D»</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <SubtaskTrackBlock track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} />
-        <SubtaskTrackBlock track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} />
+        <SubtaskTrackBlock track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
+        <SubtaskTrackBlock track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
       </div>
     </div>
   )

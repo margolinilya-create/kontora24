@@ -283,6 +283,7 @@ export default function OrdersPage() {
                       <th className="px-4 py-2 font-medium">Тип</th>
                       <th className="px-4 py-2 font-medium">Размер</th>
                       <th className="px-4 py-2 font-medium text-right">Тираж</th>
+                      <th className="px-4 py-2 font-medium text-right">В паке</th>
                       <th className="px-4 py-2 font-medium">Этап</th>
                       <th className="px-4 py-2 font-medium">Срок</th>
                       {isAdmin && <th className="px-2 py-2 font-medium w-10 sr-only">Действия</th>}
@@ -336,6 +337,7 @@ export default function OrdersPage() {
                               <th className="px-4 py-2 font-medium">Тип</th>
                               <th className="px-4 py-2 font-medium">Размер</th>
                               <th className="px-4 py-2 font-medium text-right">Тираж</th>
+                              <th className="px-4 py-2 font-medium text-right">В паке</th>
                               <th className="px-4 py-2 font-medium">Этап</th>
                               <th className="px-4 py-2 font-medium">Срок</th>
                             </tr>
@@ -441,6 +443,7 @@ function DesktopRow({ order, isAdmin, onDelete }) {
         {order.width_mm && order.height_mm ? `${order.width_mm}×${order.height_mm} мм` : '—'}
       </td>
       <td className="px-4 py-2.5 text-right text-text-muted whitespace-nowrap">{order.qty} шт</td>
+      <td className="px-4 py-2.5 text-right text-text-muted whitespace-nowrap">{order.stickers_per_pack || '—'}</td>
       <td className="px-4 py-2.5"><StatusBadge status={order.status} /></td>
       <td className={`px-4 py-2.5 whitespace-nowrap text-xs ${textCls} ${deadlineLevel === 'urgent' ? 'font-semibold' : ''}`}>
         {order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'}

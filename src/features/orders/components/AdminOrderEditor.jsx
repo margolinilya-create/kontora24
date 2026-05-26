@@ -174,9 +174,9 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         printed_qty: form.printed_qty !== '' ? Number(form.printed_qty) : null,
       }
 
-      await updateOrder(order.id, updates)
+      const patch = await updateOrder(order.id, updates)
       toast.success('Заказ обновлён')
-      onSaved()
+      onSaved(patch)
     } catch (err) {
       captureError(err, { tags: { source: 'AdminOrderEditor.save' }, extra: { orderId: order.id } })
       toast.error(translateError(err).message)

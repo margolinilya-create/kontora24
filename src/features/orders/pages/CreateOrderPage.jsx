@@ -128,6 +128,10 @@ export default function CreateOrderPage() {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const [submitting, setSubmitting] = useState(false)
+  // R9.5A (бриф 26.05): отдельный state для submit-ошибок (после прохождения
+  // Zod-валидации). Показываем полный err.message в баннере, чтобы менеджер
+  // мог переслать точный текст вместо общего toast.
+  const [submitError, setSubmitError] = useState(null)
   const [activePreset, setActivePreset] = useState(null)
   const [previewFile, setPreviewFile] = useState(null)
   const [previewBlobUrl, setPreviewBlobUrl] = useState(null)
@@ -239,13 +243,17 @@ export default function CreateOrderPage() {
 
   async function onSubmit(values) {
     setSubmitting(true)
+    setSubmitError(null)
+    let stage = 'init'
     try {
       // Свободный ввод имени заказчика — за кулисами ищем/создаём клиента.
       let clientId = null
+      stage = 'findOrCreateClient'
       if (values.client_name?.trim()) {
         const client = await findOrCreateClientByName(values.client_name)
         clientId = client?.id || null
       }
+      stage = 'createOrder'
       const order = await createOrder({
         order_type: values.order_type,
         qty: values.qty,
@@ -320,7 +328,19 @@ export default function CreateOrderPage() {
       toast.success(`Заказ ${formatOrderNumber(order)} создан`)
       navigate(`/orders/${order.id}`)
     } catch (err) {
-      toast.error(translateError(err).message)
+      captureError(err, {
+        tags: { source: `CreateOrderPage.submit.${stage}` },
+        extra: {
+          order_type: values?.order_type,
+          qty: values?.qty,
+          width_mm: values?.width_mm,
+          height_mm: values?.height_mm,
+          client_name: values?.client_name,
+          itemsCount,
+        },
+      })
+      setSubmitError({ stage, error: err })
+      toast.error(translateError(err).message || err.message)
     } finally {
       setSubmitting(false)
     }
@@ -353,6 +373,26 @@ export default function CreateOrderPage() {
               <li key={key}>{err.message}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* R9.5A (бриф 26.05): submit-ошибка после прохождения валидации.
+          Показываем полный err.message + stage + код PostgREST, чтобы можно
+          было воспроизвести по логам Sentry. */}
+      {submitError?.error && (
+        <div className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-4 text-sm mb-6" role="alert">
+          <p className="font-medium">Ошибка при создании заказа</p>
+          <p className="text-xs mt-1">
+            Этап: <span className="font-mono">{submitError.stage}</span>
+          </p>
+          <p className="text-xs mt-1 font-mono break-words">
+            {submitError.error.message || translateError(submitError.error).message}
+          </p>
+          {(submitError.error.code || submitError.error.details) && (
+            <p className="text-[11px] mt-1 font-mono break-words opacity-70">
+              {[submitError.error.code, submitError.error.details, submitError.error.hint].filter(Boolean).join(' · ')}
+            </p>
+          )}
         </div>
       )}
 

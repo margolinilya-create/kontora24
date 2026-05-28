@@ -92,6 +92,7 @@ export default function WarehousePage() {
           onSelect={setSelectedMaterial}
           filter={filter}
           onFilter={setFilter}
+          onUpdated={refetch}
         />
       ) : tab === 'inventory' ? (
         <InventoryTab materials={materials} onSaved={refetch} />
@@ -150,6 +151,7 @@ export default function WarehousePage() {
                   key={m.id}
                   material={m}
                   onAddStock={() => setSelectedMaterial(m)}
+                  onUpdated={refetch}
                 />
               ))}
             </div>

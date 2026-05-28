@@ -55,6 +55,11 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
         })
         .filter((t) => t.fields.length > 0)
     : []
+  // Single-track форма поддерживает omitFields.single — например, sticker3D
+  // multi-variant pouring: основные поля вводятся поэвидово, остаётся только смола.
+  const singleFields = (!useTracks && Array.isArray(omitFields?.single) && omitFields.single.length)
+    ? config.fields.filter((f) => !omitFields.single.includes(f.key))
+    : (config.fields || [])
 
   const [saving, setSaving] = useState(false)
   // Состояние формы — { [trackKey || 'single']: { fieldKey: value }, notes, resin }
@@ -95,6 +100,18 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
     return !data || Object.entries(data).every(([k, v]) => k === 'notes' || v === '' || v == null || Number(v) === 0)
   }
 
+  // «Хорошо залитых» (stickers_good) автоматически = stickers_poured − defects.
+  // Поле убрано из формы (фидбэк 28.05), но в БД сохраняем для совместимости
+  // с агрегациями (payout, reports, OrderProgressTab).
+  function attachComputedGood(stage, data, track) {
+    const isPour = stage === 'pouring' || (stage === 'selection_pouring' && track === 'stickers')
+    if (!isPour) return data
+    const poured = Number(data.stickers_poured ?? 0)
+    if (!Number.isFinite(poured) || poured <= 0) return data
+    const defects = Number(data.defects ?? 0) || 0
+    return { ...data, stickers_good: Math.max(0, poured - defects) }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
 
@@ -127,7 +144,8 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
       setSaving(true)
       try {
         for (const entry of trackEntries) {
-          await onSubmit(stage, { ...entry.data, track: entry.track })
+          const payload = attachComputedGood(stage, entry.data, entry.track)
+          await onSubmit(stage, { ...payload, track: entry.track })
         }
         toast.success(`Записано (${trackEntries.length})`)
         clearAll()
@@ -147,7 +165,7 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
 
     setSaving(true)
     try {
-      await onSubmit(stage, data)
+      await onSubmit(stage, attachComputedGood(stage, data, null))
       // Доп. resin-лог если есть
       const resinValue = Number(root.resin_grams || 0)
       if (resinValue > 0 && config.resinExtra) {
@@ -231,9 +249,11 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
             })}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {config.fields.map((f) => renderField(f, null))}
-          </div>
+          singleFields.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {singleFields.map((f) => renderField(f, null))}
+            </div>
+          )
         )}
 
         {isPackaging && (

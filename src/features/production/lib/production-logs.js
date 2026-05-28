@@ -83,10 +83,11 @@ export const STAGE_FIELDS = {
 
   pouring: {
     label: 'Заливка',
+    // «Хорошо» = stickers_poured − defects, в БД пишется автоматом в stickers_good
+    // при submit (фидбэк менеджера 28.05).
     quantityField: 'stickers_good',
     fields: [
       { key: 'stickers_poured', label: 'Залито', unit: 'шт' },
-      { key: 'stickers_good', label: 'Хороших', unit: 'шт' },
       { key: 'defects', label: 'Брак', unit: 'шт' },
       { key: 'resin_grams', label: 'Смола', unit: 'г', step: '0.1' },
     ],
@@ -95,14 +96,14 @@ export const STAGE_FIELDS = {
   selection_pouring: {
     label: 'Выборка / Заливка',
     quantityField: 'qty_selected',
-    // По ТЗ: убран `defects`. Отдельно — расход смолы через resinOnly-трек.
     tracks: [
       {
         key: 'stickers',
         label: 'Стикеры',
         accent: 'bg-dept-pouring/10 border-dept-pouring/30',
         fields: [
-          { key: 'stickers_good', label: 'Залито стикеров (хороших)', unit: 'шт' },
+          { key: 'stickers_poured', label: 'Залито', unit: 'шт' },
+          { key: 'defects', label: 'Брак', unit: 'шт' },
         ],
       },
       {
@@ -116,9 +117,8 @@ export const STAGE_FIELDS = {
     ],
     fields: [
       { key: 'qty_selected', label: 'Выбрано фонов', unit: 'шт' },
-      { key: 'stickers_good', label: 'Хороших стикеров', unit: 'шт' },
+      { key: 'stickers_poured', label: 'Залито стикеров', unit: 'шт' },
     ],
-    // Отдельный лог расхода смолы (без track)
     resinExtra: { key: 'resin_grams', label: 'Расход смолы', unit: 'г', step: '0.1' },
   },
 

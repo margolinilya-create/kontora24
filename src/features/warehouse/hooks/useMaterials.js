@@ -149,6 +149,24 @@ export async function bulkInventory(items) {
   return { updated, skipped }
 }
 
+/**
+ * Точечное обновление позиции склада. Поле name можно править при наличии
+ * права material:edit_name (RLS политика k24_materials_update_name).
+ */
+export async function updateMaterial(id, fields) {
+  if (!id || !fields || typeof fields !== 'object') {
+    throw new Error('updateMaterial: нужен id и объект изменений')
+  }
+  const { data, error } = await supabase
+    .from('k24_materials')
+    .update(fields)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function createMaterial({ type, name, unit, stockQty, minQty, unitCost }) {
   const { data, error } = await supabase
     .from('k24_materials')

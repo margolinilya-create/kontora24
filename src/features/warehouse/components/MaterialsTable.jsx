@@ -2,13 +2,16 @@ import { useMemo } from 'react'
 import { MATERIAL_CATEGORIES, getMaterialCategory, getStockStatus, MATERIAL_TYPES } from '@/shared/constants'
 import { formatPrice } from '@/shared/lib/utils'
 import { WarehouseFilterBar } from './WarehouseFilterBar'
+import { EditableMaterialName } from './EditableMaterialName'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 
 /**
  * Табличный вид склада с фильтрами по категории и статусу остатка.
  * При клике по строке — открывает StockModal для ручного прихода/расхода.
  * Фильтр state приходит снаружи (page-level), чтобы быть общим с другими табами.
  */
-export function MaterialsTable({ materials, onSelect, filter, onFilter }) {
+export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdated }) {
+  const canEditName = useCanDo('material:edit_name')
   const { category = 'all', status = 'all', search = '' } = filter || {}
 
   const filtered = useMemo(() => {
@@ -59,7 +62,11 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter }) {
                   const catLabel = (cat && MATERIAL_CATEGORIES[cat]?.label) || '—'
                   return (
                     <tr key={m.id} className="border-b border-border last:border-0 hover:bg-surface-2 transition-colors">
-                      <td className="px-4 py-2.5 font-medium">{m.name}</td>
+                      <td className="px-4 py-2.5 font-medium">
+                        {canEditName ? (
+                          <EditableMaterialName material={m} onUpdated={onUpdated} tableMode />
+                        ) : m.name}
+                      </td>
                       <td className="px-4 py-2.5 text-text-muted">{catLabel}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
                         <span className={Number(m.stock_qty) < 0 ? 'text-danger font-medium' : ''}>

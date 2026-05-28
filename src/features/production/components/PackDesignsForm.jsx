@@ -19,7 +19,10 @@ import { computeIncomingPerDesign } from '../lib/production-logs'
  * сотрудник может довносить количество (фидбэк менеджера 14.05).
  */
 const MODE_LABELS = {
-  pouring:  { value: 'Залито', valueAria: 'Залито, шт',     valueField: 'stickers_good',    showDefects: true,  errorEmpty: 'Введите залито или брак' },
+  // pouring: поле «Залито» пишется в stickers_poured. Поле stickers_good
+  // вычисляется автоматически в OrderProgressTab.handlePackDesignSubmit
+  // (фидбэк 28.05). Legacy-логи stickers_good читаются через fallback ниже.
+  pouring:  { value: 'Залито', valueAria: 'Залито, шт',     valueField: 'stickers_poured',  legacyField: 'stickers_good', showDefects: true,  errorEmpty: 'Введите залито или брак' },
   print:    { value: 'Напечатано', valueAria: 'Напечатано, шт', valueField: 'stickers_printed', showDefects: false, errorEmpty: 'Введите кол-во напечатанных' },
   cutting:  { value: 'Нарезано', valueAria: 'Нарезано, шт',  valueField: 'qty_cut',          showDefects: true,  errorEmpty: 'Введите нарезано или брак' },
 }
@@ -60,7 +63,11 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
     const dlogs = (logs || []).filter(
       (l) => l.stage === stage && l.track === 'stickers' && l.design_index === designIndex && !l.deleted_at,
     )
-    const value = dlogs.reduce((s, l) => s + (Number(l[labels.valueField]) || 0), 0)
+    const value = dlogs.reduce((s, l) => {
+      const primary = Number(l[labels.valueField]) || 0
+      if (primary > 0 || !labels.legacyField) return s + primary
+      return s + (Number(l[labels.legacyField]) || 0)
+    }, 0)
     const defects = dlogs.reduce((s, l) => s + (Number(l.defects) || 0), 0)
     return { value, defects }
   }

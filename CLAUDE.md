@@ -71,7 +71,7 @@ npx vercel deploy --yes --prod --scope margolinilya-creates-projects  # Deploy
 **Skip-stages:** `getOrderRoute(order)` фильтрует маршрут по флагам:
 - `design_status === 'provided'` → пропускается стадия `design` (макет от клиента, сразу в `prepress`)
 - `need_lam === false` → пропускается `lamination`
-- `bopp_bag === false && order_type !== 'stickerpack3D'` → пропускается `packaging` (R-апдейт 11.05). Упаковка нужна только для БОПП-заказов и 3D-стикерпаков
+- `bopp_bag === false && order_type NOT IN ('stickerpack3D','sticker3D')` → пропускается `packaging` (R-апдейт 11.05 + фидбэк 28.05). Упаковка обязательна для всех 3D-заказов (`sticker3D` + `stickerpack3D`), для остальных типов — только при наличии БОПП-пакета
 - 3D-стадии (`pouring`, `selection_pouring`, `assembly_3d`) уже разруливаются через `ORDER_ROUTES` per-type
 
 `isStageAllowed(order, stage)` валидирует переход. `updateOrderStatus(...)` бросает ошибку при попытке перейти на стадию вне маршрута; `{ isRollback: true }` или `{ force: true }` — admin escape (используется в `StatusOverride` и кнопке возврата в `OrderStepper`). DnD-канбан блокирует колонки запрещённых этапов через `useDroppable({ disabled: !isStageAllowed(...) })`. Если статус уже вне маршрута (грязные данные), `OrderStepper` показывает предупреждение и кнопку «Вернуть на корректный этап».
@@ -367,7 +367,7 @@ RPC: `update_stock` · `auto_deduct_materials` (⚠️ отключена в fro
 
 `FinanceTab` / `CabinetPage` автоматически считает заработок через `calculateWorkerPayout(logs, opts)` из `shared/constants.js` — **только пост-печатные операции**:
 
-- заливка стикеров: 1.0 ₽/шт (поле `stickers_good`, stages `pouring` + `selection_pouring`)
+- заливка стикеров: 1.0 ₽/шт (поле `stickers_good`, stages `pouring` + `selection_pouring`). С фидбэка 28.05 ручной ввод «Хорошо залитых» убран; форма сохраняет «Залито» (`stickers_poured`) + «Брак» (`defects`), а `stickers_good = stickers_poured − defects` пишется автоматически. Старые логи остаются совместимы.
 - выборка фонов: 0.5 ₽/шт (`qty_selected`, stage `selection_pouring`)
 - сборка 3D-пака: 0.5 ₽/стикер в паке — формула `packs_assembled × order.stickers_per_pack × 0.5` (раньше была фиксированная 0.5/пак; обновлено 12.05 по фидбэку менеджера)
 - упаковка пака: 1.5 ₽/шт (`packs_packaged`)

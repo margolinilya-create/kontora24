@@ -96,7 +96,14 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const route = getOrderRoute(order)
 
-  const showPackDesigns = isPack3D && ['print', 'cutting', 'selection_pouring'].includes(stage)
+  // Sticker3D multi-variant (фидбэк 28.05): на печать/резку/заливку показываем
+  // PackDesignsForm с N=design_variants видов, k24_pack_designs создаются триггером.
+  const isSticker3DMulti = order.order_type === 'sticker3D' && (order.design_variants || 1) > 1
+  const PACK_STAGES_3D_PACK = ['print', 'cutting', 'selection_pouring']
+  const PACK_STAGES_STICKER3D = ['print', 'cutting', 'pouring']
+  const showPackDesigns =
+    (isPack3D && PACK_STAGES_3D_PACK.includes(stage)) ||
+    (isSticker3DMulti && PACK_STAGES_STICKER3D.includes(stage))
   const packMode = stage === 'print' ? 'print' : stage === 'cutting' ? 'cutting' : 'pouring'
   const { designs, updateName } = usePackDesigns(showPackDesigns ? order.id : null)
 
@@ -159,21 +166,38 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     }
   }
 
-  // Поэвидовой ввод стикеров для 3D-стикерпака — каждый «+» создаёт production_log
-  // с worker_id + design_index + track='stickers' (единый учёт, см. usePackDesigns).
-  const PACK_STICKER_FIELD = { print: 'stickers_printed', cutting: 'qty_cut', selection_pouring: 'stickers_good' }
-  // Количественные поля трека «стикеры» убираем из общей формы — они вводятся
-  // поэвидово. Для печати у трека остаётся «Плёнка стикеров», для резки/выборки
-  // трек «стикеры» исчезает целиком (полей не остаётся).
+  // Поэвидовой ввод стикеров для 3D-стикерпака (track='stickers') и для sticker3D
+  // multi-variant (track=NULL) — каждый «+» создаёт production_log с worker_id +
+  // design_index (единый учёт, см. usePackDesigns).
+  // На pouring/selection_pouring пишем stickers_poured + computed stickers_good
+  // (фидбэк 28.05). Для legacy-агрегаций stickers_good сохраняем = value - defects.
+  const PACK_STICKER_FIELD = {
+    print: 'stickers_printed',
+    cutting: 'qty_cut',
+    selection_pouring: 'stickers_poured',
+    pouring: 'stickers_poured',
+  }
+  // Количественные поля убираем из общей формы — они вводятся поэвидово.
+  // Для печати у трека остаётся «Плёнка стикеров», для резки/выборки/заливки
+  // количественные поля исчезают (брак тоже).
   const PACK_OMIT_FIELDS = {
     print: { stickers: ['stickers_printed'] },
     cutting: { stickers: ['qty_cut', 'defects'] },
-    selection_pouring: { stickers: ['stickers_good'] },
+    selection_pouring: { stickers: ['stickers_poured', 'defects'] },
+    pouring: { single: ['stickers_poured', 'defects'] },
   }
   async function handlePackDesignSubmit(designIndex, { value, defects }) {
     const field = PACK_STICKER_FIELD[stage]
+    // PackDesignsForm.designStats фильтрует по track='stickers', поэтому для
+    // sticker3D multi-variant тоже пишем track='stickers' (логи группируются
+    // только по design_index, семантика «фон/стикер» неактуальна).
     const data = { track: 'stickers', design_index: designIndex, [field]: value }
-    if (stage === 'cutting' && defects) data.defects = defects
+    if ((stage === 'cutting' || stage === 'pouring' || stage === 'selection_pouring') && defects) {
+      data.defects = defects
+    }
+    if (stage === 'pouring' || stage === 'selection_pouring') {
+      data.stickers_good = Math.max(0, Number(value || 0) - Number(defects || 0))
+    }
     await handleSubmit(stage, data)
   }
 

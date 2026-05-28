@@ -128,8 +128,10 @@ export function getOrderRoute(order) {
   if (order?.design_status === 'provided') {
     route = route.filter(s => s !== 'design')
   }
-  // Skip packaging — нужен только для БОПП или 3D-стикерпака (по ТЗ 11.05).
-  const needsPackaging = order?.bopp_bag === true || order?.order_type === 'stickerpack3D'
+  // Skip packaging — все 3D-заказы требуют упаковку всегда (фидбэк 28.05);
+  // остальные типы — только при наличии БОПП-пакета.
+  const needsPackaging = order?.bopp_bag === true
+    || ['stickerpack3D', 'sticker3D'].includes(order?.order_type)
   if (!needsPackaging) {
     route = route.filter(s => s !== 'packaging')
   }
@@ -158,7 +160,7 @@ export const PERMISSIONS = {
   ],
   actions: [
     'order:create', 'order:edit', 'order:cancel',
-    'material:manage', 'user:manage',
+    'material:manage', 'material:edit_name', 'user:manage',
   ],
 }
 
@@ -183,6 +185,7 @@ export const PERMISSION_LABELS = {
   'order:edit': 'Редактировать заказы',
   'order:cancel': 'Отменять заказы',
   'material:manage': 'Управлять складом',
+  'material:edit_name': 'Редактировать названия материалов',
   'user:manage': 'Управлять пользователями',
 }
 

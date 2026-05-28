@@ -179,9 +179,9 @@ describe('getNextStatus', () => {
     }
   })
 
-  it('admin full path — 3D sticker (no BOPP, packaging skipped)', () => {
+  it('admin full path — 3D sticker (packaging обязателен с фидбэка 28.05)', () => {
     const order = { order_type: 'sticker3D', bopp_bag: false }
-    const path = ['new', 'design', 'prepress', 'print', 'cutting', 'pouring', 'otk', 'done']
+    const path = ['new', 'design', 'prepress', 'print', 'cutting', 'pouring', 'packaging', 'otk', 'done']
     for (let i = 0; i < path.length - 1; i++) {
       expect(getNextStatus('admin', path[i], order)).toBe(path[i + 1])
     }
@@ -215,9 +215,11 @@ describe('getNextStatus', () => {
     expect(getNextStatus('printer', 'cutting', order)).toBe('packaging')
   })
 
-  it('post_printer can advance through pouring → otk for 3D sticker (no BOPP)', () => {
+  it('post_printer can advance through pouring → packaging → otk for 3D sticker', () => {
+    // С 28.05 sticker3D всегда требует упаковки независимо от bopp_bag.
     const order3d = { order_type: 'sticker3D', bopp_bag: false }
-    expect(getNextStatus('post_printer', 'pouring', order3d)).toBe('otk')
+    expect(getNextStatus('post_printer', 'pouring', order3d)).toBe('packaging')
+    expect(getNextStatus('post_printer', 'packaging', order3d)).toBe('otk')
 
     // stickerpack3D — packaging всегда есть
     const orderPack = { order_type: 'stickerpack3D', need_lam: true }

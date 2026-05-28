@@ -323,9 +323,14 @@ describe('STAGE_FIELDS config', () => {
     }
   })
 
-  it('each stage has a valid quantityField pointing to a defined field', () => {
-    for (const [, config] of Object.entries(STAGE_FIELDS)) {
+  it('each stage has a valid quantityField (either in fields or computed)', () => {
+    // С фидбэка 28.05: на pouring/selection_pouring stickers_good вычисляется
+    // автоматически (stickers_poured − defects) и не вводится напрямую.
+    // Поле остаётся quantityField для backward-compat агрегаций.
+    const COMPUTED_QUANTITY_STAGES = new Set(['pouring', 'selection_pouring'])
+    for (const [stage, config] of Object.entries(STAGE_FIELDS)) {
       const fieldKeys = config.fields.map(f => f.key)
+      if (COMPUTED_QUANTITY_STAGES.has(stage)) continue
       expect(fieldKeys).toContain(config.quantityField)
     }
   })

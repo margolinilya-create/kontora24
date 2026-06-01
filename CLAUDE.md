@@ -66,7 +66,9 @@ npx vercel deploy --yes --prod --scope margolinilya-creates-projects  # Deploy
 `*` — двухтрековые стадии: на карточке два прогресс-бара (Фоны / Стикеры), заказ продвигается когда ОБА трека завершены.
 `**` — ламинация пропускается при need_lam=false. Для 3D стикерпаков ламинация только на фонах.
 
-**Статусы (13):** new, design, prepress, print, lamination, cutting, selection_pouring, pouring, assembly_3d, packaging, otk, done, cancelled
+**Статусы (19):** new, design, sample_layout, sample_print, color_approval, batch_layout, prepress, print, lamination, cutting, selection_pouring, pouring, drying, selection, assembly_3d, packaging, otk, done, cancelled
+
+С R11.0 (31.05) добавлены 6 новых этапов под бриф «кардинальная перестройка маршрутов»: sample workflow (sample_layout/sample_print/color_approval/batch_layout) перед основным циклом, сушка 36ч (drying) для 3D-типов, выборка штучных стикеров (selection) для sticker3D. В R11.0 они только в БД и константах — `ORDER_ROUTES` пока не меняется, UI новых этапов появится в R11.1.
 
 **Skip-stages:** `getOrderRoute(order)` фильтрует маршрут по флагам:
 - `design_status === 'provided'` → пропускается стадия `design` (макет от клиента, сразу в `prepress`)

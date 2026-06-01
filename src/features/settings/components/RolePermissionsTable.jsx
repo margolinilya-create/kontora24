@@ -10,6 +10,7 @@ const SECTIONS = [
   { key: 'stages', title: 'Производственные этапы' },
   { key: 'views', title: 'Доступ к разделам' },
   { key: 'actions', title: 'Действия' },
+  { key: 'materials', title: 'Материалы / Склад' },
 ]
 
 /**

@@ -17,10 +17,10 @@ const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-
  * заказ, либо остаток ушёл в 0 пока меняли) — пункт всё равно остаётся,
  * но помечается «(нет на складе)».
  */
-export function FilmSelect({ label, value, onChange, includeOutOfStock = false, id }) {
+export function FilmSelect({ label, value, onChange, includeOutOfStock = false, id, expected }) {
   const { materials } = useMaterials()
 
-  const options = useMemo(() => {
+  const { options, currentStock } = useMemo(() => {
     // Группируем по material_code; ключ — code, значение — суммарный stock
     const stockByCode = {}
     for (const m of materials) {
@@ -43,8 +43,15 @@ export function FilmSelect({ label, value, onChange, includeOutOfStock = false, 
         })
       }
     }
-    return result
+    return { options: result, currentStock: value ? stockByCode[value] : undefined }
   }, [materials, value, includeOutOfStock])
+
+  // R11.4: warning при дефиците — expected прогноз расхода передаётся родителем
+  // (через material-forecast). Не блокирует выбор: на складе может быть рулон
+  // новой поставки который ещё не оприходован.
+  const shortage = (expected != null && currentStock != null)
+    ? Math.max(0, expected - currentStock)
+    : 0
 
   return (
     <div>
@@ -66,6 +73,11 @@ export function FilmSelect({ label, value, onChange, includeOutOfStock = false, 
           </option>
         ))}
       </select>
+      {shortage > 0 && (
+        <p className="mt-1 text-xs text-danger">
+          На складе {formatNumber(currentStock, 1)} м, прогноз расхода {formatNumber(expected, 1)} м — не хватает {formatNumber(shortage, 1)} м.
+        </p>
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { Outlet, useLocation, Link } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { Breadcrumbs } from './Breadcrumbs'
 import { ErrorBoundary } from './ErrorBoundary'
 import Spinner from '@/shared/components/Spinner'
 import { useSidebarStore } from '@/shared/stores/sidebar-store'
@@ -65,6 +66,8 @@ export function Layout() {
             <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </Link>
         </header>
+
+        <Breadcrumbs />
 
         <main id="main-content" className="p-4 sm:p-6">
           <ErrorBoundary>

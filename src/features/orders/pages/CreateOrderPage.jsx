@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -22,6 +23,8 @@ import { captureError } from '@/shared/lib/sentry'
 import { MaterialForecast } from '../components/MaterialForecast'
 import { FilmSelect } from '../components/FilmSelect'
 import { replaceOrderItems } from '../hooks/useOrderItems'
+import { forecastMaterials } from '../lib/material-forecast'
+import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
@@ -218,6 +221,49 @@ export default function CreateOrderPage() {
   const isStickerpack3D = orderType === 'stickerpack3D'
   const isMockupImage = mockupPath && IMAGE_RX.test(mockupPath)
 
+  // R11.4: считаем прогноз расхода и складские остатки для warning'ов.
+  const { materials } = useMaterials()
+  const forecastRows = useMemo(() => forecastMaterials({
+    orderType, widthMm, heightMm, qty, filmType, lamType, boppBag,
+    items: itemsCount > 1 ? [
+      { widthMm, heightMm, qty },
+      ...extraItems.map((it) => ({
+        widthMm: Number(it.width_mm) || 0,
+        heightMm: Number(it.height_mm) || 0,
+        qty: Math.max(0, Math.floor(Number(it.qty) || 0)),
+      })),
+    ] : undefined,
+  }), [orderType, widthMm, heightMm, qty, filmType, lamType, boppBag, itemsCount, extraItems])
+
+  const stockByCode = useMemo(() => {
+    const map = {}
+    for (const m of materials || []) {
+      if (!m.material_code) continue
+      map[m.material_code] = (map[m.material_code] || 0) + (Number(m.stock_qty) || 0)
+    }
+    return map
+  }, [materials])
+
+  const expectedByCode = useMemo(() => {
+    const map = {}
+    for (const r of forecastRows) {
+      if (r.lookup?.by === 'code') map[r.lookup.value] = r.expected
+    }
+    return map
+  }, [forecastRows])
+
+  const shortages = useMemo(() => {
+    const out = []
+    for (const r of forecastRows) {
+      if (r.lookup?.by !== 'code') continue
+      const stock = stockByCode[r.lookup.value] || 0
+      if (r.expected > stock) {
+        out.push({ label: r.label, expected: r.expected, stock, unit: r.unit, missing: r.expected - stock })
+      }
+    }
+    return out
+  }, [forecastRows, stockByCode])
+
   // Smart defaults: 3D-стикерпак → auto-BOPP; первый выбор 3D → плёнка G по дефолту.
   useEffect(() => {
     if (orderType === 'sticker3D' || orderType === 'stickerpack3D') {
@@ -239,6 +285,23 @@ export default function CreateOrderPage() {
     setValue('width_mm', preset.width)
     setValue('height_mm', preset.height)
     setActivePreset(key)
+  }
+
+  const [pendingShortageValues, setPendingShortageValues] = useState(null)
+
+  function preSubmit(values) {
+    // R11.4: если на складе не хватает заявленных материалов — спросить подтверждение.
+    if (shortages.length > 0) {
+      setPendingShortageValues(values)
+      return
+    }
+    onSubmit(values)
+  }
+
+  function confirmAndSubmit() {
+    const v = pendingShortageValues
+    setPendingShortageValues(null)
+    if (v) onSubmit(v)
   }
 
   async function onSubmit(values) {
@@ -396,7 +459,7 @@ export default function CreateOrderPage() {
         </div>
       )}
 
-      <form ref={formRef} onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <form ref={formRef} onSubmit={handleSubmit(preSubmit, scrollToFirstError)} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* === LEFT: Основное + Дополнительное === */}
         <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-5">
           {/* Основное */}
@@ -513,6 +576,7 @@ export default function CreateOrderPage() {
                   id="film_type"
                   value={filmType}
                   onChange={(v) => setValue('film_type', v, { shouldDirty: true })}
+                  expected={filmType ? expectedByCode[filmType] : undefined}
                 />
                 <FilmSelect
                   label="Плёнка стикеров"
@@ -529,6 +593,7 @@ export default function CreateOrderPage() {
                   id="film_type"
                   value={filmType}
                   onChange={(v) => setValue('film_type', v, { shouldDirty: true })}
+                  expected={filmType ? expectedByCode[filmType] : undefined}
                 />
               )}
               <div>
@@ -807,6 +872,20 @@ export default function CreateOrderPage() {
           <Button type="button" variant="secondary" onClick={() => navigate('/orders')} className="flex-1 sm:flex-none">Отмена</Button>
         </div>
       </form>
+
+      <ConfirmDialog
+        isOpen={!!pendingShortageValues}
+        onClose={() => setPendingShortageValues(null)}
+        onConfirm={confirmAndSubmit}
+        title="На складе не хватает материалов"
+        message={
+          'Заявленных материалов сейчас недостаточно:\n\n' +
+          shortages.map((s) => `• ${s.label}: на складе ${s.stock.toFixed(1)} ${s.unit}, прогноз ${s.expected.toFixed(1)} ${s.unit} — не хватает ${s.missing.toFixed(1)} ${s.unit}`).join('\n') +
+          '\n\nСоздать заказ всё равно?'
+        }
+        confirmText="Создать всё равно"
+        variant="warning"
+      />
     </div>
   )
 }

@@ -202,7 +202,10 @@ export const PERMISSIONS = {
   ],
   actions: [
     'order:create', 'order:edit', 'order:cancel',
-    'material:manage', 'material:edit_name', 'user:manage',
+    'user:manage',
+  ],
+  materials: [
+    'material:add_transaction', 'material:manage', 'material:edit_name',
   ],
 }
 
@@ -232,7 +235,8 @@ export const PERMISSION_LABELS = {
   'order:create': 'Создавать заказы',
   'order:edit': 'Редактировать заказы',
   'order:cancel': 'Отменять заказы',
-  'material:manage': 'Управлять складом',
+  'material:add_transaction': 'Вносить приход/расход на складе',
+  'material:manage': 'Создавать/удалять позиции склада',
   'material:edit_name': 'Редактировать названия материалов',
   'user:manage': 'Управлять пользователями',
 }

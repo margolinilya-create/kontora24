@@ -11,6 +11,35 @@
  */
 
 export const STAGE_FIELDS = {
+  // R11.0 — новые этапы перед основным циклом производства.
+  // sample_layout / color_approval / batch_layout — БЕЗ полей (UI добавит
+  // EmptyStageAction / ColorApprovalControls в R11.1).
+  sample_print: {
+    label: 'Печать образца',
+    quantityField: 'sample_film_meters',
+    fields: [
+      { key: 'sample_film_meters', label: 'Плёнка образца', unit: 'м', step: '0.1' },
+    ],
+  },
+
+  // Сушка — таймер 36ч (см. R11.2). На этапе только фиксируется брак.
+  // quantityField не задан — completion определяется таймером, не qty-полем.
+  drying: {
+    label: 'Сушка',
+    fields: [
+      { key: 'defects', label: 'Брак', unit: 'шт' },
+    ],
+  },
+
+  // Выборка штучных стикеров (для sticker3D после сушки).
+  selection: {
+    label: 'Выборка',
+    quantityField: 'qty_selected',
+    fields: [
+      { key: 'qty_selected', label: 'Выбрано', unit: 'шт' },
+    ],
+  },
+
   print: {
     label: 'Печать',
     quantityField: 'stickers_printed',

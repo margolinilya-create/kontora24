@@ -262,13 +262,13 @@ describe('getNextStatus', () => {
 })
 
 describe('ORDER_STATUSES', () => {
-  it('has 13 statuses', () => {
-    expect(Object.keys(ORDER_STATUSES)).toHaveLength(13)
+  it('has 19 statuses (R11.0: +sample_layout/sample_print/color_approval/batch_layout/drying/selection)', () => {
+    expect(Object.keys(ORDER_STATUSES)).toHaveLength(19)
   })
 
-  it('order field is sequential 0-12', () => {
+  it('order field is sequential 0-18', () => {
     const orders = Object.values(ORDER_STATUSES).map(s => s.order).sort((a, b) => a - b)
-    expect(orders).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    expect(orders).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
   })
 
   it('each status has label and color', () => {
@@ -285,6 +285,15 @@ describe('ORDER_STATUSES', () => {
     expect(ORDER_STATUSES.selection_pouring).toBeDefined()
     expect(ORDER_STATUSES.pouring).toBeDefined()
     expect(ORDER_STATUSES.assembly_3d).toBeDefined()
+  })
+
+  it('includes R11.0 sample workflow + drying + selection', () => {
+    expect(ORDER_STATUSES.sample_layout).toBeDefined()
+    expect(ORDER_STATUSES.sample_print).toBeDefined()
+    expect(ORDER_STATUSES.color_approval).toBeDefined()
+    expect(ORDER_STATUSES.batch_layout).toBeDefined()
+    expect(ORDER_STATUSES.drying).toBeDefined()
+    expect(ORDER_STATUSES.selection).toBeDefined()
   })
 
   it('does not include removed statuses', () => {

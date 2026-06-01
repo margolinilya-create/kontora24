@@ -327,10 +327,12 @@ describe('STAGE_FIELDS config', () => {
     // С фидбэка 28.05: на pouring/selection_pouring stickers_good вычисляется
     // автоматически (stickers_poured − defects) и не вводится напрямую.
     // Поле остаётся quantityField для backward-compat агрегаций.
-    const COMPUTED_QUANTITY_STAGES = new Set(['pouring', 'selection_pouring'])
+    // R11.0: drying не имеет quantityField вовсе — completion определяется
+    // таймером 36ч, а не количеством.
+    const SKIP_QUANTITY_CHECK = new Set(['pouring', 'selection_pouring', 'drying'])
     for (const [stage, config] of Object.entries(STAGE_FIELDS)) {
       const fieldKeys = config.fields.map(f => f.key)
-      if (COMPUTED_QUANTITY_STAGES.has(stage)) continue
+      if (SKIP_QUANTITY_CHECK.has(stage)) continue
       expect(fieldKeys).toContain(config.quantityField)
     }
   })

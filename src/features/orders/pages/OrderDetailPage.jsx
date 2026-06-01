@@ -7,6 +7,7 @@ import { InfoField } from '../components/InfoField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
 import { StatusSwitcher } from '../components/StatusSwitcher'
 import { StatusOverride } from '../components/StatusOverride'
+import { ColorApprovalControls } from '../components/ColorApprovalControls'
 import { OrderStepper } from '../components/OrderStepper'
 import { OrderComments } from '../components/OrderComments'
 import { OrderProgressTab } from '../components/OrderProgressTab'
@@ -421,11 +422,17 @@ export default function OrderDetailPage() {
         {/* Right: status switch + rollback + edit gear */}
         <div className="flex items-center gap-2 ml-auto">
           <StatusOverride order={order} onUpdated={refetch} />
-          {/* Для stickerpack3D на стадиях подзадач движение через SubtaskIndicator
-              (R8.4 серии 25.05) — основная кнопка StatusSwitcher скрыта чтобы
-              не было «двух способов одно и то же». */}
-          {!(IS_3D_STICKERPACK(order.order_type) && ['print','lamination','cutting','selection_pouring'].includes(order.status)) && (
-            <StatusSwitcher order={order} onUpdated={refetch} />
+          {/* color_approval — особый этап (R11.1): согласование цвета с заказчиком.
+              Заменяем стандартный StatusSwitcher на 2 кнопки утверждено / не утверждено. */}
+          {order.status === 'color_approval' ? (
+            <ColorApprovalControls order={order} onUpdated={refetch} />
+          ) : (
+            /* Для stickerpack3D на стадиях подзадач движение через SubtaskIndicator
+               (R8.4 серии 25.05) — основная кнопка StatusSwitcher скрыта чтобы
+               не было «двух способов одно и то же». */
+            !(IS_3D_STICKERPACK(order.order_type) && ['print','lamination','cutting','selection_pouring'].includes(order.status)) && (
+              <StatusSwitcher order={order} onUpdated={refetch} />
+            )
           )}
           {canEdit && (
             <button

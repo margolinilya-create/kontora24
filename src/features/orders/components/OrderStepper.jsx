@@ -16,14 +16,20 @@ const DEPT_DOT = {
 
 function dotColor(status) {
   switch (status) {
-    case 'new': return DEPT_DOT.info
+    case 'new':
+    case 'color_approval': return DEPT_DOT.info
     case 'design':
+    case 'sample_layout':
+    case 'batch_layout':
     case 'prepress': return DEPT_DOT.design
+    case 'sample_print':
     case 'print':
     case 'lamination':
     case 'cutting': return DEPT_DOT.print
     case 'selection_pouring':
-    case 'pouring': return DEPT_DOT.pouring
+    case 'pouring':
+    case 'drying':
+    case 'selection': return DEPT_DOT.pouring
     case 'assembly_3d':
     case 'packaging':
     case 'otk':

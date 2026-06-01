@@ -38,20 +38,33 @@ export const ORDER_STATUSES = {
 }
 
 // --- Order routes by type ---
-// Regular: sticker_cut, sticker_kiss, stickerpack, rect, big
-// lamination is skipped when need_lam=false
-const ROUTE_REGULAR = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
-const ROUTE_3D_STICKER = ['new', 'design', 'prepress', 'print', 'cutting', 'pouring', 'packaging', 'otk', 'done']
-const ROUTE_3D_STICKERPACK = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'assembly_3d', 'packaging', 'otk', 'done']
+// R11.1 (бриф 31.05): добавлен sample-workflow префикс перед основным циклом
+// для всех типов — `sample_layout → sample_print → color_approval → batch_layout`.
+// `design` и `prepress` остаются (по решению пользователя «оставить рядом»);
+// `design` скипается при `design_status='provided'` (getOrderRoute).
+// 3D-типы получили этап `drying` (sticker3D) и новый `selection` после сушки.
+// sticker_kiss/big/rect упаковываются стрейч-пленкой на ОТК — поэтому в их
+// маршруте нет `packaging` (R11.1 — раньше использовали общий ROUTE_REGULAR).
+const HEAD = ['new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'batch_layout', 'prepress']
+
+const ROUTE_STICKER_CUT  = [...HEAD, 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
+const ROUTE_STICKER_KISS = [...HEAD, 'print', 'lamination', 'cutting', 'otk', 'done']
+const ROUTE_STICKERPACK  = [...HEAD, 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
+const ROUTE_BIG          = [...HEAD, 'print', 'lamination', 'cutting', 'otk', 'done']
+const ROUTE_RECT         = [...HEAD, 'print', 'lamination', 'cutting', 'otk', 'done']
+const ROUTE_3D_STICKER   = [...HEAD, 'print', 'cutting', 'pouring', 'drying', 'selection', 'packaging', 'otk', 'done']
+// stickerpack3D: drying — это статус ПОДЗАДАЧИ STICKER, не основного маршрута заказа.
+// Order.status остаётся `selection_pouring` пока обе подзадачи не дойдут до 'ready'.
+const ROUTE_3D_STICKERPACK = [...HEAD, 'print', 'lamination', 'cutting', 'selection_pouring', 'assembly_3d', 'packaging', 'otk', 'done']
 
 export const ORDER_ROUTES = {
-  sticker_cut: ROUTE_REGULAR,
-  sticker_kiss: ROUTE_REGULAR,
-  stickerpack: ROUTE_REGULAR,
+  sticker_cut: ROUTE_STICKER_CUT,
+  sticker_kiss: ROUTE_STICKER_KISS,
+  stickerpack: ROUTE_STICKERPACK,
   sticker3D: ROUTE_3D_STICKER,
   stickerpack3D: ROUTE_3D_STICKERPACK,
-  rect: ROUTE_REGULAR,
-  big: ROUTE_REGULAR,
+  rect: ROUTE_RECT,
+  big: ROUTE_BIG,
 }
 
 export const IS_3D_TYPE = (orderType) => orderType === 'sticker3D' || orderType === 'stickerpack3D'
@@ -125,17 +138,19 @@ export function getNextSubtaskStatus(track, currentStatus, order = null) {
 
 // Get the route for an order based on its type
 export function getOrderRoute(order) {
-  let route = ORDER_ROUTES[order?.order_type] || ROUTE_REGULAR
+  let route = ORDER_ROUTES[order?.order_type] || ROUTE_STICKER_CUT
   // Skip lamination if not needed
   if (!order?.need_lam) {
     route = route.filter(s => s !== 'lamination')
   }
   // Skip design when client provided the mockup (nothing to draw).
+  // sample_layout/batch_layout остаются — это уже подготовка к печати, а не
+  // первичное рисование макета.
   if (order?.design_status === 'provided') {
     route = route.filter(s => s !== 'design')
   }
-  // Skip packaging — все 3D-заказы требуют упаковку всегда (фидбэк 28.05);
-  // остальные типы — только при наличии БОПП-пакета.
+  // Skip packaging — sticker_kiss/big/rect не используют packaging (отгрузка в
+  // стрейч на OTK). Остальные типы: 3D обязательны, иначе при bopp_bag=true.
   const needsPackaging = order?.bopp_bag === true
     || ['stickerpack3D', 'sticker3D'].includes(order?.order_type)
   if (!needsPackaging) {
@@ -156,8 +171,10 @@ export function isStageAllowed(order, stage) {
 // Значения соответствуют записям в k24_role_permissions.
 export const PERMISSIONS = {
   stages: [
-    'stage:design', 'stage:prepress', 'stage:print', 'stage:lamination',
-    'stage:cutting', 'stage:pouring', 'stage:selection_pouring',
+    'stage:design', 'stage:sample_layout', 'stage:sample_print',
+    'stage:color_approval', 'stage:batch_layout', 'stage:prepress',
+    'stage:print', 'stage:lamination', 'stage:cutting', 'stage:pouring',
+    'stage:selection_pouring', 'stage:drying', 'stage:selection',
     'stage:assembly_3d', 'stage:packaging', 'stage:otk',
   ],
   views: [
@@ -172,12 +189,18 @@ export const PERMISSIONS = {
 
 export const PERMISSION_LABELS = {
   'stage:design': 'Продвигать «Дизайн»',
+  'stage:sample_layout': 'Продвигать «Вёрстка образца»',
+  'stage:sample_print': 'Продвигать «Печать образца»',
+  'stage:color_approval': 'Продвигать «Утверждение цвета»',
+  'stage:batch_layout': 'Продвигать «Вёрстка тиража»',
   'stage:prepress': 'Продвигать «Препресс»',
   'stage:print': 'Продвигать «Печать»',
   'stage:lamination': 'Продвигать «Ламинация»',
   'stage:cutting': 'Продвигать «Резка»',
   'stage:pouring': 'Продвигать «Заливка»',
   'stage:selection_pouring': 'Продвигать «Выборка/Заливка»',
+  'stage:drying': 'Продвигать «Сушка»',
+  'stage:selection': 'Продвигать «Выборка»',
   'stage:assembly_3d': 'Продвигать «Сборка 3D»',
   'stage:packaging': 'Продвигать «Упаковка»',
   'stage:otk': 'Продвигать «ОТК»',
@@ -198,12 +221,21 @@ export const PERMISSION_LABELS = {
 // Legacy: hard-coded fallback. Используется до загрузки динамических прав
 // и в местах где невозможен async-вызов (например, server-side seed).
 // Role permissions: which roles can advance FROM a given status
+// R11.1: добавлены sample_layout/batch_layout (designer), sample_print (printer),
+// drying/selection (post_printer). color_approval только manager/admin —
+// согласование с заказчиком, в legacy для designer/printer/post_printer не даём.
 export const ROLE_STAGE_PERMISSIONS = {
   admin: true, // admin can advance any stage
   manager: true, // manager can advance any stage
-  designer: ['design', 'prepress'],
-  printer: ['prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging'],
-  post_printer: ['selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'cutting', 'lamination', 'print'],
+  designer: ['design', 'sample_layout', 'batch_layout', 'prepress'],
+  printer: [
+    'sample_print', 'prepress', 'print', 'lamination', 'cutting',
+    'selection_pouring', 'pouring', 'assembly_3d', 'packaging',
+  ],
+  post_printer: [
+    'selection_pouring', 'pouring', 'drying', 'selection',
+    'assembly_3d', 'packaging', 'cutting', 'lamination', 'print',
+  ],
 }
 
 // L2 RBAC: если dynamicPerms передан (загружен из k24_role_permissions) — он
@@ -592,12 +624,18 @@ export const OPERATION_CHECKLISTS = {
 // --- Stage notification roles: when order enters status, notify these roles ---
 export const NOTIFY_ROLES = {
   design: ['designer'],
+  sample_layout: ['designer'],
+  sample_print: ['printer'],
+  color_approval: ['manager'],
+  batch_layout: ['designer'],
   prepress: ['designer', 'printer'],
   print: ['printer'],
   lamination: ['printer'],
   cutting: ['printer'],
   selection_pouring: ['post_printer'],
   pouring: ['post_printer'],
+  drying: ['post_printer'],
+  selection: ['post_printer'],
   assembly_3d: ['post_printer'],
   packaging: ['post_printer'],
   otk: ['manager'],

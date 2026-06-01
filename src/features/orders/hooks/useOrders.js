@@ -11,8 +11,13 @@ import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { getFreshAccessToken } from '@/shared/lib/auth-token'
 
 /** Этапы, на которых заказ нельзя двигать вперёд без введённых данных. */
+// R11.1: sample_print требует sample_film_meters (расход плёнки на образец),
+// selection — qty_selected. drying / color_approval / sample_layout / batch_layout
+// НЕ требуют — это либо ожидание (drying таймер), либо без производственных
+// данных (sample/batch верстка, color_approval).
 const STAGES_REQUIRING_COMPLETION = new Set([
-  'print', 'lamination', 'cutting', 'pouring', 'selection_pouring', 'assembly_3d', 'packaging',
+  'sample_print', 'print', 'lamination', 'cutting', 'pouring',
+  'selection_pouring', 'selection', 'assembly_3d', 'packaging',
 ])
 
 // Финансовые поля k24_orders — видны только admin/manager (view:finance).

@@ -8,6 +8,8 @@ import {
   getFilmCostPerMeter, calculateActualMaterialsCost, RESIN_COST_PER_GRAM,
   calculateWorkerPayout, WORKER_RATES,
   getMaterialCategory, getStockStatus,
+  SUBTASK_ROUTE_BACKGROUNDS, SUBTASK_ROUTE_STICKERS, SUBTASK_STATUS_LABELS,
+  getSubtaskRoute, getNextSubtaskStatus,
 } from './constants'
 
 describe('IS_3D_TYPE', () => {
@@ -663,5 +665,30 @@ describe('IS_3D_TYPE — all ORDER_TYPES', () => {
         expect(IS_3D_TYPE(key)).toBe(false)
       }
     }
+  })
+})
+
+describe('SUBTASK routes (R11.2)', () => {
+  it('SUBTASK_ROUTE_STICKERS включает drying между pouring и ready', () => {
+    expect(SUBTASK_ROUTE_STICKERS).toEqual(['pending', 'printing', 'cutting', 'pouring', 'drying', 'ready'])
+  })
+
+  it('SUBTASK_ROUTE_BACKGROUNDS не содержит drying (только стикеры сушатся)', () => {
+    expect(SUBTASK_ROUTE_BACKGROUNDS).not.toContain('drying')
+  })
+
+  it('SUBTASK_STATUS_LABELS содержит лейбл для drying', () => {
+    expect(SUBTASK_STATUS_LABELS.drying).toBe('Сушка')
+  })
+
+  it('getSubtaskRoute(stickers) — после pouring следующий статус drying', () => {
+    const order = { order_type: 'stickerpack3D', need_lam: true }
+    expect(getNextSubtaskStatus('stickers', 'pouring', order)).toBe('drying')
+    expect(getNextSubtaskStatus('stickers', 'drying', order)).toBe('ready')
+  })
+
+  it('getSubtaskRoute(backgrounds) пропускает laminating при need_lam=false', () => {
+    const order = { order_type: 'stickerpack3D', need_lam: false }
+    expect(getSubtaskRoute('backgrounds', order)).not.toContain('laminating')
   })
 })

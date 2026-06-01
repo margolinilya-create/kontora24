@@ -7,6 +7,7 @@ import { StageProgressBar } from '@/features/production/components/logs/StagePro
 import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
 import { addProductionLogAndCheckAdvance } from '@/features/orders/hooks/useOrders'
 import { canWriteLogForStage } from '@/shared/constants'
+import { DryingTimer } from './DryingTimer'
 
 export function OrderStageInput({ order, onUpdated }) {
   const { profile } = useAuth()
@@ -42,6 +43,10 @@ export function OrderStageInput({ order, onUpdated }) {
   return (
     <div className="bg-surface rounded-xl border border-border p-5 space-y-4">
       <h2 className="font-semibold text-lg">Запись: {config.label}</h2>
+
+      {stage === 'drying' && (
+        <DryingTimer startedAt={order.drying_started_at} />
+      )}
 
       <StageProgressBar progress={progress} />
 

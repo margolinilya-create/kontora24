@@ -10,6 +10,7 @@ import { useOrderItems } from '@/features/orders/hooks/useOrderItems'
 import { computeIncoming, computeStageProgress, hasSubtaskLog } from '@/features/production/lib/production-logs'
 import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
+import { DryingTimer } from './DryingTimer'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -19,7 +20,13 @@ import {
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 
-const NO_INPUT_STAGES = new Set(['new', 'design', 'prepress', 'otk', 'done', 'cancelled'])
+// R11.2: sample_layout / batch_layout — без производственных данных, advance
+// через StatusSwitcher. color_approval имеет свой контрол ColorApprovalControls
+// в header'е, на CurrentStageWidget показываем заглушку.
+const NO_INPUT_STAGES = new Set([
+  'new', 'design', 'sample_layout', 'color_approval', 'batch_layout', 'prepress',
+  'otk', 'done', 'cancelled',
+])
 
 function getProgressLines(order) {
   const route = getOrderRoute(order)
@@ -241,6 +248,10 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     <div className="space-y-4">
       <StageJumperBlock order={order} onUpdated={onUpdated} />
 
+      {stage === 'drying' && (
+        <DryingTimer startedAt={order.drying_started_at} />
+      )}
+
       <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
         <h2 className="font-semibold mb-3">Учёт работы на этапе: {stageLabel}</h2>
         {showPackDesigns && designs.length > 0 ? (
@@ -406,9 +417,10 @@ function MiniStepper({ route, status, accentClass }) {
   )
 }
 
-function SubtaskTrackBlock({ track, status, advance, onUpdated, canJump, logs, order }) {
+function SubtaskTrackBlock({ track, subtask, advance, onUpdated, canJump, logs, order }) {
   const [target, setTarget] = useState('')
   const [saving, setSaving] = useState(false)
+  const status = subtask?.status
   // R9.5B (бриф 26.05): маршрут с учётом need_lam — у фонов нет 'laminating'
   // если ламинация не нужна.
   const route = getSubtaskRoute(track, order)
@@ -468,6 +480,10 @@ function SubtaskTrackBlock({ track, status, advance, onUpdated, canJump, logs, o
       </div>
 
       <MiniStepper route={route} status={status} accentClass={accent} />
+
+      {status === 'drying' && (
+        <DryingTimer startedAt={subtask?.drying_started_at} />
+      )}
 
       <div className="flex items-center gap-2 flex-wrap">
         {next ? (
@@ -673,8 +689,8 @@ function SubtaskIndicator({ order, logs, onUpdated }) {
         <span className="text-xs text-text-muted">объединяются на «Сборка 3D»</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <SubtaskTrackBlock track="backgrounds" status={subtasks.backgrounds.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
-        <SubtaskTrackBlock track="stickers" status={subtasks.stickers.status} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
+        <SubtaskTrackBlock track="backgrounds" subtask={subtasks.backgrounds} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
+        <SubtaskTrackBlock track="stickers" subtask={subtasks.stickers} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
       </div>
     </div>
   )

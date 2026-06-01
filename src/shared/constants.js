@@ -84,7 +84,10 @@ export function isDualTrack(status, order) {
 // с собственными маршрутами. Подзадачи продвигаются независимо через RPC
 // advance_subtask. Когда обе в 'ready' — основной заказ переходит на assembly_3d.
 export const SUBTASK_ROUTE_BACKGROUNDS = ['pending', 'printing', 'laminating', 'cutting', 'selecting', 'ready']
-export const SUBTASK_ROUTE_STICKERS = ['pending', 'printing', 'cutting', 'pouring', 'ready']
+// R11.2: STICKER trek получил drying после pouring (бриф 31.05). Auto-advance
+// через pg_cron (миграция 045) каждые 5 минут переводит drying → ready при
+// истечении 36 часов от drying_started_at.
+export const SUBTASK_ROUTE_STICKERS = ['pending', 'printing', 'cutting', 'pouring', 'drying', 'ready']
 
 // Маппинг подзадача-статус → этап производства (для UI очередей)
 export const SUBTASK_STATUS_TO_STAGE = {
@@ -94,6 +97,7 @@ export const SUBTASK_STATUS_TO_STAGE = {
   cutting: 'cutting',
   selecting: 'selection_pouring',
   pouring: 'selection_pouring',
+  drying: null, // пассивное ожидание, нет queue-страницы
   ready: 'assembly_3d',
   cancelled: 'cancelled',
 }
@@ -105,6 +109,7 @@ export const SUBTASK_STATUS_LABELS = {
   cutting: 'Резка',
   selecting: 'Выборка',
   pouring: 'Заливка',
+  drying: 'Сушка',
   ready: 'Готово к сборке',
   cancelled: 'Отменено',
 }

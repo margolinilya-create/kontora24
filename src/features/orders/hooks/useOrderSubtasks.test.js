@@ -58,15 +58,17 @@ describe('useOrderSubtasks', () => {
     vi.restoreAllMocks()
   })
 
-  it('skips fetching when isPack3D=false', async () => {
+  it('R11.3: грузит подзадачи всегда (extra_stickers возможны у любого типа)', async () => {
     const { result } = renderHook(() => useOrderSubtasks('order-1', false))
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    expect(mockSupabase.from).not.toHaveBeenCalled()
-    expect(result.current.subtasks).toEqual({ backgrounds: null, stickers: null })
+    // С R11.3 fetch вызывается даже если isMulti=false — extras могут появиться
+    // у любого заказа после кнопки CreateExtraStickers.
+    expect(mockSupabase.from).toHaveBeenCalled()
+    expect(result.current.extras).toEqual([])
   })
 
   it('skips fetching when orderId is null', async () => {

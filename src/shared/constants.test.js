@@ -692,3 +692,36 @@ describe('SUBTASK routes (R11.2)', () => {
     expect(getSubtaskRoute('backgrounds', order)).not.toContain('laminating')
   })
 })
+
+describe('SUBTASK extra_stickers (R11.3)', () => {
+  it('extra_stickers для 3D-типа — печать → резка → заливка → сушка → ready', () => {
+    const order = { order_type: 'sticker3D' }
+    expect(getSubtaskRoute('extra_stickers', order)).toEqual(['printing', 'cutting', 'pouring', 'drying', 'ready'])
+  })
+
+  it('extra_stickers для stickerpack3D — тот же 3D-маршрут', () => {
+    const order = { order_type: 'stickerpack3D' }
+    expect(getSubtaskRoute('extra_stickers', order)).toEqual(['printing', 'cutting', 'pouring', 'drying', 'ready'])
+  })
+
+  it('extra_stickers для плоского с lamination — печать → лам → резка → ready', () => {
+    const order = { order_type: 'sticker_cut', need_lam: true }
+    expect(getSubtaskRoute('extra_stickers', order)).toEqual(['printing', 'laminating', 'cutting', 'ready'])
+  })
+
+  it('extra_stickers для плоского без lamination — пропускаем laminating', () => {
+    const order = { order_type: 'sticker_cut', need_lam: false }
+    expect(getSubtaskRoute('extra_stickers', order)).toEqual(['printing', 'cutting', 'ready'])
+  })
+
+  it('getNextSubtaskStatus для extra_stickers 3D — printing → cutting', () => {
+    const order = { order_type: 'sticker3D' }
+    expect(getNextSubtaskStatus('extra_stickers', 'printing', order)).toBe('cutting')
+    expect(getNextSubtaskStatus('extra_stickers', 'drying', order)).toBe('ready')
+  })
+
+  it('getNextSubtaskStatus для extra_stickers ready — null (конец)', () => {
+    const order = { order_type: 'sticker3D' }
+    expect(getNextSubtaskStatus('extra_stickers', 'ready', order)).toBe(null)
+  })
+})

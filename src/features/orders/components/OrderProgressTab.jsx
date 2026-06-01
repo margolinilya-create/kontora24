@@ -11,6 +11,7 @@ import { computeIncoming, computeStageProgress, hasSubtaskLog } from '@/features
 import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import { DryingTimer } from './DryingTimer'
+import { CreateExtraStickersButton } from './CreateExtraStickersButton'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -640,21 +641,103 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
   )
 }
 
+function ExtraStickerBlock({ subtask, order, advanceById, onUpdated }) {
+  const [saving, setSaving] = useState(false)
+  const status = subtask.status
+  const route = getSubtaskRoute('extra_stickers', order)
+  const next = getNextSubtaskStatus('extra_stickers', status, order)
+  const accent = 'bg-warning'
+  const tone = 'border-warning/30 bg-warning/5'
+
+  const designsMap = subtask.extra_designs || {}
+  const totalQty = Object.values(designsMap).reduce((s, v) => s + (Number(v) || 0), 0)
+  const designsList = Object.entries(designsMap)
+    .map(([idx, qty]) => `Вид ${idx}: ${qty}`)
+    .join(' · ')
+
+  async function complete() {
+    if (!next) return
+    setSaving(true)
+    try {
+      await advanceById(subtask.id, next)
+      toast.success(`Доп. стикеры → ${SUBTASK_STATUS_LABELS[next]}`)
+      onUpdated?.()
+    } catch (err) {
+      toast.error(translateError(err).message || err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={`rounded-xl border p-3 space-y-2 ${tone}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded ${accent} text-white`}>
+          Доп. стикеры #{subtask.item_idx}
+        </span>
+        <span className="text-sm font-medium text-text">{SUBTASK_STATUS_LABELS[status] || status}</span>
+      </div>
+
+      <p className="text-xs text-text-muted">{designsList || '—'} <span className="text-text">· итого {totalQty} шт</span></p>
+
+      <MiniStepper route={route} status={status} accentClass={accent} />
+
+      {status === 'drying' && (
+        <DryingTimer startedAt={subtask?.drying_started_at} />
+      )}
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {next ? (
+          <button
+            onClick={complete}
+            disabled={saving}
+            className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50 min-h-[40px] flex-1 sm:flex-none"
+          >
+            {saving ? '…' : `Завершить «${SUBTASK_STATUS_LABELS[status]}» → ${SUBTASK_STATUS_LABELS[next]}`}
+          </button>
+        ) : (
+          <span className="text-xs text-text-muted px-2 py-1">Подзадача завершена</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SubtaskIndicator({ order, logs, onUpdated }) {
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const { items } = useOrderItems(order.id)
   const isMultiVariant = items.length > 1
   const isMulti = isPack3D || isMultiVariant
   const { hasRole } = useAuth()
-  const { subtasks, variants, advance, advanceVariant } = useOrderSubtasks(order.id, isMulti)
+  // R11.3: грузим extras всегда (любой тип заказа может получить extra_stickers).
+  const { subtasks, variants, extras, advance, advanceVariant, advanceById } = useOrderSubtasks(order.id, isMulti)
   const canJump = hasRole(['admin', 'manager'])
 
-  if (!isMulti) return null
+  // Блок «Доп. стикеры» отдельно от основных подзадач — показываем если есть extras.
+  const extrasBlock = extras.length > 0 ? (
+    <div className="bg-surface rounded-2xl border border-border shadow-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-sm">Доп. стикеры ({extras.length})</h3>
+        <span className="text-xs text-text-muted">не блокируют основной маршрут</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {extras.map((s) => (
+          <ExtraStickerBlock
+            key={s.id}
+            subtask={s}
+            order={order}
+            advanceById={advanceById}
+            onUpdated={onUpdated}
+          />
+        ))}
+      </div>
+    </div>
+  ) : null
 
-  // Multi-variant: показываем блок «Виды изделий» с N подзадач.
+  let mainBlock = null
   if (isMultiVariant && !isPack3D) {
     const route = getOrderRoute(order)
-    return (
+    mainBlock = (
       <div className="bg-surface rounded-2xl border border-border shadow-card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm">Виды изделий ({items.length})</h3>
@@ -678,20 +761,26 @@ function SubtaskIndicator({ order, logs, onUpdated }) {
         </div>
       </div>
     )
+  } else if (isPack3D && subtasks.backgrounds && subtasks.stickers) {
+    mainBlock = (
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm">Подзадачи 3D-стикерпака</h3>
+          <span className="text-xs text-text-muted">объединяются на «Сборка 3D»</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <SubtaskTrackBlock track="backgrounds" subtask={subtasks.backgrounds} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
+          <SubtaskTrackBlock track="stickers" subtask={subtasks.stickers} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
+        </div>
+      </div>
+    )
   }
 
-  // stickerpack3D — старые подзадачи bg/stickers.
-  if (!subtasks.backgrounds || !subtasks.stickers) return null
+  if (!mainBlock && !extrasBlock) return null
   return (
-    <div className="bg-surface rounded-2xl border border-border shadow-card p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-sm">Подзадачи 3D-стикерпака</h3>
-        <span className="text-xs text-text-muted">объединяются на «Сборка 3D»</span>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <SubtaskTrackBlock track="backgrounds" subtask={subtasks.backgrounds} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
-        <SubtaskTrackBlock track="stickers" subtask={subtasks.stickers} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
-      </div>
+    <div className="space-y-4">
+      {mainBlock}
+      {extrasBlock}
     </div>
   )
 }
@@ -708,6 +797,10 @@ export function OrderProgressTab({ order, onUpdated }) {
       )}
 
       <SubtaskIndicator order={order} logs={logs} onUpdated={onUpdated} />
+
+      <div className="flex justify-end">
+        <CreateExtraStickersButton order={order} onCreated={onUpdated} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} />

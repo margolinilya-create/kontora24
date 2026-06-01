@@ -15,16 +15,22 @@ import { captureError } from '@/shared/lib/sentry'
  * `isMulti` — режим: грузить ли подзадачи. Передаётся из вызывающего
  * компонента (isPack3D || hasVariants).
  */
-export function useOrderSubtasks(orderId, isMulti) {
+export function useOrderSubtasks(orderId, _isMulti) {
+  // R11.3: грузим все подзадачи независимо от _isMulti (extra_stickers может
+  // появиться у любого типа заказа после кнопки CreateExtraStickers). Аргумент
+  // оставлен в сигнатуре чтобы не ломать существующие вызовы; ранее использовался
+  // для skip-логики, теперь load всегда полный.
   const [subtasks, setSubtasks] = useState({ backgrounds: null, stickers: null })
   const [variants, setVariants] = useState([])
+  const [extras, setExtras] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const fetchSubtasks = useCallback(async () => {
-    if (!orderId || !isMulti) {
+    if (!orderId) {
       setSubtasks({ backgrounds: null, stickers: null })
       setVariants([])
+      setExtras([])
       setLoading(false)
       return
     }
@@ -38,19 +44,22 @@ export function useOrderSubtasks(orderId, isMulti) {
       if (err) throw err
       const next = { backgrounds: null, stickers: null }
       const vars = []
+      const exts = []
       for (const row of data || []) {
         if (row.track === 'variant') vars.push(row)
+        else if (row.track === 'extra_stickers') exts.push(row)
         else next[row.track] = row
       }
       setSubtasks(next)
       setVariants(vars)
+      setExtras(exts)
     } catch (err) {
       setError(err)
       captureError(err, { tags: { source: 'useOrderSubtasks.fetch' }, extra: { orderId } })
     } finally {
       setLoading(false)
     }
-  }, [orderId, isMulti])
+  }, [orderId])
 
   useEffect(() => { fetchSubtasks() }, [fetchSubtasks])
 
@@ -59,7 +68,7 @@ export function useOrderSubtasks(orderId, isMulti) {
   useEffect(() => { fetchRef.current = fetchSubtasks }, [fetchSubtasks])
 
   useEffect(() => {
-    if (!orderId || !isMulti) return
+    if (!orderId) return
     // Уникальный channel name на каждое монтирование хука — иначе если
     // useOrderSubtasks вызывается дважды на странице (SubtaskIndicator +
     // CurrentStageWidget), supabase.channel() возвращает уже подписанный
@@ -75,7 +84,7 @@ export function useOrderSubtasks(orderId, isMulti) {
       }, () => fetchRef.current())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [orderId, isMulti])
+  }, [orderId])
 
   const advanceById = useCallback(async (subtaskId, toStatus) => {
     const { data, error: err } = await supabase.rpc('advance_subtask', {
@@ -105,5 +114,24 @@ export function useOrderSubtasks(orderId, isMulti) {
     return advanceById(sub.id, toStatus)
   }, [variants, advanceById])
 
-  return { subtasks, variants, loading, error, refetch: fetchSubtasks, advance, advanceVariant }
+  /**
+   * R11.3: создать подзадачу «Стикеры дополнительно» с qty по видам.
+   * @param {object} designsByIdx — { 1: 10, 2: 5 } — для каждого design_index сколько нужно
+   */
+  const createExtraStickers = useCallback(async (designsByIdx) => {
+    const { data, error: err } = await supabase.rpc('create_extra_stickers_subtask', {
+      p_order_id: orderId, p_designs: designsByIdx,
+    })
+    if (err) throw err
+    if (data?.ok === false) throw new Error(data.error || 'Не удалось создать подзадачу')
+    await fetchSubtasks()
+    return data
+  }, [orderId, fetchSubtasks])
+
+  return {
+    subtasks, variants, extras, loading, error,
+    refetch: fetchSubtasks,
+    advance, advanceVariant, advanceById,
+    createExtraStickers,
+  }
 }

@@ -88,6 +88,11 @@ export const SUBTASK_ROUTE_BACKGROUNDS = ['pending', 'printing', 'laminating', '
 // через pg_cron (миграция 045) каждые 5 минут переводит drying → ready при
 // истечении 36 часов от drying_started_at.
 export const SUBTASK_ROUTE_STICKERS = ['pending', 'printing', 'cutting', 'pouring', 'drying', 'ready']
+// R11.3: extra_stickers — короткий маршрут для допечатки.
+// Для 3D-типов (sticker3D, stickerpack3D) — с заливкой+сушкой.
+// Для плоских — с опциональной ламинацией.
+export const SUBTASK_ROUTE_EXTRA_3D = ['printing', 'cutting', 'pouring', 'drying', 'ready']
+export const SUBTASK_ROUTE_EXTRA_FLAT = ['printing', 'laminating', 'cutting', 'ready']
 
 // Маппинг подзадача-статус → этап производства (для UI очередей)
 export const SUBTASK_STATUS_TO_STAGE = {
@@ -117,13 +122,22 @@ export const SUBTASK_STATUS_LABELS = {
 export const TRACK_LABELS = {
   backgrounds: 'Фон',
   stickers: 'Стикер',
+  extra_stickers: 'Доп. стикеры',
 }
 
 // Маршрут трека подзадач с учётом флагов заказа.
 // R9.5B (бриф 26.05): если order.need_lam=false — у трека backgrounds стадия
 // 'laminating' исключается, т.к. ламинация не нужна. Трек stickers не имеет
 // ламинации в принципе.
+// R11.3: extra_stickers — короткий маршрут допечатки. Для 3D-типов с заливкой+
+// сушкой, для плоских — с опциональной ламинацией (по order.need_lam).
 export function getSubtaskRoute(track, order) {
+  if (track === 'extra_stickers') {
+    const is3D = order && (order.order_type === 'sticker3D' || order.order_type === 'stickerpack3D')
+    if (is3D) return SUBTASK_ROUTE_EXTRA_3D
+    if (!order?.need_lam) return SUBTASK_ROUTE_EXTRA_FLAT.filter((s) => s !== 'laminating')
+    return SUBTASK_ROUTE_EXTRA_FLAT
+  }
   const base = track === 'backgrounds' ? SUBTASK_ROUTE_BACKGROUNDS : SUBTASK_ROUTE_STICKERS
   if (track === 'backgrounds' && !order?.need_lam) {
     return base.filter((s) => s !== 'laminating')

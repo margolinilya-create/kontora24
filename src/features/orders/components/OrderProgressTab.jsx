@@ -12,6 +12,7 @@ import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import { DryingTimer } from './DryingTimer'
 import { CreateExtraStickersButton } from './CreateExtraStickersButton'
+import { SamplePrintWidget } from './SamplePrintWidget'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -208,6 +209,15 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
       data.stickers_good = Math.max(0, Number(value || 0) - Number(defects || 0))
     }
     await handleSubmit(stage, data)
+  }
+
+  if (stage === 'sample_print') {
+    return (
+      <div className="space-y-4">
+        <StageJumperBlock order={order} onUpdated={onUpdated} />
+        <SamplePrintWidget order={order} onAdvanced={onUpdated} />
+      </div>
+    )
   }
 
   if (NO_INPUT_STAGES.has(stage)) {

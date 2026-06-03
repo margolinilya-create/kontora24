@@ -16,6 +16,7 @@ import { OrderHistoryTab } from '../components/OrderHistoryTab'
 import { FinanceTab } from '../components/FinanceTab'
 import { PrintPreviewModal } from '@/features/techcard/components/PrintPreviewModal'
 import { TechCardPreviewSlot } from '@/features/techcard/components/TechCardPreviewSlot'
+import { SamplePrintGallery } from '../components/SamplePrintGallery'
 import { Skeleton } from '@/shared/components/Skeleton'
 import Button from '@/shared/components/Button'
 import Modal from '@/shared/components/Modal'
@@ -324,6 +325,9 @@ function OverviewTab({ order, onUpdated }) {
         </div>
         {/* Виды изделий (multi-variant, R8.3 серии 25.05) */}
         <OrderItemsList orderId={order.id} />
+
+        {/* R14.2: фото образца печати (если загружали на этапе sample_print) */}
+        <SamplePrintGallery orderId={order.id} />
 
         {/* Row 3: highlighted comment from customer */}
         {order.notes && (

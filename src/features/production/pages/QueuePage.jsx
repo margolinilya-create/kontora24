@@ -17,7 +17,9 @@ const SUBTASK_ENABLED_STAGES = new Set(['print', 'lamination', 'cutting', 'selec
 
 const QUEUE_CONFIG = {
   design: { title: 'Дизайн', subtitle: 'Разработка макетов', status: 'design' },
-  prepress: { title: 'Препресс', subtitle: 'Допечатная подготовка', status: 'prepress' },
+  // R14.2 (бриф 03.06): на вкладке препресс показываем и «Вёрстка образца»
+  // (sample_layout) — это та же подготовка к печати.
+  prepress: { title: 'Препресс', subtitle: 'Допечатная подготовка', status: 'prepress', extraStatuses: ['sample_layout'] },
   print: { title: 'Печать', subtitle: 'Печать на плёнке', status: 'print' },
   lamination: { title: 'Ламинация', subtitle: 'Ламинация плёнки', status: 'lamination' },
   cutting: { title: 'Резка', subtitle: 'Плоттерная резка', status: 'cutting' },
@@ -62,7 +64,8 @@ function sortOrders(orders, sortBy) {
 export default function QueuePage({ queueType, hideHeader, enableBatchView = false }) {
   const config = QUEUE_CONFIG[queueType]
   const { profile } = useAuth()
-  const { orders: allOrders, loading, refetch } = useOrders({ statuses: [config.status] })
+  const allStatuses = useMemo(() => [config.status, ...(config.extraStatuses || [])], [config.status, config.extraStatuses])
+  const { orders: allOrders, loading, refetch } = useOrders({ statuses: allStatuses })
   const useSubtasks = SUBTASK_ENABLED_STAGES.has(config.status)
   const { items: subtaskItems, loading: subtasksLoading, refetch: refetchSubtasks } = useSubtaskQueue(useSubtasks ? config.status : null)
   const [showMine, setShowMine] = useState(false)

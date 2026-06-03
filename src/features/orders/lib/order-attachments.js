@@ -10,8 +10,9 @@ const BUCKET = 'order-files'
  * @param {string} orderId
  * @param {File} file
  * @param {string} uploadedBy — profile.id
- * @param {{ pathPrefix?: string }} [opts] — pathPrefix позволяет различать назначение
- *   (например, 'tech-preview' для drop-zone в тех-карте). Дефолт — пусто.
+ * @param {{ pathPrefix?: string, kind?: 'attachment'|'preview'|'sample_print' }} [opts]
+ *   pathPrefix позволяет различать назначение в имени файла; `kind` пишет в одноимённую
+ *   колонку k24_order_attachments (R14.2 — для сортировки по категориям в UI).
  * @returns {Promise<object>} вставленная строка из k24_order_attachments
  */
 export async function uploadAttachment(orderId, file, uploadedBy, opts = {}) {
@@ -31,6 +32,7 @@ export async function uploadAttachment(orderId, file, uploadedBy, opts = {}) {
       file_size: file.size,
       mime_type: file.type,
       uploaded_by: uploadedBy,
+      kind: opts.kind || 'attachment',
     })
     .select()
     .single()

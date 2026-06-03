@@ -94,9 +94,10 @@ export function useOrdersCostReport(period = '30') {
           .limit(500),
         supabase.from('k24_production_logs')
           .select(`order_id, film_meters, resin_grams, lamination_meters,
-                   film_type, lam_type, stickers_printed, stickers_poured,
+                   film_type, stickers_printed, stickers_poured,
                    stickers_good, packs_assembled, packs_packaged, qty_selected,
-                   boxes_used, bopp_bags_used`)
+                   boxes_used, bopp_bags_used,
+                   order:k24_orders!order_id(lam_type)`)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
       ])
@@ -124,7 +125,8 @@ export function useOrdersCostReport(period = '30') {
         acc.resin += resinG
         acc.lam += lamM
         if (l.film_type && filmM > 0) acc.filmByType[l.film_type] = (acc.filmByType[l.film_type] || 0) + filmM
-        if (l.lam_type && lamM > 0) acc.lamByType[l.lam_type] = (acc.lamByType[l.lam_type] || 0) + lamM
+        const logLamType = l.order?.lam_type
+        if (logLamType && lamM > 0) acc.lamByType[logLamType] = (acc.lamByType[logLamType] || 0) + lamM
         acc.stickers_printed += Number(l.stickers_printed) || 0
         acc.stickers_poured += Number(l.stickers_poured) || 0
         acc.stickers_good += Number(l.stickers_good) || 0

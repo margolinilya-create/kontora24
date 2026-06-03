@@ -61,6 +61,11 @@ function getProgressLines(order) {
   if (route.includes('pouring')) {
     lines.push({ key: 'pouring', stage: 'pouring', track: null, qtyField: 'stickers_good', label: 'Залито стикеров (хороших)' })
   }
+  // R14.4: для sticker3D — отдельная линия «После сушки» = залитые − брак сушки.
+  // Кастомная агрегация (см. aggregateLine — ветка для stage='drying').
+  if (route.includes('drying')) {
+    lines.push({ key: 'drying', stage: 'drying', track: null, qtyField: '__drying', label: 'Годных после сушки' })
+  }
   if (route.includes('assembly_3d')) {
     lines.push({ key: 'assembly', stage: 'assembly_3d', track: null, qtyField: 'packs_assembled', label: 'Собрано паков' })
   }
@@ -72,9 +77,24 @@ function getProgressLines(order) {
 
 // Брак вычитается из total только для этапов из этого списка
 // (на pouring/selection_pouring stickers_good/qty_selected уже годные).
-const SUBTRACT_DEFECTS_STAGES = new Set(['print', 'cutting', 'lamination', 'packaging'])
+// R14.4 (бриф 03.06): drying — брак вычитается из суммы залитых (stickers_poured)
+// чтобы шкала прогресса показала фактический выход годных стикеров после сушки.
+const SUBTRACT_DEFECTS_STAGES = new Set(['print', 'cutting', 'lamination', 'packaging', 'drying'])
 
 function aggregateLine(logs, line) {
+  // R14.4: drying — total начинается от incoming (залитых на pouring/selection_pouring)
+  // минус брак на drying. Отрицательные значения НЕ обрезаются — пусть менеджер
+  // видит «−N перепечатать» если брак превысил тираж.
+  if (line.stage === 'drying') {
+    const pourField = (l) => Number(l.stickers_good) || Number(l.stickers_poured) || 0
+    const incoming = logs
+      .filter((l) => l.stage === 'pouring' || l.stage === 'selection_pouring')
+      .reduce((sum, l) => sum + pourField(l), 0)
+    const dryingDefects = logs
+      .filter((l) => l.stage === 'drying')
+      .reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
+    return { total: incoming - dryingDefects, defects: dryingDefects, allowNegative: true }
+  }
   let stageLogs = logs.filter((l) => l.stage === line.stage)
   if (line.track) stageLogs = stageLogs.filter((l) => l.track === line.track)
   const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[line.qtyField]) || 0), 0)
@@ -111,14 +131,17 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   const isSticker3DMulti = order.order_type === 'sticker3D' && (order.design_variants || 1) > 1
   // R14.3 (бриф 03.06): prepress добавлен — на нём менеджер вводит план по
   // каждому виду. Это запускает полноценный учёт на следующих этапах.
+  // R14.4 (бриф 03.06): drying добавлен для sticker3D — менеджер вносит брак
+  // после сушки по каждому виду.
   const PACK_STAGES_3D_PACK = ['prepress', 'print', 'cutting', 'selection_pouring']
-  const PACK_STAGES_STICKER3D = ['prepress', 'print', 'cutting', 'pouring']
+  const PACK_STAGES_STICKER3D = ['prepress', 'print', 'cutting', 'pouring', 'drying']
   const showPackDesigns =
     (isPack3D && PACK_STAGES_3D_PACK.includes(stage)) ||
     (isSticker3DMulti && PACK_STAGES_STICKER3D.includes(stage))
   const packMode = stage === 'prepress' ? 'prepress'
     : stage === 'print' ? 'print'
     : stage === 'cutting' ? 'cutting'
+    : stage === 'drying' ? 'drying'
     : 'pouring'
   const { designs, updateName, updateQtyPlanned } = usePackDesigns(showPackDesigns ? order.id : null)
 
@@ -206,6 +229,12 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     // production_log не пишем — расход материалов считается на следующих этапах.
     if (stage === 'prepress') {
       await updateQtyPlanned(designIndex, value)
+      return
+    }
+    // R14.4: на drying value — это «брак после сушки», пишем как defects лог
+    // с track='stickers' + design_index. Логика вычитания — см. aggregateLine.
+    if (stage === 'drying') {
+      await handleSubmit(stage, { track: 'stickers', design_index: designIndex, defects: value })
       return
     }
     const field = PACK_STICKER_FIELD[stage]
@@ -351,12 +380,17 @@ function ProgressLinesWidget({ order, logs }) {
       <h2 className="font-semibold mb-4">Прогресс по этапам</h2>
       <div className="space-y-3">
         {lines.map((line) => {
-          const { total, defects } = aggregateLine(logs, line)
+          const { total, defects, allowNegative } = aggregateLine(logs, line)
           const isQty = !line.unit
           const lineTarget = line.target ?? target
           const targetForLine = isQty ? lineTarget : null
           const overshoot = isQty && total > lineTarget ? total - lineTarget : 0
-          const percentage = isQty && lineTarget > 0 ? Math.min(100, Math.round((total / lineTarget) * 100)) : null
+          // R14.4: для drying допускаем отрицательные значения (брак > залитых).
+          const rawPct = isQty && lineTarget > 0 ? Math.round((total / lineTarget) * 100) : null
+          const percentage = rawPct === null
+            ? null
+            : (allowNegative ? Math.max(-100, Math.min(100, rawPct)) : Math.min(100, Math.max(0, rawPct)))
+          const isNegative = allowNegative && total < 0
           const isComplete = isQty ? total >= lineTarget : total > 0
           const unit = line.unit || 'шт'
 
@@ -384,10 +418,17 @@ function ProgressLinesWidget({ order, logs }) {
               {percentage !== null && (
                 <div className="h-1.5 bg-surface-dim rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ease-out ${isComplete ? 'bg-success' : 'bg-accent'}`}
-                    style={{ width: `${percentage}%` }}
+                    className={`h-full rounded-full transition-all duration-500 ease-out ${
+                      isNegative ? 'bg-danger' : isComplete ? 'bg-success' : 'bg-accent'
+                    }`}
+                    style={{ width: `${Math.abs(percentage)}%` }}
                   />
                 </div>
+              )}
+              {isNegative && (
+                <p className="text-xs text-danger mt-1">
+                  Брак превысил залитые на {Math.abs(total)} шт — нужна допечатка.
+                </p>
               )}
             </div>
           )

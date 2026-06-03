@@ -29,6 +29,10 @@ const MODE_LABELS = {
   // R14.3 (бриф 03.06): prepress — план к печати по каждому виду. Не пишет в
   // production_logs, обновляет k24_pack_designs.qty_planned (UPSERT в OrderProgressTab).
   prepress: { value: 'План', valueAria: 'План к печати, шт', valueField: '__plan',          showDefects: false, errorEmpty: 'Введите план хотя бы по одному виду', usePlannedField: true },
+  // R14.4 (бриф 03.06): сушка — менеджер вносит брак после 36ч по каждому виду.
+  // Сумма defects на drying-логах с track='stickers' вычитается из stickers_poured
+  // в шкале прогресса (см. SUBTRACT_DEFECTS_STAGES + getProgressLines).
+  drying:   { value: 'Брак после сушки', valueAria: 'Брак после сушки, шт', valueField: 'defects', showDefects: false, errorEmpty: 'Введите брак хотя бы по одному виду' },
 }
 
 // sessionStorage-bridge: drafts переживают unmount/remount компонента,

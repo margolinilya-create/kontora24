@@ -105,25 +105,25 @@ export default function PlannerPage() {
   return (
     <div className="flex flex-col h-[calc(100dvh-3.5rem)]">
       {/* Шапка */}
-      <div className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+      <div className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-border bg-surface">
         <h1 className="text-lg md:text-xl font-bold uppercase tracking-tight">
           Планирование производства
         </h1>
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-warning/15 text-warning border border-warning/40">
           бета
         </span>
-        <div className="ml-auto flex items-center gap-3 text-[11px] text-zinc-500">
+        <div className="ml-auto flex items-center gap-3 text-[11px] text-text-muted">
           <Legend />
         </div>
       </div>
 
       {/* Тулбар */}
-      <div className="flex items-center flex-wrap gap-3 px-4 md:px-6 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-        <label className="text-[11px] uppercase text-zinc-500 font-semibold">Тип:</label>
+      <div className="flex items-center flex-wrap gap-3 px-4 md:px-6 py-2 border-b border-border bg-surface-dim">
+        <label className="text-[11px] uppercase text-text-muted font-semibold">Тип:</label>
         <select
           value={filterType || ''}
           onChange={(e) => setFilterType(e.target.value || null)}
-          className="text-sm px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+          className="text-sm px-2 py-1 rounded border border-border bg-surface"
         >
           <option value="">все типы</option>
           {Object.entries(ORDER_TYPES).map(([key, { label }]) => (
@@ -131,12 +131,12 @@ export default function PlannerPage() {
           ))}
         </select>
 
-        <div className="flex items-center gap-1 ml-2 border border-zinc-300 dark:border-zinc-700 rounded p-0.5 bg-white dark:bg-zinc-900">
+        <div className="flex items-center gap-1 ml-2 border border-border rounded p-0.5 bg-surface">
           <button
             type="button"
             onClick={() => setDragMode('cascade')}
             className={`px-2 py-1 text-[11px] font-semibold rounded transition
-              ${dragMode === 'cascade' ? 'bg-amber-500 text-white' : 'text-zinc-600 hover:text-zinc-900'}`}
+              ${dragMode === 'cascade' ? 'bg-accent text-text' : 'text-text-muted hover:text-text'}`}
             title="Сдвинутый этап тянет за собой все последующие этапы"
           >
             Каскад
@@ -145,7 +145,7 @@ export default function PlannerPage() {
             type="button"
             onClick={() => setDragMode('this_only')}
             className={`px-2 py-1 text-[11px] font-semibold rounded transition
-              ${dragMode === 'this_only' ? 'bg-amber-500 text-white' : 'text-zinc-600 hover:text-zinc-900'}`}
+              ${dragMode === 'this_only' ? 'bg-accent text-text' : 'text-text-muted hover:text-text'}`}
             title="Двигается только этот этап, остальные фиксируются на местах"
           >
             Только этап
@@ -156,7 +156,7 @@ export default function PlannerPage() {
           type="button"
           onClick={() => setAutoplanConfirm(true)}
           disabled={overrides.length === 0}
-          className="ml-auto px-3 py-1 text-[11px] font-semibold rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="ml-auto px-3 py-1 text-[11px] font-semibold rounded border border-border bg-surface text-text hover:bg-surface-dim disabled:opacity-40 disabled:cursor-not-allowed"
           title="Снять все ручные закрепления и перейти к автоматическому плану"
         >
           ↺ Автоплан ({overrides.length})
@@ -170,7 +170,7 @@ export default function PlannerPage() {
         </div>
       ) : error ? (
         <div className="flex items-center justify-center flex-1 p-6">
-          <div className="text-sm text-red-700">
+          <div className="text-sm text-danger">
             Ошибка загрузки: {error.message || String(error)}
           </div>
         </div>
@@ -183,7 +183,7 @@ export default function PlannerPage() {
           onDragCancel={() => setDragging(null)}
         >
           <div className="grid flex-1 overflow-hidden md:grid-cols-[340px_1fr] grid-rows-[40vh_1fr] md:grid-rows-1">
-            <div className="overflow-auto border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800">
+            <div className="overflow-auto border-b md:border-b-0 md:border-r border-border">
               <OrderList />
             </div>
             <div className="overflow-auto">
@@ -222,9 +222,9 @@ export default function PlannerPage() {
 function Legend() {
   return (
     <div className="flex items-center gap-2">
-      <LegendItem className="bg-emerald-50 border border-emerald-300">≤85%</LegendItem>
-      <LegendItem className="bg-amber-50 border border-amber-300">≤100%</LegendItem>
-      <LegendItem className="bg-red-50 border border-red-300">&gt;100%</LegendItem>
+      <LegendItem className="bg-success/15 border border-success/40 text-success">≤85%</LegendItem>
+      <LegendItem className="bg-warning/15 border border-warning/40 text-warning">≤100%</LegendItem>
+      <LegendItem className="bg-danger/15 border border-danger/40 text-danger">&gt;100%</LegendItem>
       <span className="opacity-50">·</span>
       <span>🚩 срок</span>
       <span>📌 закреплено</span>
@@ -234,6 +234,6 @@ function Legend() {
 
 function LegendItem({ children, className }) {
   return (
-    <span className={`px-1.5 py-0.5 rounded text-[10px] ${className}`}>{children}</span>
+    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${className}`}>{children}</span>
   )
 }

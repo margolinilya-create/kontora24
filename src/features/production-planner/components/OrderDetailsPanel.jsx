@@ -29,8 +29,8 @@ function daysBetween(aIso, bIso) {
 
 function ForecastBadge({ label, expected, unit }) {
   return (
-    <div className="flex items-center justify-between px-2 py-1.5 rounded bg-zinc-50 dark:bg-zinc-900 text-xs">
-      <span className="text-zinc-600 dark:text-zinc-400 truncate pr-2">{label}</span>
+    <div className="flex items-center justify-between px-2 py-1.5 rounded bg-surface-dim text-xs">
+      <span className="text-text-muted truncate pr-2">{label}</span>
       <span className="font-mono font-bold tabular-nums">
         {Math.round(expected * 100) / 100} {unit}
       </span>
@@ -47,14 +47,14 @@ function StagesList({ stages }) {
         const isMilestone = ps.bucket === BUCKETS.milestone
         const isPassive = ps.bucket === BUCKETS.passive
         return (
-          <li key={ps.stage} className="flex items-center justify-between text-[12px] py-1 border-b border-zinc-100 dark:border-zinc-800 last:border-b-0">
+          <li key={ps.stage} className="flex items-center justify-between text-[12px] py-1 border-b border-border last:border-b-0">
             <div className="flex items-center gap-2">
               <span className={`inline-block w-1.5 h-1.5 rounded-full
-                ${isMilestone ? 'bg-zinc-300' : isPassive ? 'bg-amber-400' : isPlanned ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
+                ${isMilestone ? 'bg-text-muted/40' : isPassive ? 'bg-dept-pouring' : isPlanned ? 'bg-success' : 'bg-text-muted/60'}`} />
               <span className="font-medium">{label}</span>
               {ps.pinned && <span title="закреплено вручную">📌</span>}
             </div>
-            <div className="text-zinc-500 text-[11px]">
+            <div className="text-text-muted text-[11px]">
               {isMilestone ? 'веха' : isPassive ? `пассив ${ps.hours ? Math.round(ps.hours) + 'ч' : ''}` : isPlanned ? (
                 <>
                   {Math.round(ps.hours * 10) / 10}ч ·{' '}
@@ -111,9 +111,9 @@ export function OrderDetailsPanel() {
       : `опоздаем на ${daysBetween(r.finishDay, r.deadlineDisplay)} дн.`)
     : finishStatus === 'risk' ? 'впритык'
     : 'в срок'
-  const finishBg = finishStatus === 'late' ? 'bg-red-50 border-red-300 text-red-800'
-    : finishStatus === 'risk' ? 'bg-amber-50 border-amber-300 text-amber-800'
-    : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+  const finishBg = finishStatus === 'late' ? 'bg-danger/15 border-danger/40 text-danger'
+    : finishStatus === 'risk' ? 'bg-warning/15 border-warning/40 text-warning'
+    : 'bg-success/15 border-success/40 text-success'
 
   async function handleClearPins() {
     const res = await unpinAllForOrder(order.id)
@@ -133,12 +133,12 @@ export function OrderDetailsPanel() {
       />
       {/* Panel */}
       <aside
-        className="fixed right-0 top-14 bottom-0 w-full sm:w-[420px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 z-50 overflow-y-auto shadow-2xl"
+        className="fixed right-0 top-14 bottom-0 w-full sm:w-[420px] bg-surface border-l border-border z-50 overflow-y-auto shadow-2xl"
         role="dialog"
         aria-label={`Детали заказа ${formatOrderNumber(order)}`}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 px-4 py-3 flex items-center gap-2">
+        <div className="sticky top-0 bg-surface border-b border-border px-4 py-3 flex items-center gap-2">
           <span className={`inline-block w-2.5 h-2.5 rounded-full ${palette.dot}`} aria-hidden />
           <h2 className="text-base font-bold">
             <Link to={`/orders/${order.id}`} className="hover:underline">
@@ -146,14 +146,14 @@ export function OrderDetailsPanel() {
             </Link>
           </h2>
           {isRush && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-700">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-danger/15 text-danger">
               срочно
             </span>
           )}
           <button
             type="button"
             onClick={() => setSelectedOrderId(null)}
-            className="ml-auto text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition text-2xl leading-none"
+            className="ml-auto text-text-muted hover:text-text transition text-2xl leading-none"
             aria-label="Закрыть"
           >
             ×
@@ -163,9 +163,9 @@ export function OrderDetailsPanel() {
         <div className="p-4 space-y-4">
           {/* Срок + Прогноз */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-              <div className="text-[10px] uppercase font-semibold text-amber-700">🚩 Срок (менеджер)</div>
-              <div className="text-lg font-bold text-amber-900 tabular-nums">{formatDate(r?.deadlineDisplay)}</div>
+            <div className="rounded-lg border border-warning/40 bg-warning/15 px-3 py-2">
+              <div className="text-[10px] uppercase font-semibold text-warning">🚩 Срок (менеджер)</div>
+              <div className="text-lg font-bold text-warning tabular-nums">{formatDate(r?.deadlineDisplay)}</div>
             </div>
             <div className={`rounded-lg border px-3 py-2 ${finishBg}`}>
               <div className="text-[10px] uppercase font-semibold opacity-80">Прогноз готовности</div>
@@ -197,7 +197,7 @@ export function OrderDetailsPanel() {
           {/* Расход материалов */}
           {forecast.length > 0 && (
             <div>
-              <div className="text-[10px] uppercase font-semibold text-zinc-500 mb-1.5">
+              <div className="text-[10px] uppercase font-semibold text-text-muted mb-1.5">
                 Расход на тираж
               </div>
               <div className="space-y-1">
@@ -211,7 +211,7 @@ export function OrderDetailsPanel() {
           {/* Этапы */}
           {r?.plannedStages && r.plannedStages.length > 0 && (
             <div>
-              <div className="text-[10px] uppercase font-semibold text-zinc-500 mb-1.5">
+              <div className="text-[10px] uppercase font-semibold text-text-muted mb-1.5">
                 Этапы маршрута
               </div>
               <StagesList stages={r.plannedStages} />
@@ -223,7 +223,7 @@ export function OrderDetailsPanel() {
             <button
               type="button"
               onClick={handleClearPins}
-              className="w-full px-3 py-2 text-[12px] font-semibold rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"
+              className="w-full px-3 py-2 text-[12px] font-semibold rounded border border-border bg-surface hover:bg-surface-dim transition"
             >
               Снять закрепления ({orderOverrides.length})
             </button>
@@ -237,8 +237,8 @@ export function OrderDetailsPanel() {
 function Field({ label, value }) {
   return (
     <>
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="font-medium text-zinc-900 dark:text-zinc-100 truncate">{value}</dd>
+      <dt className="text-text-muted">{label}</dt>
+      <dd className="font-medium text-text truncate">{value}</dd>
     </>
   )
 }

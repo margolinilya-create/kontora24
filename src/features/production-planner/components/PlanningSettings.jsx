@@ -53,13 +53,13 @@ function FieldRow({ field, value, onChange }) {
   }
   return (
     <label className="flex items-center justify-between gap-3 py-1.5">
-      <span className="text-sm text-zinc-700 dark:text-zinc-300">{field.label}</span>
+      <span className="text-sm text-text">{field.label}</span>
       <input
         type="number"
         value={value ?? ''}
         step={field.step || '1'}
         onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-        className="w-24 px-2 py-1 text-sm text-right tabular-nums rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+        className="w-24 px-2 py-1 text-sm text-right tabular-nums rounded border border-border bg-surface"
       />
     </label>
   )
@@ -87,7 +87,7 @@ export function PlanningSettings() {
   }, [holidaysValue])
 
   if (nLoading || cLoading || hLoading) {
-    return <div className="text-sm text-zinc-500">Загрузка настроек…</div>
+    return <div className="text-sm text-text-muted">Загрузка настроек…</div>
   }
 
   async function handleSave() {
@@ -122,16 +122,16 @@ export function PlanningSettings() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+      <div className="rounded-lg border border-warning/40 bg-warning/15 px-3 py-2 text-[12px] text-warning">
         Раздел в бете. Изменения сразу применяются у всех открывших страницу «Планирование» — пересчёт через realtime.
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         <section className="space-y-1">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-zinc-700 dark:text-zinc-300 mb-2">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-text mb-2">
             Штат и оборудование
           </h3>
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="rounded-lg border border-border p-3 divide-y divide-border bg-surface">
             {CAPACITY_FIELDS.map((f) => (
               <div key={f.key} title={f.tip}>
                 <FieldRow
@@ -142,16 +142,16 @@ export function PlanningSettings() {
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-zinc-500 mt-1">
+          <p className="text-[11px] text-text-muted mt-1">
             Ёмкость бакета = ресурсы × часов в дне. Например, 2 плоттера × 8 ч = 16 ч/день в бакете «Резка».
           </p>
         </section>
 
         <section className="space-y-1">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-zinc-700 dark:text-zinc-300 mb-2">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-text mb-2">
             Нормативы скорости
           </h3>
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="rounded-lg border border-border p-3 divide-y divide-border bg-surface">
             {NORM_FIELDS.map((f) => (
               <FieldRow
                 key={f.key}
@@ -165,7 +165,7 @@ export function PlanningSettings() {
       </div>
 
       <section className="space-y-1">
-        <h3 className="text-sm font-bold uppercase tracking-wide text-zinc-700 dark:text-zinc-300 mb-2">
+        <h3 className="text-sm font-bold uppercase tracking-wide text-text mb-2">
           Госпраздники РФ (исключаются из рабочих дней)
         </h3>
         <textarea
@@ -173,9 +173,9 @@ export function PlanningSettings() {
           onChange={(e) => { setHolidaysText(e.target.value); setDirty(true) }}
           placeholder="2026-01-01&#10;2026-01-02&#10;..."
           rows={8}
-          className="w-full px-3 py-2 text-sm font-mono rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+          className="w-full px-3 py-2 text-sm font-mono rounded border border-border bg-surface"
         />
-        <p className="text-[11px] text-zinc-500">
+        <p className="text-[11px] text-text-muted">
           По одной дате на строку, формат YYYY-MM-DD. Эти дни не появятся в горизонте планирования.
         </p>
       </section>
@@ -185,12 +185,12 @@ export function PlanningSettings() {
           type="button"
           onClick={handleSave}
           disabled={!dirty || !canEdit}
-          className="px-4 py-2 text-sm font-semibold rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-4 py-2 text-sm font-semibold rounded bg-accent text-text hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Сохранить
         </button>
         {dirty && (
-          <span className="text-[12px] text-amber-700">Есть несохранённые изменения</span>
+          <span className="text-[12px] text-warning">Есть несохранённые изменения</span>
         )}
       </div>
     </div>

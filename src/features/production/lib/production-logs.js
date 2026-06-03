@@ -380,13 +380,20 @@ const SUBTASK_STATUS_TO_STAGE = {
  * Есть ли хотя бы один production_log для подзадачи в её текущем статусе?
  * Возвращает true если можно advance, false если нужно сперва внести лог.
  * Для статусов pending/ready/cancelled gate'а нет (учёта на них не бывает).
- * R14.5 (бриф 03.06): extra_stickers тоже проходит полный маршрут с учётом
- * работы на каждом этапе. Логи для extra_stickers пишутся с track='extra_stickers'.
+ *
+ * R14.5 (бриф 03.06): extra_stickers тоже должна проходить с учётом работы.
+ * R14.7 (code-review 03.06): УБИРАЕМ gate для extra_stickers до тех пор пока
+ * не появится UI flow для записи лога с track='extra_stickers'. Сейчас ни
+ * ProductionLogForm, ни CurrentStageWidget этого track не пишут — gate был
+ * вечно заблокирован, допечатка зависала в проде. Менеджер сам решает когда
+ * жать «Завершить» (правка от 04.06 по реальному репро). Когда появится
+ * ExtraStickerLogForm (per-design ввод в ExtraStickerBlock) — gate вернём.
  */
 export function hasSubtaskLog(logs, track, subtaskStatus) {
+  if (track === 'extra_stickers') return true
   const map = SUBTASK_STATUS_TO_STAGE[subtaskStatus]
   if (!map) return true
-  const requiredTrack = track === 'extra_stickers' ? 'extra_stickers' : (map.track || track)
+  const requiredTrack = map.track || track
   return (logs || []).some((l) => l.stage === map.stage && l.track === requiredTrack && !l.deleted_at)
 }
 

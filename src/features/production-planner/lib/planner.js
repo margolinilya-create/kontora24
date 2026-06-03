@@ -75,12 +75,18 @@ export function computeOrderVolumes(order, items) {
   const designVariants = Math.max(1, Number(order?.design_variants) || 1)
   const blockW = getPrintBlockWidth(order?.film_type)
 
+  // R14.7: design_variants — это число УНИКАЛЬНЫХ ДИЗАЙНОВ, распределённых
+  // внутри qty/пака, а не множитель физического тиража. Пример: stickerpack3D
+  // qty=100 паков × stickers_per_pack=10 × design_variants=10 → надо напечатать
+  // 1000 стикеров (10 дизайнов используются в 10-стикерном паке), НЕ 10 000.
+  // designVariants остаётся в результате чтобы design-стадия могла масштабировать
+  // часы дизайнера через norms.design_multiply_kinds.
   let pieces = 0
   let printMeters = 0
   let lamMeters = 0
   let totalQty = 0
   for (const it of list) {
-    const piecesThis = (isPack ? it.qty * perPack : it.qty) * designVariants
+    const piecesThis = isPack ? it.qty * perPack : it.qty
     pieces += piecesThis
     totalQty += it.qty
     printMeters += computeFilmMeters({

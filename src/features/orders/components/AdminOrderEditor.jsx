@@ -7,6 +7,7 @@ import Input from '@/shared/components/Input'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import {
   ORDER_STATUSES, ORDER_TYPES, LAMINATION_TYPES,
   DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES,
@@ -34,6 +35,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   const [profilesError, setProfilesError] = useState(null)
   const [currentClient, setCurrentClient] = useState(null)
   const [saving, setSaving] = useState(false)
+  const canSeeFinance = useCanDo('view:finance')
 
   useEffect(() => {
     if (!order) return
@@ -161,17 +163,24 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         delivery_city: form.delivery_city || null,
         delivery_address: form.delivery_address || null,
         delivery_notes: form.delivery_notes || null,
-        price_final: form.price_final !== '' ? Number(form.price_final) : null,
-        cost_materials: form.cost_materials !== '' ? Number(form.cost_materials) : null,
-        cost_labor: form.cost_labor !== '' ? Number(form.cost_labor) : null,
-        cost_total: form.cost_total !== '' ? Number(form.cost_total) : null,
-        price_per_unit: form.price_per_unit !== '' ? Number(form.price_per_unit) : null,
-        markup: form.markup !== '' ? Number(form.markup) : null,
-        discount_pct: form.discount_pct !== '' ? Number(form.discount_pct) : null,
         printed_meters: form.printed_meters !== '' ? Number(form.printed_meters) : null,
         resin_used: form.resin_used !== '' ? Number(form.resin_used) : null,
         rejected_qty: form.rejected_qty !== '' ? Number(form.rejected_qty) : null,
         printed_qty: form.printed_qty !== '' ? Number(form.printed_qty) : null,
+      }
+
+      // R14.8 (code-review 03.06): финансовые поля шлём только если есть право
+      // view:finance. Раньше любой с правом order:edit мог через handleSave
+      // случайно стереть цены (если поля были '' → null) или переписать их.
+      // CreateOrderPage уже так делал — теперь синхронизировали.
+      if (canSeeFinance) {
+        updates.price_final = form.price_final !== '' ? Number(form.price_final) : null
+        updates.cost_materials = form.cost_materials !== '' ? Number(form.cost_materials) : null
+        updates.cost_labor = form.cost_labor !== '' ? Number(form.cost_labor) : null
+        updates.cost_total = form.cost_total !== '' ? Number(form.cost_total) : null
+        updates.price_per_unit = form.price_per_unit !== '' ? Number(form.price_per_unit) : null
+        updates.markup = form.markup !== '' ? Number(form.markup) : null
+        updates.discount_pct = form.discount_pct !== '' ? Number(form.discount_pct) : null
       }
 
       const patch = await updateOrder(order.id, updates)
@@ -216,9 +225,11 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
           <Field label="Срок сдачи">
             <Input type="date" value={form.deadline || ''} onChange={(e) => update('deadline', e.target.value)} />
           </Field>
-          <Field label="Стоимость (бюджет), руб.">
-            <Input type="number" step="0.01" value={form.price_final ?? ''} onChange={(e) => update('price_final', e.target.value)} />
-          </Field>
+          {canSeeFinance && (
+            <Field label="Стоимость (бюджет), руб.">
+              <Input type="number" step="0.01" value={form.price_final ?? ''} onChange={(e) => update('price_final', e.target.value)} />
+            </Field>
+          )}
           <Field label="Источник">
             <select value={form.source || ''} onChange={(e) => update('source', e.target.value)} className={SELECT_CLASS}>
               <option value="">— Не указан —</option>
@@ -452,32 +463,36 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
 
       <hr className="border-border" />
 
-      {/* === Финансы === */}
-      <section className="space-y-4">
-        <h3 className={SECTION_TITLE}>Финансы (расчёт)</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Field label="Материалы">
-            <Input type="number" step="0.01" value={form.cost_materials ?? ''} onChange={(e) => update('cost_materials', e.target.value)} />
-          </Field>
-          <Field label="Труд">
-            <Input type="number" step="0.01" value={form.cost_labor ?? ''} onChange={(e) => update('cost_labor', e.target.value)} />
-          </Field>
-          <Field label="Себестоимость">
-            <Input type="number" step="0.01" value={form.cost_total ?? ''} onChange={(e) => update('cost_total', e.target.value)} />
-          </Field>
-          <Field label="Цена за штуку">
-            <Input type="number" step="0.01" value={form.price_per_unit ?? ''} onChange={(e) => update('price_per_unit', e.target.value)} />
-          </Field>
-          <Field label="Наценка (×)">
-            <Input type="number" step="0.1" value={form.markup ?? ''} onChange={(e) => update('markup', e.target.value)} />
-          </Field>
-          <Field label="Скидка (0–1)">
-            <Input type="number" step="0.01" min="0" max="1" value={form.discount_pct ?? ''} onChange={(e) => update('discount_pct', e.target.value)} />
-          </Field>
-        </div>
-      </section>
+      {/* === Финансы === R14.8: рендерится только при view:finance */}
+      {canSeeFinance && (
+        <>
+          <section className="space-y-4">
+            <h3 className={SECTION_TITLE}>Финансы (расчёт)</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              <Field label="Материалы">
+                <Input type="number" step="0.01" value={form.cost_materials ?? ''} onChange={(e) => update('cost_materials', e.target.value)} />
+              </Field>
+              <Field label="Труд">
+                <Input type="number" step="0.01" value={form.cost_labor ?? ''} onChange={(e) => update('cost_labor', e.target.value)} />
+              </Field>
+              <Field label="Себестоимость">
+                <Input type="number" step="0.01" value={form.cost_total ?? ''} onChange={(e) => update('cost_total', e.target.value)} />
+              </Field>
+              <Field label="Цена за штуку">
+                <Input type="number" step="0.01" value={form.price_per_unit ?? ''} onChange={(e) => update('price_per_unit', e.target.value)} />
+              </Field>
+              <Field label="Наценка (×)">
+                <Input type="number" step="0.1" value={form.markup ?? ''} onChange={(e) => update('markup', e.target.value)} />
+              </Field>
+              <Field label="Скидка (0–1)">
+                <Input type="number" step="0.01" min="0" max="1" value={form.discount_pct ?? ''} onChange={(e) => update('discount_pct', e.target.value)} />
+              </Field>
+            </div>
+          </section>
 
-      <hr className="border-border" />
+          <hr className="border-border" />
+        </>
+      )}
 
       {/* === Примечания === */}
       <section className="space-y-4">

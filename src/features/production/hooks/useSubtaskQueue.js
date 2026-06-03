@@ -35,17 +35,27 @@ export function useSubtaskQueue(stage) {
     setLoading(true)
     const { data, error } = await supabase
       .from('k24_order_subtasks')
-      .select('id, track, status, order:k24_orders!order_id(*, client:k24_clients(name))')
+      .select('id, track, status, item_idx, order:k24_orders!order_id(*, client:k24_clients(name))')
       .in('status', allowed)
     if (error) {
       setItems([])
       setLoading(false)
       return
     }
-    // Только 3D-pack заказы (на всякий случай — таблица только для них)
+    // R14.7 (code-review 03.06): extra_stickers подзадача может быть на ЛЮБОМ
+    // типе заказа (sticker3D, sticker_cut и т.п.), не только stickerpack3D.
+    // Раньше фильтр order_type === 'stickerpack3D' резал такие — допечатка
+    // была невидима на /production/print, /production/cutting, /production/pouring.
     const list = (data || [])
-      .filter((s) => s.order && s.order.order_type === 'stickerpack3D')
-      .map((s) => ({ order: s.order, track: s.track, subtask: { id: s.id, status: s.status } }))
+      .filter((s) => s.order && (
+        s.order.order_type === 'stickerpack3D' ||
+        s.track === 'extra_stickers'
+      ))
+      .map((s) => ({
+        order: s.order,
+        track: s.track,
+        subtask: { id: s.id, status: s.status, item_idx: s.item_idx },
+      }))
     setItems(list)
     setLoading(false)
   }, [stage])

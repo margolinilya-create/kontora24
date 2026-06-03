@@ -72,9 +72,24 @@ describe('computeOrderVolumes', () => {
     expect(v.kinds).toBe(2)
   })
 
-  it('design_variants ×: умножает pieces', () => {
+  it('R14.7: design_variants НЕ умножает pieces (распределяются внутри qty)', () => {
+    // qty=100 стикеров × 3 уникальных дизайна = 100 шт всего (по ~33 каждого),
+    // а не 300. designVariants остаётся в результате для design-стадии.
     const v = computeOrderVolumes(makeOrder({ qty: 100, design_variants: 3 }), [])
-    expect(v.pieces).toBe(300)
+    expect(v.pieces).toBe(100)
+    expect(v.designVariants).toBe(3)
+  })
+
+  it('R14.7: stickerpack3D с design_variants не задваивает pieces', () => {
+    // 100 паков × 10 стикеров/пак × 10 дизайнов в паке → 1000 стикеров (НЕ 10000)
+    const v = computeOrderVolumes(
+      makeOrder({ order_type: 'stickerpack3D', qty: 100, stickers_per_pack: 10, design_variants: 10 }),
+      []
+    )
+    expect(v.pieces).toBe(1000)
+    expect(v.fony).toBe(100)
+    expect(v.packs).toBe(100)
+    expect(v.designVariants).toBe(10)
   })
 
   it('пустой заказ (без размера) — нули', () => {

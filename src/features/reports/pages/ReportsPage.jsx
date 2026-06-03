@@ -13,6 +13,7 @@ import Spinner from '@/shared/components/Spinner'
 import Modal from '@/shared/components/Modal'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 
 // 5 вкладок по брифу 25.05 (R8.5):
 // 1) Unit Economics — сводка по заказам с финансами и материалами
@@ -20,12 +21,17 @@ import { translateError } from '@/shared/lib/error-translator'
 // 3) 3D-отдел — per-design расход и брак (reuse ThreeDPouringTab)
 // 4) Расходы по заказам — фактический расход материалов с себестоимостью
 // 5) P&L — упрощённая сводка для управленческого учёта
-const REPORT_TABS = [
-  { key: 'unit',     label: 'Unit Economics' },
-  { key: 'people',   label: 'Сотрудники' },
-  { key: 'team3d',   label: '3D отдел' },
-  { key: 'expenses', label: 'Расходы по заказам' },
-  { key: 'pnl',      label: 'P&L' },
+//
+// R14.8 (code-review 03.06): вкладки 1/4/5 содержат финансовые поля
+// (price_final, cost_total, маржа) — скрываются без view:finance.
+// Вкладка «Сотрудники» тоже показывает payout ₽ — также под gate.
+// «3D отдел» нейтральная по финансам, видна при view:reports.
+const REPORT_TABS_ALL = [
+  { key: 'unit',     label: 'Unit Economics', requiresFinance: true },
+  { key: 'people',   label: 'Сотрудники',     requiresFinance: true },
+  { key: 'team3d',   label: '3D отдел',       requiresFinance: false },
+  { key: 'expenses', label: 'Расходы по заказам', requiresFinance: true },
+  { key: 'pnl',      label: 'P&L',            requiresFinance: true },
 ]
 
 // R13.3 (бриф 02.06): добавлены пресет «Сегодня» и режим «Произвольный диапазон».
@@ -44,10 +50,22 @@ function isoToday() {
 }
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState('unit')
+  const canSeeFinance = useCanDo('view:finance')
+  const REPORT_TABS = useMemo(
+    () => REPORT_TABS_ALL.filter((t) => canSeeFinance || !t.requiresFinance),
+    [canSeeFinance]
+  )
+  const defaultTab = REPORT_TABS[0]?.key || 'team3d'
+  const [activeTab, setActiveTab] = useState(defaultTab)
   const [periodKey, setPeriodKey] = useState('30')
   const [customFrom, setCustomFrom] = useState(isoToday())
   const [customTo, setCustomTo] = useState(isoToday())
+
+  // R14.8: если активная вкладка стала недоступной (право отозвано на лету) —
+  // переключаемся на первую доступную, чтобы не рендерить вкладку с финансами.
+  if (!REPORT_TABS.some((t) => t.key === activeTab)) {
+    setActiveTab(defaultTab)
+  }
 
   const period = periodKey === 'custom' && customFrom && customTo
     ? `custom:${customFrom}:${customTo}`

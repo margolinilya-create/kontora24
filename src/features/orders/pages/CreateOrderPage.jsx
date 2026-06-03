@@ -292,6 +292,20 @@ export default function CreateOrderPage() {
   const [pendingShortageValues, setPendingShortageValues] = useState(null)
 
   function preSubmit(values) {
+    // R14.7 (code-review 03.06): multi-variant — блокируем submit если выбрано
+    // >1 видов, но extraItems не дозаполнен (qty=0 / w=0 / h=0 в строках).
+    // Раньше отфильтрованные строки молча терялись, заказ создавался с одним
+    // видом и подзадачи variants не генерировались. Менеджер узнавал поздно.
+    if (itemsCount > 1) {
+      const validExtras = extraItems.filter(
+        (it) => Number(it.width_mm) > 0 && Number(it.height_mm) > 0 && Number(it.qty) > 0
+      )
+      if (validExtras.length < itemsCount - 1) {
+        const missing = itemsCount - 1 - validExtras.length
+        toast.error(`Заполните все ${itemsCount} видов изделий — не хватает ${missing} (ширина, длина, тираж > 0).`)
+        return
+      }
+    }
     // R11.4: если на складе не хватает заявленных материалов — спросить подтверждение.
     if (shortages.length > 0) {
       setPendingShortageValues(values)

@@ -620,6 +620,13 @@ export function calculateWorkerPayout(logs, opts = {}) {
       selectionStickers += bgs * perPack
       pouring += Number(l.stickers_good) || 0
     }
+    if (l.stage === 'selection') {
+      // R11: выборка штучных стикеров sticker3D после сушки — каждая
+      // qty_selected = один стикер, без умножения на stickers_per_pack.
+      const qty = Number(l.qty_selected) || 0
+      selectionBgs += qty
+      selectionStickers += qty
+    }
     if (l.stage === 'assembly_3d') {
       const packs = Number(l.packs_assembled) || 0
       assemblyPacks += packs

@@ -618,6 +618,29 @@ describe('calculateWorkerPayout', () => {
     const r = calculateWorkerPayout(logs)
     expect(r.total).toBe(100 + 100 + 40 + 15)
   })
+
+  it('R14.6: stage=selection (sticker3D штучные) — qty_selected × 0.5 без stickers_per_pack', () => {
+    // 100 штучных стикеров × 0.5 ₽ = 50 ₽, не зависит от stickers_per_pack заказа
+    const logs = [
+      { stage: 'selection', qty_selected: 100, order: { stickers_per_pack: 8 } },
+    ]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.selection.bgs).toBe(100)
+    expect(r.breakdown.selection.count).toBe(100)
+    expect(r.breakdown.selection.amount).toBe(50)
+    expect(r.total).toBe(50)
+  })
+
+  it('R14.6: selection + selection_pouring смешанные — разная формула per stage', () => {
+    const logs = [
+      // sticker3D штучные: 100 × 1 × 0.5 = 50 ₽
+      { stage: 'selection', qty_selected: 100, order: { stickers_per_pack: 8 } },
+      // stickerpack3D фоны: 20 × 8 × 0.5 = 80 ₽
+      { stage: 'selection_pouring', qty_selected: 20, order: { stickers_per_pack: 8 } },
+    ]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.selection.amount).toBe(50 + 80)
+  })
 })
 
 describe('getMaterialCategory', () => {

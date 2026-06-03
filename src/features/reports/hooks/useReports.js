@@ -94,10 +94,10 @@ export function useOrdersCostReport(period = '30') {
           .limit(500),
         supabase.from('k24_production_logs')
           .select(`order_id, film_meters, resin_grams, lamination_meters,
-                   film_type, stickers_printed, stickers_poured,
+                   film_type, track, stickers_printed, stickers_poured,
                    stickers_good, packs_assembled, packs_packaged, qty_selected,
                    boxes_used, bopp_bags_used,
-                   order:k24_orders!order_id(lam_type)`)
+                   order:k24_orders!order_id(lam_type, film_type, film_type_stickers, order_type)`)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
       ])
@@ -124,7 +124,12 @@ export function useOrdersCostReport(period = '30') {
         acc.film += filmM
         acc.resin += resinG
         acc.lam += lamM
-        if (l.film_type && filmM > 0) acc.filmByType[l.film_type] = (acc.filmByType[l.film_type] || 0) + filmM
+        // R14.6 hotfix: после R8 поле film_type в логах больше не пишется (берётся
+        // из заказа). Fallback: для stickerpack3D track='stickers' — film_type_stickers,
+        // иначе — film_type заказа.
+        const isPackStickerTrack = l.order?.order_type === 'stickerpack3D' && l.track === 'stickers'
+        const ft = l.film_type || (isPackStickerTrack ? l.order?.film_type_stickers : l.order?.film_type)
+        if (ft && filmM > 0) acc.filmByType[ft] = (acc.filmByType[ft] || 0) + filmM
         const logLamType = l.order?.lam_type
         if (logLamType && lamM > 0) acc.lamByType[logLamType] = (acc.lamByType[logLamType] || 0) + lamM
         acc.stickers_printed += Number(l.stickers_printed) || 0
@@ -216,8 +221,11 @@ export function useBonusReport(period = '30') {
         }
         if (l.packs_packaged) { byWorker[name].packaging += l.packs_packaged; byWorker[name].total += l.packs_packaged * (rates.packaging || 0) }
         if (l.qty_selected) {
-          // Выборка фонов: bgs × stickers_per_pack × ставка (фидбэк 17.05 — каждый фон = N стикеров)
-          const perPack = Number(l.order?.stickers_per_pack) || 1
+          // Выборка фонов (selection_pouring) — каждый фон = N стикеров (×stickers_per_pack).
+          // Выборка штучных (R11 stage='selection' для sticker3D) — qty_selected уже = шт.
+          const perPack = l.stage === 'selection_pouring'
+            ? (Number(l.order?.stickers_per_pack) || 1)
+            : 1
           byWorker[name].selection += l.qty_selected
           byWorker[name].total += l.qty_selected * perPack * (rates.selection || 0)
         }
@@ -294,8 +302,10 @@ export function useEmployeeReport(period = '30') {
         if (!l.worker_id) return
         const w = ensure(l.worker_id, l.worker?.display_name || 'Неизвестный')
         const perPack = Number(l.order?.stickers_per_pack) || 1
+        // R14.6 hotfix: selection (штучные R11) множитель =1, selection_pouring (фоны) =perPack.
+        const selectionMult = l.stage === 'selection_pouring' ? perPack : 1
         if (l.stickers_good) { w.poured += l.stickers_good; w.payout += l.stickers_good * (rates.pouring || 0) }
-        if (l.qty_selected) { w.selected += l.qty_selected; w.payout += l.qty_selected * perPack * (rates.selection || 0) }
+        if (l.qty_selected) { w.selected += l.qty_selected; w.payout += l.qty_selected * selectionMult * (rates.selection || 0) }
         if (l.packs_assembled) { w.assembled += l.packs_assembled; w.payout += l.packs_assembled * perPack * (rates.assembly_3d || 0) }
         if (l.packs_packaged) { w.packaged += l.packs_packaged; w.payout += l.packs_packaged * (rates.packaging || 0) }
         if (l.stickers_printed) w.printed += l.stickers_printed

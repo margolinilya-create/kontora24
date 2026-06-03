@@ -70,11 +70,20 @@ export function getAttachmentUrl(filePath) {
 }
 
 /**
- * Найти первую image-attachment (для превью на тех-карте).
+ * Найти превью-изображение тех-карты.
+ * R14.6: фильтр по kind='preview' — иначе sample_print фото (kind='sample_print')
+ * утекает в тех-карту, если оно было загружено раньше превью.
+ * Фолбэк на image без kind — для исторических attachments до R14.2.
  */
 export function findPreviewAttachment(attachments) {
   if (!Array.isArray(attachments) || attachments.length === 0) return null
-  return attachments.find((a) => a.mime_type?.startsWith('image/')) || null
+  const images = attachments.filter((a) => a.mime_type?.startsWith('image/'))
+  if (images.length === 0) return null
+  return (
+    images.find((a) => a.kind === 'preview') ||
+    images.find((a) => !a.kind || a.kind === 'attachment') ||
+    null
+  )
 }
 
 export const ATTACHMENT_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp']

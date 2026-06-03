@@ -159,7 +159,10 @@ export function useOrders(filters = {}) {
 
   const debounceRef = useRef(null)
   useEffect(() => {
-    const channelName = `orders-${hookId.replace(/:/g, '')}`
+    // R14.6: добавляем uuid-суффикс — Supabase Realtime реюзает уже подписанный
+    // канал по имени, что при StrictMode/HMR ломалось (см. memory feedback
+    // supabase_realtime_channel_unique). hookId стабилен между mount'ами StrictMode.
+    const channelName = `orders-${hookId.replace(/:/g, '')}-${crypto.randomUUID()}`
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'k24_orders' }, () => {

@@ -44,7 +44,11 @@ export default async function handler(req, res) {
     // Validate Bitrix webhook URL (prevent SSRF)
     try {
       const parsed = new URL(bitrix_webhook_url)
-      if (!parsed.hostname.endsWith('bitrix24.ru') && !parsed.hostname.endsWith('bitrix24.com')) {
+      const host = parsed.hostname
+      // R14.6 SSRF fix: endsWith без точки матчит evilbitrix24.ru / notbitrix24.com.
+      const isRu = host === 'bitrix24.ru' || host.endsWith('.bitrix24.ru')
+      const isCom = host === 'bitrix24.com' || host.endsWith('.bitrix24.com')
+      if (!isRu && !isCom) {
         return res.status(400).json({ error: 'Invalid Bitrix webhook URL' })
       }
       if (parsed.protocol !== 'https:') {

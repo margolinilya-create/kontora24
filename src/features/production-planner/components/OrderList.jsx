@@ -8,15 +8,29 @@ import { usePlanStore } from '../store/plan-store'
 import { useScheduleResult } from '../hooks/useScheduleResult'
 import { getOrderPalette } from '../lib/order-colors'
 
+function daysBetween(aIso, bIso) {
+  if (!aIso || !bIso) return 0
+  const a = new Date(`${aIso}T00:00:00.000Z`).getTime()
+  const b = new Date(`${bIso}T00:00:00.000Z`).getTime()
+  return Math.round((a - b) / 86400000)
+}
+
 function StatusBadge({ result }) {
   if (!result) return null
   if (result.late) {
-    return <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">просрочен</span>
+    const delta = daysBetween(result.finishDay, result.deadlineDisplay)
+    const text = result.outOfHorizon
+      ? 'не влезает в горизонт'
+      : delta > 0
+        ? `опоздаем на ${delta} ${delta === 1 ? 'день' : delta < 5 ? 'дня' : 'дней'}`
+        : 'просрочен'
+    return <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">✗ {text}</span>
   }
   if (result.risk) {
-    return <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">впритык</span>
+    return <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">⚠ впритык</span>
   }
-  return <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700">в срок</span>
+  if (!result.finishDay) return null
+  return <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700">✓ в срок</span>
 }
 
 function formatDeadline(iso) {

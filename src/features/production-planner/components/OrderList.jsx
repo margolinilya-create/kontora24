@@ -2,6 +2,7 @@
 // бейджем СРОЧНО, статусом «в срок/впритык/просрочен», текущим этапом
 // и менеджерским сроком (золотой пилл).
 
+import { useMemo } from 'react'
 import { formatOrderNumber } from '@/shared/lib/utils'
 import { ORDER_STATUSES, ORDER_TYPES } from '@/shared/constants'
 import { usePlanStore } from '../store/plan-store'
@@ -40,7 +41,16 @@ function formatDeadline(iso) {
 }
 
 export function OrderList() {
-  const orders = usePlanStore((s) => s.getFilteredOrders())
+  // ВАЖНО: НЕЛЬЗЯ селектором вызывать s.getFilteredOrders() — он каждый
+  // раз делает .filter() и возвращает новый массив, zustand сравнивает
+  // Object.is → бесконечный ре-рендер. Берём поля отдельно и фильтруем
+  // через useMemo (стабильная ссылка пока зависимости не изменятся).
+  const allOrders = usePlanStore((s) => s.orders)
+  const filterType = usePlanStore((s) => s.filterType)
+  const orders = useMemo(
+    () => (filterType ? allOrders.filter((o) => o.order_type === filterType) : allOrders),
+    [allOrders, filterType]
+  )
   const selectedOrderId = usePlanStore((s) => s.selectedOrderId)
   const setSelectedOrderId = usePlanStore((s) => s.setSelectedOrderId)
   const result = useScheduleResult()

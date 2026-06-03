@@ -22,6 +22,16 @@ export const STAGE_FIELDS = {
     ],
   },
 
+  // R13.2 (бриф 02.06): на препрессе менеджер вводит «сколько подготовлено
+  // стикеров/изделий к печати». Поле prepared_qty добавлено миграцией 051.
+  prepress: {
+    label: 'Препресс',
+    quantityField: 'prepared_qty',
+    fields: [
+      { key: 'prepared_qty', label: 'Подготовлено к печати', unit: 'шт' },
+    ],
+  },
+
   // Сушка — таймер 36ч (см. R11.2). На этапе только фиксируется брак.
   // quantityField не задан — completion определяется таймером, не qty-полем.
   drying: {
@@ -112,12 +122,12 @@ export const STAGE_FIELDS = {
 
   pouring: {
     label: 'Заливка',
-    // «Хорошо» = stickers_poured − defects, в БД пишется автоматом в stickers_good
-    // при submit (фидбэк менеджера 28.05).
+    // R13.2 (бриф 02.06): брак убран с этого этапа — учитывается на drying,
+    // где вычитается из общего числа залитых. stickers_good = stickers_poured
+    // (пишется автоматом при submit в ProductionLogForm).
     quantityField: 'stickers_good',
     fields: [
       { key: 'stickers_poured', label: 'Залито', unit: 'шт' },
-      { key: 'defects', label: 'Брак', unit: 'шт' },
       { key: 'resin_grams', label: 'Смола', unit: 'г', step: '0.1' },
     ],
   },
@@ -130,9 +140,9 @@ export const STAGE_FIELDS = {
         key: 'stickers',
         label: 'Стикеры',
         accent: 'bg-dept-pouring/10 border-dept-pouring/30',
+        // R13.2: брак убран и здесь (consistency со спекой 11.05).
         fields: [
           { key: 'stickers_poured', label: 'Залито', unit: 'шт' },
-          { key: 'defects', label: 'Брак', unit: 'шт' },
         ],
       },
       {

@@ -24,8 +24,9 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 // R11.2: sample_layout / batch_layout — без производственных данных, advance
 // через StatusSwitcher. color_approval имеет свой контрол ColorApprovalControls
 // в header'е, на CurrentStageWidget показываем заглушку.
+// R13.2 (бриф 02.06): prepress теперь имеет форму с prepared_qty — убираем из NO_INPUT.
 const NO_INPUT_STAGES = new Set([
-  'new', 'design', 'sample_layout', 'color_approval', 'batch_layout', 'prepress',
+  'new', 'design', 'sample_layout', 'color_approval', 'batch_layout',
   'otk', 'done', 'cancelled',
 ])
 

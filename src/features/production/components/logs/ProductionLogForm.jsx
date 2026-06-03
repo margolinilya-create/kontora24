@@ -213,6 +213,14 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   const singleIncoming = !useTracks && incoming && !incoming.isStart && incoming.total != null
     ? incoming : null
 
+  // R13.2 (бриф 02.06): drying — показываем running «Пригодных» = incoming − Σdefects.
+  // На этой стадии единственное поле — брак, который вычитается из суммы залитых.
+  const dryingNetGood = (() => {
+    if (stage !== 'drying' || !singleIncoming) return null
+    const draftDefects = Number(getForm('_root').defects || 0) || 0
+    return Math.max(0, singleIncoming.total - draftDefects)
+  })()
+
   return (
     <div className="bg-surface rounded-xl border border-border p-5">
       <h3 className="font-semibold mb-2">{config.label}</h3>
@@ -221,6 +229,11 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
       {singleIncoming && (
         <p className="text-xs text-text-muted mb-3">
           Поступило на этап: {singleIncoming.total} шт
+          {dryingNetGood != null && (
+            <span className="ml-2 text-success">
+              · Пригодных после сушки: {dryingNetGood} шт
+            </span>
+          )}
         </p>
       )}
 

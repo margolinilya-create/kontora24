@@ -22,7 +22,8 @@ const MODE_LABELS = {
   // pouring: поле «Залито» пишется в stickers_poured. Поле stickers_good
   // вычисляется автоматически в OrderProgressTab.handlePackDesignSubmit
   // (фидбэк 28.05). Legacy-логи stickers_good читаются через fallback ниже.
-  pouring:  { value: 'Залито', valueAria: 'Залито, шт',     valueField: 'stickers_poured',  legacyField: 'stickers_good', showDefects: true,  errorEmpty: 'Введите залито или брак' },
+  // R13.2 (бриф 02.06): брак на заливке убран — учёт переехал на drying.
+  pouring:  { value: 'Залито', valueAria: 'Залито, шт',     valueField: 'stickers_poured',  legacyField: 'stickers_good', showDefects: false, errorEmpty: 'Введите залито хотя бы по одному виду' },
   print:    { value: 'Напечатано', valueAria: 'Напечатано, шт', valueField: 'stickers_printed', showDefects: false, errorEmpty: 'Введите кол-во напечатанных' },
   cutting:  { value: 'Нарезано', valueAria: 'Нарезано, шт',  valueField: 'qty_cut',          showDefects: true,  errorEmpty: 'Введите нарезано или брак' },
 }
@@ -44,7 +45,9 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
   const labels = MODE_LABELS[mode] || MODE_LABELS.pouring
   const orderId = designs?.[0]?.order_id || null
   const [drafts, setDrafts] = useState(() => readDrafts(orderId, stage))
-  const [savingIndex, setSavingIndex] = useState(null)
+  // R13.2 (бриф 02.06): вместо per-row «+» — одна кнопка «Сохранить» в конце,
+  // которая записывает все непустые ряды одной транзакцией.
+  const [savingAll, setSavingAll] = useState(false)
   const [editingNameId, setEditingNameId] = useState(null)
 
   // Persist drafts to sessionStorage по (orderId, stage). При смене заказа/этапа
@@ -72,24 +75,48 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
     return { value, defects }
   }
 
-  async function handleSubmit(designIndex) {
-    const draft = drafts[designIndex] || {}
-    const value = Number(draft.value || 0)
-    const defects = labels.showDefects ? Number(draft.defects || 0) : 0
-    if (value === 0 && defects === 0) {
+  async function handleSubmitAll() {
+    // Собираем все непустые ряды → пишем их batch. Если часть ушла успешно,
+    // а часть упала — toast.error со списком неуспешных, остальные drafts
+    // очищаются.
+    const pending = []
+    for (const d of designs) {
+      const draft = drafts[d.design_index] || {}
+      const value = Number(draft.value || 0)
+      const defects = labels.showDefects ? Number(draft.defects || 0) : 0
+      if (value === 0 && defects === 0) continue
+      pending.push({ designIndex: d.design_index, payload: { value, defects } })
+    }
+    if (pending.length === 0) {
       toast.error(labels.errorEmpty)
       return
     }
-    setSavingIndex(designIndex)
-    try {
-      await onSubmitDesign(designIndex, { value, defects })
-      toast.success('Записано')
-      setDrafts((prev) => { const n = { ...prev }; delete n[designIndex]; return n })
-    } catch (err) {
-      toast.error(translateError(err).message || err.message)
-    } finally {
-      setSavingIndex(null)
+    setSavingAll(true)
+    const failed = []
+    const succeeded = []
+    for (const p of pending) {
+      try {
+        await onSubmitDesign(p.designIndex, p.payload)
+        succeeded.push(p.designIndex)
+      } catch (err) {
+        failed.push({ designIndex: p.designIndex, message: translateError(err).message || err.message })
+      }
     }
+    if (succeeded.length > 0) {
+      setDrafts((prev) => {
+        const next = { ...prev }
+        for (const idx of succeeded) delete next[idx]
+        return next
+      })
+    }
+    if (failed.length === 0) {
+      toast.success(`Сохранено по ${succeeded.length} ${succeeded.length === 1 ? 'виду' : 'видам'}`)
+    } else if (succeeded.length === 0) {
+      toast.error(`Не удалось сохранить: ${failed.map((f) => `#${f.designIndex}`).join(', ')}`)
+    } else {
+      toast.error(`Сохранено ${succeeded.length}, ошибки на ${failed.map((f) => `#${f.designIndex}`).join(', ')}`)
+    }
+    setSavingAll(false)
   }
 
   if (!designs?.length) {
@@ -113,7 +140,6 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
         const total = value + defects
         const pct = d.qty_target > 0 ? Math.min(100, Math.round((total / d.qty_target) * 100)) : 0
         const isComplete = total >= d.qty_target
-        const isSaving = savingIndex === d.design_index
         const isEditingName = editingNameId === d.id
 
         return (
@@ -168,7 +194,8 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
               />
             </div>
 
-            {/* Inputs — остаются видимыми даже после достижения тиража */}
+            {/* Inputs — остаются видимыми даже после достижения тиража.
+                R13.2: «+» убран, общая кнопка «Сохранить» рендерится в конце списка. */}
             {!readOnly && (
               <div className="flex items-end gap-2">
                 <div className="flex-1">
@@ -195,12 +222,21 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
                     />
                   </div>
                 )}
-                <Button size="sm" loading={isSaving} onClick={() => handleSubmit(d.design_index)}>+</Button>
               </div>
             )}
           </div>
         )
       })}
+
+      {!readOnly && (
+        <Button
+          onClick={handleSubmitAll}
+          loading={savingAll}
+          className="w-full"
+        >
+          Сохранить
+        </Button>
+      )}
 
       <p className="text-xs text-text-muted pt-1 border-t border-border">
         Итого по стикерам: <span className="font-medium text-text tabular-nums">{grandTotal} шт</span>

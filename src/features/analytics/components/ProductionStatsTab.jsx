@@ -16,8 +16,13 @@ const PERIODS = [
   { value: 'custom', label: 'Свой период' },
 ]
 
-const STAGE_OPTIONS = ['design', 'prepress', 'print', 'lamination', 'cutting', 'pouring', 'selection_pouring', 'assembly_3d', 'packaging', 'otk']
-  .map((s) => ({ value: s, label: ORDER_STATUSES[s]?.label || s }))
+// R13.0 (бриф 02.06): добавлены R11-этапы (sample_layout/sample_print/color_approval/drying/selection).
+const STAGE_OPTIONS = [
+  'design', 'sample_layout', 'sample_print', 'color_approval', 'prepress',
+  'print', 'lamination', 'cutting',
+  'pouring', 'selection_pouring', 'drying', 'selection',
+  'assembly_3d', 'packaging', 'otk',
+].map((s) => ({ value: s, label: ORDER_STATUSES[s]?.label || s }))
 
 const ORDER_TYPE_OPTIONS = Object.entries(ORDER_TYPES).map(([value, { label }]) => ({ value, label }))
 

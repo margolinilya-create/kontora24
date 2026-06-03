@@ -106,12 +106,26 @@ export function useOrders(filters = {}) {
       if (filters.search) {
         // Sanitize: remove PostgREST operators and escape SQL LIKE wildcards
         const s = filters.search.replace(/[,()]/g, '').replace(/[%_\\]/g, '\\$&')
+
+        // R13.0 (бриф 02.06): поиск расширен на custom_number и client.name.
+        // client.name матчим через предварительный запрос к k24_clients →
+        // массив client_id → подмешиваем в or().
+        const { data: clientMatches } = await supabase
+          .from('k24_clients')
+          .select('id')
+          .ilike('name', `%${s}%`)
+          .limit(50)
+        const clientIds = (clientMatches || []).map((c) => c.id)
+
+        const orParts = []
         const num = parseInt(s, 10)
-        if (!isNaN(num)) {
-          query = query.or(`number.eq.${num},notes.ilike.%${s}%`)
-        } else {
-          query = query.ilike('notes', `%${s}%`)
+        if (!isNaN(num)) orParts.push(`number.eq.${num}`)
+        orParts.push(`custom_number.ilike.%${s}%`)
+        orParts.push(`notes.ilike.%${s}%`)
+        if (clientIds.length > 0) {
+          orParts.push(`client_id.in.(${clientIds.join(',')})`)
         }
+        query = query.or(orParts.join(','))
       }
 
       // Sort

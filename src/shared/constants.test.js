@@ -36,7 +36,8 @@ describe('IS_3D_STICKERPACK', () => {
 
 describe('getOrderRoute', () => {
   // R11.1 (бриф 31.05): добавлен sample-workflow префикс перед основным циклом
-  // (sample_layout/sample_print/color_approval/batch_layout) для всех типов.
+  // (sample_layout/sample_print/color_approval) для всех типов.
+  // R13.0 (бриф 02.06): batch_layout удалён как дубль prepress.
   // sticker_kiss/big/rect больше не имеют packaging (упаковка стрейчем на OTK).
   // sticker3D получил drying+selection после pouring.
 
@@ -46,9 +47,9 @@ describe('getOrderRoute', () => {
     expect(route).toContain('sample_layout')
     expect(route).toContain('sample_print')
     expect(route).toContain('color_approval')
-    expect(route).toContain('batch_layout')
+    expect(route).not.toContain('batch_layout')
     expect(route).toEqual([
-      'new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'batch_layout',
+      'new', 'design', 'sample_layout', 'sample_print', 'color_approval',
       'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done',
     ])
   })
@@ -131,9 +132,10 @@ describe('getOrderRoute', () => {
     const route = getOrderRoute({ order_type: 'sticker_cut', need_lam: true, design_status: 'provided' })
     expect(route).not.toContain('design')
     expect(route).toContain('prepress')
-    // sample_layout и batch_layout остаются — это уже подготовка к печати
+    // sample_layout остаётся — это уже подготовка к печати (макет тиража)
     expect(route).toContain('sample_layout')
-    expect(route).toContain('batch_layout')
+    // R13.0: batch_layout удалён из маршрута
+    expect(route).not.toContain('batch_layout')
   })
 
   it('keeps design when design_status=needs_development', () => {
@@ -146,7 +148,7 @@ describe('getOrderRoute', () => {
     expect(route).not.toContain('design')
     expect(route).not.toContain('lamination')
     expect(route).toEqual([
-      'new', 'sample_layout', 'sample_print', 'color_approval', 'batch_layout',
+      'new', 'sample_layout', 'sample_print', 'color_approval',
       'prepress', 'print', 'cutting', 'packaging', 'otk', 'done',
     ])
   })
@@ -215,7 +217,7 @@ describe('getNextStatus', () => {
   it('admin full path — sticker_cut с lamination + BOPP (включая sample workflow)', () => {
     const order = { order_type: 'sticker_cut', need_lam: true, bopp_bag: true }
     const path = [
-      'new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'batch_layout',
+      'new', 'design', 'sample_layout', 'sample_print', 'color_approval',
       'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done',
     ]
     for (let i = 0; i < path.length - 1; i++) {
@@ -226,7 +228,7 @@ describe('getNextStatus', () => {
   it('admin full path — sticker_cut без lamination/BOPP (skip lamination+packaging)', () => {
     const order = { order_type: 'sticker_cut', need_lam: false, bopp_bag: false }
     const path = [
-      'new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'batch_layout',
+      'new', 'design', 'sample_layout', 'sample_print', 'color_approval',
       'prepress', 'print', 'cutting', 'otk', 'done',
     ]
     for (let i = 0; i < path.length - 1; i++) {
@@ -237,7 +239,7 @@ describe('getNextStatus', () => {
   it('admin full path — sticker3D с drying+selection', () => {
     const order = { order_type: 'sticker3D', bopp_bag: false }
     const path = [
-      'new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'batch_layout',
+      'new', 'design', 'sample_layout', 'sample_print', 'color_approval',
       'prepress', 'print', 'cutting', 'pouring', 'drying', 'selection', 'packaging', 'otk', 'done',
     ]
     for (let i = 0; i < path.length - 1; i++) {
@@ -248,7 +250,7 @@ describe('getNextStatus', () => {
   it('admin full path — stickerpack3D с lamination (drying только в подзадаче, не в основном)', () => {
     const order = { order_type: 'stickerpack3D', need_lam: true }
     const path = [
-      'new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'batch_layout',
+      'new', 'design', 'sample_layout', 'sample_print', 'color_approval',
       'prepress', 'print', 'lamination', 'cutting', 'selection_pouring',
       'assembly_3d', 'packaging', 'otk', 'done',
     ]
@@ -257,16 +259,15 @@ describe('getNextStatus', () => {
     }
   })
 
-  it('color_approval → batch_layout (утверждение цвета пропускает design/sample верстку)', () => {
+  it('color_approval → prepress (R13.0 — batch_layout удалён как дубль prepress)', () => {
     const order = { order_type: 'sticker_cut', need_lam: true, bopp_bag: true }
-    expect(getNextStatus('admin', 'color_approval', order)).toBe('batch_layout')
+    expect(getNextStatus('admin', 'color_approval', order)).toBe('prepress')
   })
 
-  it('designer can advance sample_layout, batch_layout, design, prepress (R11.1)', () => {
+  it('designer can advance sample_layout, design, prepress (R11.1)', () => {
     const order = { order_type: 'sticker_cut' }
     expect(getNextStatus('designer', 'design', order)).toBe('sample_layout')
     expect(getNextStatus('designer', 'sample_layout', order)).toBe('sample_print')
-    expect(getNextStatus('designer', 'batch_layout', order)).toBe('prepress')
     expect(getNextStatus('designer', 'prepress', order)).toBe('print')
   })
 

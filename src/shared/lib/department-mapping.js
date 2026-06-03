@@ -137,9 +137,9 @@ export function getStatusesForDepartment(departmentId) {
 //   ОСК  — Отдел Сборки и Контроля (Сборка 3D, Упаковка, ОТК, Готово)
 
 export const DEPT_GROUPS = {
-  design:  { token: 'dept-design',  label: 'ОДП',  fullLabel: 'Отдел допечатной подготовки',         stages: ['design', 'prepress'] },
-  print:   { token: 'dept-print',   label: 'ОПРЛ', fullLabel: 'Отдел печати, резки и ламинации',     stages: ['print', 'lamination', 'cutting'] },
-  pouring: { token: 'dept-pouring', label: '3DО',  fullLabel: '3D отдел (заливка)',                  stages: ['pouring', 'selection_pouring'] },
+  design:  { token: 'dept-design',  label: 'ОДП',  fullLabel: 'Отдел допечатной подготовки',         stages: ['design', 'sample_layout', 'prepress'] },
+  print:   { token: 'dept-print',   label: 'ОПРЛ', fullLabel: 'Отдел печати, резки и ламинации',     stages: ['print', 'sample_print', 'lamination', 'cutting'] },
+  pouring: { token: 'dept-pouring', label: '3DО',  fullLabel: '3D отдел (заливка)',                  stages: ['pouring', 'selection_pouring', 'drying', 'selection'] },
   finish:  { token: 'dept-finish',  label: 'ОСК',  fullLabel: 'Отдел сборки и контроля',             stages: ['assembly_3d', 'packaging', 'otk', 'done'] },
 }
 
@@ -152,7 +152,7 @@ for (const [key, group] of Object.entries(DEPT_GROUPS)) {
 
 /** Department token (color theme name) for a production stage */
 export function getStageDeptToken(status) {
-  if (status === 'new') return 'info'
+  if (status === 'new' || status === 'color_approval') return 'info'
   if (status === 'cancelled') return 'danger'
   return _stageToGroup[status]?.token || null
 }

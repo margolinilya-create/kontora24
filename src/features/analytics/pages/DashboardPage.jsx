@@ -46,7 +46,13 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, onUpdated }) {
 
 // Production statuses ordered for "in work" filter (module-level constant
 // keeps useMemo deps stable).
-const WORK_STATUSES = ['design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
+// R13.0 (бриф 02.06): добавлены R11-этапы для корректного подсчёта «в работе».
+const WORK_STATUSES = [
+  'design', 'sample_layout', 'sample_print', 'color_approval', 'prepress',
+  'print', 'lamination', 'cutting',
+  'selection_pouring', 'pouring', 'drying', 'selection',
+  'assembly_3d', 'packaging', 'otk',
+]
 
 function StatCard({ label, value }) {
   return (
@@ -174,10 +180,12 @@ export default function DashboardPage() {
 
   // Role-specific queue status (memoized)
   const { myTasks, queueTasks } = useMemo(() => {
+    // R13.0: добавлены R11-этапы в очереди ролей (sample_layout/sample_print
+    // — печатник работает на образцах; drying/selection — постпечатники).
     const queueStatuses = {
-      designer: ['design', 'prepress'],
-      printer: ['prepress', 'print', 'lamination', 'cutting'],
-      post_printer: ['selection_pouring', 'pouring', 'assembly_3d', 'packaging'],
+      designer: ['design', 'sample_layout', 'prepress'],
+      printer: ['sample_print', 'prepress', 'print', 'lamination', 'cutting'],
+      post_printer: ['selection_pouring', 'pouring', 'drying', 'selection', 'assembly_3d', 'packaging'],
     }
     const myQueueStatusList = queueStatuses[role] || []
     const myQueueOrders = myQueueStatusList.length > 0 ? data.orders.filter((o) => myQueueStatusList.includes(o.status)) : []

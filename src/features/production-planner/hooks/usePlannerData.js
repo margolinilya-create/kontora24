@@ -8,9 +8,10 @@ import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { usePlanStore } from '../store/plan-store'
 
+// R13.0 (бриф 02.06): batch_layout удалён из активных маршрутов.
 const ACTIVE_STATUSES = [
   'new', 'design', 'sample_layout', 'sample_print', 'color_approval',
-  'batch_layout', 'prepress', 'print', 'lamination', 'cutting',
+  'prepress', 'print', 'lamination', 'cutting',
   'selection_pouring', 'pouring', 'drying', 'selection', 'assembly_3d',
   'packaging', 'otk',
 ]

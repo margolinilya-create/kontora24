@@ -20,17 +20,24 @@ import { stageDotClass } from '@/shared/lib/department-mapping'
 import { toast } from '@/shared/stores/toast-store'
 import { formatOrderNumber } from '@/shared/lib/utils'
 
-const ACTIVE_STATUSES = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
+// R13.0 (бриф 02.06): добавлены R11-этапы (sample_layout/sample_print/color_approval/drying/selection),
+// batch_layout удалён как дубль prepress.
+const ACTIVE_STATUSES = [
+  'new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'prepress',
+  'print', 'lamination', 'cutting',
+  'selection_pouring', 'pouring', 'drying', 'selection',
+  'assembly_3d', 'packaging', 'otk',
+]
 const ARCHIVED_STATUSES = ['done', 'cancelled']
 
 // Группы по отделам — таблица заказов разбивается на эти секции
 const ORDER_GROUPS = [
-  { id: 'new',      label: 'Новые',         statuses: ['new'],                                                dotStatus: 'new' },
-  { id: 'design',   label: 'Дизайн',        statuses: ['design', 'prepress'],                                 dotStatus: 'design' },
-  { id: 'print',    label: 'Печать',        statuses: ['print', 'lamination', 'cutting'],                     dotStatus: 'print' },
-  { id: 'pouring',  label: 'Заливка',       statuses: ['pouring', 'selection_pouring'],                       dotStatus: 'pouring' },
-  { id: 'finish',   label: 'Финиш',         statuses: ['assembly_3d', 'packaging', 'otk'],                    dotStatus: 'packaging' },
-  { id: 'archive',  label: 'Завершённые',   statuses: ['done', 'cancelled'],                                  dotStatus: 'done' },
+  { id: 'new',      label: 'Новые',         statuses: ['new'],                                                        dotStatus: 'new' },
+  { id: 'design',   label: 'Дизайн',        statuses: ['design', 'sample_layout', 'color_approval', 'prepress'],      dotStatus: 'design' },
+  { id: 'print',    label: 'Печать',        statuses: ['print', 'sample_print', 'lamination', 'cutting'],             dotStatus: 'print' },
+  { id: 'pouring',  label: 'Заливка',       statuses: ['pouring', 'selection_pouring', 'drying', 'selection'],        dotStatus: 'pouring' },
+  { id: 'finish',   label: 'Финиш',         statuses: ['assembly_3d', 'packaging', 'otk'],                            dotStatus: 'packaging' },
+  { id: 'archive',  label: 'Завершённые',   statuses: ['done', 'cancelled'],                                          dotStatus: 'done' },
 ]
 
 export default function OrdersPage() {

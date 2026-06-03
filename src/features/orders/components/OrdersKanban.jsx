@@ -5,11 +5,12 @@ import { DraggableCard, DragOverlayCard } from '@/features/production/components
 import { useProductionBoard } from '@/features/production/hooks/useProductionBoard'
 import { ORDER_STATUSES, isStageAllowed } from '@/shared/constants'
 import { stageBorderClass, stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
+import { COLS } from '@/features/production/components/PipelineSummary'
 import MultiSelect from '@/shared/components/MultiSelect'
 import ErrorState from '@/shared/components/ErrorState'
 
-// Все 11 рабочих колонок (без cancelled). 'done' добавится через includeArchived.
-const COLS = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
+// COLS реиспользуем из PipelineSummary — единственный источник правды
+// (R13.0): все рабочие этапы из ORDER_STATUSES без cancelled/done/batch_layout.
 
 const DEPT_OPTIONS = Object.entries(DEPT_GROUPS).map(([key, g]) => ({ value: key, label: g.label }))
 

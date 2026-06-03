@@ -39,13 +39,16 @@ export const ORDER_STATUSES = {
 
 // --- Order routes by type ---
 // R11.1 (бриф 31.05): добавлен sample-workflow префикс перед основным циклом
-// для всех типов — `sample_layout → sample_print → color_approval → batch_layout`.
+// для всех типов — `sample_layout → sample_print → color_approval → prepress`.
 // `design` и `prepress` остаются (по решению пользователя «оставить рядом»);
 // `design` скипается при `design_status='provided'` (getOrderRoute).
 // 3D-типы получили этап `drying` (sticker3D) и новый `selection` после сушки.
 // sticker_kiss/big/rect упаковываются стрейч-пленкой на ОТК — поэтому в их
 // маршруте нет `packaging` (R11.1 — раньше использовали общий ROUTE_REGULAR).
-const HEAD = ['new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'batch_layout', 'prepress']
+// R13.0 (бриф 02.06): `batch_layout` удалён из маршрута — менеджер считает его
+// дублирующим `prepress`. Статус остаётся в ORDER_STATUSES для совместимости
+// с историей старых заказов; миграция 049 переносит активные на `prepress`.
+const HEAD = ['new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'prepress']
 
 const ROUTE_STICKER_CUT  = [...HEAD, 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
 const ROUTE_STICKER_KISS = [...HEAD, 'print', 'lamination', 'cutting', 'otk', 'done']

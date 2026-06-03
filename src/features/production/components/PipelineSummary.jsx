@@ -2,7 +2,14 @@ import { memo } from 'react'
 import { ORDER_STATUSES } from '@/shared/constants'
 import { stageDotClass } from '@/shared/lib/department-mapping'
 
-const COLS = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'selection_pouring', 'pouring', 'assembly_3d', 'packaging', 'otk']
+// Все рабочие этапы из ORDER_STATUSES, без cancelled/done/batch_layout.
+// R13.0 (бриф 02.06): batch_layout удалён как дубль prepress; новые R11-этапы
+// (sample_layout, sample_print, color_approval, drying, selection) показываются
+// автоматически через сортировку по .order.
+const COLS = Object.entries(ORDER_STATUSES)
+  .filter(([key]) => key !== 'cancelled' && key !== 'done' && key !== 'batch_layout')
+  .sort((a, b) => a[1].order - b[1].order)
+  .map(([key]) => key)
 
 /**
  * Pipeline summary strip — shows all production stages with counts.

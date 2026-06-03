@@ -13,6 +13,7 @@ const { mockSupabase } = vi.hoisted(() => {
     lte: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     range: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     then: vi.fn(),
   }
   // Make the query thenable (resolves like a promise)
@@ -157,11 +158,17 @@ describe('useOrders', () => {
     })
   })
 
-  it('escapes SQL LIKE wildcards in search', async () => {
+  // R13.0 (бриф 02.06): поиск всегда уходит через .or() с custom_number/notes
+  // + опционально number.eq для числового ввода + client_id.in для матча по
+  // client.name (предварительный запрос в k24_clients).
+  it('escapes SQL LIKE wildcards in search (or-query includes notes+custom_number)', async () => {
     renderHook(() => useOrders({ search: 'test%_value' }))
 
     await waitFor(() => {
-      expect(mockSupabase._mockQuery.ilike).toHaveBeenCalledWith('notes', '%test\\%\\_value%')
+      expect(mockSupabase._mockQuery.or).toHaveBeenCalled()
+      const call = mockSupabase._mockQuery.or.mock.calls[0][0]
+      expect(call).toContain('notes.ilike.%test\\%\\_value%')
+      expect(call).toContain('custom_number.ilike.%test\\%\\_value%')
     })
   })
 
@@ -172,6 +179,7 @@ describe('useOrders', () => {
       expect(mockSupabase._mockQuery.or).toHaveBeenCalled()
       const call = mockSupabase._mockQuery.or.mock.calls[0][0]
       expect(call).toContain('number.eq.42')
+      expect(call).toContain('custom_number.ilike.%42%')
     })
   })
 

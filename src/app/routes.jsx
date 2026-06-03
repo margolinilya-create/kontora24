@@ -34,6 +34,7 @@ const SelectionPouringQueuePage = lazy(() => import('@/features/production/pages
 const Assembly3dQueuePage = lazy(() => import('@/features/production/pages/Assembly3dQueuePage'))
 const PackagingQueuePage = lazy(() => import('@/features/production/pages/PackagingQueuePage'))
 const OtkQueuePage = lazy(() => import('@/features/production/pages/OtkQueuePage'))
+const PlannerPage = lazy(() => import('@/features/production-planner/pages/PlannerPage'))
 const WarehousePage = lazy(() => import('@/features/warehouse/pages/WarehousePage'))
 const AnalyticsPage = lazy(() => import('@/features/analytics/pages/AnalyticsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'))
@@ -67,6 +68,7 @@ export const routes = [
       { path: 'production/assembly3d', element: <AuthGuard permission="stage:assembly_3d"><ErrorBoundary><Assembly3dQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/packaging', element: <AuthGuard permission="stage:packaging"><ErrorBoundary><PackagingQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/otk', element: <AuthGuard permission="stage:otk"><ErrorBoundary><OtkQueuePage /></ErrorBoundary></AuthGuard> },
+      { path: 'production/plan', element: <AuthGuard permission="view:planning"><ErrorBoundary><PlannerPage /></ErrorBoundary></AuthGuard> },
       { path: 'warehouse', element: <AuthGuard permission="view:warehouse"><ErrorBoundary><WarehousePage /></ErrorBoundary></AuthGuard> },
       { path: 'analytics', element: <AuthGuard permission="view:analytics"><ErrorBoundary><AnalyticsPage /></ErrorBoundary></AuthGuard> },
       { path: 'cabinet', element: <ErrorBoundary><CabinetPage /></ErrorBoundary> },

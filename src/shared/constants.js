@@ -199,6 +199,7 @@ export const PERMISSIONS = {
   views: [
     'view:dashboard', 'view:analytics', 'view:finance',
     'view:warehouse', 'view:reports', 'view:settings',
+    'view:planning',
   ],
   actions: [
     'order:create', 'order:edit', 'order:cancel',
@@ -232,6 +233,7 @@ export const PERMISSION_LABELS = {
   'view:warehouse': 'Видеть «Склад»',
   'view:reports': 'Видеть «Отчёты»',
   'view:settings': 'Видеть «Настройки»',
+  'view:planning': 'Видеть «Планирование» (бета)',
   'order:create': 'Создавать заказы',
   'order:edit': 'Редактировать заказы',
   'order:cancel': 'Отменять заказы',
@@ -684,6 +686,7 @@ export const NAV_ITEMS = [
   { path: '/production/assembly3d', label: 'Сборка 3D', icon: 'Hammer', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:assembly_3d' },
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:packaging' },
   { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'], permission: 'stage:otk' },
+  { path: '/production/plan', label: 'Планирование (бета)', icon: 'CalendarRange', roles: MANAGER_ROLES, permission: 'view:planning' },
   { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ALL_ROLES }, // личный кабинет — всем
   { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: MANAGER_ROLES, permission: 'view:warehouse' },
   { path: '/analytics', label: 'Аналитика', icon: 'BarChart3', roles: MANAGER_ROLES, permission: 'view:analytics' },

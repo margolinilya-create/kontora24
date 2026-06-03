@@ -109,13 +109,18 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   // Sticker3D multi-variant (фидбэк 28.05): на печать/резку/заливку показываем
   // PackDesignsForm с N=design_variants видов, k24_pack_designs создаются триггером.
   const isSticker3DMulti = order.order_type === 'sticker3D' && (order.design_variants || 1) > 1
-  const PACK_STAGES_3D_PACK = ['print', 'cutting', 'selection_pouring']
-  const PACK_STAGES_STICKER3D = ['print', 'cutting', 'pouring']
+  // R14.3 (бриф 03.06): prepress добавлен — на нём менеджер вводит план по
+  // каждому виду. Это запускает полноценный учёт на следующих этапах.
+  const PACK_STAGES_3D_PACK = ['prepress', 'print', 'cutting', 'selection_pouring']
+  const PACK_STAGES_STICKER3D = ['prepress', 'print', 'cutting', 'pouring']
   const showPackDesigns =
     (isPack3D && PACK_STAGES_3D_PACK.includes(stage)) ||
     (isSticker3DMulti && PACK_STAGES_STICKER3D.includes(stage))
-  const packMode = stage === 'print' ? 'print' : stage === 'cutting' ? 'cutting' : 'pouring'
-  const { designs, updateName } = usePackDesigns(showPackDesigns ? order.id : null)
+  const packMode = stage === 'prepress' ? 'prepress'
+    : stage === 'print' ? 'print'
+    : stage === 'cutting' ? 'cutting'
+    : 'pouring'
+  const { designs, updateName, updateQtyPlanned } = usePackDesigns(showPackDesigns ? order.id : null)
 
   // Подзадачи 3D-стикерпака (track-уровень) — миграция 032, фидбэк 17.05.
   const { subtasks, advance: advanceSubtask } = useOrderSubtasks(order.id, isPack3D)
@@ -197,6 +202,12 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     pouring: { single: ['stickers_poured', 'defects'] },
   }
   async function handlePackDesignSubmit(designIndex, { value, defects }) {
+    // R14.3: на prepress сохраняем только qty_planned в k24_pack_designs,
+    // production_log не пишем — расход материалов считается на следующих этапах.
+    if (stage === 'prepress') {
+      await updateQtyPlanned(designIndex, value)
+      return
+    }
     const field = PACK_STICKER_FIELD[stage]
     // PackDesignsForm.designStats фильтрует по track='stickers', поэтому для
     // sticker3D multi-variant тоже пишем track='stickers' (логи группируются
@@ -723,6 +734,15 @@ function SubtaskIndicator({ order, logs, onUpdated }) {
   // R11.3: грузим extras всегда (любой тип заказа может получить extra_stickers).
   const { subtasks, variants, extras, advance, advanceVariant, advanceById } = useOrderSubtasks(order.id, isMulti)
   const canJump = hasRole(['admin', 'manager'])
+
+  // R14.3 (бриф 03.06): подзадачи появляются только начиная с препресса.
+  // До prepress (new/design/sample_*/color_approval) — UI скрыт, чтобы не отвлекать
+  // менеджера. Триггер k24_order_subtasks создаёт записи pending при INSERT
+  // заказа — UI просто не рендерит их до prepress.
+  const orderRoute = getOrderRoute(order)
+  const orderIdx = orderRoute.indexOf(order.status)
+  const prepressIdx = orderRoute.indexOf('prepress')
+  if (orderIdx >= 0 && prepressIdx >= 0 && orderIdx < prepressIdx) return null
 
   // Блок «Доп. стикеры» отдельно от основных подзадач — показываем если есть extras.
   const extrasBlock = extras.length > 0 ? (

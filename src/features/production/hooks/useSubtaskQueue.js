@@ -7,6 +7,10 @@ const STAGE_TO_SUBTASK_STATUSES = {
   lamination: ['laminating'],
   cutting: ['cutting'],
   selection_pouring: ['selecting', 'pouring'],
+  // R14.3 (бриф 03.06): подзадача в pouring должна видеться на отдельной
+  // вкладке «Заливка», а не только в общем «Выборка/Заливка». Делаем sticker-
+  // трек stickerpack3D видимым и там.
+  pouring: ['pouring'],
 }
 
 /**

@@ -76,5 +76,21 @@ export function usePackDesigns(orderId) {
     await fetchDesigns()
   }, [fetchDesigns])
 
-  return { designs, loading, error, updateName, refetch: fetchDesigns }
+  // R14.3 (бриф 03.06): обновить план к печати на этапе препресс по виду.
+  // Если qty_target=0 — заодно подтягиваем qty_planned в qty_target,
+  // чтобы прогресс-бар на следующих этапах считал корректно.
+  const updateQtyPlanned = useCallback(async (designIndex, qtyPlanned) => {
+    const d = designs.find((dd) => dd.design_index === designIndex)
+    if (!d) throw new Error(`design_index ${designIndex} not found`)
+    const update = { qty_planned: Number(qtyPlanned) || 0 }
+    if (!d.qty_target || d.qty_target <= 0) update.qty_target = Number(qtyPlanned) || 0
+    const { error } = await supabase
+      .from('k24_pack_designs')
+      .update(update)
+      .eq('id', d.id)
+    if (error) throw error
+    await fetchDesigns()
+  }, [designs, fetchDesigns])
+
+  return { designs, loading, error, updateName, updateQtyPlanned, refetch: fetchDesigns }
 }

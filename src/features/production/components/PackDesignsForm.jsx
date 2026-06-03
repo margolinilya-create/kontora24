@@ -26,6 +26,9 @@ const MODE_LABELS = {
   pouring:  { value: 'Залито', valueAria: 'Залито, шт',     valueField: 'stickers_poured',  legacyField: 'stickers_good', showDefects: false, errorEmpty: 'Введите залито хотя бы по одному виду' },
   print:    { value: 'Напечатано', valueAria: 'Напечатано, шт', valueField: 'stickers_printed', showDefects: false, errorEmpty: 'Введите кол-во напечатанных' },
   cutting:  { value: 'Нарезано', valueAria: 'Нарезано, шт',  valueField: 'qty_cut',          showDefects: true,  errorEmpty: 'Введите нарезано или брак' },
+  // R14.3 (бриф 03.06): prepress — план к печати по каждому виду. Не пишет в
+  // production_logs, обновляет k24_pack_designs.qty_planned (UPSERT в OrderProgressTab).
+  prepress: { value: 'План', valueAria: 'План к печати, шт', valueField: '__plan',          showDefects: false, errorEmpty: 'Введите план хотя бы по одному виду', usePlannedField: true },
 }
 
 // sessionStorage-bridge: drafts переживают unmount/remount компонента,
@@ -63,6 +66,12 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
   }
 
   function designStats(designIndex) {
+    if (labels.usePlannedField) {
+      // R14.3 prepress: значение приходит из k24_pack_designs.qty_planned,
+      // не из логов. designs prop передаётся OrderProgressTab — берём из него.
+      const d = designs?.find((dd) => dd.design_index === designIndex)
+      return { value: Number(d?.qty_planned || 0), defects: 0 }
+    }
     const dlogs = (logs || []).filter(
       (l) => l.stage === stage && l.track === 'stickers' && l.design_index === designIndex && !l.deleted_at,
     )

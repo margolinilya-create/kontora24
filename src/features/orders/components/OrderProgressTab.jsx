@@ -704,7 +704,7 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
   )
 }
 
-function ExtraStickerBlock({ subtask, order, advanceById, onUpdated }) {
+function ExtraStickerBlock({ subtask, order, advanceById, onUpdated, logs }) {
   const [saving, setSaving] = useState(false)
   const status = subtask.status
   const route = getSubtaskRoute('extra_stickers', order)
@@ -718,8 +718,17 @@ function ExtraStickerBlock({ subtask, order, advanceById, onUpdated }) {
     .map(([idx, qty]) => `Вид ${idx}: ${qty}`)
     .join(' · ')
 
+  // R14.5 (бриф 03.06): extra_stickers подзадача теперь проходит полный маршрут
+  // с учётом работы. Без хотя бы одного лога с track='extra_stickers' на
+  // соответствующем stage кнопка «Завершить» disabled.
+  const canAdvance = hasSubtaskLog(logs || [], 'extra_stickers', status)
+
   async function complete() {
     if (!next) return
+    if (!canAdvance) {
+      toast.error(`Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»`)
+      return
+    }
     setSaving(true)
     try {
       await advanceById(subtask.id, next)
@@ -753,7 +762,8 @@ function ExtraStickerBlock({ subtask, order, advanceById, onUpdated }) {
         {next ? (
           <button
             onClick={complete}
-            disabled={saving}
+            disabled={saving || !canAdvance}
+            title={!canAdvance ? `Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»` : ''}
             className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50 min-h-[40px] flex-1 sm:flex-none"
           >
             {saving ? '…' : `Завершить «${SUBTASK_STATUS_LABELS[status]}» → ${SUBTASK_STATUS_LABELS[next]}`}
@@ -800,6 +810,7 @@ function SubtaskIndicator({ order, logs, onUpdated }) {
             order={order}
             advanceById={advanceById}
             onUpdated={onUpdated}
+            logs={logs}
           />
         ))}
       </div>

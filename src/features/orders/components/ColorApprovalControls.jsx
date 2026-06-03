@@ -10,7 +10,8 @@ import Modal from '@/shared/components/Modal'
  * R11.1: специальный контрол для этапа color_approval — менеджер показывает
  * напечатанный образец заказчику и фиксирует ответ.
  *
- *  • Утверждено  → updateOrderStatus(..., 'batch_layout')
+ *  • Утверждено  → updateOrderStatus(..., 'prepress')
+ *    (R14.5: batch_layout удалён, заменён prepress — этапы дублирующие.)
  *  • Не утверждено → модалка с обязательным комментарием (мин 5 символов)
  *    → INSERT k24_order_comments + rollback на 'sample_print' (цикл «печать
  *    нового образца → согласование» повторяется до утверждения).
@@ -29,8 +30,8 @@ export function ColorApprovalControls({ order, onUpdated }) {
   async function handleApprove() {
     setLoading(true)
     try {
-      await updateOrderStatus(order.id, 'color_approval', 'batch_layout')
-      toast.success('Цвет утверждён → Вёрстка тиража')
+      await updateOrderStatus(order.id, 'color_approval', 'prepress')
+      toast.success('Цвет утверждён → Препресс')
       onUpdated?.()
     } catch (err) {
       toast.error(translateError(err).message)

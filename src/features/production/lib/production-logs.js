@@ -380,14 +380,13 @@ const SUBTASK_STATUS_TO_STAGE = {
  * Есть ли хотя бы один production_log для подзадачи в её текущем статусе?
  * Возвращает true если можно advance, false если нужно сперва внести лог.
  * Для статусов pending/ready/cancelled gate'а нет (учёта на них не бывает).
- * R11.3: extra_stickers подзадачи продвигаются менеджером вручную без gate'а
- * (производственные логи в этих подзадачах не привязаны к track в k24_production_logs).
+ * R14.5 (бриф 03.06): extra_stickers тоже проходит полный маршрут с учётом
+ * работы на каждом этапе. Логи для extra_stickers пишутся с track='extra_stickers'.
  */
 export function hasSubtaskLog(logs, track, subtaskStatus) {
-  if (track === 'extra_stickers') return true
   const map = SUBTASK_STATUS_TO_STAGE[subtaskStatus]
   if (!map) return true
-  const requiredTrack = map.track || track
+  const requiredTrack = track === 'extra_stickers' ? 'extra_stickers' : (map.track || track)
   return (logs || []).some((l) => l.stage === map.stage && l.track === requiredTrack && !l.deleted_at)
 }
 

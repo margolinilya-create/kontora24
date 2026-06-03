@@ -19,6 +19,7 @@ import { usePlannerData } from '../hooks/usePlannerData'
 import { useScheduleResult } from '../hooks/useScheduleResult'
 import { usePlanStore } from '../store/plan-store'
 import { OrderList } from '../components/OrderList'
+import { OrderDetailsPanel } from '../components/OrderDetailsPanel'
 import { PlannerCalendar, DragOverlayChip } from '../components/PlannerCalendar'
 import { parseDragId, parseDropId } from '../lib/dnd-ids'
 import { STAGE_TO_BUCKET } from '../lib/buckets'
@@ -212,6 +213,8 @@ export default function PlannerPage() {
         onConfirm={confirmAutoplan}
         onClose={() => setAutoplanConfirm(false)}
       />
+
+      <OrderDetailsPanel />
     </div>
   )
 }

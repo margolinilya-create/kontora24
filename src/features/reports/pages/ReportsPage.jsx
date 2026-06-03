@@ -28,15 +28,30 @@ const REPORT_TABS = [
   { key: 'pnl',      label: 'P&L' },
 ]
 
+// R13.3 (бриф 02.06): добавлены пресет «Сегодня» и режим «Произвольный диапазон».
+// Custom encode: `custom:YYYY-MM-DD:YYYY-MM-DD` — getSince/getUntil в useReports
+// распарсят его на нижнюю и верхнюю границу.
 const PERIOD_TABS = [
+  { key: 'today', label: 'Сегодня' },
   { key: '7', label: '7 дней' },
   { key: '30', label: '30 дней' },
   { key: 'month', label: 'Этот месяц' },
+  { key: 'custom', label: 'Свой' },
 ]
+
+function isoToday() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('unit')
-  const [period, setPeriod] = useState('30')
+  const [periodKey, setPeriodKey] = useState('30')
+  const [customFrom, setCustomFrom] = useState(isoToday())
+  const [customTo, setCustomTo] = useState(isoToday())
+
+  const period = periodKey === 'custom' && customFrom && customTo
+    ? `custom:${customFrom}:${customTo}`
+    : periodKey
 
   return (
     <div className="space-y-4">
@@ -47,7 +62,30 @@ export default function ReportsPage() {
             Реал-тайм аналитика. Кнопки «xlsx» — выгрузка текущей таблицы.
           </p>
         </div>
-        <Tabs items={PERIOD_TABS} active={period} onChange={setPeriod} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Tabs items={PERIOD_TABS} active={periodKey} onChange={setPeriodKey} />
+          {periodKey === 'custom' && (
+            <div className="flex items-center gap-1 text-xs text-text-muted">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                max={customTo}
+                className="rounded border border-border bg-surface px-2 py-1"
+                aria-label="С"
+              />
+              <span>–</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                min={customFrom}
+                className="rounded border border-border bg-surface px-2 py-1"
+                aria-label="По"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="hidden md:inline-block">
@@ -68,12 +106,12 @@ export default function ReportsPage() {
 // 1) Unit Economics Kontora
 // ============================================================================
 function UnitEconomicsTab({ period }) {
-  const { data, loading, error } = useOrdersCostReport(period)
+  const { data, loading, error, refetch } = useOrdersCostReport(period)
   const { materials } = useMaterials()
   const costMap = useMemo(() => buildCostMap(materials), [materials])
 
   if (loading) return <CenterSpinner />
-  if (error) return <ReportError text="Не удалось загрузить Unit Economics" error={error} />
+  if (error) return <ReportError text="Не удалось загрузить Unit Economics" error={error} onRetry={refetch} />
   if (data.length === 0) return <Empty text="Нет заказов за период" />
 
   const rows = data.map((o) => {
@@ -158,11 +196,11 @@ function UnitEconomicsTab({ period }) {
 // 2) Сотрудники Конторы
 // ============================================================================
 function EmployeesTab({ period }) {
-  const { data, loading, error } = useEmployeeReport(period)
+  const { data, loading, error, refetch } = useEmployeeReport(period)
   const [openWorker, setOpenWorker] = useState(null)
 
   if (loading) return <CenterSpinner />
-  if (error) return <ReportError text="Не удалось загрузить сотрудников" error={error} />
+  if (error) return <ReportError text="Не удалось загрузить сотрудников" error={error} onRetry={refetch} />
   if (data.length === 0) return <Empty text="Нет данных за период" />
 
   function handleExport() {
@@ -255,12 +293,12 @@ function Stat({ label, value }) {
 // 4) Расходы по заказам
 // ============================================================================
 function ExpensesTab({ period }) {
-  const { data, loading, error } = useOrdersCostReport(period)
+  const { data, loading, error, refetch } = useOrdersCostReport(period)
   const { materials } = useMaterials()
   const costMap = useMemo(() => buildCostMap(materials), [materials])
 
   if (loading) return <CenterSpinner />
-  if (error) return <ReportError text="Не удалось загрузить расходы" error={error} />
+  if (error) return <ReportError text="Не удалось загрузить расходы" error={error} onRetry={refetch} />
   if (data.length === 0) return <Empty text="Нет заказов за период" />
 
   const rows = data.map((o) => ({ ...o, cost: costForOrder(o, costMap) }))
@@ -331,12 +369,12 @@ function ExpensesTab({ period }) {
 // 5) P&L
 // ============================================================================
 function PnLTab({ period }) {
-  const { data, loading, error } = useOrdersCostReport(period)
+  const { data, loading, error, refetch } = useOrdersCostReport(period)
   const { materials } = useMaterials()
   const costMap = useMemo(() => buildCostMap(materials), [materials])
 
   if (loading) return <CenterSpinner />
-  if (error) return <ReportError text="Не удалось загрузить P&L" error={error} />
+  if (error) return <ReportError text="Не удалось загрузить P&L" error={error} onRetry={refetch} />
   if (data.length === 0) return <Empty text="Нет заказов за период" />
 
   const rows = data.map((o) => {
@@ -460,17 +498,43 @@ function Empty({ text }) {
   )
 }
 
-function ReportError({ text, error }) {
-  // R9.2A (бриф 26.05): показываем сырой message ошибки, чтобы менеджер мог
-  // переслать точный текст. Расширенные детали — code/hint/details из PostgREST.
-  const detail = error?.message
+function ReportError({ text, error, onRetry }) {
+  // R13.3 (бриф 02.06): «написать причину ошибки и предложить решения».
+  // Заголовок — человекочитаемый перевод через translateError. Тело —
+  // действия (Обновить + Скопировать код для саппорта). Сырой message
+  // показываем мелким для дебага.
+  const t = translateError(error)
+  const rawMessage = error?.message
     || (typeof error === 'string' ? error : null)
-  const extra = [error?.code, error?.hint, error?.details].filter(Boolean).join(' · ')
+  const codeParts = [error?.code, error?.hint, error?.details].filter(Boolean).join(' · ')
+
+  function copyCode() {
+    const lines = [text, t.message, rawMessage, codeParts].filter(Boolean)
+    navigator.clipboard?.writeText(lines.join('\n')).then(
+      () => toast.success('Код ошибки скопирован'),
+      () => toast.error('Не удалось скопировать'),
+    )
+  }
+
   return (
-    <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-6 text-center">
-      <p className="text-sm font-medium">{text}</p>
-      {detail && <p className="text-xs mt-2 font-mono break-words">{detail}</p>}
-      {extra && <p className="text-[11px] mt-1 opacity-70 font-mono break-words">{extra}</p>}
+    <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-xl p-6">
+      <p className="text-base font-semibold text-center">{text}</p>
+      <p className="text-sm mt-1 text-center text-text">{t.message}</p>
+      <div className="flex justify-center gap-2 mt-4 flex-wrap">
+        <Button variant="secondary" onClick={onRetry || (() => window.location.reload())}>
+          Обновить
+        </Button>
+        <Button variant="secondary" onClick={copyCode}>
+          Скопировать код ошибки
+        </Button>
+      </div>
+      {(rawMessage || codeParts) && (
+        <details className="mt-4 text-xs opacity-70">
+          <summary className="cursor-pointer">Подробности для саппорта</summary>
+          {rawMessage && <p className="mt-2 font-mono break-words">{rawMessage}</p>}
+          {codeParts && <p className="mt-1 font-mono break-words">{codeParts}</p>}
+        </details>
+      )}
     </div>
   )
 }

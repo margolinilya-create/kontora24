@@ -79,6 +79,32 @@ export function translateError(err) {
     return { title: 'Ничего не найдено', message: 'Запись не существует или была удалена.' }
   }
 
+  // Case 8b — statement timeout (тяжёлый отчёт за большой период)
+  if (code === '57014' || /statement timeout|canceling statement/i.test(message)) {
+    return {
+      title: 'Запрос слишком долгий',
+      message: 'Сократите период или подождите минуту и попробуйте снова.',
+      action: 'retry',
+    }
+  }
+
+  // Case 8c — relation does not exist (миграция не применена)
+  if (code === '42P01' || /relation .* does not exist/i.test(message)) {
+    return {
+      title: 'Таблица недоступна',
+      message: 'Возможно, не применена миграция. Сообщите администратору с кодом 42P01.',
+    }
+  }
+
+  // Case 8d — column does not exist
+  if (code === '42703' || /column .* does not exist/i.test(message)) {
+    return {
+      title: 'Поле недоступно',
+      message: 'Возможно, схема обновлена, но фронтенд не перезагружен. Обновите страницу.',
+      action: 'retry',
+    }
+  }
+
   // Case 9 — payload too large
   if (status === 413 || /payload too large|file size/i.test(message)) {
     return { title: 'Файл слишком большой', message: 'Уменьшите размер и попробуйте снова.' }

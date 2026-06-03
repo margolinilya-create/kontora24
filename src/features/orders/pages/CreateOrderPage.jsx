@@ -216,6 +216,7 @@ export default function CreateOrderPage() {
   const heightMm = watch('height_mm')
   const qty = watch('qty')
   const filmType = watch('film_type')
+  const filmTypeStickers = watch('film_type_stickers')
   const boppBag = watch('bopp_bag')
   const isStickerpack = orderType === 'stickerpack' || orderType === 'stickerpack3D'
   const isStickerpack3D = orderType === 'stickerpack3D'
@@ -753,6 +754,7 @@ export default function CreateOrderPage() {
             heightMm={heightMm}
             qty={qty}
             filmType={filmType}
+            filmTypeStickers={filmTypeStickers}
             lamType={lamType}
             boppBag={boppBag}
             items={

@@ -2,12 +2,31 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { captureError } from '@/shared/lib/sentry'
-import { subDays, startOfMonth, format } from 'date-fns'
+import { subDays, startOfMonth, startOfDay, endOfDay, format, parseISO } from 'date-fns'
 
-function getSince(period) {
+// R13.3 (бриф 02.06): период расширен — `today` (с начала дня), `custom:from:to`
+// (YYYY-MM-DD строки), плюс legacy '7' / '30' / 'month'.
+export function getSince(period) {
+  if (typeof period === 'string' && period.startsWith('custom:')) {
+    const [, from] = period.split(':')
+    if (from) return startOfDay(parseISO(from)).toISOString()
+  }
+  if (period === 'today') return startOfDay(new Date()).toISOString()
   if (period === 'month') return startOfMonth(new Date()).toISOString()
   return subDays(new Date(), parseInt(period) || 30).toISOString()
 }
+
+// Возвращает верхнюю границу для custom-периода и `today`; для остальных пресетов
+// возвращает null (вызывающая сторона не вешает .lte).
+export function getUntil(period) {
+  if (typeof period === 'string' && period.startsWith('custom:')) {
+    const [, , to] = period.split(':')
+    if (to) return endOfDay(parseISO(to)).toISOString()
+  }
+  if (period === 'today') return endOfDay(new Date()).toISOString()
+  return null
+}
+
 
 export function useWorkSchedule(period = '30') {
   const [data, setData] = useState([])
@@ -22,7 +41,7 @@ export function useWorkSchedule(period = '30') {
         .from('k24_shift_entries')
         .select('*, worker:k24_profiles!worker_id(display_name)')
         .not('ended_at', 'is', null)
-        .gte('started_at', getSince(period))
+        .gte('started_at', getSince(period)).lte('started_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
         .order('started_at', { ascending: false })
       if (err) throw err
 
@@ -70,7 +89,7 @@ export function useOrdersCostReport(period = '30') {
                    film_type, film_type_stickers, lam_type, need_lam,
                    stickers_per_pack, notes, delivery_type, payment_status,
                    client:k24_clients!client_id(name)`)
-          .gte('created_at', getSince(period))
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .order('created_at', { ascending: false })
           .limit(500),
         supabase.from('k24_production_logs')
@@ -78,7 +97,7 @@ export function useOrdersCostReport(period = '30') {
                    film_type, lam_type, stickers_printed, stickers_poured,
                    stickers_good, packs_assembled, packs_packaged, qty_selected,
                    boxes_used, bopp_bags_used`)
-          .gte('created_at', getSince(period))
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
       ])
       if (ordersRes.error) throw ordersRes.error
@@ -170,7 +189,7 @@ export function useBonusReport(period = '30') {
       const [logsRes, ratesRes] = await Promise.all([
         supabase.from('k24_production_logs')
           .select('worker_id, stage, order_id, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack)')
-          .gte('created_at', getSince(period)).limit(10000),
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (logsRes.error) throw logsRes.error
@@ -235,10 +254,10 @@ export function useEmployeeReport(period = '30') {
         supabase.from('k24_shift_entries')
           .select('worker_id, duration_minutes, started_at, ended_at, worker:k24_profiles!worker_id(display_name)')
           .not('ended_at', 'is', null)
-          .gte('started_at', getSince(period)),
+          .gte('started_at', getSince(period)).lte('started_at', getUntil(period) ?? '9999-12-31T23:59:59Z'),
         supabase.from('k24_production_logs')
           .select('worker_id, stage, order_id, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack)')
-          .gte('created_at', getSince(period))
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
@@ -309,10 +328,10 @@ export function useQualityReport(period = '30') {
     try {
       const [ordersRes, logsRes] = await Promise.all([
         supabase.from('k24_orders').select('id, number, custom_number, qty, order_type')
-          .gte('created_at', getSince(period)).order('number').limit(500),
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').order('number').limit(500),
         supabase.from('k24_production_logs')
           .select('order_id, stickers_printed, stickers_poured, stickers_good')
-          .gte('created_at', getSince(period)).limit(10000),
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (logsRes.error) throw logsRes.error

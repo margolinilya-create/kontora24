@@ -37,7 +37,7 @@ export function usePlannedConsumption(materials) {
       const [ordersRes, itemsRes, logsRes] = await Promise.all([
         supabase
           .from('k24_orders')
-          .select('id, number, order_type, qty, width_mm, height_mm, film_type, lam_type, bopp_bag, status')
+          .select('id, number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, bopp_bag, status')
           .in('status', ACTIVE_STATUSES),
         supabase
           .from('k24_order_items')
@@ -85,6 +85,7 @@ export function usePlannedConsumption(materials) {
           heightMm: order.height_mm,
           qty: order.qty,
           filmType: order.film_type,
+          filmTypeStickers: order.film_type_stickers,
           lamType: order.lam_type,
           boppBag: order.bopp_bag,
           items: itemsByOrder.get(order.id),

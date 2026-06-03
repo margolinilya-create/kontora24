@@ -26,6 +26,14 @@ const RESIN_G_PER_CM2 = 0.1444 // 0,1444444444 г / см² из брифа
 const PACK_FILL_AVG = 0.6   // Коэф. заполняемости стикерпака (средний)
 const PACK_INNER_MARGIN_MM = 8 // S ≈ (W − 8) × (H − 8) из брифа
 
+// R13.4 (бриф 02.06): плёнка стикеров 3D-пака считается отдельно от плёнки фонов.
+// Формула менеджера:
+//   m² = (W × H × 0.65 × qty × 1.3) / 1_000_000
+//   метры по плёнке шириной 1230 мм = m² / 1.23
+const PACK_STICKER_FILM_COVERAGE = 0.65 // Коэф. покрытия стикерами площади
+const PACK_STICKER_FILM_MARGIN = 1.3    // Запас 30% к тиражу
+const PACK_STICKER_FILM_WIDTH_M = 1.23  // Рабочая ширина плёнки в метрах
+
 export function getPrintBlockWidth(filmType) {
   return PRINT_BLOCK_WIDTH_MM[filmType] ?? PRINT_BLOCK_FALLBACK_MM
 }
@@ -49,6 +57,23 @@ export function computeFilmMeters({ widthMm, heightMm, qty, blockWidthMm = PRINT
 
 export function computeLamMeters({ widthMm, heightMm, qty }) {
   return computeFilmMeters({ widthMm, heightMm, qty, blockWidthMm: LAM_BLOCK_WIDTH_MM })
+}
+
+/**
+ * R13.4 (бриф 02.06): расход плёнки СТИКЕРОВ для 3D-стикерпака в метрах.
+ * Формула менеджера:
+ *   m² = (W × H × 0.65 × qty × 1.3) / 1_000_000
+ *   m = m² / 1.23
+ * Возвращает метры плёнки 1230 мм. Если размер/тираж не задан — 0.
+ */
+export function computeStickerFilmMeters({ widthMm, heightMm, qty }) {
+  const w = Number(widthMm) || 0
+  const h = Number(heightMm) || 0
+  const q = Math.floor(Number(qty) || 0)
+  if (!w || !h || !q) return 0
+  const areaMm2 = w * h * PACK_STICKER_FILM_COVERAGE * q * PACK_STICKER_FILM_MARGIN
+  const areaM2 = areaMm2 / 1_000_000
+  return areaM2 / PACK_STICKER_FILM_WIDTH_M
 }
 
 /**
@@ -105,6 +130,7 @@ export function forecastMaterials({
   heightMm,
   qty,
   filmType,
+  filmTypeStickers,
   lamType,
   boppBag,
   items,
@@ -136,6 +162,31 @@ export function forecastMaterials({
     unit: 'м',
     lookup: filmType ? { by: 'code', value: filmType } : null,
   })
+
+  // 1b. R13.4 (бриф 02.06): для 3D-стикерпака отдельная плёнка для СТИКЕРОВ
+  // по формуле менеджера. Если filmTypeStickers не задан — lookup тоже null
+  // (виджет покажет «—», лимита склада не будет).
+  const filmTypeStickersEff = filmTypeStickers || null
+  if (isStickerpack3D) {
+    const stickerFilmMeters = itemList.reduce(
+      (sum, it) => sum + computeStickerFilmMeters({
+        widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty,
+      }),
+      0,
+    )
+    if (stickerFilmMeters > 0) {
+      const stickFilmLabel = filmTypeStickersEff
+        ? (FILM_TYPES[filmTypeStickersEff]?.label || filmTypeStickersEff)
+        : '—'
+      rows.push({
+        key: 'film_stickers',
+        label: `Плёнка (стикеры): ${stickFilmLabel}`,
+        expected: stickerFilmMeters,
+        unit: 'м',
+        lookup: filmTypeStickersEff ? { by: 'code', value: filmTypeStickersEff } : null,
+      })
+    }
+  }
 
   // 2. Плёнка для ламинации / переноса
   if (needLam) {

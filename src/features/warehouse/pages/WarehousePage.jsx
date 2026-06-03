@@ -1,5 +1,6 @@
 import { useState, useMemo, lazy, Suspense } from 'react'
 import { useMaterials } from '../hooks/useMaterials'
+import { usePlannedConsumption } from '../hooks/usePlannedConsumption'
 import { MaterialCard } from '../components/MaterialCard'
 import { StockModal } from '../components/StockModal'
 import { MaterialForm } from '../components/MaterialForm'
@@ -19,7 +20,10 @@ import ErrorState from '@/shared/components/ErrorState'
 const ConsumptionChart = lazy(() => import('../components/ConsumptionChart').then((m) => ({ default: m.ConsumptionChart })))
 
 export default function WarehousePage() {
-  const { materials, loading, error, refetch } = useMaterials()
+  const [showArchived, setShowArchived] = useState(false)
+  const { materials, loading, error, refetch } = useMaterials({ includeArchived: showArchived })
+  // План трат: сумма прогноза forecastMaterials по активным заказам без логов.
+  const { plan: planMap } = usePlannedConsumption(materials)
   const canCreateMaterial = useCanDo('material:manage') // создание новых позиций — для admin/manager (UI guard)
   const [selectedMaterial, setSelectedMaterial] = useState(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -93,6 +97,9 @@ export default function WarehousePage() {
           filter={filter}
           onFilter={setFilter}
           onUpdated={refetch}
+          showArchived={showArchived}
+          onToggleArchived={setShowArchived}
+          planMap={planMap}
         />
       ) : tab === 'inventory' ? (
         <InventoryTab materials={materials} onSaved={refetch} />
@@ -107,6 +114,8 @@ export default function WarehousePage() {
             onCategory={(v) => setFilter({ ...filter, category: v })}
             status={filter.status}
             onStatus={(v) => setFilter({ ...filter, status: v })}
+            showArchived={showArchived}
+            onToggleArchived={setShowArchived}
           />
 
           {/* Summary tiles — суммы остатков по типам, агрегируем по отфильтрованным */}
@@ -152,6 +161,7 @@ export default function WarehousePage() {
                   material={m}
                   onAddStock={() => setSelectedMaterial(m)}
                   onUpdated={refetch}
+                  plannedInfo={planMap?.get(m.id)}
                 />
               ))}
             </div>

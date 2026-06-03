@@ -3,7 +3,13 @@ import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 
-export function useMaterials() {
+/**
+ * @param {{ includeArchived?: boolean }} [opts]
+ *   includeArchived — если true, возвращает архивные позиции вместе с активными
+ *   (для UI «показать архив»). По умолчанию активные.
+ */
+export function useMaterials(opts = {}) {
+  const { includeArchived = false } = opts
   const [materials, setMaterials] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -13,11 +19,15 @@ export function useMaterials() {
     setError(null)
     let data, reservations
     try {
+      let materialsQuery = supabase
+        .from('k24_materials')
+        .select('*')
+        .order('type', { ascending: true })
+      if (!includeArchived) {
+        materialsQuery = materialsQuery.is('archived_at', null)
+      }
       const results = await Promise.all([
-        supabase
-          .from('k24_materials')
-          .select('*')
-          .order('type', { ascending: true }),
+        materialsQuery,
         supabase
           .from('k24_material_transactions')
           .select('material_id, delta')
@@ -52,6 +62,54 @@ export function useMaterials() {
   useRefetchOnFocus(fetchMaterials)
 
   return { materials, loading, error, refetch: fetchMaterials }
+}
+
+/**
+ * Архивация: помечает позицию как скрытую, исторические транзакции и
+ * unit_cost сохраняются. Реверс — через unarchiveMaterial.
+ */
+export async function archiveMaterial(id) {
+  if (!id) throw new Error('archiveMaterial: нужен id')
+  const { error } = await supabase
+    .from('k24_materials')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function unarchiveMaterial(id) {
+  if (!id) throw new Error('unarchiveMaterial: нужен id')
+  const { error } = await supabase
+    .from('k24_materials')
+    .update({ archived_at: null })
+    .eq('id', id)
+  if (error) throw error
+}
+
+/**
+ * Полное удаление позиции (hard delete).
+ * Перед DELETE проверяем что нет связанных транзакций — если есть,
+ * бросаем ошибку с подсказкой архивировать. Это защита от удаления позиции
+ * с историей расходов (она нужна для отчётов).
+ */
+export async function deleteMaterial(id) {
+  if (!id) throw new Error('deleteMaterial: нужен id')
+  const { count: txCount, error: countError } = await supabase
+    .from('k24_material_transactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('material_id', id)
+  if (countError) throw countError
+  if ((txCount || 0) > 0) {
+    const err = new Error(`У позиции ${txCount} транзакций — её можно только архивировать`)
+    err.code = 'HAS_TRANSACTIONS'
+    err.count = txCount
+    throw err
+  }
+  const { error } = await supabase
+    .from('k24_materials')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
 }
 
 export function useMaterialTransactions(materialId) {

@@ -21,6 +21,7 @@ export function WarehouseFilterBar({
   search, onSearch,
   category, onCategory,
   status, onStatus,
+  showArchived, onToggleArchived,
   showStatus = true,
   className = '',
 }) {
@@ -50,6 +51,17 @@ export function WarehouseFilterBar({
         >
           {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+      )}
+      {typeof onToggleArchived === 'function' && (
+        <label className="inline-flex items-center gap-2 text-sm text-text-muted px-2">
+          <input
+            type="checkbox"
+            checked={!!showArchived}
+            onChange={(e) => onToggleArchived(e.target.checked)}
+            className="rounded border-border"
+          />
+          Показать архив
+        </label>
       )}
     </div>
   )

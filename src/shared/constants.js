@@ -210,6 +210,7 @@ export const PERMISSIONS = {
   ],
   materials: [
     'material:add_transaction', 'material:manage', 'material:edit_name',
+    'material:archive', 'material:delete',
   ],
 }
 
@@ -243,6 +244,8 @@ export const PERMISSION_LABELS = {
   'material:add_transaction': 'Вносить приход/расход на складе',
   'material:manage': 'Создавать/удалять позиции склада',
   'material:edit_name': 'Редактировать названия материалов',
+  'material:archive': 'Архивировать/редактировать позиции склада',
+  'material:delete': 'Полное удаление позиций склада',
   'user:manage': 'Управлять пользователями',
 }
 

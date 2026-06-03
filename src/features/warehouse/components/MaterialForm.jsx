@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createMaterial } from '../hooks/useMaterials'
 import { MATERIAL_TYPES } from '@/shared/constants'
+import { UNIT_OPTIONS } from './MaterialEditModal'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
@@ -13,7 +14,7 @@ export function MaterialForm({ onClose, onCreated }) {
 
   function update(k, v) { setForm((p) => ({ ...p, [k]: v })) }
 
-  // Auto-set unit when type changes
+  // Auto-set unit when type changes (но можно переопределить через select)
   function handleTypeChange(type) {
     const unitMap = { film: 'm2', ink: 'ml', lam_film: 'm2', resin: 'g', blade: 'шт' }
     update('type', type)
@@ -38,18 +39,35 @@ export function MaterialForm({ onClose, onCreated }) {
   return (
     <Modal isOpen={true} onClose={onClose} title="Новый материал" maxWidth="max-w-sm">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="mat-type" className="block text-sm font-medium text-text mb-1">Тип</label>
-          <select
-            id="mat-type"
-            value={form.type}
-            onChange={(e) => handleTypeChange(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
-          >
-            {Object.entries(MATERIAL_TYPES).map(([key, m]) => (
-              <option key={key} value={key}>{m.label}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="mat-type" className="block text-sm font-medium text-text mb-1">Тип</label>
+            <select
+              id="mat-type"
+              value={form.type}
+              onChange={(e) => handleTypeChange(e.target.value)}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
+            >
+              {Object.entries(MATERIAL_TYPES).map(([key, m]) => (
+                <option key={key} value={key}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+          {/* R13.1: dropdown вместо хардкода — менеджер может переопределить
+              автозаполнение из unitMap (например, плёнка в погонных метрах). */}
+          <div>
+            <label htmlFor="mat-unit" className="block text-sm font-medium text-text mb-1">Ед. измерения</label>
+            <select
+              id="mat-unit"
+              value={form.unit}
+              onChange={(e) => update('unit', e.target.value)}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
+            >
+              {UNIT_OPTIONS.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <Input

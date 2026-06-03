@@ -3,6 +3,8 @@ import { MATERIAL_CATEGORIES, getMaterialCategory, getStockStatus, MATERIAL_TYPE
 import { formatPrice } from '@/shared/lib/utils'
 import { WarehouseFilterBar } from './WarehouseFilterBar'
 import { EditableMaterialName } from './EditableMaterialName'
+import { MaterialActionsMenu } from './MaterialActionsMenu'
+import { PlanFactBadge } from './PlanFactBadge'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 
 /**
@@ -10,7 +12,7 @@ import { useCanDo } from '@/features/auth/hooks/useCanDo'
  * При клике по строке — открывает StockModal для ручного прихода/расхода.
  * Фильтр state приходит снаружи (page-level), чтобы быть общим с другими табами.
  */
-export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdated }) {
+export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdated, showArchived, onToggleArchived, planMap }) {
   const canEditName = useCanDo('material:edit_name')
   const { category = 'all', status = 'all', search = '' } = filter || {}
 
@@ -33,6 +35,8 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
         onCategory={(v) => onFilter({ ...filter, category: v })}
         status={status}
         onStatus={(v) => onFilter({ ...filter, status: v })}
+        showArchived={showArchived}
+        onToggleArchived={onToggleArchived}
       />
 
       {filtered.length === 0 ? (
@@ -60,9 +64,10 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
                   const stStatus = getStockStatus(m)
                   const unit = MATERIAL_TYPES[m.type]?.unit || m.unit || ''
                   const catLabel = (cat && MATERIAL_CATEGORIES[cat]?.label) || '—'
+                  const isArchived = !!m.archived_at
                   return (
-                    <tr key={m.id} className="border-b border-border last:border-0 hover:bg-surface-2 transition-colors">
-                      <td className="px-4 py-2.5 font-medium">
+                    <tr key={m.id} className={`border-b border-border last:border-0 hover:bg-surface-2 transition-colors ${isArchived ? 'opacity-60' : ''}`}>
+                      <td className={`px-4 py-2.5 font-medium ${isArchived ? 'text-text-muted' : ''}`}>
                         {canEditName ? (
                           <EditableMaterialName material={m} onUpdated={onUpdated} tableMode />
                         ) : m.name}
@@ -73,6 +78,11 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
                           {Number(m.stock_qty).toFixed(1)}
                         </span>
                         <span className="text-text-muted ml-1">{unit}</span>
+                        {planMap?.get(m.id) && (
+                          <div className="mt-0.5">
+                            <PlanFactBadge plannedInfo={planMap.get(m.id)} unit={unit} />
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-text-muted">
                         {Number(m.min_qty) > 0 ? `${Number(m.min_qty).toFixed(1)} ${unit}` : '—'}
@@ -81,17 +91,26 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
                         {Number(m.unit_cost) > 0 ? `${formatPrice(m.unit_cost)}/${unit}` : '—'}
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stStatus.color}`}>
-                          {stStatus.label}
-                        </span>
+                        {isArchived ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-text-muted/15 text-text-muted">Архив</span>
+                        ) : (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stStatus.color}`}>
+                            {stStatus.label}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        <button
-                          onClick={() => onSelect(m)}
-                          className="text-xs text-text-muted hover:text-text px-2 py-1 rounded hover:bg-surface-dim transition-colors"
-                        >
-                          Приход / расход
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {!isArchived && (
+                            <button
+                              onClick={() => onSelect(m)}
+                              className="text-xs text-text-muted hover:text-text px-2 py-1 rounded hover:bg-surface-dim transition-colors"
+                            >
+                              Приход / расход
+                            </button>
+                          )}
+                          <MaterialActionsMenu material={m} onUpdated={onUpdated} />
+                        </div>
                       </td>
                     </tr>
                   )

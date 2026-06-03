@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createOrder } from '../hooks/useOrders'
 import {
-  ORDER_TYPES, LAMINATION_TYPES,
+  ORDER_TYPES,
   ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
   needsLamination,
 } from '@/shared/constants'
@@ -22,6 +22,7 @@ import { uploadAttachment, validatePreviewFile } from '@/features/orders/lib/ord
 import { captureError } from '@/shared/lib/sentry'
 import { MaterialForecast } from '../components/MaterialForecast'
 import { FilmSelect } from '../components/FilmSelect'
+import { LaminationSelect } from '../components/LaminationSelect'
 import { replaceOrderItems } from '../hooks/useOrderItems'
 import { forecastMaterials } from '../lib/material-forecast'
 import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
@@ -597,15 +598,11 @@ export default function CreateOrderPage() {
                   expected={filmType ? expectedByCode[filmType] : undefined}
                 />
               )}
-              <div>
-                <label className="block text-sm font-medium mb-1">Ламинация / перенос на монтаж</label>
-                <select {...register('lam_type')} className={SELECT_CLASS}>
-                  <option value="">Без ламинации</option>
-                  {Object.entries(LAMINATION_TYPES).map(([key, { label }]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-              </div>
+              <LaminationSelect
+                value={lamType}
+                onChange={(v) => setValue('lam_type', v, { shouldDirty: true })}
+                expected={lamType ? expectedByCode[lamType] : undefined}
+              />
             </div>
 
             {/* Заказчик + Срочность */}

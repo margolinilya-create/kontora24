@@ -1,22 +1,46 @@
-import { useState, useRef } from 'react'
-import { formatNumber } from '@/shared/lib/utils'
+import { useState, useRef, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import { formatNumber, formatOrderNumber } from '@/shared/lib/utils'
 
 /**
  * R13.1 (бриф 02.06): показывает «План трат» зелёным рядом с фактом склада.
  * Tooltip раскрывает из каких N заказов сложилось это число.
  *
+ * R14.1 (бриф 03.06): tooltip вынесен в createPortal(body) чтобы не обрезаться
+ * родительскими карточками, и показывает custom_number если задан.
+ *
  * Если plannedInfo пустой/нулевой — компонент не рендерит ничего.
  */
 export function PlanFactBadge({ plannedInfo, unit }) {
   const [open, setOpen] = useState(false)
+  const [coords, setCoords] = useState(null)
   const closeTimer = useRef(null)
+  const anchorRef = useRef(null)
+
+  const recompute = useCallback(() => {
+    const el = anchorRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setCoords({ top: r.bottom + 4, right: window.innerWidth - r.right })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    recompute()
+    window.addEventListener('scroll', recompute, true)
+    window.addEventListener('resize', recompute)
+    return () => {
+      window.removeEventListener('scroll', recompute, true)
+      window.removeEventListener('resize', recompute)
+    }
+  }, [open, recompute])
 
   if (!plannedInfo || !(plannedInfo.planned > 0)) return null
 
   const list = plannedInfo.orders || []
   const sumByOrder = new Map()
   for (const o of list) {
-    const prev = sumByOrder.get(o.id) || { id: o.id, number: o.number, qty: 0 }
+    const prev = sumByOrder.get(o.id) || { id: o.id, number: o.number, custom_number: o.custom_number, qty: 0 }
     prev.qty += Number(o.qty) || 0
     sumByOrder.set(o.id, prev)
   }
@@ -37,6 +61,7 @@ export function PlanFactBadge({ plannedInfo, unit }) {
       onMouseLeave={handleLeave}
     >
       <span
+        ref={anchorRef}
         role="button"
         tabIndex={0}
         onFocus={handleEnter}
@@ -47,15 +72,20 @@ export function PlanFactBadge({ plannedInfo, unit }) {
         <span>{formatNumber(plannedInfo.planned, 1)}</span>
         <span className="opacity-70">{unit}</span>
       </span>
-      {open && (
-        <div className="absolute z-30 top-full right-0 mt-1 min-w-[200px] max-h-64 overflow-y-auto rounded-xl border border-border bg-surface shadow-xl p-3 text-xs">
+      {open && coords && createPortal(
+        <div
+          onMouseEnter={handleEnter}
+          onMouseLeave={handleLeave}
+          style={{ position: 'fixed', top: coords.top, right: coords.right, zIndex: 9999 }}
+          className="min-w-[200px] max-h-64 overflow-y-auto rounded-xl border border-border bg-surface shadow-xl p-3 text-xs"
+        >
           <p className="font-medium mb-2 text-text">
             План трат — {aggregated.length} {pluralOrders(aggregated.length)}
           </p>
           <ul className="space-y-1">
             {aggregated.slice(0, 30).map((o) => (
               <li key={o.id} className="flex justify-between gap-3">
-                <span className="text-text-muted">#{o.number}</span>
+                <span className="text-text-muted">#{formatOrderNumber(o)}</span>
                 <span className="tabular-nums">{formatNumber(o.qty, 1)} {unit}</span>
               </li>
             ))}
@@ -63,7 +93,8 @@ export function PlanFactBadge({ plannedInfo, unit }) {
               <li className="text-text-muted/60 text-center pt-1">… ещё {aggregated.length - 30}</li>
             )}
           </ul>
-        </div>
+        </div>,
+        document.body,
       )}
     </span>
   )

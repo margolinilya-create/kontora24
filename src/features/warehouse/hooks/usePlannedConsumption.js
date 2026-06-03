@@ -37,7 +37,7 @@ export function usePlannedConsumption(materials) {
       const [ordersRes, itemsRes, logsRes] = await Promise.all([
         supabase
           .from('k24_orders')
-          .select('id, number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, bopp_bag, status')
+          .select('id, number, custom_number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, bopp_bag, status')
           .in('status', ACTIVE_STATUSES),
         supabase
           .from('k24_order_items')
@@ -97,7 +97,7 @@ export function usePlannedConsumption(materials) {
             if (!mat) continue
             const prev = result.get(mat.id) || { planned: 0, orders: [] }
             prev.planned += row.expected
-            prev.orders.push({ id: order.id, number: order.number, qty: row.expected, unit: row.unit })
+            prev.orders.push({ id: order.id, number: order.number, custom_number: order.custom_number, qty: row.expected, unit: row.unit })
             result.set(mat.id, prev)
           } else if (row.lookup.by === 'type') {
             // Размазываем поровну между материалами этого типа (грубое

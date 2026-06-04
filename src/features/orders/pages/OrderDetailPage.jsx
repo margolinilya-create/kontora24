@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail, updateOrder } from '../hooks/useOrders'
 import { useOrderItems } from '../hooks/useOrderItems'
+import { useOrderSubtasks } from '../hooks/useOrderSubtasks'
 import { findOrCreateClientByName } from '@/features/clients/hooks/useClients'
 import { InfoField } from '../components/InfoField'
 import { AdminOrderEditor } from '../components/AdminOrderEditor'
@@ -347,6 +348,7 @@ function OverviewTab({ order, onUpdated }) {
 export default function OrderDetailPage() {
   const { id } = useParams()
   const { order, history, loading, refetch, setOrder } = useOrderDetail(id)
+  const { subtasks, extras } = useOrderSubtasks(id)
   useAuth() // keep mount for legacy stores
   const isFinance = useCanDo('view:finance')
   const canEdit = useCanDo('order:edit')
@@ -458,7 +460,7 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Stepper */}
-      <OrderStepper order={order} history={history} onUpdated={refetch} />
+      <OrderStepper order={order} history={history} subtasks={subtasks} extras={extras} onUpdated={refetch} />
 
       {/* Source files link — компактная высота, инлайн-редактирование */}
       <SourceFilesRow order={order} onUpdated={refetch} onCopy={copySourceLink} />

@@ -19,7 +19,9 @@ import { translateError } from '@/shared/lib/error-translator'
 import {
   ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK,
   getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS, getSubtaskRoute,
+  DUAL_TRACK_STAGES, SUBTASK_STATUS_TO_STAGE,
 } from '@/shared/constants'
+import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 
 // R11.2: sample_layout / batch_layout — без производственных данных, advance
@@ -223,31 +225,35 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     selection_pouring: { stickers: ['stickers_poured', 'defects'] },
     pouring: { single: ['stickers_poured', 'defects'] },
   }
-  async function handlePackDesignSubmit(designIndex, { value, defects }) {
+  async function handlePackDesignSubmit(designIndex, { value, defects }, stageOverride) {
+    // stageOverride используется в dual-cards-mode (R-фидбэк 04-05.06):
+    // карточка СТИКЕР может быть на ином stage, чем order.status (если подзадача
+    // опередила/отстала). Без override — пишем на текущий order.status.
+    const effectiveStage = stageOverride || stage
     // R14.3: на prepress сохраняем только qty_planned в k24_pack_designs,
     // production_log не пишем — расход материалов считается на следующих этапах.
-    if (stage === 'prepress') {
+    if (effectiveStage === 'prepress') {
       await updateQtyPlanned(designIndex, value)
       return
     }
     // R14.4: на drying value — это «брак после сушки», пишем как defects лог
     // с track='stickers' + design_index. Логика вычитания — см. aggregateLine.
-    if (stage === 'drying') {
-      await handleSubmit(stage, { track: 'stickers', design_index: designIndex, defects: value })
+    if (effectiveStage === 'drying') {
+      await handleSubmit(effectiveStage, { track: 'stickers', design_index: designIndex, defects: value })
       return
     }
-    const field = PACK_STICKER_FIELD[stage]
+    const field = PACK_STICKER_FIELD[effectiveStage]
     // PackDesignsForm.designStats фильтрует по track='stickers', поэтому для
     // sticker3D multi-variant тоже пишем track='stickers' (логи группируются
     // только по design_index, семантика «фон/стикер» неактуальна).
     const data = { track: 'stickers', design_index: designIndex, [field]: value }
-    if ((stage === 'cutting' || stage === 'pouring' || stage === 'selection_pouring') && defects) {
+    if ((effectiveStage === 'cutting' || effectiveStage === 'pouring' || effectiveStage === 'selection_pouring') && defects) {
       data.defects = defects
     }
-    if (stage === 'pouring' || stage === 'selection_pouring') {
+    if (effectiveStage === 'pouring' || effectiveStage === 'selection_pouring') {
       data.stickers_good = Math.max(0, Number(value || 0) - Number(defects || 0))
     }
-    await handleSubmit(stage, data)
+    await handleSubmit(effectiveStage, data)
   }
 
   if (stage === 'sample_print') {
@@ -272,13 +278,119 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     )
   }
 
+  // R-фидбэк 04-05.06 (Google Doc 11GwAiE7...): для stickerpack3D на DUAL_TRACK_STAGES
+  // показываем две карточки рядом (ФОН + СТИКЕР), каждая со СВОИМ stage (по статусу
+  // подзадачи). Это позволяет ввести данные за «отстающую» подзадачу без перехода
+  // в очередь /production/X. После assembly_3d / lamination — обычный одиночный режим.
+  const isDualCardsMode = isPack3D
+    && subtasks?.backgrounds && subtasks?.stickers
+    && DUAL_TRACK_STAGES.includes(stage)
+    && subtasks.backgrounds.status !== 'ready'
+    && subtasks.stickers.status !== 'ready'
+
+  // Карточка одного трека: stage берётся из статуса подзадачи, ввод поэвидово
+  // (PackDesignsForm) активен на трек 'stickers' для всех PACK_STAGES_3D_PACK.
+  function renderTrackCard({ trackKey, subStatus, headerLabel, tonePill }) {
+    const cardStage = SUBTASK_STATUS_TO_STAGE[subStatus] || stage
+    const cardLabel = ORDER_STATUSES[cardStage]?.label || cardStage
+    const cardConfig = STAGE_FIELDS[cardStage]
+    const isDualTrackStage = !!cardConfig?.tracks
+    const otherTrack = trackKey === 'backgrounds' ? 'stickers' : 'backgrounds'
+    const otherFields = isDualTrackStage
+      ? (cardConfig.tracks.find((t) => t.key === otherTrack)?.fields?.map((f) => f.key) || [])
+      : []
+    // Полностью скрываем поля другого трека — ProductionLogForm после фильтрации
+    // оставит только нужный трек как active.
+    const omitFields = otherFields.length > 0 ? { [otherTrack]: otherFields } : undefined
+
+    const trackProgress = computeStageProgress(logs, cardStage, order.qty, trackKey)
+    const trackIncoming = computeIncoming(logs, route, cardStage, order.qty, trackKey)
+    const progressForForm = isDualTrackStage ? { [trackKey]: trackProgress } : trackProgress
+    const incomingForForm = isDualTrackStage ? { [trackKey]: trackIncoming } : trackIncoming
+
+    const showPackForCard = trackKey === 'stickers'
+      && isPack3D
+      && PACK_STAGES_3D_PACK.includes(cardStage)
+
+    const pillCls = tonePill === 'backgrounds'
+      ? 'bg-dept-print/15 text-dept-print border-dept-print/30'
+      : 'bg-dept-pouring/15 text-dept-pouring border-dept-pouring/30'
+
+    // Sub-status is in pending → форма ещё неактивна для этого трека
+    if (subStatus === 'pending') {
+      return (
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${pillCls}`}>
+              {headerLabel}
+            </span>
+            <h2 className="font-semibold">Ожидание</h2>
+          </div>
+          <p className="text-sm text-text-muted">Подзадача ещё не стартовала.</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${pillCls}`}>
+            {headerLabel}
+          </span>
+          <h2 className="font-semibold">Учёт работы на этапе: {cardLabel}</h2>
+        </div>
+        {showPackForCard && designs.length > 0 ? (
+          <div>
+            <p className="text-xs text-text-muted mb-2">Стикеры — по каждому виду отдельно</p>
+            <PackDesignsForm
+              designs={designs}
+              logs={logs}
+              stage={cardStage}
+              route={route}
+              onSubmitDesign={(designIndex, payload) => handlePackDesignSubmit(designIndex, payload, cardStage)}
+              updateName={updateName}
+              mode={cardStage === 'prepress' ? 'prepress'
+                : cardStage === 'print' ? 'print'
+                : cardStage === 'cutting' ? 'cutting'
+                : cardStage === 'drying' ? 'drying'
+                : 'pouring'}
+            />
+            <div className="mt-4 pt-4 border-t border-border">
+              <ProductionLogForm
+                stage={cardStage}
+                order={order}
+                progress={progressForForm}
+                incoming={incomingForForm}
+                onSubmit={handleSubmit}
+                omitFields={{
+                  ...(omitFields || {}),
+                  stickers: [
+                    ...(omitFields?.stickers || []),
+                    ...((PACK_OMIT_FIELDS[cardStage]?.stickers) || []),
+                  ],
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+          <ProductionLogForm
+            stage={cardStage}
+            order={order}
+            progress={progressForForm}
+            incoming={incomingForForm}
+            onSubmit={handleSubmit}
+            omitFields={omitFields}
+          />
+        )}
+      </div>
+    )
+  }
+
   const stageLabel = ORDER_STATUSES[stage]?.label || stage
 
   // Прогресс по трекам (если dual-track) или общий.
-  // На ламинации 3D-стикерпака ламинируются ТОЛЬКО фоны — incoming считаем
-  // по track='backgrounds' предыдущего этапа (фидбэк 17.05).
   let progressProp, incomingProp
-  if (isPack3D && ['print', 'cutting', 'selection_pouring'].includes(stage)) {
+  if (isPack3D && DUAL_TRACK_STAGES.includes(stage)) {
     progressProp = {
       stickers: computeStageProgress(logs, stage, order.qty, 'stickers'),
       backgrounds: computeStageProgress(logs, stage, order.qty, 'backgrounds'),
@@ -293,6 +405,42 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   } else {
     progressProp = computeStageProgress(logs, stage, order.qty)
     incomingProp = computeIncoming(logs, route, stage, order.qty, null)
+  }
+
+  const confirmDialogs = (
+    <>
+      <ConfirmDialog
+        isOpen={!!pendingAdvance}
+        onClose={() => setPendingAdvance(null)}
+        onConfirm={confirmAdvance}
+        title="Все данные заполнены, завершить этап?"
+        message={pendingAdvance ? `Заказ перейдёт на этап «${ORDER_STATUSES[pendingAdvance.to]?.label || pendingAdvance.to}». Если нужно дозаполнить — нажмите «Отмена».` : ''}
+        confirmText="Завершить этап"
+        variant="primary"
+      />
+      <ConfirmDialog
+        isOpen={!!pendingSubtask}
+        onClose={() => setPendingSubtask(null)}
+        onConfirm={confirmSubtaskAdvance}
+        title={pendingSubtask ? `Отправить ${(TRACK_LABELS[pendingSubtask.track] || pendingSubtask.track).toLowerCase()}ы на ${(SUBTASK_STATUS_LABELS[pendingSubtask.to] || pendingSubtask.to).toLowerCase()}?` : ''}
+        message={pendingSubtask ? `Подзадача «${TRACK_LABELS[pendingSubtask.track]}» перейдёт на этап «${SUBTASK_STATUS_LABELS[pendingSubtask.to]}». Другая подзадача останется на текущем этапе.` : ''}
+        confirmText="Отправить дальше"
+        variant="primary"
+      />
+    </>
+  )
+
+  if (isDualCardsMode) {
+    return (
+      <div className="space-y-4">
+        <StageJumperBlock order={order} onUpdated={onUpdated} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {renderTrackCard({ trackKey: 'backgrounds', subStatus: subtasks.backgrounds.status, headerLabel: 'ФОН', tonePill: 'backgrounds' })}
+          {renderTrackCard({ trackKey: 'stickers', subStatus: subtasks.stickers.status, headerLabel: 'СТИКЕР', tonePill: 'stickers' })}
+        </div>
+        {confirmDialogs}
+      </div>
+    )
   }
 
   return (
@@ -333,25 +481,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
         )}
       </div>
 
-      <ConfirmDialog
-        isOpen={!!pendingAdvance}
-        onClose={() => setPendingAdvance(null)}
-        onConfirm={confirmAdvance}
-        title="Все данные заполнены, завершить этап?"
-        message={pendingAdvance ? `Заказ перейдёт на этап «${ORDER_STATUSES[pendingAdvance.to]?.label || pendingAdvance.to}». Если нужно дозаполнить — нажмите «Отмена».` : ''}
-        confirmText="Завершить этап"
-        variant="primary"
-      />
-
-      <ConfirmDialog
-        isOpen={!!pendingSubtask}
-        onClose={() => setPendingSubtask(null)}
-        onConfirm={confirmSubtaskAdvance}
-        title={pendingSubtask ? `Отправить ${(TRACK_LABELS[pendingSubtask.track] || pendingSubtask.track).toLowerCase()}ы на ${(SUBTASK_STATUS_LABELS[pendingSubtask.to] || pendingSubtask.to).toLowerCase()}?` : ''}
-        message={pendingSubtask ? `Подзадача «${TRACK_LABELS[pendingSubtask.track]}» перейдёт на этап «${SUBTASK_STATUS_LABELS[pendingSubtask.to]}». Другая подзадача останется на текущем этапе.` : ''}
-        confirmText="Отправить дальше"
-        variant="primary"
-      />
+      {confirmDialogs}
     </div>
   )
 }

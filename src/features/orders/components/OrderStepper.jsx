@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { ORDER_STATUSES, ORDER_TYPES, getOrderRoute } from '@/shared/constants'
+import {
+  ORDER_STATUSES, ORDER_TYPES, getOrderRoute,
+  IS_3D_STICKERPACK, SUBTASK_STATUS_TO_STAGE, SUBTASK_STATUS_LABELS,
+  TRACK_LABELS, getSubtaskRoute,
+} from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
@@ -39,16 +43,123 @@ function dotColor(status) {
   }
 }
 
+// Цвет точки для статуса подзадачи (printing/laminating/cutting/...).
+// Маппим в order-stage через SUBTASK_STATUS_TO_STAGE и берём dotColor.
+function subtaskDotColor(subStatus) {
+  const mapped = SUBTASK_STATUS_TO_STAGE[subStatus]
+  if (mapped) return dotColor(mapped)
+  if (subStatus === 'drying') return DEPT_DOT.pouring
+  if (subStatus === 'ready') return DEPT_DOT.finish
+  return DEPT_DOT.info
+}
+
+// Одна точка с подписью под ней.
+function Dot({ kind = 'order', status, isCompleted, isCurrent, label, tooltip, size = 'md' }) {
+  const cls = kind === 'subtask' ? subtaskDotColor(status) : dotColor(status)
+  const dotSize = size === 'sm' ? 'w-2 h-2' : 'w-2.5 h-2.5'
+  const ringForCurrent = isCurrent ? 'ring-4 ring-accent/25' : ''
+  return (
+    <div className="flex flex-col items-center gap-1 shrink-0" title={tooltip}>
+      <span
+        className={`${dotSize} rounded-full transition-all ${
+          isCurrent ? `${cls} ${ringForCurrent}` : isCompleted ? cls : 'bg-surface-2 ring-1 ring-border'
+        }`}
+        aria-hidden="true"
+      />
+      <span className={`text-[10px] leading-tight whitespace-nowrap ${
+        isCurrent ? 'font-semibold text-text' : isCompleted ? 'text-text-muted' : 'text-text-muted/60'
+      }`}>{label}</span>
+    </div>
+  )
+}
+
+function Connector({ done }) {
+  return <span className={`h-px w-3 sm:w-6 shrink-0 ${done ? 'bg-text-muted/40' : 'bg-border'}`} aria-hidden="true" />
+}
+
+// Пилюля с названием трека (СТИКЕР / ФОН / ДОП СТИКЕР).
+function TrackPill({ label, tone }) {
+  const cls = {
+    backgrounds: 'bg-dept-print/15 text-dept-print border-dept-print/30',
+    stickers: 'bg-dept-pouring/15 text-dept-pouring border-dept-pouring/30',
+    extra_stickers: 'bg-warning/15 text-warning border-warning/30',
+  }[tone] || 'bg-surface-2 text-text-muted border-border'
+  return (
+    <span className={`shrink-0 inline-flex items-center justify-center px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${cls}`}>
+      {label}
+    </span>
+  )
+}
+
+// Маркер развилки/сходимости: угловая скобка из двух чёрточек.
+function ForkBracket({ direction = 'open' }) {
+  const path = direction === 'open' ? 'M14 4 L4 12 L14 20' : 'M2 4 L12 12 L2 20'
+  return (
+    <svg viewBox="0 0 16 24" width="16" height="24" className="shrink-0 text-border" aria-hidden="true">
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// Ряд chips для одного трека: пилюля слева, точки/коннекторы дальше.
+function TrackRow({ trackKey, statuses, currentStatus }) {
+  const currentIdx = statuses.indexOf(currentStatus)
+  return (
+    <div className="flex items-center gap-1.5 min-w-max">
+      <TrackPill label={TRACK_LABELS[trackKey] || trackKey} tone={trackKey} />
+      {statuses.map((s, i) => {
+        const isCompleted = currentIdx >= 0 && i < currentIdx
+        const isCurrent = i === currentIdx
+        const label = SUBTASK_STATUS_LABELS[s] || s
+        return (
+          <span key={s} className="flex items-center gap-1.5">
+            <Dot
+              kind="subtask"
+              status={s}
+              isCompleted={isCompleted}
+              isCurrent={isCurrent}
+              label={label}
+              tooltip={isCurrent ? 'Текущий этап' : isCompleted ? 'Пройден' : 'Не пройден'}
+              size="sm"
+            />
+            {i < statuses.length - 1 && <Connector done={currentIdx > i} />}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+// Ряд chips для обычного маршрута (order.status namespace).
+function OrderRow({ statuses, currentIdx, tsByStatus }) {
+  return (
+    <ol className="flex items-center gap-1.5 min-w-max">
+      {statuses.map((status, i) => {
+        const isCompleted = currentIdx >= 0 && i < currentIdx
+        const isCurrent = i === currentIdx
+        const s = ORDER_STATUSES[status]
+        const ts = tsByStatus[status]
+        const tooltip = ts
+          ? `${formatDateTime(ts.created_at)}${ts.changed_by_profile?.display_name ? ` · ${ts.changed_by_profile.display_name}` : ''}`
+          : isCurrent ? 'Текущий этап' : 'Не пройден'
+        return (
+          <li key={status} className="flex items-center gap-1.5">
+            <Dot status={status} isCompleted={isCompleted} isCurrent={isCurrent} label={s?.label || status} tooltip={tooltip} />
+            {i < statuses.length - 1 && <Connector done={currentIdx > i} />}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
 /**
  * Тонкая «закладочная» лента прогресса по этапам.
- * Каждый этап — точка в цвете отдела, текущий подсвечен ободком,
- * пройденные залиты, будущие — пустые. Tooltip с датой/исполнителем.
- *
- * Если статус заказа выпал из маршрута (напр. сменили design_status='provided'
- * или перетащили в неверную колонку до фикса DnD-валидации) — показываем
- * предупреждение с кнопкой возврата на ближайший валидный этап.
+ * Для stickerpack3D и при наличии extras — рендерит развилку с пилюлями
+ * (ФОН / СТИКЕР / ДОП СТИКЕР) между общим префиксом и общим хвостом
+ * (..prepress < tracks > assembly_3d..).
  */
-export function OrderStepper({ order, history, onUpdated }) {
+export function OrderStepper({ order, history, subtasks, extras, onUpdated }) {
   const [returning, setReturning] = useState(false)
   const isMountedRef = useRef(true)
   useEffect(() => () => { isMountedRef.current = false }, [])
@@ -59,14 +170,9 @@ export function OrderStepper({ order, history, onUpdated }) {
   const isCancelled = order.status === 'cancelled'
   const isOffRoute = !isCancelled && currentIdx === -1
 
-  // map: status → first transition into it
   const tsByStatus = {}
-  history?.forEach((h) => {
-    if (!tsByStatus[h.to_status]) tsByStatus[h.to_status] = h
-  })
+  history?.forEach((h) => { if (!tsByStatus[h.to_status]) tsByStatus[h.to_status] = h })
 
-  // Ближайший валидный статус для возврата (первый после 'new'). Если route пустой —
-  // оставляем null и не показываем кнопку.
   const recoveryTarget = route.find((s) => s !== 'new') ?? route[0] ?? null
 
   async function handleReturn() {
@@ -122,53 +228,125 @@ export function OrderStepper({ order, history, onUpdated }) {
     )
   }
 
+  const isPack3D = IS_3D_STICKERPACK(order.order_type)
+  const hasMainSubtasks = isPack3D && subtasks?.backgrounds && subtasks?.stickers
+  const hasExtras = Array.isArray(extras) && extras.length > 0
+  const showFork = hasMainSubtasks || (hasExtras && (isPack3D || order.order_type === 'sticker3D'))
+
+  // Без развилки — текущий стандартный stepper.
+  if (!showFork) {
+    return (
+      <div className="bg-surface rounded-xl border border-border px-3 py-2.5 overflow-x-auto">
+        <OrderRow statuses={route} currentIdx={currentIdx} tsByStatus={tsByStatus} />
+      </div>
+    )
+  }
+
+  // Развилка: префикс до первой dual-track стадии, хвост от assembly_3d.
+  // Для sticker3D с extras: split по 'print', merge — после маршрута stickers
+  // (assembly_3d отсутствует в sticker3D, но extras всё равно отдельным треком).
+  const splitStage = 'print'
+  const mergeStage = isPack3D ? 'assembly_3d' : 'packaging'
+  const splitIdx = route.indexOf(splitStage)
+  const mergeIdx = route.indexOf(mergeStage)
+  const safeSplit = splitIdx < 0 ? Math.max(0, route.length - 1) : splitIdx
+  const safeMerge = mergeIdx < 0 ? route.length : mergeIdx
+  const prefix = route.slice(0, safeSplit)
+  const suffix = route.slice(safeMerge)
+
+  // Текущий индекс относительно префикса и хвоста.
+  const prefixCurrentIdx = prefix.indexOf(order.status)
+  const isAfterFork = order.status === mergeStage || route.indexOf(order.status) > safeMerge
+  // Если order.status уже >= mergeStage — префикс полностью пройден.
+  // Иначе если order.status в DUAL — префикс полностью пройден, suffix не начат.
+  let suffixCurrentIdx = -1
+  if (isAfterFork) {
+    suffixCurrentIdx = suffix.indexOf(order.status)
+  }
+  // Префикс показываем как пройденный когда находимся в DUAL или дальше.
+  const inOrAfterDual = currentIdx >= safeSplit
+  const prefixEffectiveCurrent = inOrAfterDual ? prefix.length : prefixCurrentIdx
+
+  // Треки для развилки. По скрину менеджера — порядок: СТИКЕР сверху, ФОН снизу.
+  // Фильтруем pending/ready (они не показываются как этапы маршрута).
+  function visibleSubtaskRoute(trackKey) {
+    return getSubtaskRoute(trackKey, order).filter((s) => s !== 'pending' && s !== 'ready')
+  }
+
+  const trackRows = []
+  if (hasMainSubtasks) {
+    trackRows.push({
+      key: 'stickers',
+      statuses: visibleSubtaskRoute('stickers'),
+      current: subtasks.stickers.status,
+    })
+    trackRows.push({
+      key: 'backgrounds',
+      statuses: visibleSubtaskRoute('backgrounds'),
+      current: subtasks.backgrounds.status,
+    })
+  } else if (!isPack3D && order.order_type === 'sticker3D') {
+    // Для sticker3D рендерим «основной» маршрут как один трек (на основе ORDER route
+    // между splitIdx и mergeIdx) — для визуального единообразия с extras.
+    const dualSlice = route.slice(safeSplit, safeMerge)
+    trackRows.push({
+      key: 'main',
+      statuses: dualSlice,
+      current: order.status,
+      isOrderRoute: true,
+    })
+  }
+  if (hasExtras) {
+    for (const ex of extras) {
+      trackRows.push({
+        key: `extra-${ex.id}`,
+        statuses: visibleSubtaskRoute('extra_stickers'),
+        current: ex.status,
+        trackLabel: 'extra_stickers',
+      })
+    }
+  }
+
   return (
     <div className="bg-surface rounded-xl border border-border px-3 py-2.5 overflow-x-auto">
-      <ol className="flex items-center gap-1.5 min-w-max">
-        {route.map((status, i) => {
-          const isCompleted = i < currentIdx
-          const isCurrent = i === currentIdx
-          const s = ORDER_STATUSES[status]
-          const ts = tsByStatus[status]
-          const dotCls = dotColor(status)
+      <div className="flex items-start gap-3 min-w-max">
+        {/* Префикс */}
+        <OrderRow statuses={prefix} currentIdx={prefixEffectiveCurrent} tsByStatus={tsByStatus} />
 
-          const tooltip = ts
-            ? `${formatDateTime(ts.created_at)}${ts.changed_by_profile?.display_name ? ` · ${ts.changed_by_profile.display_name}` : ''}`
-            : isCurrent ? 'Текущий этап' : 'Не пройден'
+        {/* Скобка раскрытия */}
+        <div className="flex items-center self-stretch pt-1.5">
+          <ForkBracket direction="open" />
+        </div>
 
-          // Mobile «Dock»: текущий этап крупнее, остальные мелкие без подписи.
-          // На md+ — обычный вид (точки одинаковые, подпись под каждой) — фидбэк 17.05.
-          const dotSizeCls = isCurrent
-            ? 'w-3.5 h-3.5 md:w-2.5 md:h-2.5'
-            : 'w-2 h-2 md:w-2.5 md:h-2.5'
-          const labelVisibilityCls = isCurrent ? '' : 'hidden md:inline'
+        {/* Параллельные треки */}
+        <div className="flex flex-col gap-3 py-1.5">
+          {trackRows.map((row) => (
+            row.isOrderRoute ? (
+              <OrderRow
+                key={row.key}
+                statuses={row.statuses}
+                currentIdx={row.statuses.indexOf(row.current)}
+                tsByStatus={tsByStatus}
+              />
+            ) : (
+              <TrackRow
+                key={row.key}
+                trackKey={row.trackLabel || row.key}
+                statuses={row.statuses}
+                currentStatus={row.current}
+              />
+            )
+          ))}
+        </div>
 
-          return (
-            <li key={status} className="flex items-center gap-1.5">
-              <div className="flex flex-col items-center gap-1" title={tooltip}>
-                <span
-                  className={`${dotSizeCls} rounded-full transition-all ${
-                    isCurrent
-                      ? `${dotCls} ring-4 ring-accent/25`
-                      : isCompleted
-                        ? dotCls
-                        : 'bg-surface-2 ring-1 ring-border'
-                  }`}
-                  aria-hidden="true"
-                />
-                <span className={`text-[10px] leading-tight whitespace-nowrap ${labelVisibilityCls} ${
-                  isCurrent ? 'font-semibold text-text text-[11px] md:text-[10px]' : isCompleted ? 'text-text-muted' : 'text-text-muted/60'
-                }`}>
-                  {s?.label || status}
-                </span>
-              </div>
-              {i < route.length - 1 && (
-                <span className={`h-px w-3 sm:w-6 ${i < currentIdx ? 'bg-text-muted/40' : 'bg-border'}`} aria-hidden="true" />
-              )}
-            </li>
-          )
-        })}
-      </ol>
+        {/* Скобка сходимости */}
+        <div className="flex items-center self-stretch pt-1.5">
+          <ForkBracket direction="close" />
+        </div>
+
+        {/* Хвост */}
+        <OrderRow statuses={suffix} currentIdx={suffixCurrentIdx} tsByStatus={tsByStatus} />
+      </div>
     </div>
   )
 }

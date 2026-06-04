@@ -317,45 +317,57 @@ export function computeIncomingPerDesign(logs, route, stage, designIndex) {
 /**
  * Validate a log entry for a given stage.
  *
- * Лимита по тиражу заказа НЕТ (фидбэк менеджера 14.05): печать — стартовый этап,
+ * Возвращает `null` если всё OK, либо `{ severity, message }`:
+ *  • `severity='error'`  — блокирует submit (обязательные поля, отрицательные числа)
+ *  • `severity='warning'` — разрешает submit, показывается как напоминание
+ *                           (R15.1, бриф 04.06: «оставить как напоминание»)
+ *
+ * Лимита по тиражу заказа НЕТ (фидбэк 14.05): печать — стартовый этап,
  * вводится без ограничений; последующие этапы ограничены только количеством,
  * фактически поступившим на этап (`options.incoming`), а не тиражом `qty`.
+ * Превышение прихода больше не блокирует submit — менеджер собирает паки
+ * пока фоны ещё не все выбраны (#3 / #7 в брифе 04.06).
  *
  * @param {string} stage
  * @param {object} data
  * @param {object} [options]
  *   options.progress — {total, target} прогресс по quantityField (используется для «осталось»)
  *   options.incoming — {total, isStart} сколько пришло с предыдущего этапа.
- *     Если isStart=true или total==null — лимита нет (стартовый этап).
- *   options.allowOvershoot — снять лимит прихода (напр. для packaging)
+ *     Если isStart=true или total==null — предупреждения нет (стартовый этап).
+ *   options.allowOvershoot — снять предупреждение прихода (напр. для packaging)
+ * @returns {{ severity: 'error' | 'warning', message: string } | null}
  */
 export function validateLogEntry(stage, data, options = {}) {
   const config = STAGE_FIELDS[stage]
-  if (!config) return 'Неизвестный этап'
+  if (!config) return { severity: 'error', message: 'Неизвестный этап' }
 
   const fields = config.fields || []
   for (const field of fields) {
     if (field.required && !data[field.key] && data[field.key] !== 0) {
-      return `Заполните поле "${field.label}"`
+      return { severity: 'error', message: `Заполните поле "${field.label}"` }
     }
     if (data[field.key] !== undefined && data[field.key] !== '') {
       const num = Number(data[field.key])
-      if (isNaN(num) || num < 0) return `"${field.label}" должно быть положительным числом`
+      if (isNaN(num) || num < 0) {
+        return { severity: 'error', message: `"${field.label}" должно быть положительным числом` }
+      }
     }
   }
 
-  // Лимит по приходу с предыдущего этапа: «нельзя обработать больше, чем поступило».
+  // R15.1 (бриф 04.06 #3/#7): лимит по приходу теперь WARNING, не блок.
   // Проверяем ТОЛЬКО основное value (config.quantityField); defects могут быть
-  // любыми и не учитываются в лимите (фидбэк менеджера 18.05: «если введено
-  // максимальное, то брак может быть любой — он отнимается от учтённого»).
-  // Для стартового этапа (isStart / total==null) лимита нет вовсе.
+  // любыми и не учитываются в лимите (фидбэк менеджера 18.05). Для стартового
+  // этапа (isStart / total==null) предупреждения нет вовсе.
   const inc = options.incoming
   if (inc && !inc.isStart && inc.total != null && config.quantityField && !options.allowOvershoot) {
     const value = Number(data[config.quantityField] || 0)
     const alreadyConsumed = Number(options.progress?.total || 0)
     const available = Math.max(0, Number(inc.total || 0) - alreadyConsumed)
     if (value > available) {
-      return `На этап поступило ${inc.total} шт. Доступно ещё: ${available}`
+      return {
+        severity: 'warning',
+        message: `На этап поступило ${inc.total} шт. Доступно ещё: ${available}`,
+      }
     }
   }
 

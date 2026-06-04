@@ -112,6 +112,21 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
     return { ...data, stickers_good: Math.max(0, poured - defects) }
   }
 
+  // R15.1 (бриф 04.06 #3/#7): validateLogEntry теперь возвращает
+  // { severity, message } | null. error блокирует submit, warning — напоминание,
+  // submit идёт дальше. Возвращает true если можно продолжать.
+  function applyValidation(res, labelPrefix) {
+    if (!res) return true
+    const msg = labelPrefix ? `${labelPrefix}: ${res.message}` : res.message
+    if (res.severity === 'error') {
+      toast.error(msg)
+      return false
+    }
+    // warning — submit разрешён, показываем напоминание (toast.info без Sentry)
+    toast.info(msg)
+    return true
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
 
@@ -124,12 +139,12 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
       for (const t of activeTracks) {
         const data = getForm(t.key)
         if (isFormEmpty(data)) continue
-        const validationErr = validateLogEntry(stage, data, {
+        const validationRes = validateLogEntry(stage, data, {
           progress: progress?.[t.key],
           incoming: incoming?.[t.key],
           allowOvershoot,
         })
-        if (validationErr) { toast.error(`${t.label}: ${validationErr}`); return }
+        if (!applyValidation(validationRes, t.label)) return
         trackEntries.push({ track: t.key, data: { ...data, notes: root.notes || null } })
       }
       // Доп. resin-лог для selection_pouring
@@ -160,8 +175,8 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
     // Single-track
     const data = { ...getForm('single'), notes: root.notes || null }
     if (isFormEmpty(data)) { toast.error('Заполните хотя бы одно поле'); return }
-    const err = validateLogEntry(stage, data, { progress, incoming, allowOvershoot })
-    if (err) { toast.error(err); return }
+    const validationRes = validateLogEntry(stage, data, { progress, incoming, allowOvershoot })
+    if (!applyValidation(validationRes, null)) return
 
     setSaving(true)
     try {

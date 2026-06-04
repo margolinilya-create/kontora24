@@ -195,8 +195,9 @@ describe('computeDualTrackProgress', () => {
 })
 
 describe('validateLogEntry', () => {
+  // R15.1 (бриф 04.06): теперь возвращает { severity, message } | null.
   it('returns error for unknown stage', () => {
-    expect(validateLogEntry('nonexistent', {})).toBe('Неизвестный этап')
+    expect(validateLogEntry('nonexistent', {})).toEqual({ severity: 'error', message: 'Неизвестный этап' })
   })
 
   it('returns null for valid print data', () => {
@@ -225,6 +226,14 @@ describe('validateLogEntry', () => {
     expect(validateLogEntry('print', { film_type: 'G' })).toBeNull()
   })
 
+  it('returns error for negative number on numeric field', () => {
+    // R15.1: явный test что error возвращается как объект.
+    expect(validateLogEntry('cutting', { qty_cut: -5 })).toEqual({
+      severity: 'error',
+      message: expect.stringContaining('положительным числом'),
+    })
+  })
+
   it('no longer caps by order qty — print accepts more than target', () => {
     // Печать — стартовый этап, вводится без ограничений (фидбэк 14.05).
     expect(validateLogEntry('print', { stickers_printed: 5000 }, {
@@ -233,20 +242,24 @@ describe('validateLogEntry', () => {
     })).toBeNull()
   })
 
-  it('no qty cap on later stages — only incoming caps', () => {
-    // lamination больше не ограничен тиражом, только фактическим приходом
+  it('no qty cap on later stages — only incoming triggers warning', () => {
+    // lamination больше не ограничен тиражом
     expect(validateLogEntry('lamination', { lamination_qty: 300 }, {
       progress: { total: 0, target: 100 },
       incoming: { total: 500 },
     })).toBeNull()
   })
 
-  it('caps by incoming quantity on non-start stages', () => {
-    const err = validateLogEntry('lamination', { lamination_qty: 120 }, {
+  it('returns WARNING (not error) when exceeding incoming', () => {
+    // R15.1: лимит прихода — теперь warning, submit разрешён.
+    const res = validateLogEntry('lamination', { lamination_qty: 120 }, {
       progress: { total: 0 },
       incoming: { total: 100 },
     })
-    expect(err).toMatch(/поступило 100/i)
+    expect(res).toEqual({
+      severity: 'warning',
+      message: expect.stringMatching(/поступило 100/i),
+    })
   })
 
   it('ignores incoming cap when stage is start (isStart)', () => {
@@ -267,6 +280,14 @@ describe('validateLogEntry', () => {
     expect(validateLogEntry('lamination', { lamination_qty: 0, defects: 999 }, {
       progress: { total: 0 },
       incoming: { total: 100 },
+    })).toBeNull()
+  })
+
+  it('allowOvershoot снимает warning о приходе (packaging)', () => {
+    expect(validateLogEntry('packaging', { packs_packaged: 5000 }, {
+      progress: { total: 0 },
+      incoming: { total: 100 },
+      allowOvershoot: true,
     })).toBeNull()
   })
 })

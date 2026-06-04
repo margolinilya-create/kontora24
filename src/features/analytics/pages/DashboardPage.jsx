@@ -13,8 +13,10 @@ const CompleteTaskModal = lazy(() => import('@/features/production/components/Co
 import Button from '@/shared/components/Button'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import Tabs from '@/shared/components/Tabs'
+import Modal from '@/shared/components/Modal'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { ProductionStatsTab } from '../components/ProductionStatsTab'
+import { ActiveShiftsWidget } from '../components/ActiveShiftsWidget'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
@@ -85,6 +87,9 @@ export default function DashboardPage() {
   const [batchCompleting, setBatchCompleting] = useState(false)
   const [showBatchConfirm, setShowBatchConfirm] = useState(false)
   const [managerTab, setManagerTab] = useState('overview')
+  // R15.4 (бриф 04.06 #2): какая метрика открыта во всплывающем списке заказов.
+  // null — закрыто. 'inWork' / 'dueToday' — режим списка.
+  const [metricModal, setMetricModal] = useState(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -374,17 +379,37 @@ export default function DashboardPage() {
 
           {managerTab === 'overview' && (
             <>
-              {/* Top metrics — bento tiles, +8pt по ТЗ */}
+              {/* Top metrics — bento tiles, +8pt по ТЗ.
+                  R15.4: кликабельны → Modal со списком заказов. */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+                <button
+                  type="button"
+                  onClick={() => setMetricModal('inWork')}
+                  disabled={ordersInWork.length === 0}
+                  className="bg-surface rounded-2xl border border-border shadow-card p-5 text-left transition-all hover:ring-2 hover:ring-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-default disabled:hover:ring-0"
+                >
                   <p className="text-text-muted text-sm">Заказов в работе</p>
                   <p className="text-5xl font-bold mt-2 font-display tracking-tight leading-none">{ordersInWork.length}</p>
-                </div>
-                <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+                  {ordersInWork.length > 0 && (
+                    <p className="text-[11px] text-text-muted mt-2 opacity-60">— открыть список</p>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMetricModal('dueToday')}
+                  disabled={ordersDueToday.length === 0}
+                  className="bg-surface rounded-2xl border border-border shadow-card p-5 text-left transition-all hover:ring-2 hover:ring-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-default disabled:hover:ring-0"
+                >
                   <p className="text-text-muted text-sm">К сдаче сегодня</p>
                   <p className="text-5xl font-bold mt-2 font-display tracking-tight leading-none">{ordersDueToday.length}</p>
-                </div>
+                  {ordersDueToday.length > 0 && (
+                    <p className="text-[11px] text-text-muted mt-2 opacity-60">— открыть список</p>
+                  )}
+                </button>
               </div>
+
+              {/* R15.4 #1: виджет активных смен */}
+              <ActiveShiftsWidget />
 
               {/* Список срочных заказов (priority=urgent или просроченные) */}
               {urgentOrders.length > 0 && (
@@ -463,8 +488,57 @@ export default function DashboardPage() {
           )}
 
           {managerTab === 'production' && <ProductionStatsTab />}
+
+          {/* R15.4: модалка с детальным списком заказов по клику на метрики */}
+          {metricModal && (
+            <Modal
+              isOpen
+              onClose={() => setMetricModal(null)}
+              title={metricModal === 'inWork' ? 'Заказы в работе' : 'К сдаче сегодня'}
+              maxWidth="max-w-lg"
+            >
+              <MetricOrdersList
+                orders={metricModal === 'inWork' ? ordersInWork : ordersDueToday}
+                onClose={() => setMetricModal(null)}
+                showDeadline={metricModal === 'dueToday'}
+              />
+            </Modal>
+          )}
         </>
       )}
     </div>
+  )
+}
+
+function MetricOrdersList({ orders, onClose, showDeadline }) {
+  if (orders.length === 0) {
+    return <p className="text-sm text-text-muted">Список пуст</p>
+  }
+  return (
+    <ul className="space-y-1.5 text-sm max-h-96 overflow-y-auto">
+      {orders.map((o) => (
+        <li key={o.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-border last:border-0">
+          <Link
+            to={`/orders/${o.id}`}
+            onClick={onClose}
+            className="flex items-center gap-2 min-w-0 hover:text-accent"
+          >
+            <span className="font-semibold text-text shrink-0">#{formatOrderNumber(o)}</span>
+            <span className="text-text-muted truncate text-xs">
+              {ORDER_TYPES[o.order_type]?.label} · {o.qty} шт
+              {o.client?.name && ` · ${o.client.name}`}
+            </span>
+          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            {showDeadline && o.deadline && (
+              <span className="text-[11px] text-text-muted tabular-nums">
+                {new Date(o.deadline).toLocaleDateString('ru-RU')}
+              </span>
+            )}
+            <StatusBadge status={o.status} />
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }

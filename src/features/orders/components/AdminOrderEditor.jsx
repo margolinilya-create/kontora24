@@ -349,8 +349,14 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               ))}
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Input type="number" placeholder="Ширина" value={form.width_mm ?? ''} onChange={(e) => update('width_mm', e.target.value)} />
-              <Input type="number" placeholder="Высота" value={form.height_mm ?? ''} onChange={(e) => update('height_mm', e.target.value)} />
+              <div>
+                <label htmlFor="admin_width_mm" className="block text-xs text-text-muted mb-0.5">Ширина, мм</label>
+                <Input id="admin_width_mm" type="number" placeholder="100" value={form.width_mm ?? ''} onChange={(e) => update('width_mm', e.target.value)} />
+              </div>
+              <div>
+                <label htmlFor="admin_height_mm" className="block text-xs text-text-muted mb-0.5">Длина, мм</label>
+                <Input id="admin_height_mm" type="number" placeholder="100" value={form.height_mm ?? ''} onChange={(e) => update('height_mm', e.target.value)} />
+              </div>
             </div>
           </div>
 

@@ -492,11 +492,13 @@ export default function CreateOrderPage() {
               <SizePresetPicker activePreset={activePreset} onSelect={applyPreset} isPack={isStickerpack} />
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <div>
-                  <Input type="number" placeholder="Ширина" inputMode="numeric" aria-invalid={!!errors.width_mm} className={errors.width_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('width_mm', { onChange: () => setActivePreset(null) })} />
+                  <label htmlFor="width_mm" className="block text-xs text-text-muted mb-0.5">Ширина, мм</label>
+                  <Input id="width_mm" type="number" placeholder="100" inputMode="numeric" aria-invalid={!!errors.width_mm} className={errors.width_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('width_mm', { onChange: () => setActivePreset(null) })} />
                   <FieldError error={errors.width_mm} />
                 </div>
                 <div>
-                  <Input type="number" placeholder="Высота" inputMode="numeric" aria-invalid={!!errors.height_mm} className={errors.height_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('height_mm', { onChange: () => setActivePreset(null) })} />
+                  <label htmlFor="height_mm" className="block text-xs text-text-muted mb-0.5">Длина, мм</label>
+                  <Input id="height_mm" type="number" placeholder="100" inputMode="numeric" aria-invalid={!!errors.height_mm} className={errors.height_mm ? 'border-danger ring-1 ring-danger/30' : ''} {...register('height_mm', { onChange: () => setActivePreset(null) })} />
                   <FieldError error={errors.height_mm} />
                 </div>
               </div>
@@ -556,7 +558,7 @@ export default function CreateOrderPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-text-muted mb-0.5">Высота, мм</label>
+                      <label className="block text-xs text-text-muted mb-0.5">Длина, мм</label>
                       <Input
                         type="number" inputMode="numeric" min="1"
                         value={it.height_mm}

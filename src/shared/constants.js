@@ -260,7 +260,7 @@ export const ROLE_STAGE_PERMISSIONS = {
   manager: true, // manager can advance any stage
   designer: ['design', 'sample_layout', 'batch_layout', 'prepress'],
   printer: [
-    'sample_print', 'prepress', 'print', 'lamination', 'cutting',
+    'sample_layout', 'sample_print', 'prepress', 'print', 'lamination', 'cutting',
     'selection_pouring', 'pouring', 'assembly_3d', 'packaging',
   ],
   post_printer: [

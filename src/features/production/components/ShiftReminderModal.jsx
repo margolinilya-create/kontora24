@@ -69,8 +69,12 @@ export function ShiftReminderModal() {
   async function handleEnd() {
     setBusy(true)
     try {
-      await clockOut()
-      toast.success('Смена завершена')
+      const res = await clockOut()
+      const min = res?.durationMinutes || 0
+      const hours = Math.floor(min / 60)
+      const mins = min % 60
+      const human = hours > 0 ? `${hours}ч ${mins}мин` : `${mins}мин`
+      toast.success(`Смена завершена · ${human} сохранено`)
       setShowEnd(false)
       sessionStorage.removeItem(END_DISMISS_KEY)
       sessionStorage.removeItem(START_DISMISS_KEY)

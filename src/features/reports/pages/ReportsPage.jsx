@@ -147,7 +147,7 @@ function UnitEconomicsTab({ period }) {
     const header = [
       'ID', '№ заказа', 'Дата приёма', 'Дедлайн', 'Клиент', 'Продукт', '3D смола',
       'Размер', 'Тираж', 'Стикеров в паке', 'Плёнка', 'Ламинация', 'Комментарий',
-      'Отгрузка', '% брака', '% излишков', 'Сумма заказа', 'Тип оплаты',
+      'Отгрузка', '% брака', 'Излишки, шт', 'Излишки, %', 'Сумма заказа', 'Тип оплаты',
       'Себест. плёнки, ₽', 'Себест. смолы, ₽', 'Себест. материалов, ₽',
       'Оплата труда, ₽', 'Себест. итого (мат+труд), ₽',
       'Маржинальность, ₽', 'Маржинальность, %',
@@ -161,7 +161,7 @@ function UnitEconomicsTab({ period }) {
       o.need_lam ? (LAMINATION_TYPES[o.lam_type]?.label || 'Да') : 'Нет',
       o.notes || '—',
       DELIVERY_TYPES[o.delivery_type]?.label || '—',
-      `${o.reject_pct}%`, `${o.surplus_pct}%`,
+      `${o.reject_pct}%`, o.surplus, `${o.surplus_pct}%`,
       o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
       Math.round(o.mat_film), Math.round(o.mat_resin), Math.round(o.mat_total),
       o.cost_labor || 0, Math.round(o.total_cost_with_mat_labor),
@@ -178,7 +178,7 @@ function UnitEconomicsTab({ period }) {
           <tr className="border-b border-border">
             <Th>№</Th><Th>Дата</Th><Th>Клиент</Th><Th>Продукт</Th>
             <Th right>Размер</Th><Th right>Тираж</Th><Th>Плёнка</Th><Th>Лам.</Th>
-            <Th right>Брак%</Th><Th right>Излиш.%</Th>
+            <Th right>Брак%</Th><Th right>Излиш.шт</Th><Th right>Излиш.%</Th>
             <Th right>Сумма</Th><Th right>Плёнка ₽</Th><Th right>Смола ₽</Th>
             <Th right>С/с итого</Th><Th right>Маржа ₽</Th><Th right>Маржа %</Th>
           </tr>
@@ -195,6 +195,7 @@ function UnitEconomicsTab({ period }) {
               <Td>{FILM_TYPES[o.film_type]?.label || '—'}</Td>
               <Td>{o.need_lam ? (LAMINATION_TYPES[o.lam_type]?.label || 'Да') : '—'}</Td>
               <Td right danger={o.reject_pct > 15}>{o.reject_pct}%</Td>
+              <Td right muted>{o.surplus > 0 ? `+${o.surplus}` : o.surplus}</Td>
               <Td right muted>{o.surplus_pct}%</Td>
               <Td right>{formatPrice(o.price_final)}</Td>
               <Td right muted>{Math.round(o.mat_film)}</Td>
@@ -323,7 +324,7 @@ function ExpensesTab({ period }) {
 
   function handleExport() {
     const header = [
-      '№ заказа', 'Клиент', 'Тираж',
+      '№ заказа', 'Клиент', 'Тираж', 'Излишки, шт', 'Излишки, %',
       'Плёнка, м', 'Себест. плёнки, ₽',
       'Ламинация, м', 'Себест. лам., ₽',
       'БОПП, шт', 'Себест. БОПП, ₽',
@@ -333,6 +334,7 @@ function ExpensesTab({ period }) {
     ]
     const aoa = [header, ...rows.map((o) => [
       formatOrderNumber(o), o.client_name || '—', o.qty,
+      o.surplus, `${o.surplus_pct}%`,
       Number(o.actual_film || 0).toFixed(1), Math.round(o.cost.film),
       Number(o.actual_lam || 0).toFixed(1), Math.round(o.cost.lam),
       o.bopp_bags_used || 0, Math.round(o.cost.bopp),
@@ -350,6 +352,7 @@ function ExpensesTab({ period }) {
         <thead className="text-text-muted">
           <tr className="border-b border-border">
             <Th>№</Th><Th>Клиент</Th><Th right>Тираж</Th>
+            <Th right>Излиш.шт</Th><Th right>Излиш.%</Th>
             <Th right>Плёнка</Th><Th right>₽</Th>
             <Th right>Лам.</Th><Th right>₽</Th>
             <Th right>БОПП</Th><Th right>₽</Th>
@@ -364,6 +367,8 @@ function ExpensesTab({ period }) {
               <Td bold>{formatOrderNumber(o)}</Td>
               <Td>{o.client_name || '—'}</Td>
               <Td right>{o.qty}</Td>
+              <Td right muted>{o.surplus > 0 ? `+${o.surplus}` : o.surplus}</Td>
+              <Td right muted>{o.surplus_pct}%</Td>
               <Td right>{Number(o.actual_film || 0).toFixed(1)}м</Td>
               <Td right muted>{Math.round(o.cost.film)}</Td>
               <Td right>{Number(o.actual_lam || 0).toFixed(1)}м</Td>

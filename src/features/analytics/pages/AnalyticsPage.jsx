@@ -25,8 +25,20 @@ function getThemeColor(varName) {
   return getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
 }
 
+function isoToday() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export default function AnalyticsPage() {
-  const [period, setPeriod] = useState('30d')
+  // R15.2 (бриф 04.06 #9): отдельный ключ периода + custom-диапазон.
+  // Финальное значение `period` для useAnalyticsData кодируется как
+  // 'custom:YYYY-MM-DD:YYYY-MM-DD' (см. parsePeriod в useAnalyticsData).
+  const [periodKey, setPeriodKey] = useState('30d')
+  const [customFrom, setCustomFrom] = useState(isoToday())
+  const [customTo, setCustomTo] = useState(isoToday())
+  const period = periodKey === 'custom' && customFrom && customTo
+    ? `custom:${customFrom}:${customTo}`
+    : periodKey
   const [activeTab, setActiveTab] = useState('finance')
   const [chartColors, setChartColors] = useState({ grid: '#e5e7eb', tooltipBorder: '#e5e7eb', tooltipBg: '#ffffff' })
 
@@ -60,13 +72,13 @@ export default function AnalyticsPage() {
             <h1 className="text-2xl font-bold font-display tracking-tight">Аналитика</h1>
             <p className="text-text-muted">Финансы и производственные метрики</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             {PERIODS.map((p) => (
               <button
                 key={p.key}
-                onClick={() => setPeriod(p.key)}
+                onClick={() => setPeriodKey(p.key)}
                 className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
-                  period === p.key
+                  periodKey === p.key
                     ? 'bg-text text-bg shadow-card'
                     : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
                 }`}
@@ -74,6 +86,27 @@ export default function AnalyticsPage() {
                 {p.label}
               </button>
             ))}
+            {periodKey === 'custom' && (
+              <div className="flex items-center gap-1 text-xs text-text-muted">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  max={customTo}
+                  className="rounded border border-border bg-surface px-2 py-1"
+                  aria-label="С"
+                />
+                <span>–</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  min={customFrom}
+                  className="rounded border border-border bg-surface px-2 py-1"
+                  aria-label="По"
+                />
+              </div>
+            )}
           </div>
         </div>
         <div className="bg-surface rounded-2xl border border-border shadow-card p-10 text-center">
@@ -102,7 +135,7 @@ export default function AnalyticsPage() {
                 doc.setFontSize(16); doc.setFont('helvetica', 'bold')
                 doc.text('Kontora24 — Аналитика', 15, 20)
                 doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-                doc.text(`Период: ${PERIODS.find((p) => p.key === period)?.label}`, 15, 28)
+                doc.text(`Период: ${PERIODS.find((p) => p.key === periodKey)?.label || period}`, 15, 28)
                 let y = 38
                 const rows = [
                   ['Выручка', formatPrice(analytics.revenue)],
@@ -133,9 +166,9 @@ export default function AnalyticsPage() {
           {PERIODS.map((p) => (
             <button
               key={p.key}
-              onClick={() => setPeriod(p.key)}
+              onClick={() => setPeriodKey(p.key)}
               className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
-                period === p.key
+                periodKey === p.key
                   ? 'bg-text text-bg shadow-card'
                   : 'bg-surface border border-border text-text-muted hover:bg-surface-dim'
               }`}
@@ -143,6 +176,27 @@ export default function AnalyticsPage() {
               {p.label}
             </button>
           ))}
+          {periodKey === 'custom' && (
+            <div className="flex items-center gap-1 text-xs text-text-muted">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                max={customTo}
+                className="rounded border border-border bg-surface px-2 py-1"
+                aria-label="С"
+              />
+              <span>–</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                min={customFrom}
+                className="rounded border border-border bg-surface px-2 py-1"
+                aria-label="По"
+              />
+            </div>
+          )}
         </div>
       </div>
 

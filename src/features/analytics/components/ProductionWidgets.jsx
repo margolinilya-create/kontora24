@@ -14,22 +14,33 @@ import { formatOrderNumber } from '@/shared/lib/utils'
  *   - byWorker: { op: { [worker_id]: { name, count } } }
  *   - ordersById: { [order_id]: order }
  */
+// R15.2 (бриф 04.06 #8): добавлены R11-этапы. Tile отображается только если
+// value > 0 за выбранный период — иначе блок засоряется пустыми нулями.
 const TILES = [
-  { op: 'poured',    label: 'Залито стикеров', unit: 'шт', bg: 'bg-dept-pouring/10', fg: 'text-dept-pouring' },
-  { op: 'selected',  label: 'Выбрано фонов',   unit: 'шт', bg: 'bg-dept-print/10',   fg: 'text-dept-print' },
-  { op: 'assembled', label: 'Собрано 3D-паков', unit: 'шт', bg: 'bg-dept-finish/10', fg: 'text-dept-finish' },
-  { op: 'packaged',  label: 'Упаковано',       unit: 'шт', bg: 'bg-accent/10',       fg: 'text-accent' },
+  { op: 'samplePrint', label: 'Образцов отпечатано', unit: 'шт', bg: 'bg-dept-design/10', fg: 'text-dept-design', alwaysShow: false },
+  { op: 'prepared',    label: 'Препресс план',        unit: 'шт', bg: 'bg-dept-design/10', fg: 'text-dept-design', alwaysShow: false },
+  { op: 'printed',     label: 'Напечатано (всего)',   unit: 'шт', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
+  { op: 'laminated',   label: 'Заламинировано',       unit: 'шт', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
+  { op: 'cut',         label: 'Нарезано',             unit: 'шт', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
+  { op: 'poured',      label: 'Залито стикеров',      unit: 'шт', bg: 'bg-dept-pouring/10', fg: 'text-dept-pouring', alwaysShow: true },
+  { op: 'drying',      label: 'Брак на сушке',        unit: 'шт', bg: 'bg-danger/10',       fg: 'text-danger',       alwaysShow: false },
+  { op: 'selection',   label: 'Выбрано штучных',      unit: 'шт', bg: 'bg-dept-pouring/10', fg: 'text-dept-pouring', alwaysShow: false },
+  { op: 'selected',    label: 'Выбрано фонов',        unit: 'шт', bg: 'bg-dept-print/10',   fg: 'text-dept-print',   alwaysShow: true },
+  { op: 'assembled',   label: 'Собрано 3D-паков',     unit: 'шт', bg: 'bg-dept-finish/10',  fg: 'text-dept-finish',  alwaysShow: true },
+  { op: 'packaged',    label: 'Упаковано',            unit: 'шт', bg: 'bg-accent/10',       fg: 'text-accent',       alwaysShow: true },
 ]
 
 export function ProductionWidgets({ productionTotals }) {
   const [openOp, setOpenOp] = useState(null)
   const tile = TILES.find((t) => t.op === openOp)
 
+  const visibleTiles = TILES.filter((t) => t.alwaysShow || (productionTotals.totals[t.op] || 0) > 0)
+
   return (
     <div className="bg-surface rounded-2xl border border-border shadow-card p-4">
       <h2 className="font-semibold mb-3">Производство — сводка</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {TILES.map((t) => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {visibleTiles.map((t) => {
           const value = productionTotals.totals[t.op] || 0
           if (value === 0) {
             return (

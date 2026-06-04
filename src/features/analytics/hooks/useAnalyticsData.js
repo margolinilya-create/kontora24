@@ -5,14 +5,45 @@ import {
   calculateActualMaterialsCost, calculateWorkerPayout,
 } from '@/shared/constants'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
-import { subDays, subMonths, subWeeks, startOfWeek, format, differenceInHours, getISOWeek } from 'date-fns'
+import { subDays, subMonths, subWeeks, startOfWeek, startOfDay, endOfDay, format, differenceInHours, getISOWeek } from 'date-fns'
 
 export const PERIODS = [
-  { key: '7d', label: '7 дней', getStart: () => subDays(new Date(), 7) },
-  { key: '30d', label: '30 дней', getStart: () => subDays(new Date(), 30) },
-  { key: '90d', label: '3 месяца', getStart: () => subMonths(new Date(), 3) },
-  { key: 'all', label: 'Всё время', getStart: () => new Date('2020-01-01') },
+  { key: 'today', label: 'Сегодня' },
+  { key: '7d', label: '7 дней' },
+  { key: '30d', label: '30 дней' },
+  { key: '90d', label: '3 месяца' },
+  { key: 'all', label: 'Всё время' },
+  { key: 'custom', label: 'Свой' },
 ]
+
+/**
+ * Распарсить ключ периода в { startDate, endDate }.
+ * Поддерживает базовые ключи + custom-формат `custom:YYYY-MM-DD:YYYY-MM-DD`.
+ * Для 'all' возвращает большой исторический диапазон.
+ * R15.2 (бриф 04.06 #9): добавлен today + произвольный диапазон.
+ */
+export function parsePeriod(period) {
+  const now = new Date()
+  if (typeof period === 'string' && period.startsWith('custom:')) {
+    const [, fromIso, toIso] = period.split(':')
+    if (fromIso && toIso) {
+      return { startDate: startOfDay(new Date(fromIso)), endDate: endOfDay(new Date(toIso)) }
+    }
+  }
+  switch (period) {
+    case 'today':
+      return { startDate: startOfDay(now), endDate: endOfDay(now) }
+    case '7d':
+      return { startDate: subDays(now, 7), endDate: now }
+    case '90d':
+      return { startDate: subMonths(now, 3), endDate: now }
+    case 'all':
+      return { startDate: new Date('2020-01-01'), endDate: now }
+    case '30d':
+    default:
+      return { startDate: subDays(now, 30), endDate: now }
+  }
+}
 
 export function useAnalyticsData(period) {
   const [data, setData] = useState({
@@ -25,17 +56,18 @@ export function useAnalyticsData(period) {
     setLoading(true)
     setError(null)
     try {
-      const periodDef = PERIODS.find((p) => p.key === period) || PERIODS[1]
-      const startDate = periodDef.getStart()
-      const periodMs = Date.now() - startDate.getTime()
+      const { startDate, endDate } = parsePeriod(period)
+      const periodMs = endDate.getTime() - startDate.getTime()
       const prevStart = new Date(startDate.getTime() - periodMs)
+      const sinceIso = startDate.toISOString()
+      const untilIso = endDate.toISOString()
 
       const [ordersRes, historyRes, matTxRes, prevOrdersRes, logsRes] = await Promise.all([
-        supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', startDate.toISOString()).limit(1000),
-        supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', startDate.toISOString()).limit(5000),
-        supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', startDate.toISOString()).limit(5000),
-        period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', startDate.toISOString()).limit(1000) : Promise.resolve({ data: [], error: null }),
-        supabase.from('k24_production_logs').select('id, order_id, stage, track, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, film_meters, film_type, lamination_meters, lamination_qty, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', startDate.toISOString()).limit(10000),
+        supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
+        supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
+        supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
+        period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', sinceIso).limit(1000) : Promise.resolve({ data: [], error: null }),
+        supabase.from('k24_production_logs').select('id, order_id, stage, track, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, film_meters, film_type, lamination_meters, lamination_qty, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(10000),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (historyRes.error) throw historyRes.error
@@ -182,12 +214,17 @@ export function useAnalyticsData(period) {
     return Object.entries(workload).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
   }, [orders])
 
-  // Production widgets: общие счётчики 4 операций + breakdown по orders/workers.
+  // Production widgets: общие счётчики операций + breakdown по orders/workers.
   // Используются в AnalyticsPage как кликабельные виджеты (фидбэк 17.05).
+  // R15.2 (бриф 04.06 #8): добавлены R11-этапы — printed (печать всего),
+  // laminated, cut, prepared (препресс), samplePrint, drying (брак),
+  // selection (штучные стикеры на sticker3D после сушки).
   const productionTotals = useMemo(() => {
-    const tot = { poured: 0, selected: 0, assembled: 0, packaged: 0 }
-    const byOp = { poured: {}, selected: {}, assembled: {}, packaged: {} }      // { op: { order_id: count } }
-    const workersByOp = { poured: {}, selected: {}, assembled: {}, packaged: {} } // { op: { worker_id: { name, count } } }
+    const OPS = ['poured', 'selected', 'assembled', 'packaged', 'printed', 'laminated', 'cut', 'prepared', 'samplePrint', 'drying', 'selection']
+    const tot = {}
+    const byOp = {}
+    const workersByOp = {}
+    for (const op of OPS) { tot[op] = 0; byOp[op] = {}; workersByOp[op] = {} }
     const ordersByIdLocal = {}
     for (const o of orders) ordersByIdLocal[o.id] = o
     function bump(op, log, qty) {
@@ -213,6 +250,34 @@ export function useAnalyticsData(period) {
       }
       if (log.stage === 'packaging') {
         bump('packaged', log, Number(log.packs_packaged) || 0)
+      }
+      // R11/R15.2 — новые этапы
+      if (log.stage === 'print') {
+        const stickers = Number(log.stickers_printed) || 0
+        const backgrounds = Number(log.backgrounds_printed) || 0
+        bump('printed', log, stickers + backgrounds)
+      }
+      if (log.stage === 'lamination') {
+        bump('laminated', log, Number(log.lamination_qty) || 0)
+      }
+      if (log.stage === 'cutting') {
+        bump('cut', log, Number(log.qty_cut) || 0)
+      }
+      if (log.stage === 'prepress') {
+        bump('prepared', log, Number(log.prepared_qty) || 0)
+      }
+      if (log.stage === 'sample_print') {
+        // считаем сами образцы как «1» — поле sample_film_meters — это м плёнки,
+        // но виджет показывает количество событий печати образца.
+        bump('samplePrint', log, Number(log.sample_film_meters) > 0 ? 1 : 0)
+      }
+      if (log.stage === 'drying') {
+        // На drying фиксируется ТОЛЬКО брак (см. STAGE_FIELDS), поэтому виджет
+        // показывает «брак на сушке» — суммируем defects.
+        bump('drying', log, Number(log.defects) || 0)
+      }
+      if (log.stage === 'selection') {
+        bump('selection', log, Number(log.qty_selected) || 0)
       }
     }
     return { totals: tot, byOrder: byOp, byWorker: workersByOp, ordersById: ordersByIdLocal }

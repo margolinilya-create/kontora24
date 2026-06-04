@@ -7,7 +7,7 @@ import { PackDesignsForm } from '@/features/production/components/PackDesignsFor
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
 import { useOrderSubtasks } from '@/features/orders/hooks/useOrderSubtasks'
 import { useOrderItems } from '@/features/orders/hooks/useOrderItems'
-import { computeIncoming, computeStageProgress, hasSubtaskLog } from '@/features/production/lib/production-logs'
+import { computeIncoming, computeStageProgress, hasSubtaskLog, SUBTRACT_DEFECTS_STAGES } from '@/features/production/lib/production-logs'
 import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import { DryingTimer } from './DryingTimer'
@@ -75,11 +75,10 @@ function getProgressLines(order) {
   return lines
 }
 
-// Брак вычитается из total только для этапов из этого списка
-// (на pouring/selection_pouring stickers_good/qty_selected уже годные).
-// R14.4 (бриф 03.06): drying — брак вычитается из суммы залитых (stickers_poured)
-// чтобы шкала прогресса показала фактический выход годных стикеров после сушки.
-const SUBTRACT_DEFECTS_STAGES = new Set(['print', 'cutting', 'lamination', 'packaging', 'drying'])
+// R15.5 (бриф 04.06 #12, audit): константа теперь импортируется из
+// production-logs.js (единая точка истины). Раньше тут была локальная копия
+// с лишним 'drying' — но aggregateLine для drying идёт по кастомной ветке
+// (incoming − dryingDefects, allowNegative), сет не читается. Dead code убран.
 
 function aggregateLine(logs, line) {
   // R14.4: drying — total начинается от incoming (залитых на pouring/selection_pouring)

@@ -184,8 +184,12 @@ export const STAGE_FIELDS = {
  * Этапы, на которых брак должен вычитаться из «годных» в шкале прогресса.
  * Для pouring/selection_pouring брак НЕ вычитается — поле stickers_good /
  * qty_selected уже представляет годные изделия (фидбэк менеджера 17.05).
+ *
+ * R15.5 (бриф 04.06 #12, audit): экспортируем чтобы OrderProgressTab.aggregateLine
+ * импортировал ту же константу. Раньше там был дубль с лишним 'drying' (на drying
+ * aggregateLine идёт по кастомной ветке и сет не читает — dead code).
  */
-const SUBTRACT_DEFECTS_STAGES = new Set(['print', 'cutting', 'lamination', 'packaging'])
+export const SUBTRACT_DEFECTS_STAGES = new Set(['print', 'cutting', 'lamination', 'packaging'])
 
 /**
  * Compute progress for a given stage from production logs.

@@ -5,17 +5,25 @@ const BUCKET = 'order-files'
 
 /**
  * Загрузить файл в attachments заказа.
- * Кидает ошибку для перехвата в UI; на стороне UI оборачиваем в try/catch с translateError.
+ *
+ * `uploaded_by` всегда берётся из `auth.getUser().id`, а не из переданного
+ * `profile.id` — это критично для admin-emulation: когда admin смотрит UI
+ * глазами printer через RoleSwitcher, `profile.id === printer.id`, но
+ * `auth.uid() === admin.id`. RLS-чек `uploaded_by = auth.uid()` отказал бы.
+ * Параметр `_uploadedBy` оставлен для совместимости со старыми вызовами
+ * (CreateOrderPage / TechCardPreviewSlot), но игнорируется.
  *
  * @param {string} orderId
  * @param {File} file
- * @param {string} uploadedBy — profile.id
+ * @param {string} _uploadedBy — игнорируется (см. выше)
  * @param {{ pathPrefix?: string, kind?: 'attachment'|'preview'|'sample_print' }} [opts]
- *   pathPrefix позволяет различать назначение в имени файла; `kind` пишет в одноимённую
- *   колонку k24_order_attachments (R14.2 — для сортировки по категориям в UI).
  * @returns {Promise<object>} вставленная строка из k24_order_attachments
  */
-export async function uploadAttachment(orderId, file, uploadedBy, opts = {}) {
+export async function uploadAttachment(orderId, file, _uploadedBy, opts = {}) {
+  const { data: { user }, error: userErr } = await supabase.auth.getUser()
+  if (userErr) throw userErr
+  if (!user) throw new Error('Не авторизован. Войдите снова.')
+
   const ext = file.name.split('.').pop()
   const prefix = opts.pathPrefix ? `${opts.pathPrefix}-` : ''
   const path = `${orderId}/${prefix}${Date.now()}.${ext}`
@@ -31,7 +39,7 @@ export async function uploadAttachment(orderId, file, uploadedBy, opts = {}) {
       file_path: path,
       file_size: file.size,
       mime_type: file.type,
-      uploaded_by: uploadedBy,
+      uploaded_by: user.id,
       kind: opts.kind || 'attachment',
     })
     .select()

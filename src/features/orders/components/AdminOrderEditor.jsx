@@ -9,11 +9,12 @@ import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import {
-  ORDER_STATUSES, ORDER_TYPES, LAMINATION_TYPES,
+  ORDER_STATUSES, ORDER_TYPES,
   DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES,
   PRIORITIES, SIZE_PRESETS,
 } from '@/shared/constants'
 import { FilmSelect } from './FilmSelect'
+import { LaminationSelect } from './LaminationSelect'
 
 const SECTION_TITLE = 'text-xs uppercase tracking-wide text-text-muted font-medium'
 const FIELD_LABEL = 'block text-sm font-medium text-text mb-1.5'
@@ -48,6 +49,9 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       lam_type: order.lam_type || 'glossy',
       film_type: order.film_type || 'G',
       film_type_stickers: order.film_type_stickers || order.film_type || 'G',
+      film_material_id: order.film_material_id || null,
+      film_stickers_material_id: order.film_stickers_material_id || null,
+      lam_material_id: order.lam_material_id || null,
       custom_number: order.custom_number || '',
       design_variants: order.design_variants ?? '',
       deadline: order.deadline ? order.deadline.split('T')[0] : '',
@@ -134,9 +138,14 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         qty: form.qty !== '' ? Number(form.qty) : null,
         need_lam: form.need_lam,
         lam_type: form.need_lam ? form.lam_type : null,
+        lam_material_id: form.need_lam ? (form.lam_material_id || null) : null,
         film_type: form.film_type || null,
+        film_material_id: form.film_material_id || null,
         film_type_stickers: form.order_type === 'stickerpack3D'
           ? (form.film_type_stickers || form.film_type || null)
+          : null,
+        film_stickers_material_id: form.order_type === 'stickerpack3D'
+          ? (form.film_stickers_material_id || null)
           : null,
         custom_number: form.custom_number?.trim() || null,
         design_variants: form.design_variants !== '' ? Number(form.design_variants) : null,
@@ -312,16 +321,22 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
           </Field>
           <Field label={isStickerpack3D ? 'Плёнка фонов' : 'Плёнка'}>
             <FilmSelect
-              value={form.film_type || 'G'}
-              onChange={(v) => update('film_type', v)}
+              value={form.film_material_id || form.film_type || 'G'}
+              onChange={({ materialId, code }) => {
+                update('film_material_id', materialId)
+                if (code) update('film_type', code)
+              }}
               includeOutOfStock
             />
           </Field>
           {isStickerpack3D && (
             <Field label="Плёнка стикеров">
               <FilmSelect
-                value={form.film_type_stickers || form.film_type || 'G'}
-                onChange={(v) => update('film_type_stickers', v)}
+                value={form.film_stickers_material_id || form.film_type_stickers || form.film_type || 'G'}
+                onChange={({ materialId, code }) => {
+                  update('film_stickers_material_id', materialId)
+                  if (code) update('film_type_stickers', code)
+                }}
                 includeOutOfStock
               />
             </Field>
@@ -378,11 +393,17 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
                 <span className="text-sm">Да</span>
               </label>
               {form.need_lam && (
-                <select value={form.lam_type || 'glossy'} onChange={(e) => update('lam_type', e.target.value)} className={SELECT_CLASS}>
-                  {Object.entries(LAMINATION_TYPES).map(([k, { label }]) => (
-                    <option key={k} value={k}>{label}</option>
-                  ))}
-                </select>
+                <div className="flex-1 min-w-0">
+                  <LaminationSelect
+                    label=""
+                    value={form.lam_material_id || form.lam_type || 'glossy'}
+                    onChange={({ materialId, code }) => {
+                      update('lam_material_id', materialId)
+                      update('lam_type', code || 'glossy')
+                    }}
+                    includeOutOfStock
+                  />
+                </div>
               )}
             </div>
           </Field>

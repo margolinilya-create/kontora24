@@ -111,7 +111,10 @@ const schema = z.object({
   height_mm: z.coerce.number().min(1, 'Укажите высоту'),
   film_type: z.string().default('G'),
   film_type_stickers: z.string().optional().nullable(),
+  film_material_id: z.string().optional().nullable(),
+  film_stickers_material_id: z.string().optional().nullable(),
   lam_type: z.string().optional(),
+  lam_material_id: z.string().optional().nullable(),
   design_status: z.string().default('provided'),
   mockup_path: z.string().optional(),
   stickers_per_pack: z.coerce.number().optional(),
@@ -189,6 +192,7 @@ export default function CreateOrderPage() {
       order_type: '', qty: 1, width_mm: 100, height_mm: 100,
       lam_type: '', is_urgent: false, bopp_bag: false,
       film_type: 'G', film_type_stickers: 'G',
+      film_material_id: null, film_stickers_material_id: null, lam_material_id: null,
       is_partner: false, payment_status: 'not_paid',
       design_status: 'provided', delivery_type: 'pickup',
       client_name: '',
@@ -340,8 +344,11 @@ export default function CreateOrderPage() {
         height_mm: values.height_mm,
         need_lam: needLam,
         lam_type: needLam ? values.lam_type : null,
+        lam_material_id: needLam ? (values.lam_material_id || null) : null,
         film_type: values.film_type,
+        film_material_id: values.film_material_id || null,
         film_type_stickers: isStickerpack3D ? (values.film_type_stickers || values.film_type) : null,
+        film_stickers_material_id: isStickerpack3D ? (values.film_stickers_material_id || null) : null,
         client_id: clientId,
         deadline: values.deadline || null,
         priority: values.is_urgent ? 'urgent' : 'normal',
@@ -592,15 +599,21 @@ export default function CreateOrderPage() {
                 <FilmSelect
                   label="Плёнка фонов"
                   id="film_type"
-                  value={filmType}
-                  onChange={(v) => setValue('film_type', v, { shouldDirty: true })}
+                  value={watch('film_material_id') || filmType}
+                  onChange={({ materialId, code }) => {
+                    setValue('film_material_id', materialId, { shouldDirty: true })
+                    if (code) setValue('film_type', code, { shouldDirty: true })
+                  }}
                   expected={filmType ? expectedByCode[filmType] : undefined}
                 />
                 <FilmSelect
                   label="Плёнка стикеров"
                   id="film_type_stickers"
-                  value={watch('film_type_stickers')}
-                  onChange={(v) => setValue('film_type_stickers', v, { shouldDirty: true })}
+                  value={watch('film_stickers_material_id') || watch('film_type_stickers')}
+                  onChange={({ materialId, code }) => {
+                    setValue('film_stickers_material_id', materialId, { shouldDirty: true })
+                    if (code) setValue('film_type_stickers', code, { shouldDirty: true })
+                  }}
                 />
               </div>
             ) : null}
@@ -609,14 +622,20 @@ export default function CreateOrderPage() {
                 <FilmSelect
                   label="Плёнка"
                   id="film_type"
-                  value={filmType}
-                  onChange={(v) => setValue('film_type', v, { shouldDirty: true })}
+                  value={watch('film_material_id') || filmType}
+                  onChange={({ materialId, code }) => {
+                    setValue('film_material_id', materialId, { shouldDirty: true })
+                    if (code) setValue('film_type', code, { shouldDirty: true })
+                  }}
                   expected={filmType ? expectedByCode[filmType] : undefined}
                 />
               )}
               <LaminationSelect
-                value={lamType}
-                onChange={(v) => setValue('lam_type', v, { shouldDirty: true })}
+                value={watch('lam_material_id') || lamType}
+                onChange={({ materialId, code }) => {
+                  setValue('lam_material_id', materialId, { shouldDirty: true })
+                  setValue('lam_type', code || '', { shouldDirty: true })
+                }}
                 expected={lamType ? expectedByCode[lamType] : undefined}
               />
             </div>

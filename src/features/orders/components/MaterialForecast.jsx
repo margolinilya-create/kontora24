@@ -18,10 +18,16 @@ export function MaterialForecast({
 }) {
   const { materials, loading } = useMaterials()
 
+  // R17.6: кандидаты на БОПП-matching из k24_materials с размерами.
+  const boppCandidates = useMemo(() => {
+    return (materials || []).filter((m) => m.type === 'packaging_bag' && m.archived_at == null)
+  }, [materials])
+
   const rows = useMemo(() => forecastMaterials({
     orderType, widthMm, heightMm, qty,
     filmType, filmTypeStickers, lamType, boppBag, items,
-  }), [orderType, widthMm, heightMm, qty, filmType, filmTypeStickers, lamType, boppBag, items])
+    boppCandidates,
+  }), [orderType, widthMm, heightMm, qty, filmType, filmTypeStickers, lamType, boppBag, items, boppCandidates])
 
   const stockByCode = useMemo(() => {
     const map = {}
@@ -36,6 +42,13 @@ export function MaterialForecast({
     for (const m of materials) {
       if (m.type) map[m.type] = (map[m.type] || 0) + (Number(m.stock_qty) || 0)
     }
+    return map
+  }, [materials])
+
+  // R17.6: остаток по конкретной позиции (для БОПП matching).
+  const stockById = useMemo(() => {
+    const map = {}
+    for (const m of materials) map[m.id] = Number(m.stock_qty) || 0
     return map
   }, [materials])
 
@@ -58,6 +71,8 @@ export function MaterialForecast({
           const stock = row.lookup
             ? (row.lookup.by === 'code'
                 ? stockByCode[row.lookup.value]
+                : row.lookup.by === 'materialId'
+                ? stockById[row.lookup.value]
                 : stockByType[row.lookup.value])
             : undefined
           const stockKnown = stock !== undefined

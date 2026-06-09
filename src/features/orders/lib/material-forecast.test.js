@@ -6,6 +6,7 @@ import {
   computeResinGrams,
   computeBoppQty,
   forecastMaterials,
+  pickBoppMaterial,
 } from './material-forecast'
 
 describe('getPrintBlockWidth', () => {
@@ -251,5 +252,67 @@ describe('forecastMaterials', () => {
       filmType: 'G',
     })
     expect(rows.find((r) => r.key === 'film_stickers')).toBeUndefined()
+  })
+})
+
+describe('pickBoppMaterial (R17.6)', () => {
+  const candidates = [
+    { id: 'a', name: 'ПБ 100×150', width_mm: 100, height_mm: 150, stock_qty: 50 },
+    { id: 'b', name: 'ПБ 150×200', width_mm: 150, height_mm: 200, stock_qty: 30 },
+    { id: 'c', name: 'ПБ 200×300', width_mm: 200, height_mm: 300, stock_qty: 20 },
+    { id: 'x', name: 'ПБ без размеров', width_mm: null, height_mm: null, stock_qty: 100 },
+  ]
+
+  it('выбирает самый плотный из подходящих по габаритам', () => {
+    // Изделие 90×140 мм + запас 4 мм → нужно ≥ 144×94. Подходят все три (a, b, c).
+    // Минимальная площадь у `a` (100×150 = 15000).
+    const picked = pickBoppMaterial([{ widthMm: 90, heightMm: 140, qty: 100 }], candidates)
+    expect(picked).not.toBeNull()
+    expect(picked.id).toBe('a')
+  })
+
+  it('ориентация изделия не важна', () => {
+    // Изделие 140×90 (повёрнуто) → тот же подбор.
+    const picked = pickBoppMaterial([{ widthMm: 140, heightMm: 90, qty: 50 }], candidates)
+    expect(picked.id).toBe('a')
+  })
+
+  it('выбирает больший пакет если изделие крупнее', () => {
+    // Изделие 140×180 + 4 = 184×144. Не подходит a (150 < 184). Подходит b и c.
+    const picked = pickBoppMaterial([{ widthMm: 140, heightMm: 180, qty: 10 }], candidates)
+    expect(picked.id).toBe('b')
+  })
+
+  it('возвращает null когда ни один пакет не подходит', () => {
+    // Изделие 250×350 → нужно ≥ 354×254. Нет таких.
+    const picked = pickBoppMaterial([{ widthMm: 250, heightMm: 350, qty: 5 }], candidates)
+    expect(picked).toBeNull()
+  })
+
+  it('игнорирует кандидатов без размеров', () => {
+    const picked = pickBoppMaterial(
+      [{ widthMm: 90, heightMm: 140, qty: 10 }],
+      [{ id: 'x', name: 'без размеров', width_mm: null, height_mm: null, stock_qty: 100 }],
+    )
+    expect(picked).toBeNull()
+  })
+
+  it('возвращает null при пустых items или кандидатах', () => {
+    expect(pickBoppMaterial([], candidates)).toBeNull()
+    expect(pickBoppMaterial([{ widthMm: 100, heightMm: 100, qty: 10 }], [])).toBeNull()
+  })
+
+  it('учитывает максимальные габариты по всем items (multi-variant)', () => {
+    // Если виды: 90×140 + 130×170. Нужно max(170,140)=170 (+4=174) × max(90,130)=130 (+4=134).
+    // a: 150×100 — не подходит (100 < 134).
+    // b: 200×150 — подходит (200≥174, 150≥134).
+    const picked = pickBoppMaterial(
+      [
+        { widthMm: 90, heightMm: 140, qty: 50 },
+        { widthMm: 130, heightMm: 170, qty: 50 },
+      ],
+      candidates,
+    )
+    expect(picked.id).toBe('b')
   })
 })

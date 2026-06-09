@@ -280,6 +280,9 @@ function SourceFilesRow({ order, onUpdated, onCopy }) {
   )
 }
 
+// R17.1 (бриф 5.06 «Страница заказа / вкладка обзор»): для multi-variant
+// размер и тираж выводятся отдельными колонками в таблице, чтобы менеджер
+// видел оба параметра по каждому виду без скучивания.
 function OrderItemsList({ orderId }) {
   const { items } = useOrderItems(orderId)
   if (!items || items.length <= 1) return null
@@ -288,13 +291,32 @@ function OrderItemsList({ orderId }) {
       <p className="text-xs font-medium text-text-muted uppercase mb-2">
         Виды изделий ({items.length})
       </p>
-      <div className="space-y-1 text-sm">
+      {/* Desktop: таблица */}
+      <table className="hidden sm:table w-full text-sm">
+        <thead className="text-xs text-text-muted">
+          <tr className="border-b border-border">
+            <th className="text-left py-1.5 font-normal">№</th>
+            <th className="text-left py-1.5 font-normal">Размер</th>
+            <th className="text-right py-1.5 font-normal">Тираж</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it) => (
+            <tr key={it.id} className="border-b border-border last:border-0">
+              <td className="py-1.5 text-text-muted">Вид {it.idx}</td>
+              <td className="py-1.5 font-medium tabular-nums">{Number(it.width_mm)} × {Number(it.height_mm)} мм</td>
+              <td className="py-1.5 text-right font-medium tabular-nums">{Number(it.qty)} шт</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* Mobile: карточки с размером и тиражом на отдельных строках */}
+      <div className="sm:hidden space-y-2">
         {items.map((it) => (
-          <div key={it.id} className="flex items-center justify-between gap-3 py-1 border-b border-border last:border-0">
-            <span className="text-text-muted">Вид {it.idx}</span>
-            <span className="font-medium tabular-nums">
-              {Number(it.width_mm)} × {Number(it.height_mm)} мм · {Number(it.qty)} шт
-            </span>
+          <div key={it.id} className="border border-border rounded-lg p-2.5">
+            <p className="text-xs text-text-muted mb-1">Вид {it.idx}</p>
+            <p className="text-sm font-medium tabular-nums">{Number(it.width_mm)} × {Number(it.height_mm)} мм</p>
+            <p className="text-sm font-medium tabular-nums">{Number(it.qty)} шт</p>
           </div>
         ))}
       </div>
@@ -313,11 +335,11 @@ function OverviewTab({ order, onUpdated }) {
           <InfoField label="Тип" value={ORDER_TYPES[order.order_type]?.label || order.order_type} />
           <InfoField label="Размер" value={`${order.width_mm} x ${order.height_mm} мм`} />
           <InfoField label="Тираж" value={`${order.qty} шт`} />
-          <InfoField label="Плёнка" value={FILM_TYPES[order.film_type]?.label || (order.film_type && order.film_type !== 'white' ? order.film_type : '—')} />
+          <InfoField label="Плёнка" value={order.film_material?.name || FILM_TYPES[order.film_type]?.label || (order.film_type && order.film_type !== 'white' ? order.film_type : '—')} />
         </div>
         {/* Row 2: Ламинация / БОПП / Стикеров в паке (только пак) / Отгрузка */}
         <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <InfoField label="Ламинация" value={order.need_lam ? (LAMINATION_TYPES[order.lam_type]?.label || 'Да') : 'Нет'} />
+          <InfoField label="Ламинация" value={order.need_lam ? (order.lam_material?.name || LAMINATION_TYPES[order.lam_type]?.label || 'Да') : 'Нет'} />
           <InfoField label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
           {isPack && (
             <InfoField label="Стикеров в паке" value={order.stickers_per_pack || '—'} />

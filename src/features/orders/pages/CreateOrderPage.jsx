@@ -183,6 +183,31 @@ export default function CreateOrderPage() {
     setPreviewBlobUrl(null)
   }
 
+  // R17.1 (бриф 5.06 «Оформление заказа»): Ctrl+V из буфера обмена.
+  useEffect(() => {
+    function handlePaste(e) {
+      // Игнорируем paste внутри текстовых полей — не перехватываем обычный paste-текст.
+      const target = e.target
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return
+      }
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const it of items) {
+        if (it.kind === 'file' && it.type.startsWith('image/')) {
+          const file = it.getAsFile()
+          if (file) {
+            e.preventDefault()
+            selectPreviewFile(file)
+            return
+          }
+        }
+      }
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  }, [previewBlobUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => () => { if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl) }, [previewBlobUrl])
 
   const formRef = useRef(null)

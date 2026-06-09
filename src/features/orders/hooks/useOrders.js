@@ -43,16 +43,22 @@ const DETAIL_FIELDS_BASE = `id, number, custom_number, client_id, order_type, st
   film_type, stickers_per_pack, is_3d, mockup_path, is_urgent, is_partner, needs_montage_film,
   needs_individual_cut, printed_meters, resin_used, rejected_qty, printed_qty, deal_name,
   source, source_referrer, design_status, delivery_type, delivery_city, delivery_address,
-  delivery_notes, bopp_bag, film_type_stickers, ink_deducted_at`
+  delivery_notes, bopp_bag, film_type_stickers, ink_deducted_at,
+  film_material_id, film_stickers_material_id, lam_material_id`
 
 const DETAIL_FIELDS_FINANCE = `, cost_materials, cost_labor, cost_total, markup, discount_pct,
   price_final, price_per_unit, payment_status`
 
+// R17.1 (бриф 5.06): названия конкретных позиций склада подтягиваем join'ами,
+// чтобы OverviewTab и OrderReportsTab показывали реальное имя плёнки/ламинации.
 const DETAIL_RELATIONS = `,
   client:k24_clients(*),
   assignee:k24_profiles!assigned_to(*),
   creator:k24_profiles!created_by(*),
-  attachments:k24_order_attachments(id, file_name, file_path, mime_type)`
+  attachments:k24_order_attachments(id, file_name, file_path, mime_type),
+  film_material:k24_materials!film_material_id(id, name, material_code),
+  film_stickers_material:k24_materials!film_stickers_material_id(id, name, material_code),
+  lam_material:k24_materials!lam_material_id(id, name, material_code)`
 
 async function fetchWithRetry(url, options, retries = 3, delays = [1000, 5000, 15000]) {
   for (let i = 0; i <= retries; i++) {

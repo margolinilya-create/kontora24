@@ -58,12 +58,19 @@ export function OrderReportsTab({ order }) {
           <p className="text-sm text-text-muted">Нет данных. Расход появится после ввода на вкладке «Прогресс».</p>
         ) : (
           <div className="divide-y divide-border">
-            {Object.entries(printFilm).map(([ft, m]) => (
-              <div key={ft} className="py-2 flex items-center justify-between text-sm">
-                <span>{FILM_TYPES[ft]?.label || ft}</span>
-                <span className="font-medium tabular-nums">{m.toFixed(1)} м</span>
-              </div>
-            ))}
+            {Object.entries(printFilm).map(([ft, m]) => {
+              // R17.1: предпочитаем название конкретной позиции склада, если
+              // менеджер её привязал к заказу. Fallback — generic-лейбл из enum.
+              let label = FILM_TYPES[ft]?.label || ft
+              if (ft === order.film_type && order.film_material?.name) label = order.film_material.name
+              if (ft === order.film_type_stickers && order.film_stickers_material?.name) label = order.film_stickers_material.name
+              return (
+                <div key={ft} className="py-2 flex items-center justify-between text-sm">
+                  <span>{label}</span>
+                  <span className="font-medium tabular-nums">{m.toFixed(1)} м</span>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -75,7 +82,7 @@ export function OrderReportsTab({ order }) {
             Расход {order.lam_type === 'transfer' ? 'монтажной плёнки' : 'плёнки для ламинации'}
           </h2>
           <div className="flex items-center justify-between text-sm">
-            <span>{LAMINATION_TYPES[order.lam_type]?.label || 'Ламинация'}</span>
+            <span>{order.lam_material?.name || LAMINATION_TYPES[order.lam_type]?.label || 'Ламинация'}</span>
             <span className="font-medium tabular-nums">{lamMeters.toFixed(1)} м</span>
           </div>
         </div>

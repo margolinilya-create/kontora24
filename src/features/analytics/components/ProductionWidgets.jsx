@@ -20,8 +20,12 @@ const TILES = [
   { op: 'samplePrint', label: 'Образцов отпечатано', unit: 'шт', bg: 'bg-dept-design/10', fg: 'text-dept-design', alwaysShow: false },
   { op: 'prepared',    label: 'Препресс план',        unit: 'шт', bg: 'bg-dept-design/10', fg: 'text-dept-design', alwaysShow: false },
   { op: 'printed',     label: 'Напечатано (всего)',   unit: 'шт', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
+  // R17.5 (бриф 5.06): печать/ламинация/резка отдельно в погонных метрах.
+  { op: 'printMeters', label: 'Печать',               unit: 'пм', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
   { op: 'laminated',   label: 'Заламинировано',       unit: 'шт', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
+  { op: 'lamMeters',   label: 'Ламинация',            unit: 'пм', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
   { op: 'cut',         label: 'Нарезано',             unit: 'шт', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
+  { op: 'cutMeters',   label: 'Резка',                unit: 'пм', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
   { op: 'poured',      label: 'Залито стикеров',      unit: 'шт', bg: 'bg-dept-pouring/10', fg: 'text-dept-pouring', alwaysShow: true },
   { op: 'drying',      label: 'Брак на сушке',        unit: 'шт', bg: 'bg-danger/10',       fg: 'text-danger',       alwaysShow: false },
   { op: 'selection',   label: 'Выбрано штучных',      unit: 'шт', bg: 'bg-dept-pouring/10', fg: 'text-dept-pouring', alwaysShow: false },

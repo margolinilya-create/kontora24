@@ -144,29 +144,36 @@ function UnitEconomicsTab({ period }) {
   })
 
   function handleExport() {
+    // R17.5 (бриф 5.06): «Маржа» → «Разница» = цена − Себестоимость материалов.
+    // Колонки «Себест. итого (мат+труд)» и отдельная «Себест. материалов»
+    // объединены в одну «Себестоимость материалов, ₽».
     const header = [
       'ID', '№ заказа', 'Дата приёма', 'Дедлайн', 'Клиент', 'Продукт', '3D смола',
       'Размер', 'Тираж', 'Стикеров в паке', 'Плёнка', 'Ламинация', 'Комментарий',
       'Отгрузка', '% брака', 'Излишки, шт', 'Излишки, %', 'Сумма заказа', 'Тип оплаты',
-      'Себест. плёнки, ₽', 'Себест. смолы, ₽', 'Себест. материалов, ₽',
-      'Оплата труда, ₽', 'Себест. итого (мат+труд), ₽',
-      'Маржинальность, ₽', 'Маржинальность, %',
+      'Себест. плёнки, ₽', 'Себест. смолы, ₽', 'Себестоимость материалов, ₽',
+      'Оплата труда, ₽', 'Разница, ₽', 'Разница, %',
     ]
-    const aoa = [header, ...rows.map((o) => [
-      o.id, formatOrderNumber(o), formatDate(o.created_at), o.deadline || '—',
-      o.client_name || '—', ORDER_TYPES[o.order_type]?.label || o.order_type,
-      o.order_type === 'sticker3D' || o.order_type === 'stickerpack3D' ? 'Да' : 'Нет',
-      `${o.width_mm}×${o.height_mm}`, o.qty, o.stickers_per_pack || '—',
-      FILM_TYPES[o.film_type]?.label || o.film_type || '—',
-      o.need_lam ? (LAMINATION_TYPES[o.lam_type]?.label || 'Да') : 'Нет',
-      o.notes || '—',
-      DELIVERY_TYPES[o.delivery_type]?.label || '—',
-      `${o.reject_pct}%`, o.surplus, `${o.surplus_pct}%`,
-      o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
-      Math.round(o.mat_film), Math.round(o.mat_resin), Math.round(o.mat_total),
-      o.cost_labor || 0, Math.round(o.total_cost_with_mat_labor),
-      o.profit, `${o.margin_pct}%`,
-    ])]
+    const aoa = [header, ...rows.map((o) => {
+      const matCost = Math.round(o.mat_total)
+      const diff = (Number(o.price_final) || 0) - matCost
+      const diffPct = Number(o.price_final) > 0 ? Math.round((diff / Number(o.price_final)) * 100) : 0
+      return [
+        o.id, formatOrderNumber(o), formatDate(o.created_at), o.deadline || '—',
+        o.client_name || '—', ORDER_TYPES[o.order_type]?.label || o.order_type,
+        o.order_type === 'sticker3D' || o.order_type === 'stickerpack3D' ? 'Да' : 'Нет',
+        `${o.width_mm}×${o.height_mm}`, o.qty, o.stickers_per_pack || '—',
+        o.film_material?.name || FILM_TYPES[o.film_type]?.label || o.film_type || '—',
+        o.need_lam ? (o.lam_material?.name || LAMINATION_TYPES[o.lam_type]?.label || 'Да') : 'Нет',
+        o.notes || '—',
+        DELIVERY_TYPES[o.delivery_type]?.label || '—',
+        `${o.reject_pct}%`, o.surplus, `${o.surplus_pct}%`,
+        o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
+        Math.round(o.mat_film), Math.round(o.mat_resin), matCost,
+        o.cost_labor || 0,
+        diff, `${diffPct}%`,
+      ]
+    })]
     downloadXlsx(`unit-economics-${period}`, 'Unit Economics', aoa)
       .catch((err) => toast.error(translateError(err).message))
   }
@@ -180,31 +187,37 @@ function UnitEconomicsTab({ period }) {
             <Th right>Размер</Th><Th right>Тираж</Th><Th>Плёнка</Th><Th>Лам.</Th>
             <Th right>Брак%</Th><Th right>Излиш.шт</Th><Th right>Излиш.%</Th>
             <Th right>Сумма</Th><Th right>Плёнка ₽</Th><Th right>Смола ₽</Th>
-            <Th right>С/с итого</Th><Th right>Маржа ₽</Th><Th right>Маржа %</Th>
+            <Th right>Себест. мат.</Th><Th right>Разница ₽</Th><Th right>Разница %</Th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((o) => (
-            <tr key={o.id} className="border-b border-border last:border-0">
-              <Td bold>{formatOrderNumber(o)}</Td>
-              <Td>{formatDate(o.created_at)}</Td>
-              <Td>{o.client_name || '—'}</Td>
-              <Td>{ORDER_TYPES[o.order_type]?.label}</Td>
-              <Td right>{o.width_mm}×{o.height_mm}</Td>
-              <Td right>{o.qty}</Td>
-              <Td>{FILM_TYPES[o.film_type]?.label || '—'}</Td>
-              <Td>{o.need_lam ? (LAMINATION_TYPES[o.lam_type]?.label || 'Да') : '—'}</Td>
-              <Td right danger={o.reject_pct > 15}>{o.reject_pct}%</Td>
-              <Td right muted>{o.surplus > 0 ? `+${o.surplus}` : o.surplus}</Td>
-              <Td right muted>{o.surplus_pct}%</Td>
-              <Td right>{formatPrice(o.price_final)}</Td>
-              <Td right muted>{Math.round(o.mat_film)}</Td>
-              <Td right muted>{Math.round(o.mat_resin)}</Td>
-              <Td right>{formatPrice(o.total_cost_with_mat_labor)}</Td>
-              <Td right success={o.profit > 0} danger={o.profit < 0}>{formatPrice(o.profit)}</Td>
-              <Td right>{o.margin_pct}%</Td>
-            </tr>
-          ))}
+          {rows.map((o) => {
+            // R17.5: «Разница» = цена − Себестоимость материалов (без труда).
+            const matCost = Math.round(o.mat_total)
+            const diff = (Number(o.price_final) || 0) - matCost
+            const diffPct = Number(o.price_final) > 0 ? Math.round((diff / Number(o.price_final)) * 100) : 0
+            return (
+              <tr key={o.id} className="border-b border-border last:border-0">
+                <Td bold>{formatOrderNumber(o)}</Td>
+                <Td>{formatDate(o.created_at)}</Td>
+                <Td>{o.client_name || '—'}</Td>
+                <Td>{ORDER_TYPES[o.order_type]?.label}</Td>
+                <Td right>{o.width_mm}×{o.height_mm}</Td>
+                <Td right>{o.qty}</Td>
+                <Td>{o.film_material?.name || FILM_TYPES[o.film_type]?.label || '—'}</Td>
+                <Td>{o.need_lam ? (o.lam_material?.name || LAMINATION_TYPES[o.lam_type]?.label || 'Да') : '—'}</Td>
+                <Td right danger={o.reject_pct > 15}>{o.reject_pct}%</Td>
+                <Td right muted>{o.surplus > 0 ? `+${o.surplus}` : o.surplus}</Td>
+                <Td right muted>{o.surplus_pct}%</Td>
+                <Td right>{formatPrice(o.price_final)}</Td>
+                <Td right muted>{Math.round(o.mat_film)}</Td>
+                <Td right muted>{Math.round(o.mat_resin)}</Td>
+                <Td right>{formatPrice(matCost)}</Td>
+                <Td right success={diff > 0} danger={diff < 0}>{formatPrice(diff)}</Td>
+                <Td right>{diffPct}%</Td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </ReportFrame>

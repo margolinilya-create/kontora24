@@ -220,7 +220,11 @@ export function useAnalyticsData(period) {
   // laminated, cut, prepared (препресс), samplePrint, drying (брак),
   // selection (штучные стикеры на sticker3D после сушки).
   const productionTotals = useMemo(() => {
-    const OPS = ['poured', 'selected', 'assembled', 'packaged', 'printed', 'laminated', 'cut', 'prepared', 'samplePrint', 'drying', 'selection']
+    // R17.5 (бриф 5.06 «Аналитика»): добавлены ops для погонных метров —
+    // печать (printMeters), ламинация (lamMeters), резка (cutMeters).
+    // Менеджер просил «виджеты с учётом печати, ламинации и реза, измерять
+    // в погонных метрах» — параллельно с «штучными» виджетами.
+    const OPS = ['poured', 'selected', 'assembled', 'packaged', 'printed', 'laminated', 'cut', 'prepared', 'samplePrint', 'drying', 'selection', 'printMeters', 'lamMeters', 'cutMeters']
     const tot = {}
     const byOp = {}
     const workersByOp = {}
@@ -256,12 +260,17 @@ export function useAnalyticsData(period) {
         const stickers = Number(log.stickers_printed) || 0
         const backgrounds = Number(log.backgrounds_printed) || 0
         bump('printed', log, stickers + backgrounds)
+        // R17.5: погонные метры плёнки на печать (округление до 0.1 м для UI).
+        bump('printMeters', log, Math.round((Number(log.film_meters) || 0) * 10) / 10)
       }
       if (log.stage === 'lamination') {
         bump('laminated', log, Number(log.lamination_qty) || 0)
+        bump('lamMeters', log, Math.round((Number(log.lamination_meters) || 0) * 10) / 10)
       }
       if (log.stage === 'cutting') {
         bump('cut', log, Number(log.qty_cut) || 0)
+        // На резке plotter тянет столько же метров плёнки сколько было на печати.
+        bump('cutMeters', log, Math.round((Number(log.film_meters) || 0) * 10) / 10)
       }
       if (log.stage === 'prepress') {
         bump('prepared', log, Number(log.prepared_qty) || 0)

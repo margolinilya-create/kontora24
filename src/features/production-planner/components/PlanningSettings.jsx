@@ -28,12 +28,15 @@ const NORM_FIELDS = [
   { key: 'drying_hours', label: 'Сушка (часов, пассив)', step: '1' },
 ]
 
+// R17.3 (бриф 5.06): 3DO и ОСК — раздельные отделы. Поле post_print
+// оставлено как legacy для совместимости со старыми значениями в k24_settings.
 const CAPACITY_FIELDS = [
-  { key: 'designers', label: 'Дизайнеры', tip: 'Бакет design' },
+  { key: 'designers', label: 'Дизайнеры', tip: 'Бакет design (ОДП)' },
   { key: 'prepress', label: 'Препресс', tip: 'Бакет prepress (sample_layout + batch_layout + prepress)' },
   { key: 'printers', label: 'Печатники / печатные машины', tip: 'Бакет oprl_print (печать + ламинация + sample_print)' },
-  { key: 'cutters', label: 'Режущие плоттеры', tip: 'Бакет oprl_cut' },
-  { key: 'post_print', label: 'Постпечать (бригада)', tip: 'Бакет post_print (заливка + выборка + сборка + упаковка + ОТК)' },
+  { key: 'cutters', label: 'Режущие плоттеры', tip: 'Бакет oprl_cut (резка)' },
+  { key: 'post_3do', label: '3DO (заливка / сушка)', tip: 'Заливщики + поток заливки/сушки' },
+  { key: 'post_osk', label: 'ОСК (сборка / упаковка / ОТК)', tip: 'Постпечатники: выборка фонов, сборка 3D, упаковка, ОТК/выдача' },
   { key: 'hours_per_day', label: 'Часов в рабочем дне', tip: 'Длина рабочей смены' },
 ]
 

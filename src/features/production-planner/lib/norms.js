@@ -26,14 +26,18 @@ export const DEFAULT_NORMS = Object.freeze({
   drying_hours:                    36,    // пассив, людей не занимает
 })
 
-// Дефолтные ёмкости по решению пользователя (бриф 03.06): пост-печатная
-// бригада 3 человека = один общий бакет post_print = 24 ч/день.
+// R17.3 (бриф 5.06): 3DO и ОСК — раздельные отделы. Дефолт: 1 заливщик в
+// 3DO + 2 постпечатника в ОСК. Старое поле post_print (R12 single-bucket)
+// больше не используется — оставлено в схеме для обратной совместимости
+// при загрузке существующих настроек.
 export const DEFAULT_CAPACITY = Object.freeze({
   designers:     1,
   prepress:      1,
   printers:      1,
   cutters:       2,
-  post_print:    3,
+  post_3do:      1,
+  post_osk:      2,
+  post_print:    3, // legacy, не читается с R17.3
   hours_per_day: 8,
 })
 
@@ -49,6 +53,10 @@ export function resolveCapacity(value) {
 
 // Часы в рабочем дне для каждого бакета, исходя из количества ресурсов.
 // hours_per_day — общий норматив длины рабочего дня.
+// R17.3: добавлены bucket_3do/bucket_osk; legacy post_print остаётся для
+// миграционной совместимости — если в k24_settings:planning:capacity
+// сохранено только post_print=N, фолбэк распределяет: 1 заливщик в 3DO,
+// остальное в ОСК.
 export function bucketHoursPerDay(bucket, capacity = DEFAULT_CAPACITY) {
   const cap = resolveCapacity(capacity)
   const hpd = Number(cap.hours_per_day) || 8
@@ -57,7 +65,20 @@ export function bucketHoursPerDay(bucket, capacity = DEFAULT_CAPACITY) {
     case BUCKETS.prepress:   return (Number(cap.prepress)   || 1) * hpd
     case BUCKETS.oprl_print: return (Number(cap.printers)   || 1) * hpd
     case BUCKETS.oprl_cut:   return (Number(cap.cutters)    || 2) * hpd
-    case BUCKETS.post_print: return (Number(cap.post_print) || 3) * hpd
+    case BUCKETS.bucket_3do: {
+      if (cap.post_3do != null) return (Number(cap.post_3do) || 1) * hpd
+      // Legacy fallback: распределяем post_print → 3DO=1, ОСК=остаток.
+      const legacy = Number(cap.post_print)
+      return (Number.isFinite(legacy) && legacy >= 2 ? 1 : Math.max(0, legacy || 0)) * hpd
+    }
+    case BUCKETS.bucket_osk: {
+      if (cap.post_osk != null) return (Number(cap.post_osk) || 2) * hpd
+      const legacy = Number(cap.post_print)
+      return (Number.isFinite(legacy) && legacy >= 2 ? legacy - 1 : 0) * hpd
+    }
+    // Legacy: BUCKETS.post_print больше не используется в STAGE_TO_BUCKET,
+    // но если кто-то вызывает с этим bucket-id — отвечаем суммой.
+    case 'post_print':       return ((Number(cap.post_3do) || 1) + (Number(cap.post_osk) || 2)) * hpd
     default:                 return 0 // passive / milestone — ёмкость не считается
   }
 }

@@ -12,7 +12,6 @@ import {
 } from '@dnd-kit/core'
 import { ORDER_TYPES } from '@/shared/constants'
 import Spinner from '@/shared/components/Spinner'
-import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { usePlannerData } from '../hooks/usePlannerData'
@@ -23,7 +22,15 @@ import { OrderDetailsPanel } from '../components/OrderDetailsPanel'
 import { PlannerCalendar, DragOverlayChip } from '../components/PlannerCalendar'
 import { parseDragId, parseDropId } from '../lib/dnd-ids'
 import { STAGE_TO_BUCKET } from '../lib/buckets'
-import { pinStage, pinStageWithFreeze, unpinAll } from '../lib/plan-overrides'
+import { pinStage, pinStageWithFreeze } from '../lib/plan-overrides'
+
+// R17.3 (бриф 5.06): пресеты горизонта планирования в рабочих днях.
+// 22 ≈ 1 месяц, 44 ≈ 2 месяца, 66 ≈ 3 месяца.
+const HORIZON_PRESETS = [
+  { value: 22, label: '1 месяц' },
+  { value: 44, label: '2 месяца' },
+  { value: 66, label: '3 месяца' },
+]
 
 export default function PlannerPage() {
   usePlannerData()
@@ -34,11 +41,11 @@ export default function PlannerPage() {
   const setFilterType = usePlanStore((s) => s.setFilterType)
   const dragMode = usePlanStore((s) => s.dragMode)
   const setDragMode = usePlanStore((s) => s.setDragMode)
-  const overrides = usePlanStore((s) => s.overrides)
+  const horizonDays = usePlanStore((s) => s.horizonDays)
+  const setHorizonDays = usePlanStore((s) => s.setHorizonDays)
   const result = useScheduleResult()
 
   const [dragging, setDragging] = useState(null) // { orderId, stage, hours }
-  const [autoplanConfirm, setAutoplanConfirm] = useState(false)
 
   useEffect(() => {
     usePlanStore.getState().setSelectedOrderId(null)
@@ -96,17 +103,11 @@ export default function PlannerPage() {
     }
   }
 
-  async function confirmAutoplan() {
-    setAutoplanConfirm(false)
-    const res = await unpinAll()
-    if (res.ok) toast.success(`План сброшен (снято ${res.removed || 0} закреплений)`)
-  }
-
   return (
     <div className="flex flex-col h-[calc(100dvh-3.5rem)]">
       {/* Шапка */}
       <div className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-border bg-surface">
-        <h1 className="text-lg md:text-xl font-bold uppercase tracking-tight">
+        <h1 className="text-lg md:text-xl font-bold font-display uppercase tracking-tight">
           Планирование производства
         </h1>
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-warning/15 text-warning border border-warning/40">
@@ -152,15 +153,18 @@ export default function PlannerPage() {
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setAutoplanConfirm(true)}
-          disabled={overrides.length === 0}
-          className="ml-auto px-3 py-1 text-[11px] font-semibold rounded border border-border bg-surface text-text hover:bg-surface-dim disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Снять все ручные закрепления и перейти к автоматическому плану"
+        {/* R17.3 (бриф 5.06): выбор горизонта планирования вместо «Автоплан». */}
+        <label className="ml-auto text-[11px] uppercase text-text-muted font-semibold">Горизонт:</label>
+        <select
+          value={horizonDays}
+          onChange={(e) => setHorizonDays(Number(e.target.value))}
+          className="text-sm px-2 py-1 rounded border border-border bg-surface"
+          title="Сколько рабочих дней показывать в календаре"
         >
-          ↺ Автоплан ({overrides.length})
-        </button>
+          {HORIZON_PRESETS.map((h) => (
+            <option key={h.value} value={h.value}>{h.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Тело */}
@@ -204,15 +208,6 @@ export default function PlannerPage() {
           </DragOverlay>
         </DndContext>
       )}
-
-      <ConfirmDialog
-        isOpen={autoplanConfirm}
-        title="Сбросить ручной план?"
-        message={`Будет снято ${overrides.length} закреплений. Расписание пересчитается с нуля.`}
-        confirmText="Сбросить"
-        onConfirm={confirmAutoplan}
-        onClose={() => setAutoplanConfirm(false)}
-      />
 
       <OrderDetailsPanel />
     </div>

@@ -12,9 +12,11 @@ describe('buckets', () => {
     }
   })
 
-  it('видимых бакетов ровно 6 (5 рабочих + passive)', () => {
+  it('видимых бакетов ровно 7 (6 рабочих + passive)', () => {
+    // R17.3 (бриф 5.06): post_print разделён на 3DO (заливка/сушка) и
+    // ОСК (выборка/сборка/упаковка/ОТК).
     expect(VISIBLE_BUCKETS).toEqual([
-      'design', 'prepress', 'oprl_print', 'oprl_cut', 'post_print', 'passive',
+      'design', 'prepress', 'oprl_print', 'oprl_cut', '3do', 'osk', 'passive',
     ])
   })
 
@@ -26,14 +28,14 @@ describe('buckets', () => {
     expect(STAGE_TO_BUCKET.cancelled).toBe(BUCKETS.milestone)
   })
 
-  it('post_print объединяет 3DО + ОСК (решение пользователя)', () => {
-    // По умолчанию ТЗ разделяет, но у нас бригада — одна
-    expect(STAGE_TO_BUCKET.pouring).toBe(BUCKETS.post_print)
-    expect(STAGE_TO_BUCKET.selection_pouring).toBe(BUCKETS.post_print)
-    expect(STAGE_TO_BUCKET.selection).toBe(BUCKETS.post_print)
-    expect(STAGE_TO_BUCKET.assembly_3d).toBe(BUCKETS.post_print)
-    expect(STAGE_TO_BUCKET.packaging).toBe(BUCKETS.post_print)
-    expect(STAGE_TO_BUCKET.otk).toBe(BUCKETS.post_print)
+  it('R17.3: 3DO держит заливку + selection_pouring, ОСК — выборку/сборку/упаковку/ОТК', () => {
+    // Бриф 5.06: 3DO и ОСК — раздельные отделы.
+    expect(STAGE_TO_BUCKET.pouring).toBe(BUCKETS.bucket_3do)
+    expect(STAGE_TO_BUCKET.selection_pouring).toBe(BUCKETS.bucket_3do)
+    expect(STAGE_TO_BUCKET.selection).toBe(BUCKETS.bucket_osk)
+    expect(STAGE_TO_BUCKET.assembly_3d).toBe(BUCKETS.bucket_osk)
+    expect(STAGE_TO_BUCKET.packaging).toBe(BUCKETS.bucket_osk)
+    expect(STAGE_TO_BUCKET.otk).toBe(BUCKETS.bucket_osk)
   })
 
   it('печатник делит print + lamination + sample_print', () => {
@@ -51,7 +53,9 @@ describe('buckets', () => {
   it('BUCKET_STAGES — обратный индекс', () => {
     expect(BUCKET_STAGES.design).toContain('design')
     expect(BUCKET_STAGES.oprl_cut).toEqual(['cutting'])
-    expect(BUCKET_STAGES.post_print.length).toBeGreaterThanOrEqual(6)
+    // R17.3: 3DO + ОСК вместо post_print.
+    expect(BUCKET_STAGES['3do'].length).toBeGreaterThanOrEqual(2) // pouring + selection_pouring
+    expect(BUCKET_STAGES.osk.length).toBeGreaterThanOrEqual(4)    // selection + assembly_3d + packaging + otk
   })
 
   it('getBucketForStage возвращает milestone для неизвестного этапа', () => {

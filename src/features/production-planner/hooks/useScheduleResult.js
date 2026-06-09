@@ -15,6 +15,8 @@ export function useScheduleResult({ horizonDays = 30 } = {}) {
   const holidays = usePlanStore((s) => s.holidays)
   const filterType = usePlanStore((s) => s.filterType)
   const today = usePlanStore((s) => s.today)
+  // R17.3 (бриф 5.06): горизонт планирования из store (1/2/3 мес.).
+  const horizonOverride = usePlanStore((s) => s.horizonDays)
 
   return useMemo(() => {
     const filtered = filterType ? orders.filter((o) => o.order_type === filterType) : orders
@@ -26,8 +28,7 @@ export function useScheduleResult({ horizonDays = 30 } = {}) {
       capacity,
       holidays,
       today: today || new Date(),
-      horizonDays,
+      horizonDays: horizonOverride || horizonDays,
     })
-    // schedule — чистая функция, зависимости перечислены явно
-  }, [orders, items, overrides, norms, capacity, holidays, filterType, today, horizonDays])
+  }, [orders, items, overrides, norms, capacity, holidays, filterType, today, horizonDays, horizonOverride])
 }

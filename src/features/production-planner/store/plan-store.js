@@ -23,6 +23,7 @@ const DEFAULT_STATE = {
   dragMode: 'cascade',   // 'cascade' | 'this_only'
   filterType: null,       // null | order_type для фильтра
   today: null,            // Date | null (для тестов фиксируется явно)
+  horizonDays: 30,        // R17.3 — горизонт планирования (рабочих дней вперёд)
 
   // Жизненный цикл
   loading: true,
@@ -82,6 +83,7 @@ export const usePlanStore = create((set, get) => ({
   setDragMode: (mode) => set({ dragMode: mode === 'this_only' ? 'this_only' : 'cascade' }),
   setFilterType: (orderType) => set({ filterType: orderType || null }),
   setToday: (date) => set({ today: date instanceof Date ? date : null }),
+  setHorizonDays: (days) => set({ horizonDays: Math.max(7, Number(days) || 30) }),
 
   // Сброс — используется при логауте или unmount планировщика.
   reset: () => set({ ...DEFAULT_STATE }),

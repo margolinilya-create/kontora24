@@ -695,7 +695,7 @@ export const NAV_ITEMS = [
   { path: '/production/lamination', label: 'Ламинация', icon: 'Layers', roles: ['admin', 'manager', 'printer'], permission: 'stage:lamination' },
   { path: '/production/cutting', label: 'Резка', icon: 'Scissors', roles: ['admin', 'manager', 'printer'], permission: 'stage:cutting' },
   { path: '/production/pouring', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:pouring' },
-  { path: '/production/selection', label: 'Выборка / Заливка', icon: 'Combine', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:selection_pouring' },
+  { path: '/production/selection', label: 'Выборка', icon: 'Combine', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:selection_pouring' },
   { path: '/production/assembly3d', label: 'Сборка 3D', icon: 'Hammer', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:assembly_3d' },
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:packaging' },
   { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'], permission: 'stage:otk' },

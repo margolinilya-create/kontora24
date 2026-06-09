@@ -32,9 +32,11 @@ export function buildCostMap(materials) {
  * Себестоимость материалов для одного заказа.
  * @param {object} row — расширенный row из useOrdersCostReport: должен содержать
  *   actual_film_by_type, actual_lam_by_type (объекты code → метры),
- *   actual_resin (граммы), bopp_bags_used, boxes_used.
+ *   actual_resin (граммы), boxes_used.
+ *   R17.0: bopp_bags_used убрано — поле не пишется в k24_production_logs.
+ *   БОПП-себестоимость вернётся в R17.6 через k24_material_transactions join.
  * @param {object} costMap — результат buildCostMap.
- * @returns {{ film: number, lam: number, resin: number, bopp: number, box: number, total: number }}
+ * @returns {{ film: number, lam: number, resin: number, box: number, total: number }}
  */
 export function costForOrder(row, costMap) {
   let film = 0
@@ -46,7 +48,6 @@ export function costForOrder(row, costMap) {
     lam += (Number(m) || 0) * (costMap.byCode[code] || 0)
   }
   const resin = (Number(row.actual_resin) || 0) * (costMap.byCode.resin || 0)
-  const bopp = (Number(row.bopp_bags_used) || 0) * (costMap.avgByType.packaging_bag || 0)
   const box = (Number(row.boxes_used) || 0) * (costMap.avgByType.box || 0)
-  return { film, lam, resin, bopp, box, total: film + lam + resin + bopp + box }
+  return { film, lam, resin, box, total: film + lam + resin + box }
 }

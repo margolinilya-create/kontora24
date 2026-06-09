@@ -3,6 +3,7 @@ import { addMaterialTransaction, useMaterialTransactions } from '../hooks/useMat
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { formatNumber, formatDateTime, formatPrice } from '@/shared/lib/utils'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
@@ -16,9 +17,14 @@ export function StockModal({ material, onClose, onDone }) {
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState('form') // 'form' | 'history'
   const { transactions, loading: histLoading } = useMaterialTransactions(material.id)
+  const canTransact = useCanDo('material:add_transaction')
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!canTransact) {
+      toast.error('Нет прав на внесение прихода/расхода')
+      return
+    }
     const num = Number(delta)
     if (!num || num <= 0) return
 

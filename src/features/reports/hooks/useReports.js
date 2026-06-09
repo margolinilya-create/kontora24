@@ -96,7 +96,7 @@ export function useOrdersCostReport(period = '30') {
           .select(`order_id, film_meters, resin_grams, lamination_meters,
                    film_type, track, stickers_printed, stickers_poured,
                    stickers_good, packs_assembled, packs_packaged, qty_selected,
-                   boxes_used, bopp_bags_used,
+                   boxes_used,
                    order:k24_orders!order_id(lam_type, film_type, film_type_stickers, order_type)`)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
@@ -112,7 +112,7 @@ export function useOrdersCostReport(period = '30') {
             filmByType: {}, lamByType: {},
             stickers_printed: 0, stickers_poured: 0, stickers_good: 0,
             packs_assembled: 0, packs_packaged: 0, qty_selected: 0,
-            boxes_used: 0, bopp_bags_used: 0,
+            boxes_used: 0,
             payouts: 0,
           }
         }
@@ -139,11 +139,10 @@ export function useOrdersCostReport(period = '30') {
         acc.packs_packaged += Number(l.packs_packaged) || 0
         acc.qty_selected += Number(l.qty_selected) || 0
         acc.boxes_used += Number(l.boxes_used) || 0
-        acc.bopp_bags_used += Number(l.bopp_bags_used) || 0
       })
 
       const rows = (ordersRes.data || []).map((o) => {
-        const lg = logsByOrder[o.id] || { film: 0, resin: 0, lam: 0, stickers_printed: 0, stickers_poured: 0, stickers_good: 0, packs_assembled: 0, packs_packaged: 0, qty_selected: 0, boxes_used: 0, bopp_bags_used: 0, filmByType: {}, lamByType: {} }
+        const lg = logsByOrder[o.id] || { film: 0, resin: 0, lam: 0, stickers_printed: 0, stickers_poured: 0, stickers_good: 0, packs_assembled: 0, packs_packaged: 0, qty_selected: 0, boxes_used: 0, filmByType: {}, lamByType: {} }
         const rejected = lg.stickers_poured > 0 ? lg.stickers_poured - lg.stickers_good : 0
         const rejectPct = lg.stickers_poured > 0 ? Math.round((rejected / lg.stickers_poured) * 100) : 0
         const surplus = lg.stickers_printed > 0 && o.qty > 0 ? lg.stickers_printed - o.qty : 0
@@ -163,7 +162,6 @@ export function useOrdersCostReport(period = '30') {
           packs_packaged: lg.packs_packaged,
           qty_selected: lg.qty_selected,
           boxes_used: lg.boxes_used,
-          bopp_bags_used: lg.bopp_bags_used,
           rejected, reject_pct: rejectPct, surplus, surplus_pct: surplusPct,
           profit: (Number(o.price_final) || 0) - (Number(o.cost_total) || 0),
           margin_pct: o.price_final > 0 ? Math.round(((o.price_final - o.cost_total) / o.price_final) * 100) : 0,

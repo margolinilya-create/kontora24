@@ -327,7 +327,6 @@ function ExpensesTab({ period }) {
       '№ заказа', 'Клиент', 'Тираж', 'Излишки, шт', 'Излишки, %',
       'Плёнка, м', 'Себест. плёнки, ₽',
       'Ламинация, м', 'Себест. лам., ₽',
-      'БОПП, шт', 'Себест. БОПП, ₽',
       'Коробки, шт', 'Себест. коробок, ₽',
       'Смола, г', 'Себест. смолы, ₽',
       'Итого материалов, ₽',
@@ -337,7 +336,6 @@ function ExpensesTab({ period }) {
       o.surplus, `${o.surplus_pct}%`,
       Number(o.actual_film || 0).toFixed(1), Math.round(o.cost.film),
       Number(o.actual_lam || 0).toFixed(1), Math.round(o.cost.lam),
-      o.bopp_bags_used || 0, Math.round(o.cost.bopp),
       o.boxes_used || 0, Math.round(o.cost.box),
       Math.round(o.actual_resin), Math.round(o.cost.resin),
       Math.round(o.cost.total),
@@ -355,7 +353,6 @@ function ExpensesTab({ period }) {
             <Th right>Излиш.шт</Th><Th right>Излиш.%</Th>
             <Th right>Плёнка</Th><Th right>₽</Th>
             <Th right>Лам.</Th><Th right>₽</Th>
-            <Th right>БОПП</Th><Th right>₽</Th>
             <Th right>Кор.</Th><Th right>₽</Th>
             <Th right>Смола</Th><Th right>₽</Th>
             <Th right>Итого ₽</Th>
@@ -373,8 +370,6 @@ function ExpensesTab({ period }) {
               <Td right muted>{Math.round(o.cost.film)}</Td>
               <Td right>{Number(o.actual_lam || 0).toFixed(1)}м</Td>
               <Td right muted>{Math.round(o.cost.lam)}</Td>
-              <Td right>{o.bopp_bags_used || 0}</Td>
-              <Td right muted>{Math.round(o.cost.bopp)}</Td>
               <Td right>{o.boxes_used || 0}</Td>
               <Td right muted>{Math.round(o.cost.box)}</Td>
               <Td right>{Math.round(o.actual_resin)}г</Td>

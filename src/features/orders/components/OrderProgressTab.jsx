@@ -41,6 +41,13 @@ function getProgressLines(order) {
   const packStickerTarget = isPack3D ? order.qty * (order.stickers_per_pack || 1) : order.qty
   const lines = []
 
+  // R17.2 (бриф 5.06 «На вкладке прогресс / препресс»): реальная шкала
+  // прогресса препресса — поле prepared_qty (миграция 051). Target =
+  // design_variants (кол-во видов под подготовку). Для одиночного вида = 1.
+  if (route.includes('prepress')) {
+    const prepressTarget = Math.max(1, Number(order.design_variants) || 1)
+    lines.push({ key: 'prepress', stage: 'prepress', track: null, qtyField: 'prepared_qty', label: 'Препресс (видов)', target: prepressTarget })
+  }
   if (route.includes('print')) {
     lines.push({ key: 'print_stickers', stage: 'print', track: isPack3D ? 'stickers' : null, qtyField: 'stickers_printed', label: 'Напечатано стикеров', target: isPack3D ? packStickerTarget : undefined })
     if (isPack3D) {
@@ -515,12 +522,16 @@ function ProgressLinesWidget({ order, logs }) {
           const targetForLine = isQty ? lineTarget : null
           const overshoot = isQty && total > lineTarget ? total - lineTarget : 0
           // R14.4: для drying допускаем отрицательные значения (брак > залитых).
+          // R17.2 (бриф 5.06): отображаем фактическую процентовку >100% (105/117/120…)
+          // в бейдже, полоса всё равно держится на 100%.
           const rawPct = isQty && lineTarget > 0 ? Math.round((total / lineTarget) * 100) : null
           const percentage = rawPct === null
             ? null
-            : (allowNegative ? Math.max(-100, Math.min(100, rawPct)) : Math.min(100, Math.max(0, rawPct)))
+            : (allowNegative ? Math.max(-999, Math.min(999, rawPct)) : Math.max(0, Math.min(999, rawPct)))
+          const barPercentage = percentage === null ? null : Math.min(100, Math.max(0, Math.abs(percentage)))
           const isNegative = allowNegative && total < 0
           const isComplete = isQty ? total >= lineTarget : total > 0
+          const isOvershoot = isQty && rawPct !== null && rawPct > 100
           const unit = line.unit || 'шт'
 
           return (
@@ -541,7 +552,7 @@ function ProgressLinesWidget({ order, logs }) {
                   {total} {targetForLine !== null && <>/ {targetForLine}</>} {unit}
                 </span>
                 {percentage !== null && (
-                  <span className={isComplete ? 'text-success font-medium' : ''}>{percentage}%</span>
+                  <span className={isOvershoot ? 'text-text-muted font-medium' : isComplete ? 'text-success font-medium' : ''}>{percentage}%</span>
                 )}
               </div>
               {percentage !== null && (
@@ -550,7 +561,7 @@ function ProgressLinesWidget({ order, logs }) {
                     className={`h-full rounded-full transition-all duration-500 ease-out ${
                       isNegative ? 'bg-danger' : isComplete ? 'bg-success' : 'bg-accent'
                     }`}
-                    style={{ width: `${Math.abs(percentage)}%` }}
+                    style={{ width: `${barPercentage}%` }}
                   />
                 </div>
               )}

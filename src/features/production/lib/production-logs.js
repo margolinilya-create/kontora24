@@ -191,28 +191,42 @@ export const STAGE_FIELDS = {
  */
 export const SUBTRACT_DEFECTS_STAGES = new Set(['print', 'cutting', 'lamination', 'packaging'])
 
+// Поле количества, которое РЕАЛЬНО пишется на dual-track этапах в зависимости
+// от трека. На print трек 'backgrounds' хранит backgrounds_printed (а
+// quantityField этапа — stickers_printed); на selection_pouring трек 'stickers'
+// хранит stickers_good (а quantityField — qty_selected). Прогресс трека обязан
+// читать ИМЕННО это поле — иначе бар трека всегда 0 (фидбэк 29.06, аудит).
+const DUAL_TRACK_FIELDS = {
+  print: { backgrounds: 'backgrounds_printed', stickers: 'stickers_printed' },
+  cutting: { backgrounds: 'qty_cut', stickers: 'qty_cut' },
+  selection_pouring: { backgrounds: 'qty_selected', stickers: 'stickers_good' },
+}
+
 /**
  * Compute progress for a given stage from production logs.
  * Брак вычитается из total для этапов из SUBTRACT_DEFECTS_STAGES.
+ *
+ * Поле количества разрешается с учётом трека через DUAL_TRACK_FIELDS — на
+ * dual-track этапах разные треки пишут разные поля (см. коммент выше). Фильтр
+ * по треку применяется ТОЛЬКО к этапам, которые действительно хранят данные
+ * по трекам (есть `tracks` в STAGE_FIELDS или запись в DUAL_TRACK_FIELDS).
+ * Для одиночных этапов (напр. ламинация фонов пишется с track=null) переданный
+ * трек игнорируется, иначе фильтр обнулял бы прогресс.
  */
 export function computeStageProgress(logs, stage, targetQty, track) {
   const config = STAGE_FIELDS[stage]
   if (!config) return { total: 0, target: targetQty, percentage: 0, isComplete: false }
 
-  const qtyField = config.quantityField
+  const trackField = track && DUAL_TRACK_FIELDS[stage]?.[track]
+  const qtyField = trackField || config.quantityField
+  const isTrackedStage = !!config.tracks || !!DUAL_TRACK_FIELDS[stage]
   let stageLogs = logs.filter((l) => l.stage === stage)
-  if (track) stageLogs = stageLogs.filter((l) => l.track === track)
+  if (track && isTrackedStage) stageLogs = stageLogs.filter((l) => l.track === track)
   const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[qtyField]) || 0), 0)
   const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
   const total = SUBTRACT_DEFECTS_STAGES.has(stage) ? Math.max(0, totalRaw - defects) : totalRaw
   const percentage = targetQty > 0 ? Math.min(100, Math.round((total / targetQty) * 100)) : 0
   return { total, target: targetQty, percentage, isComplete: total >= targetQty }
-}
-
-const DUAL_TRACK_FIELDS = {
-  print: { backgrounds: 'backgrounds_printed', stickers: 'stickers_printed' },
-  cutting: { backgrounds: 'qty_cut', stickers: 'qty_cut' },
-  selection_pouring: { backgrounds: 'qty_selected', stickers: 'stickers_good' },
 }
 
 export function computeDualTrackProgress(logs, stage, targetQty) {

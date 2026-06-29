@@ -7,6 +7,7 @@ import { useRoleSwitcherStore } from '@/shared/stores/role-switcher-store'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 // safeRpc убран вместе с auto_deduct_materials (12.05)
 import { captureError } from '@/shared/lib/sentry'
+import { toast } from '@/shared/stores/toast-store'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { getFreshAccessToken } from '@/shared/lib/auth-token'
 
@@ -325,7 +326,10 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
     }
   }
 
-  // Блокировка перехода вперёд без введённых данных на текущем этапе
+  // R-фидбэк 29.06: completion-check СМЯГЧЁН — продвижение вперёд без полных
+  // данных больше НЕ блокируется, а показывает предупреждение (toast.info),
+  // как validateLogEntry в R15.1. Заказ двигается так же свободно, как
+  // подзадачи. isRollback / force по-прежнему пропускают проверку молча.
   if (!options.isRollback && !options.force && fromStatus && STAGES_REQUIRING_COMPLETION.has(fromStatus)) {
     const order = orderForRoute || (await supabase
       .from('k24_orders')
@@ -336,6 +340,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
     const isPack3D = order?.order_type === 'stickerpack3D'
     const tracks = isPack3D && DUAL_TRACK_STAGES.includes(fromStatus) ? ['backgrounds', 'stickers'] : [null]
 
+    const incompleteTracks = []
     for (const track of tracks) {
       const { data: result, error: checkError } = await supabase.rpc('check_stage_completion', {
         p_order_id: orderId,
@@ -343,15 +348,18 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
         p_track: track,
       })
       if (checkError) {
-        // Если RPC недоступна — лучше пропустить заказ (degrade gracefully), чем заблокировать
+        // Если RPC недоступна — деградируем мягко, без предупреждения.
         captureError(checkError, { tags: { source: 'updateOrderStatus.checkCompletion' }, extra: { orderId, fromStatus, track } })
         break
       }
       if (!result?.is_complete) {
-        const stageLabel = ORDER_STATUSES[fromStatus]?.label || fromStatus
-        const trackLabel = track === 'backgrounds' ? ' (фоны)' : track === 'stickers' ? ' (стикеры)' : ''
-        throw new Error(`Этап «${stageLabel}»${trackLabel} не завершён. Сначала введите данные на странице заказа.`)
+        incompleteTracks.push(track === 'backgrounds' ? ' (фоны)' : track === 'stickers' ? ' (стикеры)' : '')
       }
+    }
+    if (incompleteTracks.length > 0) {
+      const stageLabel = ORDER_STATUSES[fromStatus]?.label || fromStatus
+      const suffix = incompleteTracks.filter(Boolean).join(',')
+      toast.info(`Этап «${stageLabel}»${suffix} не завершён — данные не введены, но заказ продвинут.`)
     }
   }
 

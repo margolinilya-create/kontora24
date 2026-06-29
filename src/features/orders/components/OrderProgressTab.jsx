@@ -7,7 +7,7 @@ import { PackDesignsForm } from '@/features/production/components/PackDesignsFor
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
 import { useOrderSubtasks } from '@/features/orders/hooks/useOrderSubtasks'
 import { useOrderItems } from '@/features/orders/hooks/useOrderItems'
-import { computeIncoming, computeStageProgress, hasSubtaskLog, SUBTRACT_DEFECTS_STAGES } from '@/features/production/lib/production-logs'
+import { computeIncoming, computeStageProgress, SUBTRACT_DEFECTS_STAGES } from '@/features/production/lib/production-logs'
 import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import { DryingTimer } from './DryingTimer'
@@ -621,7 +621,7 @@ function MiniStepper({ route, status, accentClass }) {
   )
 }
 
-function SubtaskTrackBlock({ track, subtask, advance, onUpdated, canJump, logs, order }) {
+function SubtaskTrackBlock({ track, subtask, advance, onUpdated, canJump, order }) {
   const [target, setTarget] = useState('')
   const [saving, setSaving] = useState(false)
   const status = subtask?.status
@@ -631,18 +631,15 @@ function SubtaskTrackBlock({ track, subtask, advance, onUpdated, canJump, logs, 
   const otherOptions = route.filter((s) => s !== status)
   const next = getNextSubtaskStatus(track, status, order)
 
-  // Нельзя advance если для текущего status трека ещё нет ни одного production_log.
-  // Кроме pending/ready/cancelled — там учёта не бывает (hasSubtaskLog возвращает true).
-  const canAdvance = hasSubtaskLog(logs || [], track, status)
+  // R-фидбэк 29.06: убран gate hasSubtaskLog — подзадачи двигаются свободно,
+  // без требования наличия лога на текущем этапе. Менеджер сам решает когда
+  // переводить трек дальше (напр. ламинация фонов пишется с track=null и не
+  // удовлетворяла gate'у track='backgrounds' → ФОН застревал на ламинации).
   const accent = track === 'backgrounds' ? 'bg-dept-print' : 'bg-dept-pouring'
   const tone = track === 'backgrounds' ? 'border-dept-print/30 bg-dept-print/5' : 'border-dept-pouring/30 bg-dept-pouring/5'
 
   async function complete() {
     if (!next) return
-    if (!canAdvance) {
-      toast.error(`Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»`)
-      return
-    }
     setSaving(true)
     try {
       await advance(track, next)
@@ -657,10 +654,6 @@ function SubtaskTrackBlock({ track, subtask, advance, onUpdated, canJump, logs, 
 
   async function handleJump() {
     if (!target) return
-    if (!canAdvance) {
-      toast.error(`Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»`)
-      return
-    }
     setSaving(true)
     try {
       await advance(track, target)
@@ -693,8 +686,7 @@ function SubtaskTrackBlock({ track, subtask, advance, onUpdated, canJump, logs, 
         {next ? (
           <button
             onClick={complete}
-            disabled={saving || !canAdvance}
-            title={!canAdvance ? `Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»` : ''}
+            disabled={saving}
             className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50 min-h-[40px] flex-1 sm:flex-none"
           >
             {saving ? '…' : `Завершить «${SUBTASK_STATUS_LABELS[status]}» → ${SUBTASK_STATUS_LABELS[next]}`}
@@ -844,7 +836,7 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
   )
 }
 
-function ExtraStickerBlock({ subtask, order, advanceById, onUpdated, logs }) {
+function ExtraStickerBlock({ subtask, order, advanceById, onUpdated }) {
   const [saving, setSaving] = useState(false)
   const status = subtask.status
   const route = getSubtaskRoute('extra_stickers', order)
@@ -858,17 +850,10 @@ function ExtraStickerBlock({ subtask, order, advanceById, onUpdated, logs }) {
     .map(([idx, qty]) => `Вид ${idx}: ${qty}`)
     .join(' · ')
 
-  // R14.5 (бриф 03.06): extra_stickers подзадача теперь проходит полный маршрут
-  // с учётом работы. Без хотя бы одного лога с track='extra_stickers' на
-  // соответствующем stage кнопка «Завершить» disabled.
-  const canAdvance = hasSubtaskLog(logs || [], 'extra_stickers', status)
-
+  // R-фидбэк 29.06: gate hasSubtaskLog снят — допускаем свободное продвижение
+  // подзадачи доп. стикеров без требования лога на текущем этапе.
   async function complete() {
     if (!next) return
-    if (!canAdvance) {
-      toast.error(`Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»`)
-      return
-    }
     setSaving(true)
     try {
       await advanceById(subtask.id, next)
@@ -902,8 +887,7 @@ function ExtraStickerBlock({ subtask, order, advanceById, onUpdated, logs }) {
         {next ? (
           <button
             onClick={complete}
-            disabled={saving || !canAdvance}
-            title={!canAdvance ? `Сначала внесите данные на этапе «${SUBTASK_STATUS_LABELS[status]}»` : ''}
+            disabled={saving}
             className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50 min-h-[40px] flex-1 sm:flex-none"
           >
             {saving ? '…' : `Завершить «${SUBTASK_STATUS_LABELS[status]}» → ${SUBTASK_STATUS_LABELS[next]}`}
@@ -916,7 +900,7 @@ function ExtraStickerBlock({ subtask, order, advanceById, onUpdated, logs }) {
   )
 }
 
-function SubtaskIndicator({ order, logs, onUpdated }) {
+function SubtaskIndicator({ order, onUpdated }) {
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const { items } = useOrderItems(order.id)
   const isMultiVariant = items.length > 1
@@ -950,7 +934,6 @@ function SubtaskIndicator({ order, logs, onUpdated }) {
             order={order}
             advanceById={advanceById}
             onUpdated={onUpdated}
-            logs={logs}
           />
         ))}
       </div>
@@ -992,8 +975,8 @@ function SubtaskIndicator({ order, logs, onUpdated }) {
           <span className="text-xs text-text-muted">объединяются на «Сборка 3D»</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <SubtaskTrackBlock track="backgrounds" subtask={subtasks.backgrounds} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
-          <SubtaskTrackBlock track="stickers" subtask={subtasks.stickers} advance={advance} onUpdated={onUpdated} canJump={canJump} logs={logs} order={order} />
+          <SubtaskTrackBlock track="backgrounds" subtask={subtasks.backgrounds} advance={advance} onUpdated={onUpdated} canJump={canJump} order={order} />
+          <SubtaskTrackBlock track="stickers" subtask={subtasks.stickers} advance={advance} onUpdated={onUpdated} canJump={canJump} order={order} />
         </div>
       </div>
     )
@@ -1019,7 +1002,7 @@ export function OrderProgressTab({ order, onUpdated }) {
         </div>
       )}
 
-      <SubtaskIndicator order={order} logs={logs} onUpdated={onUpdated} />
+      <SubtaskIndicator order={order} onUpdated={onUpdated} />
 
       <div className="flex justify-end">
         <CreateExtraStickersButton order={order} onCreated={onUpdated} />

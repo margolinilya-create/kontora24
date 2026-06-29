@@ -298,7 +298,11 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   // Карточка одного трека: stage берётся из статуса подзадачи, ввод поэвидово
   // (PackDesignsForm) активен на трек 'stickers' для всех PACK_STAGES_3D_PACK.
   function renderTrackCard({ trackKey, subStatus, headerLabel, tonePill }) {
-    const cardStage = SUBTASK_STATUS_TO_STAGE[subStatus] || stage
+    // R-фидбэк 29.06: подзадача 'drying' (сушка стикеров) в SUBTASK_STATUS_TO_STAGE
+    // = null (нет queue-страницы), поэтому раньше карточка падала на фолбэк
+    // cardStage=order.status (обычно 'selection_pouring') и показывала форму
+    // ЗАЛИВКИ. Для сушки нужен ввод брака по каждому виду → маппим явно в 'drying'.
+    const cardStage = subStatus === 'drying' ? 'drying' : (SUBTASK_STATUS_TO_STAGE[subStatus] || stage)
     const cardLabel = ORDER_STATUSES[cardStage]?.label || cardStage
     const cardConfig = STAGE_FIELDS[cardStage]
     const isDualTrackStage = !!cardConfig?.tracks
@@ -325,7 +329,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
 
     const showPackForCard = trackKey === 'stickers'
       && isPack3D
-      && PACK_STAGES_3D_PACK.includes(cardStage)
+      && (PACK_STAGES_3D_PACK.includes(cardStage) || cardStage === 'drying')
 
     const pillCls = tonePill === 'backgrounds'
       ? 'bg-dept-print/15 text-dept-print border-dept-print/30'
@@ -356,7 +360,11 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
         </div>
         {showPackForCard && designs.length > 0 ? (
           <div>
-            <p className="text-xs text-text-muted mb-2">Стикеры — по каждому виду отдельно</p>
+            <p className="text-xs text-text-muted mb-2">
+              {cardStage === 'drying'
+                ? 'Брак после сушки — по каждому виду отдельно'
+                : 'Стикеры — по каждому виду отдельно'}
+            </p>
             <PackDesignsForm
               designs={designs}
               logs={logs}
@@ -370,22 +378,26 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
                 : cardStage === 'drying' ? 'drying'
                 : 'pouring'}
             />
-            <div className="mt-4 pt-4 border-t border-border">
-              <ProductionLogForm
-                stage={cardStage}
-                order={order}
-                progress={progressForForm}
-                incoming={incomingForForm}
-                onSubmit={handleSubmit}
-                omitFields={{
-                  ...(omitFields || {}),
-                  stickers: [
-                    ...(omitFields?.stickers || []),
-                    ...((PACK_OMIT_FIELDS[cardStage]?.stickers) || []),
-                  ],
-                }}
-              />
-            </div>
+            {/* На сушке единственное поле — брак, вводится поэвидово выше.
+                Нижняя одиночная форма не нужна (фидбэк 29.06). */}
+            {cardStage !== 'drying' && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <ProductionLogForm
+                  stage={cardStage}
+                  order={order}
+                  progress={progressForForm}
+                  incoming={incomingForForm}
+                  onSubmit={handleSubmit}
+                  omitFields={{
+                    ...(omitFields || {}),
+                    stickers: [
+                      ...(omitFields?.stickers || []),
+                      ...((PACK_OMIT_FIELDS[cardStage]?.stickers) || []),
+                    ],
+                  }}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <ProductionLogForm

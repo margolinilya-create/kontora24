@@ -39,14 +39,37 @@ describe('computeStageProgress', () => {
     expect(result.percentage).toBe(100)
   })
 
-  it('filters by track when provided', () => {
+  it('filters by track and resolves the per-track field (print)', () => {
+    // На print трек 'backgrounds' пишет backgrounds_printed, 'stickers' —
+    // stickers_printed. Прогресс трека должен читать ИМЕННО своё поле.
     const logs = [
-      { stage: 'print', track: 'backgrounds', stickers_printed: 40 },
+      { stage: 'print', track: 'backgrounds', backgrounds_printed: 40 },
       { stage: 'print', track: 'stickers', stickers_printed: 30 },
-      { stage: 'print', track: 'backgrounds', stickers_printed: 20 },
+      { stage: 'print', track: 'backgrounds', backgrounds_printed: 20 },
     ]
-    const result = computeStageProgress(logs, 'print', 100, 'backgrounds')
-    expect(result.total).toBe(60)
+    expect(computeStageProgress(logs, 'print', 100, 'backgrounds').total).toBe(60)
+    expect(computeStageProgress(logs, 'print', 100, 'stickers').total).toBe(30)
+  })
+
+  it('resolves stickers_good for selection_pouring stickers track', () => {
+    // Трек 'stickers' на selection_pouring пишет stickers_good (не qty_selected).
+    const logs = [
+      { stage: 'selection_pouring', track: 'stickers', stickers_good: 80 },
+      { stage: 'selection_pouring', track: 'backgrounds', qty_selected: 50 },
+    ]
+    expect(computeStageProgress(logs, 'selection_pouring', 100, 'stickers').total).toBe(80)
+    expect(computeStageProgress(logs, 'selection_pouring', 100, 'backgrounds').total).toBe(50)
+  })
+
+  it('ignores track filter for single-track stages (lamination logs are track=null)', () => {
+    // Ламинация фонов 3D-стикерпака пишется одиночной формой с track=null, но
+    // очередь/карточка передаёт track='backgrounds'. Прогресс не должен
+    // обнуляться из-за фильтра (фидбэк 29.06).
+    const logs = [
+      { stage: 'lamination', track: null, lamination_qty: 30 },
+      { stage: 'lamination', track: null, lamination_qty: 20 },
+    ]
+    expect(computeStageProgress(logs, 'lamination', 100, 'backgrounds').total).toBe(50)
   })
 
   it('returns zero progress for unknown stage', () => {

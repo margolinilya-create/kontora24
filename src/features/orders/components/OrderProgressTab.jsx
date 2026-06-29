@@ -310,7 +310,15 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     // оставит только нужный трек как active.
     const omitFields = otherFields.length > 0 ? { [otherTrack]: otherFields } : undefined
 
-    const trackProgress = computeStageProgress(logs, cardStage, order.qty, trackKey)
+    // R-фидбэк 29.06: для ОДИНОЧНЫХ (не dual-track) cardStage — напр. ламинация
+    // фонов — production_log пишется БЕЗ track (track=null), т.к. форма одиночная.
+    // Раньше прогресс считался с фильтром track='backgrounds' → бар всегда 0,
+    // введённые данные «не учитывались». Для stickerpack3D ламинация и так
+    // применяется только к фонам (BACKGROUNDS_ONLY_STAGES), поэтому считаем
+    // прогресс без фильтра по треку. Incoming оставляем по своему треку —
+    // ламинация приходит с печати фонов (track='backgrounds').
+    const progressTrack = isDualTrackStage ? trackKey : null
+    const trackProgress = computeStageProgress(logs, cardStage, order.qty, progressTrack)
     const trackIncoming = computeIncoming(logs, route, cardStage, order.qty, trackKey)
     const progressForForm = isDualTrackStage ? { [trackKey]: trackProgress } : trackProgress
     const incomingForForm = isDualTrackStage ? { [trackKey]: trackIncoming } : trackIncoming

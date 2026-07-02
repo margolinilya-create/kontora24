@@ -212,7 +212,18 @@ export function useOrderDetail(id) {
           .order('created_at', { ascending: false }),
       ])
       if (orderRes.error) throw orderRes.error
-      setOrder(orderRes.data)
+      let orderData = orderRes.data
+      // R18.4 (бриф 30.06): наклейка «на бокс» с номером заказа печатается любым
+      // сотрудником, но имя заказчика видно только менеджеру — RLS k24_clients
+      // SELECT ограничен admin/manager, поэтому join client:* у работников = null.
+      // Подтягиваем ТОЛЬКО имя через SECURITY DEFINER RPC (без утечки телефона/email).
+      if (orderData && orderData.client_id && !orderData.client?.name) {
+        const { data: clientName } = await supabase.rpc('k24_order_client_name', { p_order_id: orderData.id })
+        if (clientName) {
+          orderData = { ...orderData, client: { ...(orderData.client || {}), name: clientName } }
+        }
+      }
+      setOrder(orderData)
       setHistory(historyRes.data || [])
     } catch (err) {
       setError(err)

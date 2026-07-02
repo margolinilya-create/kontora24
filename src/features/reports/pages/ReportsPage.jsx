@@ -134,30 +134,34 @@ function UnitEconomicsTab({ period }) {
 
   const rows = data.map((o) => {
     const mat = costForOrder(o, costMap)
+    // R18.0: труд — фактический сдельный расчёт (o.labor_cost из useReports),
+    // а не ручное поле cost_labor. Затраты на производство = материалы + труд.
+    const labor = Number(o.labor_cost) || 0
     return {
       ...o,
       mat_film: mat.film,
+      mat_lam: mat.lam,
       mat_resin: mat.resin,
       mat_total: mat.total,
-      total_cost_with_mat_labor: mat.total + (Number(o.cost_labor) || 0),
+      labor,
+      prod_cost: mat.total + labor,
     }
   })
 
   function handleExport() {
-    // R17.5 (бриф 5.06): «Маржа» → «Разница» = цена − Себестоимость материалов.
-    // Колонки «Себест. итого (мат+труд)» и отдельная «Себест. материалов»
-    // объединены в одну «Себестоимость материалов, ₽».
+    // R18.0 (бриф 30.06): плёнка/ламинация — конкретное имя со склада;
+    // % брака — брак сушки / залито; себестоимости плёнки печати/ламинации/смолы
+    // и стоимость труда — по фактическим данным; «Разница» → «Затраты на
+    // производство» (материалы + труд).
     const header = [
       'ID', '№ заказа', 'Дата приёма', 'Дедлайн', 'Клиент', 'Продукт', '3D смола',
       'Размер', 'Тираж', 'Стикеров в паке', 'Плёнка', 'Ламинация', 'Комментарий',
       'Отгрузка', '% брака', 'Излишки, шт', 'Излишки, %', 'Сумма заказа', 'Тип оплаты',
-      'Себест. плёнки, ₽', 'Себест. смолы, ₽', 'Себестоимость материалов, ₽',
-      'Оплата труда, ₽', 'Разница, ₽', 'Разница, %',
+      'Себестоимость плёнки для печати, ₽', 'Себестоимость плёнки для ламинации, ₽',
+      'Себестоимость смолы, ₽', 'Себестоимость материалов, ₽', 'Стоимость труда, ₽',
+      'Затраты на производство, ₽',
     ]
     const aoa = [header, ...rows.map((o) => {
-      const matCost = Math.round(o.mat_total)
-      const diff = (Number(o.price_final) || 0) - matCost
-      const diffPct = Number(o.price_final) > 0 ? Math.round((diff / Number(o.price_final)) * 100) : 0
       return [
         o.id, formatOrderNumber(o), formatDate(o.created_at), o.deadline || '—',
         o.client_name || '—', ORDER_TYPES[o.order_type]?.label || o.order_type,
@@ -169,9 +173,9 @@ function UnitEconomicsTab({ period }) {
         DELIVERY_TYPES[o.delivery_type]?.label || '—',
         `${o.reject_pct}%`, o.surplus, `${o.surplus_pct}%`,
         o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
-        Math.round(o.mat_film), Math.round(o.mat_resin), matCost,
-        o.cost_labor || 0,
-        diff, `${diffPct}%`,
+        Math.round(o.mat_film), Math.round(o.mat_lam), Math.round(o.mat_resin),
+        Math.round(o.mat_total), Math.round(o.labor),
+        Math.round(o.prod_cost),
       ]
     })]
     downloadXlsx(`unit-economics-${period}`, 'Unit Economics', aoa)
@@ -186,16 +190,13 @@ function UnitEconomicsTab({ period }) {
             <Th>№</Th><Th>Дата</Th><Th>Клиент</Th><Th>Продукт</Th>
             <Th right>Размер</Th><Th right>Тираж</Th><Th>Плёнка</Th><Th>Лам.</Th>
             <Th right>Брак%</Th><Th right>Излиш.шт</Th><Th right>Излиш.%</Th>
-            <Th right>Сумма</Th><Th right>Плёнка ₽</Th><Th right>Смола ₽</Th>
-            <Th right>Себест. мат.</Th><Th right>Разница ₽</Th><Th right>Разница %</Th>
+            <Th right>Сумма</Th>
+            <Th right>Плёнка печать ₽</Th><Th right>Плёнка лам. ₽</Th><Th right>Смола ₽</Th>
+            <Th right>Себест. мат.</Th><Th right>Труд ₽</Th><Th right>Затраты произв. ₽</Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((o) => {
-            // R17.5: «Разница» = цена − Себестоимость материалов (без труда).
-            const matCost = Math.round(o.mat_total)
-            const diff = (Number(o.price_final) || 0) - matCost
-            const diffPct = Number(o.price_final) > 0 ? Math.round((diff / Number(o.price_final)) * 100) : 0
             return (
               <tr key={o.id} className="border-b border-border last:border-0">
                 <Td bold>{formatOrderNumber(o)}</Td>
@@ -211,10 +212,11 @@ function UnitEconomicsTab({ period }) {
                 <Td right muted>{o.surplus_pct}%</Td>
                 <Td right>{formatPrice(o.price_final)}</Td>
                 <Td right muted>{Math.round(o.mat_film)}</Td>
+                <Td right muted>{Math.round(o.mat_lam)}</Td>
                 <Td right muted>{Math.round(o.mat_resin)}</Td>
-                <Td right>{formatPrice(matCost)}</Td>
-                <Td right success={diff > 0} danger={diff < 0}>{formatPrice(diff)}</Td>
-                <Td right>{diffPct}%</Td>
+                <Td right>{formatPrice(Math.round(o.mat_total))}</Td>
+                <Td right muted>{formatPrice(Math.round(o.labor))}</Td>
+                <Td right>{formatPrice(Math.round(o.prod_cost))}</Td>
               </tr>
             )
           })}

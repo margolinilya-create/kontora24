@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfMonth, startOfDay, endOfDay, format, parseISO } from 'date-fns'
+import { calculateWorkerPayout } from '@/shared/constants'
 
 // R13.3 (бриф 02.06): период расширен — `today` (с начала дня), `custom:from:to`
 // (YYYY-MM-DD строки), плюс legacy '7' / '30' / 'month'.
@@ -87,22 +88,31 @@ export function useOrdersCostReport(period = '30') {
                    cost_materials, cost_labor, cost_total, status,
                    created_at, deadline, width_mm, height_mm,
                    film_type, film_type_stickers, lam_type, need_lam,
+                   film_material_id, lam_material_id,
                    stickers_per_pack, notes, delivery_type, payment_status,
-                   client:k24_clients!client_id(name)`)
+                   client:k24_clients!client_id(name),
+                   film_material:k24_materials!film_material_id(id, name, material_code),
+                   lam_material:k24_materials!lam_material_id(id, name, material_code)`)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .order('created_at', { ascending: false })
           .limit(500),
         supabase.from('k24_production_logs')
-          .select(`order_id, film_meters, resin_grams, lamination_meters,
+          .select(`order_id, stage, defects, film_meters, resin_grams, lamination_meters,
                    film_type, track, stickers_printed, stickers_poured,
                    stickers_good, packs_assembled, packs_packaged, qty_selected,
                    boxes_used,
                    order:k24_orders!order_id(lam_type, film_type, film_type_stickers, order_type)`)
+          .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (logsRes.error) throw logsRes.error
+
+      // ordersById — нужен calculateWorkerPayout для stickers_per_pack.
+      const ordersById = Object.fromEntries((ordersRes.data || []).map((o) => [o.id, o]))
+      // rawLogsByOrder — сырые логи по заказу для прогона через calculateWorkerPayout.
+      const rawLogsByOrder = {}
 
       const logsByOrder = {}
       ;(logsRes.data || []).forEach((l) => {
@@ -112,11 +122,14 @@ export function useOrdersCostReport(period = '30') {
             filmByType: {}, lamByType: {},
             stickers_printed: 0, stickers_poured: 0, stickers_good: 0,
             packs_assembled: 0, packs_packaged: 0, qty_selected: 0,
-            boxes_used: 0,
+            boxes_used: 0, drying_defects: 0,
             payouts: 0,
           }
         }
+        ;(rawLogsByOrder[l.order_id] ||= []).push(l)
         const acc = logsByOrder[l.order_id]
+        // R18.0: брак сушки — числитель для % брака заливки в Unit Economics.
+        if (l.stage === 'drying') acc.drying_defects += Number(l.defects) || 0
         const filmM = Number(l.film_meters) || 0
         const resinG = Number(l.resin_grams) || 0
         const lamM = Number(l.lamination_meters) || 0
@@ -142,11 +155,22 @@ export function useOrdersCostReport(period = '30') {
       })
 
       const rows = (ordersRes.data || []).map((o) => {
-        const lg = logsByOrder[o.id] || { film: 0, resin: 0, lam: 0, stickers_printed: 0, stickers_poured: 0, stickers_good: 0, packs_assembled: 0, packs_packaged: 0, qty_selected: 0, boxes_used: 0, filmByType: {}, lamByType: {} }
-        const rejected = lg.stickers_poured > 0 ? lg.stickers_poured - lg.stickers_good : 0
-        const rejectPct = lg.stickers_poured > 0 ? Math.round((rejected / lg.stickers_poured) * 100) : 0
-        const surplus = lg.stickers_printed > 0 && o.qty > 0 ? lg.stickers_printed - o.qty : 0
-        const surplusPct = o.qty > 0 ? Math.round((surplus / o.qty) * 100) : 0
+        const lg = logsByOrder[o.id] || { film: 0, resin: 0, lam: 0, stickers_printed: 0, stickers_poured: 0, stickers_good: 0, packs_assembled: 0, packs_packaged: 0, qty_selected: 0, boxes_used: 0, drying_defects: 0, filmByType: {}, lamByType: {} }
+        // R18.0 (бриф 30.06): % брака = брак на сушке / залито (нас интересует
+        // брак именно после заливки, который фиксируется на этапе сушки).
+        // Обе величины в штуках стикеров — единицы согласованы.
+        const dryingDefects = lg.drying_defects || 0
+        const rejectPct = lg.stickers_poured > 0 ? Math.round((dryingDefects / lg.stickers_poured) * 100) : 0
+        // Излишки шт = залито − тираж − брак. Для стикерпаков «тираж» в стикерах =
+        // qty × stickers_per_pack (qty у пака — число паков, а заливка — штучная),
+        // для остальных типов тираж = qty. % — от тиража (решение пользователя).
+        const isPack = o.order_type === 'stickerpack' || o.order_type === 'stickerpack3D'
+        const targetStickers = isPack ? (o.qty || 0) * (Number(o.stickers_per_pack) || 1) : (o.qty || 0)
+        const surplus = lg.stickers_poured > 0 && targetStickers > 0 ? lg.stickers_poured - targetStickers - dryingDefects : 0
+        const surplusPct = targetStickers > 0 ? Math.round((surplus / targetStickers) * 100) : 0
+        // Стоимость труда — фактический сдельный расчёт по всем логам заказа
+        // (заливка/выборка/сборка/упаковка), а не ручное поле cost_labor.
+        const laborCost = calculateWorkerPayout(rawLogsByOrder[o.id] || [], { ordersById }).total
         return {
           ...o,
           client_name: o.client?.name || null,
@@ -162,7 +186,9 @@ export function useOrdersCostReport(period = '30') {
           packs_packaged: lg.packs_packaged,
           qty_selected: lg.qty_selected,
           boxes_used: lg.boxes_used,
-          rejected, reject_pct: rejectPct, surplus, surplus_pct: surplusPct,
+          drying_defects: dryingDefects,
+          reject_pct: rejectPct, surplus, surplus_pct: surplusPct,
+          labor_cost: laborCost,
           profit: (Number(o.price_final) || 0) - (Number(o.cost_total) || 0),
           margin_pct: o.price_final > 0 ? Math.round(((o.price_final - o.cost_total) / o.price_final) * 100) : 0,
         }

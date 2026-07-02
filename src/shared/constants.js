@@ -580,10 +580,48 @@ export function getStockStatus(material) {
 // Используется в личном кабинете для расчёта потенциального заработка
 // на основе production logs.
 export const WORKER_RATES = {
-  pouring_per_sticker:  1.0,  // заливка одного стикера (хорошего)
+  pouring_per_sticker:  1.0,  // заливка одного стикера (хорошего) — стандартная форма
   selection_per_sticker: 0.5, // выборка фона, оплачивается как qty_selected × stickers_per_pack × 0.5 (фидбэк 17.05)
   assembly_per_pack:    0.5,  // сборка одного пака, считаем по стикерам в паке
   packaging_per_pack:   1.5,  // упаковка одного пака
+  // R19: заливка по форме стикера (бриф 30.06). standard = pouring_per_sticker.
+  pouring_by_shape: {
+    standard:    1.0,
+    complex:     1.5, // сложная форма
+    big:         1.5, // большая форма
+    complex_big: 2.0, // сложная и большая форма
+  },
+}
+
+// R19: формы (типы) стикеров — влияют на ставку заливки. Хранятся в
+// k24_pack_designs.shape_type (по design_index) и k24_orders.sticker_shape.
+export const STICKER_SHAPES = {
+  standard:    { label: 'Стандартная' },
+  complex:     { label: 'Сложная форма' },
+  big:         { label: 'Большая форма' },
+  complex_big: { label: 'Сложная и большая' },
+}
+
+// R19: перевод настроек bonus_rates ({pouring, selection, assembly_3d, packaging,
+// pouring_shapes}) в форму WORKER_RATES для calculateWorkerPayout.opts.rates.
+export function settingsToRates(bonusRates) {
+  if (!bonusRates || typeof bonusRates !== 'object') return undefined
+  const r = {}
+  if (bonusRates.pouring != null) r.pouring_per_sticker = Number(bonusRates.pouring)
+  if (bonusRates.selection != null) r.selection_per_sticker = Number(bonusRates.selection)
+  if (bonusRates.assembly_3d != null) r.assembly_per_pack = Number(bonusRates.assembly_3d)
+  if (bonusRates.packaging != null) r.packaging_per_pack = Number(bonusRates.packaging)
+  if (bonusRates.pouring_shapes && typeof bonusRates.pouring_shapes === 'object') {
+    r.pouring_by_shape = bonusRates.pouring_shapes
+  }
+  return r
+}
+
+const POURING_SHAPE_LABEL = {
+  standard: 'Заливка (стандартная)',
+  complex: 'Заливка (сложная форма)',
+  big: 'Заливка (большая форма)',
+  complex_big: 'Заливка (сложная и большая)',
 }
 
 /**
@@ -592,15 +630,31 @@ export const WORKER_RATES = {
  * @param {Array} logs — записи k24_production_logs (могут содержать связанный order через order_id/order)
  * @param {object} [opts]
  * @param {object} [opts.ordersById] — карта { [order_id]: order } чтобы достать stickers_per_pack
+ * @param {object} [opts.rates] — переопределение ставок (форма WORKER_RATES). Дефолт — WORKER_RATES.
+ * @param {object} [opts.shapeByDesign] — { `${order_id}:${design_index}`: shape } из k24_pack_designs
+ * @param {object} [opts.orderShape] — { [order_id]: shape } из k24_orders.sticker_shape
  * @returns {{ breakdown: object, total: number }}
  *
- * Формула сборки 3D обновлена 12.05: packs_assembled × stickers_per_pack × 0,5 ₽.
- * Формула выборки фонов обновлена 17.05: qty_selected × stickers_per_pack × 0,5 ₽
- * (раньше была фиксированная ставка за фон без учёта что к каждому фону относятся
- * stickers_per_pack стикеров).
+ * R19 (бриф 30.06): заливка оплачивается по форме стикера (standard 1.0 /
+ * complex 1.5 / big 1.5 / complex_big 2.0). Форма ищется по design_index в
+ * shapeByDesign, затем order-level orderShape, иначе 'standard'. breakdown
+ * заливки разбит на pouring_<shape> — по одной ставке на строку.
+ * Без shape-карт всё падает в 'standard' → суммы как раньше.
+ *
+ * Формула сборки 3D: packs_assembled × stickers_per_pack × ставка.
+ * Формула выборки фонов: qty_selected × stickers_per_pack × ставка.
  */
 export function calculateWorkerPayout(logs, opts = {}) {
-  let pouring = 0, packaging = 0
+  const rates = { ...WORKER_RATES, ...(opts.rates || {}) }
+  const shapeRate = { ...WORKER_RATES.pouring_by_shape, ...(opts.rates?.pouring_by_shape || {}) }
+  const resolveShape = (l) =>
+    opts.shapeByDesign?.[`${l.order_id}:${l.design_index}`]
+    || opts.orderShape?.[l.order_id]
+    || 'standard'
+
+  // Заливка — по формам стикера.
+  const pouringByShape = { standard: 0, complex: 0, big: 0, complex_big: 0 }
+  let packaging = 0
   // Выборку и сборку считаем в «стикерах», чтобы умножить на ставку 0.5 ₽/стикер.
   let selectionStickers = 0
   let assemblyStickers = 0
@@ -609,8 +663,12 @@ export function calculateWorkerPayout(logs, opts = {}) {
   let assemblyPacks = 0
 
   for (const l of logs || []) {
-    if (l.stage === 'pouring') {
-      pouring += Number(l.stickers_good) || 0
+    if (l.stage === 'pouring' || l.stage === 'selection_pouring') {
+      const good = Number(l.stickers_good) || 0
+      if (good > 0) {
+        const shape = resolveShape(l)
+        pouringByShape[shape] = (pouringByShape[shape] || 0) + good
+      }
     }
     if (l.stage === 'selection_pouring') {
       const bgs = Number(l.qty_selected) || 0
@@ -618,7 +676,6 @@ export function calculateWorkerPayout(logs, opts = {}) {
       const order = opts.ordersById?.[l.order_id] || l.order || null
       const perPack = Number(order?.stickers_per_pack) || 1
       selectionStickers += bgs * perPack
-      pouring += Number(l.stickers_good) || 0
     }
     if (l.stage === 'selection') {
       // R11: выборка штучных стикеров sticker3D после сушки — каждая
@@ -638,13 +695,18 @@ export function calculateWorkerPayout(logs, opts = {}) {
       packaging += Number(l.packs_packaged) || 0
     }
   }
-  const breakdown = {
-    pouring:    { count: pouring,           rate: WORKER_RATES.pouring_per_sticker,   amount: pouring           * WORKER_RATES.pouring_per_sticker,   label: 'Заливка стикеров' },
-    selection:  { count: selectionStickers, rate: WORKER_RATES.selection_per_sticker, amount: selectionStickers * WORKER_RATES.selection_per_sticker, label: 'Выборка фонов', bgs: selectionBgs },
-    assembly:   { count: assemblyStickers,  rate: WORKER_RATES.assembly_per_pack,     amount: assemblyStickers  * WORKER_RATES.assembly_per_pack,     label: 'Сборка 3D-паков', packs: assemblyPacks },
-    packaging:  { count: packaging,         rate: WORKER_RATES.packaging_per_pack,    amount: packaging         * WORKER_RATES.packaging_per_pack,    label: 'Упаковка паков' },
+
+  const breakdown = {}
+  for (const shape of ['standard', 'complex', 'big', 'complex_big']) {
+    const count = pouringByShape[shape] || 0
+    const rate = shapeRate[shape] ?? rates.pouring_per_sticker
+    breakdown[`pouring_${shape}`] = { count, rate, amount: count * rate, label: POURING_SHAPE_LABEL[shape], shape }
   }
-  const total = breakdown.pouring.amount + breakdown.selection.amount + breakdown.assembly.amount + breakdown.packaging.amount
+  breakdown.selection = { count: selectionStickers, rate: rates.selection_per_sticker, amount: selectionStickers * rates.selection_per_sticker, label: 'Выборка фонов', bgs: selectionBgs }
+  breakdown.assembly  = { count: assemblyStickers,  rate: rates.assembly_per_pack,     amount: assemblyStickers  * rates.assembly_per_pack,     label: 'Сборка 3D-паков', packs: assemblyPacks }
+  breakdown.packaging = { count: packaging,         rate: rates.packaging_per_pack,    amount: packaging         * rates.packaging_per_pack,    label: 'Упаковка паков' }
+
+  const total = Object.values(breakdown).reduce((sum, b) => sum + b.amount, 0)
   return { breakdown, total }
 }
 

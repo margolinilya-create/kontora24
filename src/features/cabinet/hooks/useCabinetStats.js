@@ -4,7 +4,8 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, startOfMonth, subMonths, format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { calculateWorkerPayout } from '@/shared/constants'
+import { calculateWorkerPayout, settingsToRates } from '@/shared/constants'
+import { fetchShapeByDesign, orderShapeFromLogs } from '@/shared/lib/payout-context'
 
 /**
  * Personal stats for worker cabinet:
@@ -33,10 +34,10 @@ export function useCabinetStats(period = '30') {
       // Для графика берём 6 месяцев независимо от выбранного периода
       const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5)).toISOString()
 
-      const [logsRes, shiftsRes, monthlyRes] = await Promise.all([
+      const [logsRes, shiftsRes, monthlyRes, ratesRes] = await Promise.all([
         supabase
           .from('k24_production_logs')
-          .select('*, order:k24_orders!order_id(number, custom_number, order_type, qty, stickers_per_pack)')
+          .select('*, order:k24_orders!order_id(number, custom_number, order_type, qty, stickers_per_pack, sticker_shape)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', since)
@@ -50,10 +51,11 @@ export function useCabinetStats(period = '30') {
           .order('started_at', { ascending: false }),
         supabase
           .from('k24_production_logs')
-          .select('stage, order_id, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, defects, created_at, order:k24_orders!order_id(stickers_per_pack)')
+          .select('stage, order_id, design_index, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, defects, created_at, order:k24_orders!order_id(stickers_per_pack, sticker_shape)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', sixMonthsAgo),
+        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (logsRes.error) throw logsRes.error
       if (shiftsRes.error) throw shiftsRes.error
@@ -62,6 +64,12 @@ export function useCabinetStats(period = '30') {
       const logs = logsRes.data || []
       const shifts = shiftsRes.data || []
       const monthly = monthlyRes.data || []
+
+      // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
+      const payoutRates = settingsToRates(ratesRes.data?.value)
+      const shapeByDesign = await fetchShapeByDesign([...logs, ...monthly].map((l) => l.order_id))
+      const orderShape = orderShapeFromLogs([...logs, ...monthly])
+      const payoutOpts = { rates: payoutRates, shapeByDesign, orderShape }
 
       // Aggregate by action type (за выбранный период)
       const actionMap = {}
@@ -163,7 +171,7 @@ export function useCabinetStats(period = '30') {
       for (const [key, monthLogs] of Object.entries(monthlyByKey)) {
         const b = monthBuckets.get(key)
         if (!b) continue
-        b.earnings = calculateWorkerPayout(monthLogs).total
+        b.earnings = calculateWorkerPayout(monthLogs, payoutOpts).total
       }
       for (const [key, ids] of Object.entries(orderIdsByMonth)) {
         const b = monthBuckets.get(key)
@@ -172,8 +180,8 @@ export function useCabinetStats(period = '30') {
 
       const totalHours = shifts.reduce((sum, s) => sum + (s.duration_minutes || 0), 0) / 60
 
-      // Расчёт потенциального заработка по ставкам аудита 8.05
-      const payout = calculateWorkerPayout(logs)
+      // Расчёт потенциального заработка (R19: ставки из настроек + формы)
+      const payout = calculateWorkerPayout(logs, payoutOpts)
 
       setStats({
         byAction: Object.values(actionMap),

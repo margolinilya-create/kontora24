@@ -630,6 +630,7 @@ export default function CreateOrderPage() {
                     if (code) setValue('film_type', code, { shouldDirty: true })
                   }}
                   expected={filmType ? expectedByCode[filmType] : undefined}
+                  includeOutOfStock
                 />
                 <FilmSelect
                   label="Плёнка стикеров"
@@ -639,6 +640,7 @@ export default function CreateOrderPage() {
                     setValue('film_stickers_material_id', materialId, { shouldDirty: true })
                     if (code) setValue('film_type_stickers', code, { shouldDirty: true })
                   }}
+                  includeOutOfStock
                 />
               </div>
             ) : null}
@@ -653,6 +655,7 @@ export default function CreateOrderPage() {
                     if (code) setValue('film_type', code, { shouldDirty: true })
                   }}
                   expected={filmType ? expectedByCode[filmType] : undefined}
+                  includeOutOfStock
                 />
               )}
               <LaminationSelect

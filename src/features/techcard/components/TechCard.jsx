@@ -3,6 +3,8 @@ import { formatOrderType } from '../utils'
 import { formatOrderNumber } from '@/shared/lib/utils'
 import { getFilmMaterialName, IS_3D_TYPE, IS_3D_STICKERPACK, LAMINATION_TYPES } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useOrderItems } from '@/features/orders/hooks/useOrderItems'
+import { isMultiVariant, sumVariantQty, formatVariantSizes } from '@/features/orders/lib/order-items-format'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import {
@@ -28,12 +30,17 @@ const PRINT_HIDE = 'print-hide'
 
 const TechCardInner = forwardRef(function TechCardInner({ order, editable = false, onUpdated }, ref) {
   const { profile } = useAuth()
+  // R18.3: хук вызываем до early-return (rules-of-hooks); useOrderItems терпит пустой id.
+  const { items } = useOrderItems(order?.id)
   if (!order) return null
 
   const canEdit = editable && (profile?.role === 'admin' || profile?.role === 'manager')
 
   const is3D = IS_3D_TYPE(order.order_type)
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
+  // R18.3: multi-variant заказ — на тех-карте общий тираж + перечень видов.
+  const multiVariant = isMultiVariant(items)
+  const totalQty = multiVariant ? sumVariantQty(items) : (order.qty || 0)
   const deadlineDate = order.deadline ? new Date(order.deadline) : null
   const dayOfWeek = deadlineDate ? DAYS_RU[deadlineDate.getDay()] : ''
 
@@ -124,11 +131,23 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
             <Field label="Заказчик" value={order.client?.name || '—'} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
-            <Field label="Тираж" value={`${order.qty || 0} шт`} />
-            <Field label="Формат" value={`${order.width_mm || 0}×${order.height_mm || 0} мм`} />
+            <Field label={multiVariant ? 'Тираж (всего)' : 'Тираж'} value={`${totalQty} шт`} />
+            <Field label={multiVariant ? 'Размеры (по видам)' : 'Формат'} value={multiVariant ? formatVariantSizes(items) : `${order.width_mm || 0}×${order.height_mm || 0} мм`} valueFontSize={multiVariant ? 9 : undefined} />
             <Field label="Кол-во видов" value={order.design_variants || 1} />
             <Field label="Вид сдачи" value={formatOrderType(order.order_type)} />
           </div>
+          {multiVariant && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(items.length, 4)}, 1fr)`, gap: 3 * MM }}>
+              {items.map((it) => (
+                <Field
+                  key={it.id}
+                  label={`Вид ${it.idx}`}
+                  value={`${Number(it.width_mm)}×${Number(it.height_mm)} мм · ${Number(it.qty)} шт`}
+                  valueFontSize={8}
+                />
+              ))}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
             {isPack3D ? (
               <>

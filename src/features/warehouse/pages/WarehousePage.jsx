@@ -7,6 +7,7 @@ import { MaterialForm } from '../components/MaterialForm'
 import { MaterialsTable } from '../components/MaterialsTable'
 import { TransactionsHistory } from '../components/TransactionsHistory'
 import { InventoryTab } from '../components/InventoryTab'
+import { ArchivedMaterialsTab } from '../components/ArchivedMaterialsTab'
 import { WarehouseFilterBar } from '../components/WarehouseFilterBar'
 import { MATERIAL_TYPES, getMaterialCategory, getStockStatus } from '@/shared/constants'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
@@ -75,6 +76,7 @@ export default function WarehousePage() {
           { key: 'inventory', label: 'Инвентаризация' },
           { key: 'history', label: 'История операций' },
           { key: 'analytics', label: 'Расход и прогноз' },
+          { key: 'archived', label: 'Архив' },
         ]
         return (
           <>
@@ -105,6 +107,8 @@ export default function WarehousePage() {
         <InventoryTab materials={materials} onSaved={refetch} />
       ) : tab === 'history' ? (
         <TransactionsHistory />
+      ) : tab === 'archived' ? (
+        <ArchivedMaterialsTab />
       ) : (
         <>
           <WarehouseFilterBar

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useOrderDetail, updateOrder } from '../hooks/useOrders'
 import { useOrderItems } from '../hooks/useOrderItems'
+import { isMultiVariant, sumVariantQty, formatVariantSizes } from '../lib/order-items-format'
 import { useOrderSubtasks } from '../hooks/useOrderSubtasks'
 import { findOrCreateClientByName } from '@/features/clients/hooks/useClients'
 import { InfoField } from '../components/InfoField'
@@ -326,6 +327,11 @@ function OrderItemsList({ orderId }) {
 
 function OverviewTab({ order, onUpdated }) {
   const isPack = order.order_type === 'stickerpack' || order.order_type === 'stickerpack3D'
+  const { items } = useOrderItems(order.id)
+  // R18.1: при нескольких видах изделий — общий тираж (сумма) и размеры по видам.
+  const multi = isMultiVariant(items)
+  const sizeValue = multi ? formatVariantSizes(items) : `${order.width_mm} x ${order.height_mm} мм`
+  const qtyValue = multi ? `${sumVariantQty(items)} шт` : `${order.qty} шт`
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Left: 3 rows */}
@@ -333,8 +339,8 @@ function OverviewTab({ order, onUpdated }) {
         {/* Row 1: Тип / Размер / Тираж / Плёнка */}
         <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <InfoField label="Тип" value={ORDER_TYPES[order.order_type]?.label || order.order_type} />
-          <InfoField label="Размер" value={`${order.width_mm} x ${order.height_mm} мм`} />
-          <InfoField label="Тираж" value={`${order.qty} шт`} />
+          <InfoField label={multi ? 'Размеры (по видам)' : 'Размер'} value={sizeValue} />
+          <InfoField label={multi ? 'Тираж (всего)' : 'Тираж'} value={qtyValue} />
           <InfoField label="Плёнка" value={order.film_material?.name || FILM_TYPES[order.film_type]?.label || (order.film_type && order.film_type !== 'white' ? order.film_type : '—')} />
         </div>
         {/* Row 2: Ламинация / БОПП / Стикеров в паке (только пак) / Отгрузка */}

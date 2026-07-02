@@ -552,6 +552,10 @@ function ProgressLinesWidget({ order, logs }) {
           const isNegative = allowNegative && total < 0
           const isComplete = isQty ? total >= lineTarget : total > 0
           const isOvershoot = isQty && rawPct !== null && rawPct > 100
+          // R18.7 (бриф 30.06): на сушке полоса «переполнена» — залито сверх тиража
+          // (например 120 из 100). Полоса физически не шире трека, поэтому overfill
+          // показываем штриховкой поверх полной полосы + бейджем фактического % (120%).
+          const isOverfilled = isOvershoot && allowNegative
           const unit = line.unit || 'шт'
 
           return (
@@ -581,7 +585,12 @@ function ProgressLinesWidget({ order, logs }) {
                     className={`h-full rounded-full transition-all duration-500 ease-out ${
                       isNegative ? 'bg-danger' : isComplete ? 'bg-success' : 'bg-accent'
                     }`}
-                    style={{ width: `${barPercentage}%` }}
+                    style={{
+                      width: `${barPercentage}%`,
+                      ...(isOverfilled ? {
+                        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.4) 4px, rgba(255,255,255,0.4) 8px)',
+                      } : {}),
+                    }}
                   />
                 </div>
               )}

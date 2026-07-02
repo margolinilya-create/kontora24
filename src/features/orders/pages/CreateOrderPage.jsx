@@ -8,8 +8,9 @@ import { createOrder } from '../hooks/useOrders'
 import {
   ORDER_TYPES,
   ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
-  needsLamination,
+  needsLamination, STICKER_SHAPES,
 } from '@/shared/constants'
+import { applyPackShapes } from '@/features/production/hooks/usePackDesigns'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { toast } from '@/shared/stores/toast-store'
@@ -163,6 +164,23 @@ export default function CreateOrderPage() {
   function updateExtraItem(idx, field, value) {
     setExtraItems((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
   }
+
+  // R19: типы (формы) стикеров в 3D-паке — {shape, number}. Итого стикеров в
+  // паке = стандартные (поле stickers_per_pack) + эти строки. number = design_index.
+  const [stickerTypes, setStickerTypes] = useState([])
+  function addStickerType(std) {
+    // Авто-номер = стандартные + уже добавленные + 1 (спецы идут после стандартных).
+    const nextNum = (Number(std) || 0) + stickerTypes.length + 1
+    setStickerTypes((prev) => [...prev, { shape: 'complex', number: String(nextNum) }])
+  }
+  function updateStickerType(idx, field, value) {
+    setStickerTypes((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
+  }
+  function removeStickerType(idx) {
+    setStickerTypes((prev) => prev.filter((_, i) => i !== idx))
+  }
+  // R19.2: форма одиночного 3D-стикера (order-level).
+  const [stickerShape, setStickerShape] = useState('standard')
   const previewInputRef = useRef(null)
   const canSeeFinance = useCanDo('view:finance')
 
@@ -248,8 +266,15 @@ export default function CreateOrderPage() {
   const filmType = watch('film_type')
   const filmTypeStickers = watch('film_type_stickers')
   const boppBag = watch('bopp_bag')
+  const standardPerPack = Number(watch('stickers_per_pack')) || 0
   const isStickerpack = orderType === 'stickerpack' || orderType === 'stickerpack3D'
   const isStickerpack3D = orderType === 'stickerpack3D'
+  const isSticker3D = orderType === 'sticker3D'
+  // R19: валидные типы стикеров (форма выбрана, номер задан).
+  const validStickerTypes = useMemo(
+    () => stickerTypes.filter((t) => t.shape && Number(t.number) > 0),
+    [stickerTypes],
+  )
   const isMockupImage = mockupPath && IMAGE_RX.test(mockupPath)
 
   // R11.4: считаем прогноз расхода и складские остатки для warning'ов.
@@ -388,7 +413,12 @@ export default function CreateOrderPage() {
         payment_status: values.payment_status,
         design_status: values.design_status,
         mockup_path: values.mockup_path || null,
-        stickers_per_pack: isStickerpack && values.stickers_per_pack ? values.stickers_per_pack : null,
+        // R19: итого стикеров в паке = стандартные + спец-типы (форма по номеру).
+        stickers_per_pack: isStickerpack
+          ? ((Number(values.stickers_per_pack) || 0) + (isStickerpack3D ? validStickerTypes.length : 0)) || null
+          : null,
+        // R19.2: форма одиночного 3D-стикера.
+        sticker_shape: isSticker3D ? stickerShape : 'standard',
         delivery_type: values.delivery_type,
         delivery_city: values.delivery_city || null,
         delivery_address: values.delivery_address || null,
@@ -419,6 +449,23 @@ export default function CreateOrderPage() {
             })
             toast.error('Заказ создан, но доп. виды не сохранились — добавьте в редакторе заказа')
           }
+        }
+      }
+
+      // R19: проставить формы спец-стикеров по номерам (design_index).
+      // Строки pack_designs уже создал триггер из stickers_per_pack.
+      if (isStickerpack3D && validStickerTypes.length > 0) {
+        try {
+          await applyPackShapes(order.id, validStickerTypes.map((t) => ({
+            design_index: Number(t.number),
+            shape: t.shape,
+          })))
+        } catch (shapeErr) {
+          captureError(shapeErr, {
+            tags: { source: 'CreateOrderPage.applyPackShapes' },
+            extra: { orderId: order.id },
+          })
+          toast.error('Заказ создан, но формы стикеров не сохранились — задайте на странице заказа')
         }
       }
 
@@ -610,11 +657,77 @@ export default function CreateOrderPage() {
               </div>
             )}
 
-            {/* Стикеров в паке (только для пака) */}
+            {/* Стикеров в паке (только для пака) + R19 типы форм для 3D-пака */}
             {isStickerpack && (
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    {isStickerpack3D ? 'Кол-во стандартных стикеров' : 'Стикеров в паке'}
+                  </label>
+                  <Input type="number" inputMode="numeric" min="0" {...register('stickers_per_pack')} />
+                </div>
+                {isStickerpack3D && (
+                  <div className="space-y-2 p-3 rounded-xl border border-border bg-surface-dim">
+                    {stickerTypes.map((t, i) => (
+                      <div key={i} className="grid grid-cols-[1fr_84px_auto] gap-2 items-end">
+                        <div>
+                          <label className="block text-xs text-text-muted mb-0.5">Тип стикера</label>
+                          <select
+                            value={t.shape}
+                            onChange={(e) => updateStickerType(i, 'shape', e.target.value)}
+                            className="w-full rounded-lg border border-border bg-surface px-2 py-2.5 text-sm min-h-[44px]"
+                          >
+                            {Object.entries(STICKER_SHAPES).filter(([k]) => k !== 'standard').map(([k, s]) => (
+                              <option key={k} value={k}>{s.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-muted mb-0.5">Номер</label>
+                          <Input
+                            type="number" inputMode="numeric" min="1"
+                            value={t.number}
+                            onChange={(e) => updateStickerType(i, 'number', e.target.value)}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeStickerType(i)}
+                          className="min-h-[44px] px-3 text-text-muted hover:text-danger"
+                          title="Удалить"
+                        >✕</button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addStickerType(standardPerPack)}
+                      className="text-sm text-accent hover:text-accent/80"
+                    >
+                      + Добавить тип стикеров
+                    </button>
+                    {(validStickerTypes.length > 0 || standardPerPack > 0) && (
+                      <p className="text-xs text-text-muted">
+                        Итого в паке: {standardPerPack + validStickerTypes.length} стикеров
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* R19.2: форма одиночного 3D-стикера */}
+            {isSticker3D && (
               <div>
-                <label className="block text-sm font-medium mb-1">Стикеров в паке</label>
-                <Input type="number" inputMode="numeric" min="1" {...register('stickers_per_pack')} />
+                <label className="block text-sm font-medium mb-1">Тип стикера</label>
+                <select
+                  value={stickerShape}
+                  onChange={(e) => setStickerShape(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]"
+                >
+                  {Object.entries(STICKER_SHAPES).map(([k, s]) => (
+                    <option key={k} value={k}>{s.label}</option>
+                  ))}
+                </select>
               </div>
             )}
 

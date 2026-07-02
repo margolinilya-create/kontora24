@@ -11,7 +11,7 @@ import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import {
   ORDER_STATUSES, ORDER_TYPES,
   DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES,
-  PRIORITIES, SIZE_PRESETS,
+  PRIORITIES, SIZE_PRESETS, STICKER_SHAPES,
 } from '@/shared/constants'
 import { FilmSelect } from './FilmSelect'
 import { LaminationSelect } from './LaminationSelect'
@@ -73,6 +73,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       design_status: order.design_status || 'provided',
       mockup_path: order.mockup_path || '',
       stickers_per_pack: order.stickers_per_pack ?? '',
+      sticker_shape: order.sticker_shape || 'standard',
       delivery_type: order.delivery_type || 'pickup',
       delivery_city: order.delivery_city || '',
       delivery_address: order.delivery_address || '',
@@ -168,6 +169,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         design_status: form.design_status || null,
         mockup_path: form.mockup_path || null,
         stickers_per_pack: form.stickers_per_pack !== '' ? Number(form.stickers_per_pack) : null,
+        sticker_shape: form.order_type === 'sticker3D' ? (form.sticker_shape || 'standard') : 'standard',
         delivery_type: form.delivery_type || 'pickup',
         delivery_city: form.delivery_city || null,
         delivery_address: form.delivery_address || null,
@@ -205,6 +207,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
 
   const isStickerpack = form.order_type === 'stickerpack' || form.order_type === 'stickerpack3D'
   const isStickerpack3D = form.order_type === 'stickerpack3D'
+  const isSticker3D = form.order_type === 'sticker3D'
 
   // 3D-стикерпак → BOPP обязателен
   useEffect(() => {
@@ -382,8 +385,21 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
             <Input type="number" value={form.design_variants ?? ''} onChange={(e) => update('design_variants', e.target.value)} />
           </Field>
           {isStickerpack && (
-            <Field label="Стикеров в паке">
+            <Field label={isStickerpack3D ? 'Стикеров в паке (всего)' : 'Стикеров в паке'}>
               <Input type="number" value={form.stickers_per_pack ?? ''} onChange={(e) => update('stickers_per_pack', e.target.value)} />
+            </Field>
+          )}
+          {isSticker3D && (
+            <Field label="Тип стикера">
+              <select
+                value={form.sticker_shape || 'standard'}
+                onChange={(e) => update('sticker_shape', e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]"
+              >
+                {Object.entries(STICKER_SHAPES).map(([k, s]) => (
+                  <option key={k} value={k}>{s.label}</option>
+                ))}
+              </select>
             </Field>
           )}
           <Field label="Ламинация / перенос на монтаж" className={isStickerpack ? '' : 'sm:col-span-2 lg:col-span-1'}>

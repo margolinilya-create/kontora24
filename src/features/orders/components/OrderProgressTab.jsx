@@ -151,7 +151,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     : stage === 'cutting' ? 'cutting'
     : stage === 'drying' ? 'drying'
     : 'pouring'
-  const { designs, updateName, updateQtyPlanned } = usePackDesigns(showPackDesigns ? order.id : null)
+  const { designs, updateName, updateQtyPlanned, updateShape } = usePackDesigns(showPackDesigns ? order.id : null)
 
   // Подзадачи 3D-стикерпака (track-уровень) — миграция 032, фидбэк 17.05.
   const { subtasks, advance: advanceSubtask } = useOrderSubtasks(order.id, isPack3D)
@@ -372,6 +372,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
               route={route}
               onSubmitDesign={(designIndex, payload) => handlePackDesignSubmit(designIndex, payload, cardStage)}
               updateName={updateName}
+              updateShape={updateShape}
               mode={cardStage === 'prepress' ? 'prepress'
                 : cardStage === 'print' ? 'print'
                 : cardStage === 'cutting' ? 'cutting'
@@ -490,6 +491,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
               route={route}
               onSubmitDesign={handlePackDesignSubmit}
               updateName={updateName}
+              updateShape={updateShape}
               mode={packMode}
             />
             <div className="mt-4 pt-4 border-t border-border">

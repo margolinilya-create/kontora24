@@ -3,6 +3,7 @@ import Button from '@/shared/components/Button'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { computeIncomingPerDesign } from '../lib/production-logs'
+import { STICKER_SHAPES } from '@/shared/constants'
 
 /**
  * Виджет ввода по видам стикеров для 3D-стикерпака.
@@ -48,7 +49,7 @@ function readDrafts(orderId, stage) {
   } catch { return {} }
 }
 
-function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, route, onSubmitDesign, updateName, readOnly = false, mode = 'pouring' }) {
+function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, route, onSubmitDesign, updateName, updateShape, readOnly = false, mode = 'pouring' }) {
   const labels = MODE_LABELS[mode] || MODE_LABELS.pouring
   const orderId = designs?.[0]?.order_id || null
   const [drafts, setDrafts] = useState(() => readDrafts(orderId, stage))
@@ -194,9 +195,28 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
                   </button>
                 )}
               </div>
-              <span className={`text-xs ${isComplete ? 'text-success font-medium' : 'text-text-muted'}`}>
-                {total} / {d.qty_target} ({pct}%)
-              </span>
+              <div className="flex items-center gap-2">
+                {/* R19: форма стикера (влияет на ставку заливки) */}
+                {updateShape && (
+                  <select
+                    value={d.shape_type || 'standard'}
+                    disabled={readOnly}
+                    onChange={async (e) => {
+                      try { await updateShape(d.id, e.target.value) }
+                      catch (err) { toast.error(translateError(err).message) }
+                    }}
+                    className="text-xs rounded-md border border-border bg-surface px-1.5 py-1"
+                    title="Форма стикера"
+                  >
+                    {Object.entries(STICKER_SHAPES).map(([key, s]) => (
+                      <option key={key} value={key}>{s.label}</option>
+                    ))}
+                  </select>
+                )}
+                <span className={`text-xs ${isComplete ? 'text-success font-medium' : 'text-text-muted'}`}>
+                  {total} / {d.qty_target} ({pct}%)
+                </span>
+              </div>
             </div>
 
             {/* Progress */}

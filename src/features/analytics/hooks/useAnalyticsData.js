@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import {
   ORDER_TYPES, ORDER_STATUSES,
-  calculateActualMaterialsCost, calculateWorkerPayout,
+  calculateActualMaterialsCost, calculateWorkerPayout, settingsToRates,
 } from '@/shared/constants'
+import { fetchShapeByDesign } from '@/shared/lib/payout-context'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, subMonths, subWeeks, startOfWeek, startOfDay, endOfDay, format, differenceInHours, getISOWeek } from 'date-fns'
 
@@ -48,6 +49,7 @@ export function parsePeriod(period) {
 export function useAnalyticsData(period) {
   const [data, setData] = useState({
     orders: [], statusHistory: [], materialTx: [], prevOrders: [], productionLogs: [],
+    payoutRates: undefined, shapeByDesign: {}, orderShape: {},
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -62,12 +64,13 @@ export function useAnalyticsData(period) {
       const sinceIso = startDate.toISOString()
       const untilIso = endDate.toISOString()
 
-      const [ordersRes, historyRes, matTxRes, prevOrdersRes, logsRes] = await Promise.all([
-        supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
+      const [ordersRes, historyRes, matTxRes, prevOrdersRes, logsRes, ratesRes] = await Promise.all([
+        supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, stickers_per_pack, sticker_shape, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
         supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
         supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
         period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').is('deleted_at', null).gte('created_at', prevStart.toISOString()).lt('created_at', sinceIso).limit(1000) : Promise.resolve({ data: [], error: null }),
-        supabase.from('k24_production_logs').select('id, order_id, stage, track, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, film_meters, film_type, lamination_meters, lamination_qty, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(10000),
+        supabase.from('k24_production_logs').select('id, order_id, stage, track, design_index, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, film_meters, film_type, lamination_meters, lamination_qty, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(10000),
+        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (historyRes.error) throw historyRes.error
@@ -75,12 +78,21 @@ export function useAnalyticsData(period) {
       if (prevOrdersRes.error) throw prevOrdersRes.error
       if (logsRes.error) throw logsRes.error
 
+      // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
+      const payoutRates = settingsToRates(ratesRes.data?.value)
+      const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
+      const orderShape = {}
+      ;(ordersRes.data || []).forEach((o) => {
+        if (o.sticker_shape && o.sticker_shape !== 'standard') orderShape[o.id] = o.sticker_shape
+      })
+
       setData({
         orders: ordersRes.data || [],
         statusHistory: historyRes.data || [],
         materialTx: matTxRes.data || [],
         prevOrders: prevOrdersRes.data || [],
         productionLogs: logsRes.data || [],
+        payoutRates, shapeByDesign, orderShape,
       })
     } catch (err) {
       setError(err)
@@ -115,7 +127,7 @@ export function useAnalyticsData(period) {
   const ordersEnriched = useMemo(() => orders.map((o) => {
     const logs = logsByOrder[o.id] || []
     const materials = calculateActualMaterialsCost(logs, o.film_type)
-    const payout = calculateWorkerPayout(logs, { ordersById })
+    const payout = calculateWorkerPayout(logs, { ordersById, rates: data.payoutRates, shapeByDesign: data.shapeByDesign, orderShape: data.orderShape })
     const computedCost = materials.total + payout.total
     const fallbackCost = Number(o.cost_total) || (Number(o.cost_materials) || 0) + (Number(o.cost_labor) || 0)
     return {
@@ -123,7 +135,7 @@ export function useAnalyticsData(period) {
       _computedCost: computedCost > 0 ? computedCost : fallbackCost,
       _payout: payout.total,
     }
-  }), [orders, logsByOrder, ordersById])
+  }), [orders, logsByOrder, ordersById, data.payoutRates, data.shapeByDesign, data.orderShape])
 
   const doneOrders = useMemo(() => ordersEnriched.filter((o) => o.status === 'done'), [ordersEnriched])
   const revenue = useMemo(() => doneOrders.reduce((s, o) => s + (Number(o.price_final) || 0), 0), [doneOrders])
@@ -298,7 +310,7 @@ export function useAnalyticsData(period) {
     for (const log of data.productionLogs) {
       if (!log.worker_id) continue
       const name = log.worker?.display_name || 'Неизвестно'
-      const payout = calculateWorkerPayout([log], { ordersById })
+      const payout = calculateWorkerPayout([log], { ordersById, rates: data.payoutRates, shapeByDesign: data.shapeByDesign, orderShape: data.orderShape })
       if (!byWorker[name]) byWorker[name] = 0
       byWorker[name] += payout.total
     }
@@ -306,7 +318,7 @@ export function useAnalyticsData(period) {
       .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
       .filter((w) => w.amount > 0)
       .sort((a, b) => b.amount - a.amount)
-  }, [data.productionLogs])
+  }, [data.productionLogs, ordersById, data.payoutRates, data.shapeByDesign, data.orderShape])
 
   const matData = useMemo(() => {
     // 1) Из material_transactions (списания)

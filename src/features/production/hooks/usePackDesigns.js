@@ -76,6 +76,16 @@ export function usePackDesigns(orderId) {
     await fetchDesigns()
   }, [fetchDesigns])
 
+  // R19: форма стикера по виду (влияет на ставку заливки).
+  const updateShape = useCallback(async (designId, shape) => {
+    const { error } = await supabase
+      .from('k24_pack_designs')
+      .update({ shape_type: shape || 'standard' })
+      .eq('id', designId)
+    if (error) throw error
+    await fetchDesigns()
+  }, [fetchDesigns])
+
   // R14.3 (бриф 03.06): обновить план к печати на этапе препресс по виду.
   // Если qty_target=0 — заодно подтягиваем qty_planned в qty_target,
   // чтобы прогресс-бар на следующих этапах считал корректно.
@@ -92,5 +102,29 @@ export function usePackDesigns(orderId) {
     await fetchDesigns()
   }, [designs, fetchDesigns])
 
-  return { designs, loading, error, updateName, updateQtyPlanned, refetch: fetchDesigns }
+  return { designs, loading, error, updateName, updateQtyPlanned, updateShape, refetch: fetchDesigns }
+}
+
+/**
+ * R19: проставить формы стикеров по номерам (design_index) после создания
+ * заказа. Строки pack_designs создаёт триггер из stickers_per_pack — здесь
+ * лишь патчим shape_type у спец-номеров. Пустой/standard пропускаем.
+ * @param {string} orderId
+ * @param {Array<{ design_index:number, shape:string }>} shapes
+ */
+export async function applyPackShapes(orderId, shapes) {
+  if (!orderId || !Array.isArray(shapes) || shapes.length === 0) return
+  const results = await Promise.allSettled(
+    shapes
+      .filter((s) => s && s.shape && s.shape !== 'standard' && s.design_index > 0)
+      .map((s) =>
+        supabase
+          .from('k24_pack_designs')
+          .update({ shape_type: s.shape })
+          .eq('order_id', orderId)
+          .eq('design_index', s.design_index)
+      )
+  )
+  const failed = results.filter((r) => r.status === 'rejected' || r.value?.error)
+  if (failed.length) throw new Error(`Не удалось сохранить форму ${failed.length} стикер(ов)`)
 }

@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react'
 import {
   ORDER_SOURCES, PAYMENT_STATUSES,
   calculateActualMaterialsCost, getFilmCostPerMeter, FILM_TYPES,
-  calculateWorkerPayout,
+  calculateWorkerPayout, settingsToRates,
 } from '@/shared/constants'
+import { supabase } from '@/shared/lib/supabase'
+import { fetchShapeByDesign } from '@/shared/lib/payout-context'
 import { formatPrice } from '@/shared/lib/utils'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { InfoField } from './InfoField'
@@ -18,7 +21,26 @@ import { InfoField } from './InfoField'
 export function FinanceTab({ order }) {
   const { logs } = useProductionLogs(order.id, order.qty)
   const actual = calculateActualMaterialsCost(logs, order.film_type)
-  const payout = calculateWorkerPayout(logs, { ordersById: { [order.id]: order } })
+  // R19: ставки из настроек + формы стикеров (async) для дифф. оплаты заливки.
+  const [payoutExtra, setPayoutExtra] = useState({ rates: undefined, shapeByDesign: {}, orderShape: {} })
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const [ratesRes, shapeByDesign] = await Promise.all([
+          supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
+          fetchShapeByDesign([order.id]),
+        ])
+        if (cancelled) return
+        const orderShape = order.sticker_shape && order.sticker_shape !== 'standard'
+          ? { [order.id]: order.sticker_shape } : {}
+        setPayoutExtra({ rates: settingsToRates(ratesRes.data?.value), shapeByDesign, orderShape })
+      } catch { /* дифф. ставки — не критично, падаем на standard */ }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [order.id, order.sticker_shape])
+  const payout = calculateWorkerPayout(logs, { ordersById: { [order.id]: order }, ...payoutExtra })
 
   const total = Number(order.price_final) || 0
   const manualLabor = Number(order.cost_labor) || 0

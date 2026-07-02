@@ -6,7 +6,7 @@ import {
   CAN_CANCEL_ROLES, ROLES, ORDER_TYPES, ORDER_ROUTES,
   NOTIFY_ROLES,
   getFilmCostPerMeter, calculateActualMaterialsCost, RESIN_COST_PER_GRAM,
-  calculateWorkerPayout, WORKER_RATES,
+  calculateWorkerPayout, WORKER_RATES, settingsToRates,
   getMaterialCategory, getStockStatus,
   SUBTASK_ROUTE_BACKGROUNDS, SUBTASK_ROUTE_STICKERS, SUBTASK_STATUS_LABELS,
   getSubtaskRoute, getNextSubtaskStatus,
@@ -542,8 +542,9 @@ describe('calculateWorkerPayout', () => {
       { stage: 'pouring', stickers_good: 50 },
     ]
     const r = calculateWorkerPayout(logs)
-    expect(r.breakdown.pouring.count).toBe(150)
-    expect(r.breakdown.pouring.amount).toBe(150 * WORKER_RATES.pouring_per_sticker)
+    // R19: без shape-карт всё падает в 'standard'
+    expect(r.breakdown.pouring_standard.count).toBe(150)
+    expect(r.breakdown.pouring_standard.amount).toBe(150 * WORKER_RATES.pouring_per_sticker)
     expect(r.total).toBe(150)
   })
 
@@ -556,8 +557,8 @@ describe('calculateWorkerPayout', () => {
     expect(r.breakdown.selection.bgs).toBe(100)
     expect(r.breakdown.selection.count).toBe(100) // stickers (= bgs × 1)
     expect(r.breakdown.selection.amount).toBe(50)
-    expect(r.breakdown.pouring.count).toBe(80)
-    expect(r.breakdown.pouring.amount).toBe(80 * 1)
+    expect(r.breakdown.pouring_standard.count).toBe(80)
+    expect(r.breakdown.pouring_standard.amount).toBe(80 * 1)
     expect(r.total).toBe(50 + 80)
   })
 
@@ -640,6 +641,63 @@ describe('calculateWorkerPayout', () => {
     ]
     const r = calculateWorkerPayout(logs)
     expect(r.breakdown.selection.amount).toBe(50 + 80)
+  })
+
+  // ── R19: заливка по форме стикера ──
+  it('R19: shapeByDesign — разные ставки заливки по форме', () => {
+    const logs = [
+      { stage: 'selection_pouring', order_id: 'o1', design_index: 1, qty_selected: 0, stickers_good: 10 }, // standard 1.0 → 10
+      { stage: 'selection_pouring', order_id: 'o1', design_index: 2, qty_selected: 0, stickers_good: 10 }, // complex 1.5 → 15
+      { stage: 'selection_pouring', order_id: 'o1', design_index: 3, qty_selected: 0, stickers_good: 10 }, // complex_big 2.0 → 20
+    ]
+    const r = calculateWorkerPayout(logs, {
+      shapeByDesign: { 'o1:2': 'complex', 'o1:3': 'complex_big' },
+    })
+    expect(r.breakdown.pouring_standard.count).toBe(10)
+    expect(r.breakdown.pouring_standard.amount).toBe(10)
+    expect(r.breakdown.pouring_complex.amount).toBe(15)
+    expect(r.breakdown.pouring_complex_big.amount).toBe(20)
+    expect(r.total).toBe(10 + 15 + 20)
+  })
+
+  it('R19: orderShape — форма на уровне заказа (одиночный sticker3D)', () => {
+    const logs = [{ stage: 'pouring', order_id: 'o9', stickers_good: 40 }]
+    const r = calculateWorkerPayout(logs, { orderShape: { o9: 'big' } })
+    expect(r.breakdown.pouring_big.count).toBe(40)
+    expect(r.breakdown.pouring_big.amount).toBe(40 * 1.5)
+    expect(r.total).toBe(60)
+  })
+
+  it('R19: shapeByDesign приоритетнее orderShape', () => {
+    const logs = [{ stage: 'pouring', order_id: 'o1', design_index: 5, stickers_good: 10 }]
+    const r = calculateWorkerPayout(logs, {
+      shapeByDesign: { 'o1:5': 'complex_big' },
+      orderShape: { o1: 'standard' },
+    })
+    expect(r.breakdown.pouring_complex_big.amount).toBe(20)
+  })
+
+  it('R19: opts.rates переопределяет ставки', () => {
+    const logs = [{ stage: 'packaging', packs_packaged: 10 }]
+    const r = calculateWorkerPayout(logs, { rates: { packaging_per_pack: 2 } })
+    expect(r.breakdown.packaging.amount).toBe(20)
+  })
+
+  it('R19: opts.rates.pouring_by_shape переопределяет ставку формы', () => {
+    const logs = [{ stage: 'pouring', order_id: 'o1', stickers_good: 10 }]
+    const r = calculateWorkerPayout(logs, {
+      orderShape: { o1: 'complex' },
+      rates: { pouring_by_shape: { complex: 3 } },
+    })
+    expect(r.breakdown.pouring_complex.amount).toBe(30)
+  })
+
+  it('R19: settingsToRates переводит bonus_rates в форму WORKER_RATES', () => {
+    const rates = settingsToRates({ pouring: 1, selection: 0.7, assembly_3d: 0.6, packaging: 2, pouring_shapes: { complex: 3 } })
+    expect(rates.selection_per_sticker).toBe(0.7)
+    expect(rates.assembly_per_pack).toBe(0.6)
+    expect(rates.packaging_per_pack).toBe(2)
+    expect(rates.pouring_by_shape.complex).toBe(3)
   })
 })
 

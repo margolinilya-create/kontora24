@@ -3,7 +3,8 @@ import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfMonth, startOfDay, endOfDay, format, parseISO } from 'date-fns'
-import { calculateWorkerPayout } from '@/shared/constants'
+import { calculateWorkerPayout, settingsToRates } from '@/shared/constants'
+import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog, pouringRateForShape } from '@/shared/lib/payout-context'
 
 // R13.3 (бриф 02.06): период расширен — `today` (с начала дня), `custom:from:to`
 // (YYYY-MM-DD строки), плюс legacy '7' / '30' / 'month'.
@@ -82,13 +83,13 @@ export function useOrdersCostReport(period = '30') {
       // Расширенный набор полей для Unit Economics / P&L / Расходы по заказам
       // (R8.5 серии 25.05). Подтягиваем клиента, ламинацию, плёнку, оплату,
       // дедлайны, доставку — всё нужно для итоговых таблиц.
-      const [ordersRes, logsRes] = await Promise.all([
+      const [ordersRes, logsRes, ratesRes] = await Promise.all([
         supabase.from('k24_orders')
           .select(`id, number, custom_number, order_type, qty, price_final,
                    cost_materials, cost_labor, cost_total, status,
                    created_at, deadline, width_mm, height_mm,
                    film_type, film_type_stickers, lam_type, need_lam,
-                   film_material_id, lam_material_id,
+                   film_material_id, lam_material_id, sticker_shape,
                    stickers_per_pack, notes, delivery_type, payment_status,
                    client:k24_clients!client_id(name),
                    film_material:k24_materials!film_material_id(id, name, material_code),
@@ -97,7 +98,7 @@ export function useOrdersCostReport(period = '30') {
           .order('created_at', { ascending: false })
           .limit(500),
         supabase.from('k24_production_logs')
-          .select(`order_id, stage, defects, film_meters, resin_grams, lamination_meters,
+          .select(`order_id, stage, defects, design_index, film_meters, resin_grams, lamination_meters,
                    film_type, track, stickers_printed, stickers_poured,
                    stickers_good, packs_assembled, packs_packaged, qty_selected,
                    boxes_used,
@@ -105,9 +106,19 @@ export function useOrdersCostReport(period = '30') {
           .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
+        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (logsRes.error) throw logsRes.error
+      // ratesRes.error PGRST116 (нет строки) — ок, дефолтные ставки
+
+      // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
+      const payoutRates = settingsToRates(ratesRes.data?.value)
+      const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
+      const orderShape = {}
+      ;(ordersRes.data || []).forEach((o) => {
+        if (o.sticker_shape && o.sticker_shape !== 'standard') orderShape[o.id] = o.sticker_shape
+      })
 
       // ordersById — нужен calculateWorkerPayout для stickers_per_pack.
       const ordersById = Object.fromEntries((ordersRes.data || []).map((o) => [o.id, o]))
@@ -170,7 +181,7 @@ export function useOrdersCostReport(period = '30') {
         const surplusPct = targetStickers > 0 ? Math.round((surplus / targetStickers) * 100) : 0
         // Стоимость труда — фактический сдельный расчёт по всем логам заказа
         // (заливка/выборка/сборка/упаковка), а не ручное поле cost_labor.
-        const laborCost = calculateWorkerPayout(rawLogsByOrder[o.id] || [], { ordersById }).total
+        const laborCost = calculateWorkerPayout(rawLogsByOrder[o.id] || [], { ordersById, rates: payoutRates, shapeByDesign, orderShape }).total
         return {
           ...o,
           client_name: o.client?.name || null,
@@ -219,7 +230,7 @@ export function useBonusReport(period = '30') {
     try {
       const [logsRes, ratesRes] = await Promise.all([
         supabase.from('k24_production_logs')
-          .select('worker_id, stage, order_id, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack)')
+          .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack, sticker_shape)')
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
@@ -230,13 +241,19 @@ export function useBonusReport(period = '30') {
       const rates = ratesRes.data?.value || {
         pouring: 1, assembly_3d: 0.5, packaging: 1.5, selection: 0.5,
       }
+      // R19: формы стикеров для дифф. оплаты заливки.
+      const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
+      const orderShape = orderShapeFromLogs(logsRes.data)
 
       const byWorker = {}
       ;(logsRes.data || []).forEach((l) => {
         const name = l.worker?.display_name || 'Неизвестный'
         if (!byWorker[name]) byWorker[name] = { name, resin: 0, assembly: 0, packaging: 0, selection: 0, total: 0 }
 
-        if (l.stickers_good) { byWorker[name].resin += l.stickers_good; byWorker[name].total += l.stickers_good * (rates.pouring || 0) }
+        if (l.stickers_good) {
+          const pRate = pouringRateForShape(shapeForLog(l, shapeByDesign, orderShape), rates)
+          byWorker[name].resin += l.stickers_good; byWorker[name].total += l.stickers_good * pRate
+        }
         if (l.packs_assembled) {
           // Сборка 3D: packs × stickers_per_pack × ставка (фидбэк 12.05)
           const perPack = Number(l.order?.stickers_per_pack) || 1
@@ -290,7 +307,7 @@ export function useEmployeeReport(period = '30') {
           .not('ended_at', 'is', null)
           .gte('started_at', getSince(period)).lte('started_at', getUntil(period) ?? '9999-12-31T23:59:59Z'),
         supabase.from('k24_production_logs')
-          .select('worker_id, stage, order_id, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack)')
+          .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack, sticker_shape)')
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
@@ -300,6 +317,9 @@ export function useEmployeeReport(period = '30') {
       if (ratesRes.error && ratesRes.error.code !== 'PGRST116') throw ratesRes.error
 
       const rates = ratesRes.data?.value || { pouring: 1, assembly_3d: 0.5, packaging: 1.5, selection: 0.5 }
+      // R19: формы стикеров для дифф. оплаты заливки.
+      const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
+      const orderShape = orderShapeFromLogs(logsRes.data)
       const byWorker = {}
 
       function ensure(workerId, name) {
@@ -328,7 +348,10 @@ export function useEmployeeReport(period = '30') {
         const perPack = Number(l.order?.stickers_per_pack) || 1
         // R14.6 hotfix: selection (штучные R11) множитель =1, selection_pouring (фоны) =perPack.
         const selectionMult = l.stage === 'selection_pouring' ? perPack : 1
-        if (l.stickers_good) { w.poured += l.stickers_good; w.payout += l.stickers_good * (rates.pouring || 0) }
+        if (l.stickers_good) {
+          const pRate = pouringRateForShape(shapeForLog(l, shapeByDesign, orderShape), rates)
+          w.poured += l.stickers_good; w.payout += l.stickers_good * pRate
+        }
         if (l.qty_selected) { w.selected += l.qty_selected; w.payout += l.qty_selected * selectionMult * (rates.selection || 0) }
         if (l.packs_assembled) { w.assembled += l.packs_assembled; w.payout += l.packs_assembled * perPack * (rates.assembly_3d || 0) }
         if (l.packs_packaged) { w.packaged += l.packs_packaged; w.payout += l.packs_packaged * (rates.packaging || 0) }

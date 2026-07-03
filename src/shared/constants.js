@@ -604,24 +604,36 @@ export const STICKER_SHAPES = {
 
 // R19: перевод настроек bonus_rates ({pouring, selection, assembly_3d, packaging,
 // pouring_shapes}) в форму WORKER_RATES для calculateWorkerPayout.opts.rates.
+const BONUS_RATE_FIELDS = {
+  pouring: 'pouring_per_sticker',
+  selection: 'selection_per_sticker',
+  assembly_3d: 'assembly_per_pack',
+  packaging: 'packaging_per_pack',
+}
 export function settingsToRates(bonusRates) {
   if (!bonusRates || typeof bonusRates !== 'object') return undefined
   const r = {}
-  if (bonusRates.pouring != null) r.pouring_per_sticker = Number(bonusRates.pouring)
-  if (bonusRates.selection != null) r.selection_per_sticker = Number(bonusRates.selection)
-  if (bonusRates.assembly_3d != null) r.assembly_per_pack = Number(bonusRates.assembly_3d)
-  if (bonusRates.packaging != null) r.packaging_per_pack = Number(bonusRates.packaging)
+  for (const [src, dst] of Object.entries(BONUS_RATE_FIELDS)) {
+    if (bonusRates[src] != null) r[dst] = Number(bonusRates[src])
+  }
   if (bonusRates.pouring_shapes && typeof bonusRates.pouring_shapes === 'object') {
     r.pouring_by_shape = bonusRates.pouring_shapes
   }
   return r
 }
 
-const POURING_SHAPE_LABEL = {
-  standard: 'Заливка (стандартная)',
-  complex: 'Заливка (сложная форма)',
-  big: 'Заливка (большая форма)',
-  complex_big: 'Заливка (сложная и большая)',
+/**
+ * R19: форма конкретного лога заливки. Приоритет: подзадача по design_index →
+ * order-level orderShape → sticker_shape в embed-заказе → 'standard'.
+ * Единый резолвер для calculateWorkerPayout и инлайн-расчётов отчётов.
+ */
+export function resolveLogShape(log, shapeByDesign, orderShape) {
+  return (
+    shapeByDesign?.[`${log.order_id}:${log.design_index}`]
+    || orderShape?.[log.order_id]
+    || (log.order?.sticker_shape && log.order.sticker_shape !== 'standard' ? log.order.sticker_shape : null)
+    || 'standard'
+  )
 }
 
 /**
@@ -647,13 +659,9 @@ const POURING_SHAPE_LABEL = {
 export function calculateWorkerPayout(logs, opts = {}) {
   const rates = { ...WORKER_RATES, ...(opts.rates || {}) }
   const shapeRate = { ...WORKER_RATES.pouring_by_shape, ...(opts.rates?.pouring_by_shape || {}) }
-  const resolveShape = (l) =>
-    opts.shapeByDesign?.[`${l.order_id}:${l.design_index}`]
-    || opts.orderShape?.[l.order_id]
-    || 'standard'
 
   // Заливка — по формам стикера.
-  const pouringByShape = { standard: 0, complex: 0, big: 0, complex_big: 0 }
+  const pouringByShape = {}
   let packaging = 0
   // Выборку и сборку считаем в «стикерах», чтобы умножить на ставку 0.5 ₽/стикер.
   let selectionStickers = 0
@@ -666,7 +674,7 @@ export function calculateWorkerPayout(logs, opts = {}) {
     if (l.stage === 'pouring' || l.stage === 'selection_pouring') {
       const good = Number(l.stickers_good) || 0
       if (good > 0) {
-        const shape = resolveShape(l)
+        const shape = resolveLogShape(l, opts.shapeByDesign, opts.orderShape)
         pouringByShape[shape] = (pouringByShape[shape] || 0) + good
       }
     }
@@ -697,10 +705,11 @@ export function calculateWorkerPayout(logs, opts = {}) {
   }
 
   const breakdown = {}
-  for (const shape of ['standard', 'complex', 'big', 'complex_big']) {
+  for (const shape of Object.keys(STICKER_SHAPES)) {
     const count = pouringByShape[shape] || 0
     const rate = shapeRate[shape] ?? rates.pouring_per_sticker
-    breakdown[`pouring_${shape}`] = { count, rate, amount: count * rate, label: POURING_SHAPE_LABEL[shape], shape }
+    const label = `Заливка (${STICKER_SHAPES[shape].label.toLowerCase()})`
+    breakdown[`pouring_${shape}`] = { count, rate, amount: count * rate, label, shape }
   }
   breakdown.selection = { count: selectionStickers, rate: rates.selection_per_sticker, amount: selectionStickers * rates.selection_per_sticker, label: 'Выборка фонов', bgs: selectionBgs }
   breakdown.assembly  = { count: assemblyStickers,  rate: rates.assembly_per_pack,     amount: assemblyStickers  * rates.assembly_per_pack,     label: 'Сборка 3D-паков', packs: assemblyPacks }

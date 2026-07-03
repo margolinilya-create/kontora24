@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react'
 import {
   ORDER_SOURCES, PAYMENT_STATUSES,
   calculateActualMaterialsCost, getFilmCostPerMeter, FILM_TYPES,
-  calculateWorkerPayout, settingsToRates,
+  calculateWorkerPayout,
 } from '@/shared/constants'
-import { supabase } from '@/shared/lib/supabase'
-import { fetchShapeByDesign } from '@/shared/lib/payout-context'
+import { loadPayoutContext } from '@/shared/lib/payout-context'
 import { formatPrice } from '@/shared/lib/utils'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { InfoField } from './InfoField'
@@ -25,21 +24,11 @@ export function FinanceTab({ order }) {
   const [payoutExtra, setPayoutExtra] = useState({ rates: undefined, shapeByDesign: {}, orderShape: {} })
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      try {
-        const [ratesRes, shapeByDesign] = await Promise.all([
-          supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
-          fetchShapeByDesign([order.id]),
-        ])
-        if (cancelled) return
-        const orderShape = order.sticker_shape && order.sticker_shape !== 'standard'
-          ? { [order.id]: order.sticker_shape } : {}
-        setPayoutExtra({ rates: settingsToRates(ratesRes.data?.value), shapeByDesign, orderShape })
-      } catch { /* дифф. ставки — не критично, падаем на standard */ }
-    }
-    load()
+    loadPayoutContext({ orders: [order] })
+      .then((ctx) => { if (!cancelled) setPayoutExtra(ctx) })
+      .catch(() => { /* дифф. ставки — не критично, падаем на standard */ })
     return () => { cancelled = true }
-  }, [order.id, order.sticker_shape])
+  }, [order.id, order.sticker_shape]) // eslint-disable-line react-hooks/exhaustive-deps
   const payout = calculateWorkerPayout(logs, { ordersById: { [order.id]: order }, ...payoutExtra })
 
   const total = Number(order.price_final) || 0

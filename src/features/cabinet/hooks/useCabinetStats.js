@@ -4,8 +4,8 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, startOfMonth, subMonths, format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { calculateWorkerPayout, settingsToRates } from '@/shared/constants'
-import { fetchShapeByDesign, orderShapeFromLogs } from '@/shared/lib/payout-context'
+import { calculateWorkerPayout } from '@/shared/constants'
+import { loadPayoutContext } from '@/shared/lib/payout-context'
 
 /**
  * Personal stats for worker cabinet:
@@ -34,7 +34,7 @@ export function useCabinetStats(period = '30') {
       // Для графика берём 6 месяцев независимо от выбранного периода
       const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5)).toISOString()
 
-      const [logsRes, shiftsRes, monthlyRes, ratesRes] = await Promise.all([
+      const [logsRes, shiftsRes, monthlyRes] = await Promise.all([
         supabase
           .from('k24_production_logs')
           .select('*, order:k24_orders!order_id(number, custom_number, order_type, qty, stickers_per_pack, sticker_shape)')
@@ -55,7 +55,6 @@ export function useCabinetStats(period = '30') {
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', sixMonthsAgo),
-        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (logsRes.error) throw logsRes.error
       if (shiftsRes.error) throw shiftsRes.error
@@ -66,10 +65,7 @@ export function useCabinetStats(period = '30') {
       const monthly = monthlyRes.data || []
 
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
-      const payoutRates = settingsToRates(ratesRes.data?.value)
-      const shapeByDesign = await fetchShapeByDesign([...logs, ...monthly].map((l) => l.order_id))
-      const orderShape = orderShapeFromLogs([...logs, ...monthly])
-      const payoutOpts = { rates: payoutRates, shapeByDesign, orderShape }
+      const payoutOpts = await loadPayoutContext({ logs: [...logs, ...monthly] })
 
       // Aggregate by action type (за выбранный период)
       const actionMap = {}

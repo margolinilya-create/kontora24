@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { settingsToRates, resolveLogShape } from '@/shared/constants'
 
 /**
  * R19: контекст для дифференцированной оплаты заливки по форме стикера.
@@ -44,14 +45,37 @@ export function orderShapeFromLogs(logs) {
   return map
 }
 
+/** То же, но из массива заказов ({ id, sticker_shape }). */
+export function orderShapeFromOrders(orders) {
+  const map = {}
+  for (const o of orders || []) {
+    if (o.id && o.sticker_shape && o.sticker_shape !== 'standard') map[o.id] = o.sticker_shape
+  }
+  return map
+}
+
 /** Форма конкретного лога заливки по картам shapeByDesign/orderShape. */
-export function shapeForLog(log, shapeByDesign, orderShape) {
-  return (
-    shapeByDesign?.[`${log.order_id}:${log.design_index}`] ||
-    orderShape?.[log.order_id] ||
-    (log.order?.sticker_shape && log.order.sticker_shape !== 'standard' ? log.order.sticker_shape : null) ||
-    'standard'
-  )
+export const shapeForLog = resolveLogShape
+
+/**
+ * Собрать весь контекст дифф. оплаты одним вызовом: ставки из настроек +
+ * формы по design_index + формы order-level. Заменяет копипасту в хуках
+ * аналитики / кабинета / отчётов / FinanceTab.
+ *
+ * @param {object} src — источник order_id и order-level форм:
+ *   { orders?: Array, logs?: Array, orderIds?: string[] }
+ *   orders → orderShape через orderShapeFromOrders; иначе logs → orderShapeFromLogs.
+ * @returns {Promise<{ rates, shapeByDesign, orderShape }>}
+ */
+export async function loadPayoutContext({ orders, logs, orderIds } = {}) {
+  const ids = orderIds
+    || (orders ? orders.map((o) => o.id) : (logs || []).map((l) => l.order_id))
+  const [ratesRes, shapeByDesign] = await Promise.all([
+    supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
+    fetchShapeByDesign(ids),
+  ])
+  const orderShape = orders ? orderShapeFromOrders(orders) : orderShapeFromLogs(logs)
+  return { rates: settingsToRates(ratesRes.data?.value), shapeByDesign, orderShape }
 }
 
 /** Ставка заливки для формы из bonus_rates ({ pouring, pouring_shapes }). */

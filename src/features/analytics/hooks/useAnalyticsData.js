@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import {
   ORDER_TYPES, ORDER_STATUSES,
-  calculateActualMaterialsCost, calculateWorkerPayout, settingsToRates,
+  calculateActualMaterialsCost, calculateWorkerPayout,
 } from '@/shared/constants'
-import { fetchShapeByDesign } from '@/shared/lib/payout-context'
+import { loadPayoutContext } from '@/shared/lib/payout-context'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, subMonths, subWeeks, startOfWeek, startOfDay, endOfDay, format, differenceInHours, getISOWeek } from 'date-fns'
 
@@ -64,13 +64,12 @@ export function useAnalyticsData(period) {
       const sinceIso = startDate.toISOString()
       const untilIso = endDate.toISOString()
 
-      const [ordersRes, historyRes, matTxRes, prevOrdersRes, logsRes, ratesRes] = await Promise.all([
+      const [ordersRes, historyRes, matTxRes, prevOrdersRes, logsRes] = await Promise.all([
         supabase.from('k24_orders').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, stickers_per_pack, sticker_shape, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
         supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
         supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
         period !== 'all' ? supabase.from('k24_orders').select('id, status, price_final').is('deleted_at', null).gte('created_at', prevStart.toISOString()).lt('created_at', sinceIso).limit(1000) : Promise.resolve({ data: [], error: null }),
         supabase.from('k24_production_logs').select('id, order_id, stage, track, design_index, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, film_meters, film_type, lamination_meters, lamination_qty, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(10000),
-        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (historyRes.error) throw historyRes.error
@@ -79,11 +78,11 @@ export function useAnalyticsData(period) {
       if (logsRes.error) throw logsRes.error
 
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
-      const payoutRates = settingsToRates(ratesRes.data?.value)
-      const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
-      const orderShape = {}
-      ;(ordersRes.data || []).forEach((o) => {
-        if (o.sticker_shape && o.sticker_shape !== 'standard') orderShape[o.id] = o.sticker_shape
+      // shapeByDesign — по order_id из логов (могут ссылаться на заказы вне
+      // периода); orderShape — из заказов периода.
+      const { rates: payoutRates, shapeByDesign, orderShape } = await loadPayoutContext({
+        orders: ordersRes.data || [],
+        orderIds: (logsRes.data || []).map((l) => l.order_id),
       })
 
       setData({
@@ -304,18 +303,19 @@ export function useAnalyticsData(period) {
     return { totals: tot, byOrder: byOp, byWorker: workersByOp, ordersById: ordersByIdLocal }
   }, [data.productionLogs, orders])
 
-  // Зарплата по работникам — из production_logs через WORKER_RATES
+  // Зарплата по работникам — из production_logs через WORKER_RATES.
+  // Группируем логи по работнику и считаем payout один раз на работника
+  // (а не на каждый лог — иначе N вызовов на 10k логов).
   const payrollData = useMemo(() => {
-    const byWorker = {}
+    const logsByWorker = {}
     for (const log of data.productionLogs) {
       if (!log.worker_id) continue
       const name = log.worker?.display_name || 'Неизвестно'
-      const payout = calculateWorkerPayout([log], { ordersById, rates: data.payoutRates, shapeByDesign: data.shapeByDesign, orderShape: data.orderShape })
-      if (!byWorker[name]) byWorker[name] = 0
-      byWorker[name] += payout.total
+      ;(logsByWorker[name] ||= []).push(log)
     }
-    return Object.entries(byWorker)
-      .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
+    const opts = { ordersById, rates: data.payoutRates, shapeByDesign: data.shapeByDesign, orderShape: data.orderShape }
+    return Object.entries(logsByWorker)
+      .map(([name, logs]) => ({ name, amount: Math.round(calculateWorkerPayout(logs, opts).total) }))
       .filter((w) => w.amount > 0)
       .sort((a, b) => b.amount - a.amount)
   }, [data.productionLogs, ordersById, data.payoutRates, data.shapeByDesign, data.orderShape])

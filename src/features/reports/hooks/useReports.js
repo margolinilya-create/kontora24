@@ -3,8 +3,8 @@ import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfMonth, startOfDay, endOfDay, format, parseISO } from 'date-fns'
-import { calculateWorkerPayout, settingsToRates } from '@/shared/constants'
-import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog, pouringRateForShape } from '@/shared/lib/payout-context'
+import { calculateWorkerPayout } from '@/shared/constants'
+import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog, pouringRateForShape, loadPayoutContext } from '@/shared/lib/payout-context'
 
 // R13.3 (бриф 02.06): период расширен — `today` (с начала дня), `custom:from:to`
 // (YYYY-MM-DD строки), плюс legacy '7' / '30' / 'month'.
@@ -83,7 +83,7 @@ export function useOrdersCostReport(period = '30') {
       // Расширенный набор полей для Unit Economics / P&L / Расходы по заказам
       // (R8.5 серии 25.05). Подтягиваем клиента, ламинацию, плёнку, оплату,
       // дедлайны, доставку — всё нужно для итоговых таблиц.
-      const [ordersRes, logsRes, ratesRes] = await Promise.all([
+      const [ordersRes, logsRes] = await Promise.all([
         supabase.from('k24_orders')
           .select(`id, number, custom_number, order_type, qty, price_final,
                    cost_materials, cost_labor, cost_total, status,
@@ -106,18 +106,15 @@ export function useOrdersCostReport(period = '30') {
           .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
-        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (logsRes.error) throw logsRes.error
-      // ratesRes.error PGRST116 (нет строки) — ок, дефолтные ставки
 
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
-      const payoutRates = settingsToRates(ratesRes.data?.value)
-      const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
-      const orderShape = {}
-      ;(ordersRes.data || []).forEach((o) => {
-        if (o.sticker_shape && o.sticker_shape !== 'standard') orderShape[o.id] = o.sticker_shape
+      // shapeByDesign — по order_id из логов; orderShape — из заказов периода.
+      const { rates: payoutRates, shapeByDesign, orderShape } = await loadPayoutContext({
+        orders: ordersRes.data || [],
+        orderIds: (logsRes.data || []).map((l) => l.order_id),
       })
 
       // ordersById — нужен calculateWorkerPayout для stickers_per_pack.

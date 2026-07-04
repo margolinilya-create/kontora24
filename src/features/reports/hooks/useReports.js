@@ -89,11 +89,12 @@ export function useOrdersCostReport(period = '30') {
                    cost_materials, cost_labor, cost_total, status,
                    created_at, deadline, width_mm, height_mm,
                    film_type, film_type_stickers, lam_type, need_lam,
-                   film_material_id, lam_material_id, sticker_shape,
+                   film_material_id, film_stickers_material_id, lam_material_id, sticker_shape,
                    stickers_per_pack, notes, delivery_type, payment_status,
                    client:k24_clients!client_id(name),
-                   film_material:k24_materials!film_material_id(id, name, material_code),
-                   lam_material:k24_materials!lam_material_id(id, name, material_code)`)
+                   film_material:k24_materials!film_material_id(id, name, material_code, unit_cost),
+                   film_stickers_material:k24_materials!film_stickers_material_id(id, name, material_code, unit_cost),
+                   lam_material:k24_materials!lam_material_id(id, name, material_code, unit_cost)`)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .order('created_at', { ascending: false })
           .limit(500),
@@ -111,6 +112,19 @@ export function useOrdersCostReport(period = '30') {
       if (ordersRes.error) throw ordersRes.error
       if (logsRes.error) throw logsRes.error
       // ratesRes.error PGRST116 (нет строки) — ок, дефолтные ставки
+
+      // R20.4 (бриф 3.07): виды изделий для подстрок 107.1 / 107.2 / … в Unit Economics.
+      const orderIds = (ordersRes.data || []).map((o) => o.id)
+      const itemsByOrder = {}
+      if (orderIds.length > 0) {
+        const { data: itemsData, error: itemsErr } = await supabase
+          .from('k24_order_items')
+          .select('order_id, idx, width_mm, height_mm, qty')
+          .in('order_id', orderIds)
+          .order('idx', { ascending: true })
+        if (itemsErr) throw itemsErr
+        for (const it of itemsData || []) (itemsByOrder[it.order_id] ||= []).push(it)
+      }
 
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
       const payoutRates = settingsToRates(ratesRes.data?.value)
@@ -185,6 +199,7 @@ export function useOrdersCostReport(period = '30') {
         return {
           ...o,
           client_name: o.client?.name || null,
+          items: itemsByOrder[o.id] || [],
           actual_film: lg.film,
           actual_resin: lg.resin,
           actual_lam: lg.lam,

@@ -333,6 +333,64 @@ export function computeIncomingPerDesign(logs, route, stage, designIndex) {
 }
 
 /**
+ * R20.5 (бриф 3.07): этапы, на которых multi-variant заказ (несколько размерных
+ * видов из k24_order_items) учитывается по каждому виду отдельно — строки ввода
+ * и прогресс-бары per вид. По брифу: печать, резка, заливка, выборка, упаковка.
+ * `selection_pouring` исключён осознанно: он есть только в маршруте stickerpack3D,
+ * который отсечён гвардом !isPack3D (виджет видов там свой — PackDesignsForm).
+ * Ламинация и сушка остаются order-level.
+ */
+export const VARIANT_STAGES = ['print', 'cutting', 'pouring', 'selection', 'packaging']
+
+/**
+ * R20.5: прогресс этапа по конкретному размерному виду (item_idx =
+ * k24_order_items.idx). Зеркало computeStageProgress без track-логики:
+ * поле — quantityField этапа, фильтр — item_idx, брак вычитается на этапах
+ * из SUBTRACT_DEFECTS_STAGES. Логи без item_idx (legacy/одиночные) не считаются.
+ */
+export function computeStageProgressPerItem(logs, stage, targetQty, itemIdx) {
+  const config = STAGE_FIELDS[stage]
+  if (!config?.quantityField) return { total: 0, target: targetQty, percentage: 0, isComplete: false }
+  const stageLogs = (logs || []).filter(
+    (l) => l.stage === stage && l.item_idx === itemIdx && !l.deleted_at,
+  )
+  const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[config.quantityField]) || 0), 0)
+  const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
+  const total = SUBTRACT_DEFECTS_STAGES.has(stage) ? Math.max(0, totalRaw - defects) : totalRaw
+  const percentage = targetQty > 0 ? Math.min(100, Math.round((total / targetQty) * 100)) : 0
+  return { total, target: targetQty, percentage, isComplete: total >= targetQty }
+}
+
+/**
+ * R20.5: поэвидовой incoming по размерному виду — сколько изделий вида itemIdx
+ * пришло с предыдущего этапа маршрута. Зеркало computeIncomingPerDesign, но
+ * фильтр по item_idx (без track). Order-level этапы между per-вид этапами
+ * (например, ламинация — её логи не несут item_idx) прозрачны: produced=0 →
+ * идём дальше назад к ближайшему per-вид этапу (резка «видит» печать сквозь
+ * ламинацию). print → { isStart: true } — стартовый этап сам создаёт количество.
+ */
+export function computeIncomingPerItem(logs, route, stage, itemIdx) {
+  if (!route || !route.includes(stage)) return { total: null, source: null, isStart: true }
+  const idx = route.indexOf(stage)
+  if (idx <= 0) return { total: null, source: null, isStart: true }
+
+  for (let i = idx - 1; i >= 0; i--) {
+    const prev = route[i]
+    const field = STAGE_FIELDS[prev]?.quantityField
+    if (!field) continue
+    const stageLogs = (logs || []).filter(
+      (l) => l.stage === prev && l.item_idx === itemIdx && !l.deleted_at,
+    )
+    const produced = stageLogs.reduce((s, l) => s + (Number(l[field]) || 0), 0)
+    const defects = stageLogs.reduce((s, l) => s + (Number(l.defects) || 0), 0)
+    if (produced > 0) {
+      return { total: Math.max(0, produced - defects), source: prev, produced, defects }
+    }
+  }
+  return { total: null, source: null, isStart: true }
+}
+
+/**
  * Validate a log entry for a given stage.
  *
  * Возвращает `null` если всё OK, либо `{ severity, message }`:

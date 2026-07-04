@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog, compute3DPouringReport } from './production-logs'
+import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog, compute3DPouringReport, computeStageProgressPerItem, computeIncomingPerItem } from './production-logs'
 
 const ROUTE = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
 
@@ -482,5 +482,83 @@ describe('compute3DPouringReport (CSV сводка по 3D-заливке)', () 
     expect(rows[0].good).toBe(80)
     expect(rows[0].defects).toBe(20)
     expect(rows[0].pouredRaw).toBe(100)
+  })
+})
+
+describe('R20.5: computeStageProgressPerItem (учёт по размерным видам)', () => {
+  it('фильтрует по item_idx и этапу, игнорирует логи без item_idx', () => {
+    const logs = [
+      { stage: 'print', item_idx: 1, stickers_printed: 30 },
+      { stage: 'print', item_idx: 2, stickers_printed: 200 },
+      { stage: 'print', stickers_printed: 999 },            // order-level, не считается
+      { stage: 'cutting', item_idx: 1, qty_cut: 10 },
+    ]
+    expect(computeStageProgressPerItem(logs, 'print', 100, 1).total).toBe(30)
+    expect(computeStageProgressPerItem(logs, 'print', 300, 2).total).toBe(200)
+  })
+
+  it('вычитает брак на cutting/packaging, но не на pouring', () => {
+    const cut = [{ stage: 'cutting', item_idx: 1, qty_cut: 50, defects: 5 }]
+    expect(computeStageProgressPerItem(cut, 'cutting', 50, 1).total).toBe(45)
+    const pour = [{ stage: 'pouring', item_idx: 1, stickers_good: 40, defects: 3 }]
+    expect(computeStageProgressPerItem(pour, 'pouring', 40, 1).total).toBe(40)
+  })
+
+  it('pouring читает stickers_good; deleted_at пропускается; percentage/isComplete', () => {
+    const logs = [
+      { stage: 'pouring', item_idx: 1, stickers_good: 60 },
+      { stage: 'pouring', item_idx: 1, stickers_good: 40, deleted_at: '2026-01-01' },
+    ]
+    const r = computeStageProgressPerItem(logs, 'pouring', 100, 1)
+    expect(r.total).toBe(60)
+    expect(r.percentage).toBe(60)
+    expect(r.isComplete).toBe(false)
+    expect(computeStageProgressPerItem(logs, 'pouring', 60, 1).isComplete).toBe(true)
+  })
+
+  it('нулевой target и этап без quantityField (drying) не ломаются', () => {
+    expect(computeStageProgressPerItem([], 'print', 0, 1).percentage).toBe(0)
+    expect(computeStageProgressPerItem([], 'drying', 10, 1).total).toBe(0)
+  })
+})
+
+describe('R20.5: computeIncomingPerItem (поэвидовой приход)', () => {
+  it('print — стартовый этап (isStart)', () => {
+    const r = computeIncomingPerItem([], ROUTE, 'print', 1)
+    expect(r.isStart).toBe(true)
+  })
+
+  it('резка «видит» печать сквозь order-level ламинацию; виды изолированы', () => {
+    const logs = [
+      { stage: 'print', item_idx: 1, stickers_printed: 100 },
+      { stage: 'print', item_idx: 2, stickers_printed: 300 },
+      { stage: 'lamination', lamination_qty: 400 },          // без item_idx — прозрачна
+    ]
+    const r1 = computeIncomingPerItem(logs, ROUTE, 'cutting', 1)
+    expect(r1.total).toBe(100)
+    expect(r1.source).toBe('print')
+    expect(computeIncomingPerItem(logs, ROUTE, 'cutting', 2).total).toBe(300)
+  })
+
+  it('вычитает брак предыдущего этапа', () => {
+    const logs = [{ stage: 'print', item_idx: 1, stickers_printed: 100, defects: 10 }]
+    expect(computeIncomingPerItem(logs, ROUTE, 'cutting', 1).total).toBe(90)
+  })
+
+  it('sticker3D: selection ← pouring.stickers_good (drying без qty-поля пропускается)', () => {
+    const route3d = ['new', 'design', 'prepress', 'print', 'cutting', 'pouring', 'drying', 'selection', 'packaging', 'otk', 'done']
+    const logs = [
+      { stage: 'pouring', item_idx: 1, stickers_good: 80 },
+      { stage: 'drying', item_idx: 1, defects: 5 },
+    ]
+    const r = computeIncomingPerItem(logs, route3d, 'selection', 1)
+    expect(r.source).toBe('pouring')
+    expect(r.total).toBe(80)
+  })
+
+  it('этап вне маршрута → isStart; нет per-вид логов вовсе → isStart', () => {
+    expect(computeIncomingPerItem([], ROUTE, 'pouring', 1).isStart).toBe(true)
+    const logs = [{ stage: 'print', stickers_printed: 100 }] // только order-level
+    expect(computeIncomingPerItem(logs, ROUTE, 'cutting', 1).isStart).toBe(true)
   })
 })

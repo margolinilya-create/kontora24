@@ -7,7 +7,8 @@ import { PackDesignsForm } from '@/features/production/components/PackDesignsFor
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
 import { useOrderSubtasks } from '@/features/orders/hooks/useOrderSubtasks'
 import { useOrderItems } from '@/features/orders/hooks/useOrderItems'
-import { computeIncoming, computeStageProgress, SUBTRACT_DEFECTS_STAGES } from '@/features/production/lib/production-logs'
+import { computeIncoming, computeStageProgress, SUBTRACT_DEFECTS_STAGES, VARIANT_STAGES } from '@/features/production/lib/production-logs'
+import { VariantLogForm } from '@/features/production/components/VariantLogForm'
 import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import { DryingTimer } from './DryingTimer'
@@ -33,13 +34,42 @@ const NO_INPUT_STAGES = new Set([
   'otk', 'done', 'cancelled',
 ])
 
-function getProgressLines(order) {
+// R20.5: маппинг per-вид линий прогресса (multi-variant заказы) — поле и
+// короткий лейбл этапа. Только этапы из VARIANT_STAGES.
+const VARIANT_LINE = {
+  print: { qtyField: 'stickers_printed', label: 'Печать' },
+  cutting: { qtyField: 'qty_cut', label: 'Резка' },
+  pouring: { qtyField: 'stickers_good', label: 'Заливка' },
+  selection: { qtyField: 'qty_selected', label: 'Выборка' },
+  packaging: { qtyField: 'packs_packaged', label: 'Упаковка' },
+}
+
+function getProgressLines(order, items) {
   const route = getOrderRoute(order)
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const is3D = isPack3D || order.order_type === 'sticker3D'
   // Для 3D-стикерпака стикеры вводятся поэвидово: всего нужно qty × кол-во видов.
   const packStickerTarget = isPack3D ? order.qty * (order.stickers_per_pack || 1) : order.qty
   const lines = []
+
+  // R20.5 (бриф 3.07): multi-variant — на этапах VARIANT_STAGES добавляем
+  // линию на каждый размерный вид (target = тираж вида). Order-level линия
+  // остаётся (в неё падают логи без item_idx, в т.ч. легаси).
+  const isMultiVariant = !isPack3D && Array.isArray(items) && items.length > 1
+  const pushItemLines = (stage) => {
+    if (!isMultiVariant || !VARIANT_LINE[stage]) return
+    for (const it of items) {
+      lines.push({
+        key: `${stage}_item_${it.idx}`,
+        stage,
+        track: null,
+        itemIdx: it.idx,
+        qtyField: VARIANT_LINE[stage].qtyField,
+        label: `${VARIANT_LINE[stage].label} — Вид ${it.idx} (${Number(it.width_mm)}×${Number(it.height_mm)})`,
+        target: Number(it.qty) || 0,
+      })
+    }
+  }
 
   // R17.2 (бриф 5.06 «На вкладке прогресс / препресс»): реальная шкала
   // прогресса препресса — поле prepared_qty (миграция 051). Target =
@@ -53,6 +83,7 @@ function getProgressLines(order) {
     if (isPack3D) {
       lines.push({ key: 'print_backgrounds', stage: 'print', track: 'backgrounds', qtyField: 'backgrounds_printed', label: 'Напечатано фонов' })
     }
+    pushItemLines('print')
   }
   if (route.includes('lamination')) {
     lines.push({ key: 'lamination_qty', stage: 'lamination', track: null, qtyField: 'lamination_qty', label: isPack3D ? 'Заламинировано фонов' : 'Заламинировано' })
@@ -62,6 +93,7 @@ function getProgressLines(order) {
     if (isPack3D) {
       lines.push({ key: 'cutting_bg', stage: 'cutting', track: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано фонов' })
     }
+    pushItemLines('cutting')
   }
   if (route.includes('selection_pouring')) {
     lines.push({ key: 'selection', stage: 'selection_pouring', track: 'backgrounds', qtyField: 'qty_selected', label: 'Выбрано фонов' })
@@ -69,17 +101,24 @@ function getProgressLines(order) {
   }
   if (route.includes('pouring')) {
     lines.push({ key: 'pouring', stage: 'pouring', track: null, qtyField: 'stickers_good', label: 'Залито стикеров (хороших)' })
+    pushItemLines('pouring')
   }
   // R14.4: для sticker3D — отдельная линия «После сушки» = залитые − брак сушки.
   // Кастомная агрегация (см. aggregateLine — ветка для stage='drying').
   if (route.includes('drying')) {
     lines.push({ key: 'drying', stage: 'drying', track: null, qtyField: '__drying', label: 'Годных после сушки' })
   }
+  // R20.5 (попутный фикс): у этапа selection раньше вообще не было линии.
+  if (route.includes('selection')) {
+    lines.push({ key: 'selection_qty', stage: 'selection', track: null, qtyField: 'qty_selected', label: 'Выбрано' })
+    pushItemLines('selection')
+  }
   if (route.includes('assembly_3d')) {
     lines.push({ key: 'assembly', stage: 'assembly_3d', track: null, qtyField: 'packs_assembled', label: 'Собрано паков' })
   }
   if (route.includes('packaging')) {
     lines.push({ key: 'packaging', stage: 'packaging', track: null, qtyField: 'packs_packaged', label: is3D ? 'Упаковано стикеров' : 'Упаковано' })
+    pushItemLines('packaging')
   }
   return lines
 }
@@ -105,6 +144,8 @@ function aggregateLine(logs, line) {
   }
   let stageLogs = logs.filter((l) => l.stage === line.stage)
   if (line.track) stageLogs = stageLogs.filter((l) => l.track === line.track)
+  // R20.5: per-вид линии считают только логи своего размерного вида.
+  if (line.itemIdx != null) stageLogs = stageLogs.filter((l) => l.item_idx === line.itemIdx)
   const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[line.qtyField]) || 0), 0)
   const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
   const total = SUBTRACT_DEFECTS_STAGES.has(line.stage) ? Math.max(0, totalRaw - defects) : totalRaw
@@ -129,7 +170,7 @@ function aggregateFilmUsage(logs, order) {
   return byType
 }
 
-function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
+function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
   const stage = order.status
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const route = getOrderRoute(order)
@@ -146,6 +187,11 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
   const showPackDesigns =
     (isPack3D && PACK_STAGES_3D_PACK.includes(stage)) ||
     (isSticker3DMulti && PACK_STAGES_STICKER3D.includes(stage))
+  // R20.5 (бриф 3.07): multi-variant (несколько размерных видов из order_items) —
+  // поэвидовой учёт на этапах VARIANT_STAGES. Приоритет у PackDesignsForm
+  // (дизайн-виды): два виджета на одном этапе задваивали бы учёт.
+  const isMultiVariantOrder = !isPack3D && (items?.length || 0) > 1
+  const showVariantForm = isMultiVariantOrder && VARIANT_STAGES.includes(stage) && !showPackDesigns
   const packMode = stage === 'prepress' ? 'prepress'
     : stage === 'print' ? 'print'
     : stage === 'cutting' ? 'cutting'
@@ -180,6 +226,17 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
     if (res?.is_complete && res?.next_status) {
       setPendingAdvance({ to: res.next_status })
     }
+  }
+
+  // R20.5: поэвидовой лог — values уже реальные колонки (из STAGE_FIELDS.fields),
+  // добавляем item_idx + track:null. На заливке good = poured (брак убран R13.2,
+  // как attachComputedGood в ProductionLogForm).
+  async function handleVariantSubmit(itemIdx, values) {
+    const data = { ...values, track: null, item_idx: itemIdx }
+    if (stage === 'pouring') {
+      data.stickers_good = Math.max(0, Number(values.stickers_poured || 0))
+    }
+    await handleSubmit(stage, data)
   }
 
   async function confirmAdvance() {
@@ -505,6 +562,20 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated }) {
               />
             </div>
           </div>
+        ) : showVariantForm ? (
+          /* R20.5 (бриф 3.07): поэвидовой учёт по размерным видам изделий.
+             Одиночная форма скрыта — все поля этапа переехали per-вид. */
+          <div>
+            <p className="text-xs text-text-muted mb-2">Учёт — по каждому виду изделия</p>
+            <VariantLogForm
+              items={items}
+              logs={logs}
+              stage={stage}
+              route={route}
+              order={order}
+              onSubmitItem={handleVariantSubmit}
+            />
+          </div>
         ) : (
           <ProductionLogForm stage={stage} order={order} progress={progressProp} incoming={incomingProp} onSubmit={handleSubmit} />
         )}
@@ -527,8 +598,8 @@ function StageJumperBlock({ order, onUpdated }) {
   )
 }
 
-function ProgressLinesWidget({ order, logs }) {
-  const lines = getProgressLines(order)
+function ProgressLinesWidget({ order, logs, items = [] }) {
+  const lines = getProgressLines(order, items)
   const target = order.qty
   const isOnPrint = order.status === 'print'
   const filmUsage = isOnPrint ? aggregateFilmUsage(logs, order) : null
@@ -561,7 +632,8 @@ function ProgressLinesWidget({ order, logs }) {
           const unit = line.unit || 'шт'
 
           return (
-            <div key={line.key} className="rounded-xl border border-border p-3">
+            /* R20.5: per-вид линии — с отступом, как дети своей стадии */
+            <div key={line.key} className={`rounded-xl border border-border p-3 ${line.itemIdx != null ? 'ml-3' : ''}`}>
               <div className="flex items-start justify-between gap-2 mb-2">
                 <span className="text-sm font-medium">{line.label}</span>
                 <div className="flex items-center gap-2 shrink-0 text-xs">
@@ -931,9 +1003,9 @@ function ExtraStickerBlock({ subtask, order, advanceById, onUpdated }) {
   )
 }
 
-function SubtaskIndicator({ order, onUpdated }) {
+// R20.5: items приходят пропом из OrderProgressTab (один fetch на вкладку).
+function SubtaskIndicator({ order, onUpdated, items = [] }) {
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
-  const { items } = useOrderItems(order.id)
   const isMultiVariant = items.length > 1
   const isMulti = isPack3D || isMultiVariant
   const { hasRole } = useAuth()
@@ -1024,6 +1096,9 @@ function SubtaskIndicator({ order, onUpdated }) {
 
 export function OrderProgressTab({ order, onUpdated }) {
   const { logs, refetch, updateLog, softDeleteLog, error: logsError } = useProductionLogs(order.id, order.qty)
+  // R20.5: размерные виды один раз на вкладку — виджет учёта, прогресс-бары
+  // и индикатор подзадач читают один и тот же массив.
+  const { items } = useOrderItems(order.id)
 
   return (
     <div className="space-y-6">
@@ -1033,15 +1108,15 @@ export function OrderProgressTab({ order, onUpdated }) {
         </div>
       )}
 
-      <SubtaskIndicator order={order} onUpdated={onUpdated} />
+      <SubtaskIndicator order={order} onUpdated={onUpdated} items={items} />
 
       <div className="flex justify-end">
         <CreateExtraStickersButton order={order} onCreated={onUpdated} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} />
-        <ProgressLinesWidget order={order} logs={logs} />
+        <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} items={items} />
+        <ProgressLinesWidget order={order} logs={logs} items={items} />
       </div>
 
       <ActualCostSummary order={order} logs={logs} />

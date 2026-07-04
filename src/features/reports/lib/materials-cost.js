@@ -31,22 +31,53 @@ export function buildCostMap(materials) {
 /**
  * Себестоимость материалов для одного заказа.
  * @param {object} row — расширенный row из useOrdersCostReport: должен содержать
- *   actual_film_by_type, actual_lam_by_type (объекты code → метры),
- *   actual_resin (граммы), boxes_used.
+ *   actual_film / actual_lam (метры всего), actual_film_by_type,
+ *   actual_lam_by_type (объекты code → метры), actual_resin (граммы), boxes_used,
+ *   и (R20.2) джойны film_material / film_stickers_material / lam_material с unit_cost.
  *   R17.0: bopp_bags_used убрано — поле не пишется в k24_production_logs.
- *   БОПП-себестоимость вернётся в R17.6 через k24_material_transactions join.
  * @param {object} costMap — результат buildCostMap.
  * @returns {{ film: number, lam: number, resin: number, box: number, total: number }}
+ *
+ * R20.2 (бриф 3.07): приоритет — себестоимость КОНКРЕТНО выбранной позиции
+ * склада (film_material_id / lam_material_id, R16.1). Фолбэк по material_code —
+ * только для legacy-заказов без выбранной позиции: ходовые Orajet-позиции
+ * вообще не имеют кода (метры оценивались в 0 ₽), а код 'G' указывает на другую
+ * физическую позицию (Duckson) с чужой ценой.
  */
 export function costForOrder(row, costMap) {
+  const filmUnit = Number(row.film_material?.unit_cost) || 0
+  const stickersUnit = Number(row.film_stickers_material?.unit_cost) || 0
+
   let film = 0
-  for (const [code, m] of Object.entries(row.actual_film_by_type || {})) {
-    film += (Number(m) || 0) * (costMap.byCode[code] || 0)
+  if (filmUnit > 0 && stickersUnit > 0 && row.film_type_stickers && row.film_type_stickers !== row.film_type) {
+    // 3D-пак с разными плёнками фонов/стикеров: метры разделены по кодам треков.
+    for (const [code, m] of Object.entries(row.actual_film_by_type || {})) {
+      const unit = code === row.film_type_stickers ? stickersUnit : filmUnit
+      film += (Number(m) || 0) * unit
+    }
+  } else if (filmUnit > 0) {
+    // Одна выбранная плёнка — все метры по её цене.
+    film = (Number(row.actual_film) || 0) * filmUnit
+  } else {
+    // Legacy-фолбэк по material_code (+ плёнка стикеров по позиции, если выбрана только она).
+    for (const [code, m] of Object.entries(row.actual_film_by_type || {})) {
+      const unit = (stickersUnit > 0 && code === row.film_type_stickers)
+        ? stickersUnit
+        : (costMap.byCode[code] || 0)
+      film += (Number(m) || 0) * unit
+    }
   }
+
   let lam = 0
-  for (const [code, m] of Object.entries(row.actual_lam_by_type || {})) {
-    lam += (Number(m) || 0) * (costMap.byCode[code] || 0)
+  const lamUnit = Number(row.lam_material?.unit_cost) || 0
+  if (lamUnit > 0) {
+    lam = (Number(row.actual_lam) || 0) * lamUnit
+  } else {
+    for (const [code, m] of Object.entries(row.actual_lam_by_type || {})) {
+      lam += (Number(m) || 0) * (costMap.byCode[code] || 0)
+    }
   }
+
   const resin = (Number(row.actual_resin) || 0) * (costMap.byCode.resin || 0)
   const box = (Number(row.boxes_used) || 0) * (costMap.avgByType.box || 0)
   return { film, lam, resin, box, total: film + lam + resin + box }

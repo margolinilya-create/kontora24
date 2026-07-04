@@ -133,7 +133,8 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
             <Field label={multiVariant ? 'Тираж (всего)' : 'Тираж'} value={`${totalQty} шт`} />
             <Field label={multiVariant ? 'Размеры (по видам)' : 'Формат'} value={multiVariant ? formatVariantSizes(items) : `${order.width_mm || 0}×${order.height_mm || 0} мм`} valueFontSize={multiVariant ? 9 : undefined} />
-            <Field label="Кол-во видов" value={order.design_variants || 1} />
+            {/* R20.0 (бриф 3.07): для multi-variant — фактическое число видов изделий */}
+            <Field label="Кол-во видов" value={multiVariant ? items.length : (order.design_variants || 1)} />
             <Field label="Вид сдачи" value={formatOrderType(order.order_type)} />
           </div>
           {multiVariant && (

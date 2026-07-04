@@ -56,7 +56,9 @@ export function useMaterials(opts = {}) {
 
     setMaterials(materialsWithReservations)
     setLoading(false)
-  }, [])
+    // R20.0 (бриф 3.07, «висячий баг»): includeArchived в deps — иначе stale-closure,
+    // чекбокс «Показать архив» не перезапрашивал список.
+  }, [includeArchived])
 
   useEffect(() => { fetchMaterials() }, [fetchMaterials])
   useRefetchOnFocus(fetchMaterials)

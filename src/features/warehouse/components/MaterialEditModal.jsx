@@ -18,6 +18,9 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
     type: material.type || 'film',
     unit: material.unit || 'm2',
     minQty: Number(material.min_qty) || 0,
+    // R20.1 (бриф 3.07): себестоимость редактируется вручную (например,
+    // чтобы исправить испорченный WAC у «Duckson белая (Глянцевая)»).
+    unitCost: Number(material.unit_cost) || 0,
   })
   const [loading, setLoading] = useState(false)
 
@@ -33,6 +36,7 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
         type: form.type,
         unit: form.unit,
         min_qty: form.minQty,
+        unit_cost: Math.max(0, Number(form.unitCost) || 0),
       })
       toast.success('Позиция сохранена')
       onUpdated()
@@ -92,6 +96,21 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
           min="0"
           step="any"
         />
+
+        <div>
+          <Input
+            label={`Себестоимость (₽/${form.unit})`}
+            id="medit-cost"
+            type="number"
+            value={form.unitCost}
+            onChange={(e) => update('unitCost', Number(e.target.value))}
+            min="0"
+            step="any"
+          />
+          <p className="mt-1 text-xs text-text-muted">
+            При следующем приходе с указанной стоимостью пересчитается автоматически (средневзвешенно).
+          </p>
+        </div>
 
         <Button type="submit" loading={loading} className="w-full">
           Сохранить

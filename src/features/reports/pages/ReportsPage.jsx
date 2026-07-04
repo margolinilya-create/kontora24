@@ -148,6 +148,24 @@ function UnitEconomicsTab({ period }) {
     }
   })
 
+  // R20.4 (бриф 3.07): multi-variant заказы разворачиваются в подстроки
+  // 107.1 / 107.2 / … — Размер и Тираж свои у каждого вида; деньги и
+  // «Излишки, шт» — раз на заказ, в первой подстроке (суммы в Excel не двоятся).
+  const displayRows = rows.flatMap((o) => {
+    if (!o.items || o.items.length <= 1) {
+      return [{ ...o, _rowKey: o.id, _num: formatOrderNumber(o), _first: true }]
+    }
+    return o.items.map((it, i) => ({
+      ...o,
+      _rowKey: `${o.id}:${it.idx}`,
+      _num: `${formatOrderNumber(o)}.${it.idx}`,
+      _first: i === 0,
+      width_mm: it.width_mm,
+      height_mm: it.height_mm,
+      qty: it.qty,
+    }))
+  })
+
   function handleExport() {
     // R18.0 (бриф 30.06): плёнка/ламинация — конкретное имя со склада;
     // % брака — брак сушки / залито; себестоимости плёнки печати/ламинации/смолы
@@ -161,9 +179,11 @@ function UnitEconomicsTab({ period }) {
       'Себестоимость смолы, ₽', 'Себестоимость материалов, ₽', 'Стоимость труда, ₽',
       'Затраты на производство, ₽',
     ]
-    const aoa = [header, ...rows.map((o) => {
+    const aoa = [header, ...displayRows.map((o) => {
+      // Деньги и «Излишки, шт» — только в первой подстроке заказа (R20.4).
+      const first = o._first
       return [
-        o.id, formatOrderNumber(o), formatDate(o.created_at), o.deadline || '—',
+        o.id, o._num, formatDate(o.created_at), o.deadline || '—',
         o.client_name || '—', ORDER_TYPES[o.order_type]?.label || o.order_type,
         o.order_type === 'sticker3D' || o.order_type === 'stickerpack3D' ? 'Да' : 'Нет',
         `${o.width_mm}×${o.height_mm}`, o.qty, o.stickers_per_pack || '—',
@@ -171,11 +191,11 @@ function UnitEconomicsTab({ period }) {
         o.need_lam ? (o.lam_material?.name || LAMINATION_TYPES[o.lam_type]?.label || 'Да') : 'Нет',
         o.notes || '—',
         DELIVERY_TYPES[o.delivery_type]?.label || '—',
-        `${o.reject_pct}%`, o.surplus, `${o.surplus_pct}%`,
-        o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
-        Math.round(o.mat_film), Math.round(o.mat_lam), Math.round(o.mat_resin),
-        Math.round(o.mat_total), Math.round(o.labor),
-        Math.round(o.prod_cost),
+        `${o.reject_pct}%`, first ? o.surplus : '', `${o.surplus_pct}%`,
+        first ? (o.price_final || 0) : '', PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
+        first ? Math.round(o.mat_film) : '', first ? Math.round(o.mat_lam) : '', first ? Math.round(o.mat_resin) : '',
+        first ? Math.round(o.mat_total) : '', first ? Math.round(o.labor) : '',
+        first ? Math.round(o.prod_cost) : '',
       ]
     })]
     downloadXlsx(`unit-economics-${period}`, 'Unit Economics', aoa)
@@ -196,10 +216,11 @@ function UnitEconomicsTab({ period }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((o) => {
+          {displayRows.map((o) => {
+            const first = o._first
             return (
-              <tr key={o.id} className="border-b border-border last:border-0">
-                <Td bold>{formatOrderNumber(o)}</Td>
+              <tr key={o._rowKey} className="border-b border-border last:border-0">
+                <Td bold>{o._num}</Td>
                 <Td>{formatDate(o.created_at)}</Td>
                 <Td>{o.client_name || '—'}</Td>
                 <Td>{ORDER_TYPES[o.order_type]?.label}</Td>
@@ -208,15 +229,15 @@ function UnitEconomicsTab({ period }) {
                 <Td>{o.film_material?.name || FILM_TYPES[o.film_type]?.label || '—'}</Td>
                 <Td>{o.need_lam ? (o.lam_material?.name || LAMINATION_TYPES[o.lam_type]?.label || 'Да') : '—'}</Td>
                 <Td right danger={o.reject_pct > 15}>{o.reject_pct}%</Td>
-                <Td right muted>{o.surplus > 0 ? `+${o.surplus}` : o.surplus}</Td>
+                <Td right muted>{first ? (o.surplus > 0 ? `+${o.surplus}` : o.surplus) : ''}</Td>
                 <Td right muted>{o.surplus_pct}%</Td>
-                <Td right>{formatPrice(o.price_final)}</Td>
-                <Td right muted>{Math.round(o.mat_film)}</Td>
-                <Td right muted>{Math.round(o.mat_lam)}</Td>
-                <Td right muted>{Math.round(o.mat_resin)}</Td>
-                <Td right>{formatPrice(Math.round(o.mat_total))}</Td>
-                <Td right muted>{formatPrice(Math.round(o.labor))}</Td>
-                <Td right>{formatPrice(Math.round(o.prod_cost))}</Td>
+                <Td right>{first ? formatPrice(o.price_final) : ''}</Td>
+                <Td right muted>{first ? Math.round(o.mat_film) : ''}</Td>
+                <Td right muted>{first ? Math.round(o.mat_lam) : ''}</Td>
+                <Td right muted>{first ? Math.round(o.mat_resin) : ''}</Td>
+                <Td right>{first ? formatPrice(Math.round(o.mat_total)) : ''}</Td>
+                <Td right muted>{first ? formatPrice(Math.round(o.labor)) : ''}</Td>
+                <Td right>{first ? formatPrice(Math.round(o.prod_cost)) : ''}</Td>
               </tr>
             )
           })}
@@ -338,13 +359,15 @@ function ExpensesTab({ period }) {
   const rows = data.map((o) => ({ ...o, cost: costForOrder(o, costMap) }))
 
   function handleExport() {
+    // R20.3 (бриф 3.07): «Стоимость труда» и «Затраты на производство» —
+    // единый принцип расчёта с Unit Economics (labor_cost из production logs).
     const header = [
       '№ заказа', 'Клиент', 'Тираж', 'Излишки, шт', 'Излишки, %',
       'Плёнка, м', 'Себест. плёнки, ₽',
       'Ламинация, м', 'Себест. лам., ₽',
       'Коробки, шт', 'Себест. коробок, ₽',
       'Смола, г', 'Себест. смолы, ₽',
-      'Итого материалов, ₽',
+      'Итого материалов, ₽', 'Стоимость труда, ₽', 'Затраты на производство, ₽',
     ]
     const aoa = [header, ...rows.map((o) => [
       formatOrderNumber(o), o.client_name || '—', o.qty,
@@ -353,7 +376,8 @@ function ExpensesTab({ period }) {
       Number(o.actual_lam || 0).toFixed(1), Math.round(o.cost.lam),
       o.boxes_used || 0, Math.round(o.cost.box),
       Math.round(o.actual_resin), Math.round(o.cost.resin),
-      Math.round(o.cost.total),
+      Math.round(o.cost.total), Math.round(o.labor_cost || 0),
+      Math.round(o.cost.total + (Number(o.labor_cost) || 0)),
     ])]
     downloadXlsx(`расходы-по-заказам-${period}`, 'Расходы', aoa)
       .catch((err) => toast.error(translateError(err).message))
@@ -370,7 +394,7 @@ function ExpensesTab({ period }) {
             <Th right>Лам.</Th><Th right>₽</Th>
             <Th right>Кор.</Th><Th right>₽</Th>
             <Th right>Смола</Th><Th right>₽</Th>
-            <Th right>Итого ₽</Th>
+            <Th right>Мат. ₽</Th><Th right>Труд ₽</Th><Th right>Затраты ₽</Th>
           </tr>
         </thead>
         <tbody>
@@ -389,7 +413,9 @@ function ExpensesTab({ period }) {
               <Td right muted>{Math.round(o.cost.box)}</Td>
               <Td right>{Math.round(o.actual_resin)}г</Td>
               <Td right muted>{Math.round(o.cost.resin)}</Td>
-              <Td right bold>{formatPrice(o.cost.total)}</Td>
+              <Td right>{formatPrice(o.cost.total)}</Td>
+              <Td right muted>{formatPrice(o.labor_cost)}</Td>
+              <Td right bold>{formatPrice(o.cost.total + (Number(o.labor_cost) || 0))}</Td>
             </tr>
           ))}
         </tbody>
@@ -412,7 +438,9 @@ function PnLTab({ period }) {
 
   const rows = data.map((o) => {
     const mat = costForOrder(o, costMap)
-    const matLabor = mat.total + (Number(o.cost_labor) || 0)
+    // R20.3 (бриф 3.07): труд — фактический сдельный расчёт (labor_cost из хука),
+    // единый принцип с Unit Economics; ручное cost_labor больше не используется.
+    const matLabor = mat.total + (Number(o.labor_cost) || 0)
     const profit = (Number(o.price_final) || 0) - matLabor
     const marginPct = o.price_final > 0 ? Math.round((profit / o.price_final) * 100) : 0
     return { ...o, mat_total: mat.total, total_cost_with_mat_labor: matLabor, real_profit: profit, real_margin: marginPct }
@@ -430,7 +458,7 @@ function PnLTab({ period }) {
     const aoa = [header, ...rows.map((o) => [
       formatOrderNumber(o), o.client_name || '—',
       o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
-      Math.round(o.mat_total), o.cost_labor || 0,
+      Math.round(o.mat_total), Math.round(o.labor_cost || 0),
       Math.round(o.real_profit), `${o.real_margin}%`,
     ])]
     aoa.push([])
@@ -467,7 +495,7 @@ function PnLTab({ period }) {
               <Td right>{formatPrice(o.price_final)}</Td>
               <Td muted>{PAYMENT_STATUSES[o.payment_status]?.label || '—'}</Td>
               <Td right muted>{formatPrice(o.mat_total)}</Td>
-              <Td right muted>{formatPrice(o.cost_labor)}</Td>
+              <Td right muted>{formatPrice(o.labor_cost)}</Td>
               <Td right success={o.real_profit > 0} danger={o.real_profit < 0}>{formatPrice(o.real_profit)}</Td>
               <Td right>{o.real_margin}%</Td>
             </tr>

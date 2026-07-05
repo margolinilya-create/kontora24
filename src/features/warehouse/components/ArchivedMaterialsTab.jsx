@@ -84,7 +84,9 @@ export function ArchivedMaterialsTab() {
             {materials.map((m) => {
               const cat = getMaterialCategory(m)
               const catLabel = (cat && MATERIAL_CATEGORIES[cat]?.label) || '—'
-              const unit = MATERIAL_TYPES[m.type]?.unit || m.unit || ''
+              // Фактическая единица позиции важнее дефолта типа: у позиции в
+              // погонных метрах иначе показывалось «m2» (QA 04.07, баг №7).
+              const unit = m.unit || MATERIAL_TYPES[m.type]?.unit || ''
               return (
                 <tr key={m.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-2.5 font-medium text-text-muted">{m.name}</td>

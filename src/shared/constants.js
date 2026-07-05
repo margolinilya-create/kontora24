@@ -193,6 +193,10 @@ export function isStageAllowed(order, stage) {
 // Значения соответствуют записям в k24_role_permissions.
 export const PERMISSIONS = {
   stages: [
+    // stage:new — приём заказа в работу (переход из «Новый» на первый этап
+    // маршрута). Без него StatusSwitcher/канбан блокировали выход из new
+    // для всех ролей, включая admin (QA 04.07, баг №3; сид — миграция 068).
+    'stage:new',
     'stage:design', 'stage:sample_layout', 'stage:sample_print',
     'stage:color_approval', 'stage:batch_layout', 'stage:prepress',
     'stage:print', 'stage:lamination', 'stage:cutting', 'stage:pouring',
@@ -215,6 +219,7 @@ export const PERMISSIONS = {
 }
 
 export const PERMISSION_LABELS = {
+  'stage:new': 'Продвигать «Новый» (приём в работу)',
   'stage:design': 'Продвигать «Дизайн»',
   'stage:sample_layout': 'Продвигать «Вёрстка образца»',
   'stage:sample_print': 'Продвигать «Печать образца»',

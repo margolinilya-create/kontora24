@@ -90,31 +90,68 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
   }
 
   async function handleSubmitAll() {
-    // Собираем все непустые ряды → пишем их batch. Если часть ушла успешно,
-    // а часть упала — toast.error со списком неуспешных, остальные drafts
-    // очищаются.
+    // Собираем все непустые ряды → пишем их batch (N отдельных insert'ов).
+    // Упавшие виды автоматически повторяем ОДИН раз: QA 04.07 поймал потерю
+    // 2 из 4 видов на сетевом сбое. Ретрай идемпотентен — каждому виду заранее
+    // выдаётся клиентский logId (PK лога): если первый insert на самом деле
+    // прошёл, а упал только ответ, повтор ловит 23505 и засчитывается успехом
+    // (без дубля, который завысил бы прогресс и сдельную оплату).
+    // logId живёт в drafts (sessionStorage) до подтверждённого успеха: он
+    // должен пережить и вторую волну, и РУЧНОЙ повтор по тосту (и даже
+    // reload) — иначе повтор с новым UUID создаст дубль лога, завысив
+    // прогресс и сдельную оплату. Guard по конвенции проекта: на старых
+    // WebView randomUUID отсутствует — тогда идём без id (как до фикса),
+    // Math.random-фолбэк не годится для uuid-колонки PK.
     const pending = []
+    const draftsWithIds = { ...drafts }
     for (const d of designs) {
-      const draft = drafts[d.design_index] || {}
+      const draft = draftsWithIds[d.design_index] || {}
       const value = Number(draft.value || 0)
       const defects = labels.showDefects ? Number(draft.defects || 0) : 0
       if (value === 0 && defects === 0) continue
-      pending.push({ designIndex: d.design_index, payload: { value, defects } })
+      const logId = draft.logId || globalThis.crypto?.randomUUID?.() || null
+      draftsWithIds[d.design_index] = { ...draft, logId }
+      pending.push({ designIndex: d.design_index, payload: { value, defects, logId } })
     }
+    if (pending.length > 0) setDrafts(draftsWithIds)
     if (pending.length === 0) {
       toast.error(labels.errorEmpty)
       return
     }
     setSavingAll(true)
-    const failed = []
     const succeeded = []
+    let retriedOk = 0
+    let failed = []
     for (const p of pending) {
       try {
         await onSubmitDesign(p.designIndex, p.payload)
         succeeded.push(p.designIndex)
       } catch (err) {
-        failed.push({ designIndex: p.designIndex, message: translateError(err).message || err.message })
+        failed.push({ ...p, message: translateError(err).message || err.message })
       }
+    }
+    // Вторая волна — по упавшим, с теми же logId.
+    if (failed.length > 0) {
+      const stillFailed = []
+      for (const p of failed) {
+        try {
+          await onSubmitDesign(p.designIndex, p.payload)
+          succeeded.push(p.designIndex)
+          retriedOk++
+        } catch (err) {
+          if (err?.code === '23505') {
+            // Дубликат PK: первый insert прошёл, упал только ответ.
+            // Ограничение: completion-check/предложение перехода в этом
+            // случае не запускаются (insert бросил до них) — прогресс
+            // догонит realtime/refetch, этап двигается вручную как обычно.
+            succeeded.push(p.designIndex)
+            retriedOk++
+          } else {
+            stillFailed.push({ ...p, message: translateError(err).message || err.message })
+          }
+        }
+      }
+      failed = stillFailed
     }
     if (succeeded.length > 0) {
       setDrafts((prev) => {
@@ -124,11 +161,11 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
       })
     }
     if (failed.length === 0) {
-      toast.success(`Сохранено по ${succeeded.length} ${succeeded.length === 1 ? 'виду' : 'видам'}`)
-    } else if (succeeded.length === 0) {
-      toast.error(`Не удалось сохранить: ${failed.map((f) => `#${f.designIndex}`).join(', ')}`)
+      const base = `Сохранено по ${succeeded.length} ${succeeded.length === 1 ? 'виду' : 'видам'}`
+      toast.success(retriedOk > 0 ? `${base} (часть — со 2-й попытки)` : base)
     } else {
-      toast.error(`Сохранено ${succeeded.length}, ошибки на ${failed.map((f) => `#${f.designIndex}`).join(', ')}`)
+      const list = failed.map((f) => `#${f.designIndex}`).join(', ')
+      toast.error(`Не сохранились виды: ${list} — данные не потеряны, проверьте связь и нажмите «Сохранить» ещё раз`)
     }
     setSavingAll(false)
   }

@@ -303,9 +303,12 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   // isRollback / force — admin escape (StatusOverride).
   let orderForRoute = null
   if (!options.isRollback && !options.force) {
+    // ВСЕ поля, которые использует getOrderRoute: order_type, design_status,
+    // need_lam, bopp_bag. Без bopp_bag маршрут терял «Упаковку» для не-3D
+    // заказов с БОПП-пакетом (QA 04.07, баг №4).
     const { data: o } = await supabase
       .from('k24_orders')
-      .select('order_type, design_status, need_lam, number')
+      .select('order_type, design_status, need_lam, bopp_bag, number')
       .eq('id', orderId)
       .single()
     orderForRoute = o
@@ -490,9 +493,13 @@ export async function addProductionLogAndCheckAdvance(orderId, stage, logData, o
       }
       isComplete = (bgResult.data?.is_complete ?? false) && (stResult.data?.is_complete ?? false)
     } else {
+      // p_track передаём явно: пока в БД жили две перегрузки функции, вызов
+      // без него был неоднозначен (PGRST203) и completion молча не работал
+      // (QA 04.07, баг №5; перегрузка удалена миграцией 069).
       const { data: result, error: checkError } = await supabase.rpc('check_stage_completion', {
         p_order_id: orderId,
         p_stage: stage,
+        p_track: null,
       })
       if (checkError) {
         captureError(checkError, {

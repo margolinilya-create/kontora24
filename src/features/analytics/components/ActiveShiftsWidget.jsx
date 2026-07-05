@@ -10,6 +10,9 @@ import { ru } from 'date-fns/locale'
 import Modal from '@/shared/components/Modal'
 
 const FULL_SHIFT_MIN = 8 * 60
+// Смена дольше 12ч почти наверняка означает забытый clock-out (QA 04.07
+// поймал живую смену 26ч+) — красим в danger и подписываем явно.
+const OVERTIME_MIN = 12 * 60
 
 /**
  * R15.4 (бриф 04.06 #1): виджет «Активные смены» на главной для admin/manager.
@@ -117,7 +120,8 @@ export function ActiveShiftsWidget() {
           const hours = Math.floor(elapsed / 60)
           const mins = elapsed % 60
           const isFull = elapsed >= FULL_SHIFT_MIN
-          const dotClass = isFull ? 'bg-warning' : 'bg-success'
+          const isOvertime = elapsed >= OVERTIME_MIN
+          const dotClass = isOvertime ? 'bg-danger' : isFull ? 'bg-warning' : 'bg-success'
           const workerLogs = logsByWorker[s.worker_id] || []
           return (
             <button
@@ -141,6 +145,11 @@ export function ActiveShiftsWidget() {
                   <span className="text-accent ml-2">· записей: {workerLogs.length}</span>
                 )}
               </p>
+              {isOvertime && (
+                <p className="text-[11px] text-danger mt-1 font-medium">
+                  дольше 12 ч — забыт clock-out?
+                </p>
+              )}
             </button>
           )
         })}

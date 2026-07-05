@@ -24,11 +24,13 @@ export const STAGE_FIELDS = {
 
   // R13.2 (бриф 02.06): на препрессе менеджер вводит «сколько подготовлено
   // стикеров/изделий к печати». Поле prepared_qty добавлено миграцией 051.
+  // «видов»: таргет прогресс-линии — design_variants, не тираж; со старым
+  // лейблом «к печати (шт)» вводили штуки и получали 999% (QA 04.07).
   prepress: {
     label: 'Препресс',
     quantityField: 'prepared_qty',
     fields: [
-      { key: 'prepared_qty', label: 'Подготовлено к печати', unit: 'шт' },
+      { key: 'prepared_qty', label: 'Подготовлено видов', unit: 'видов' },
     ],
   },
 
@@ -274,9 +276,14 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
   const idx = route.indexOf(stage)
   if (idx <= 0) return { total: null, source: null, isStart: true }
 
-  // Идём назад по маршруту до ближайшего этапа с qty-логом (skip 'new'/'design'/'prepress')
+  // Идём назад по маршруту до ближайшего этапа с qty-логом.
+  // prepress пропускаем ЯВНО: его prepared_qty — это «подготовлено ВИДОВ»
+  // (таргет = design_variants), а не штуки. Без скипа печать получала
+  // «Поступило: 2 шт» при тираже 500 и ложный warning на каждый ввод
+  // (ревью фиксов QA 04.07).
   for (let i = idx - 1; i >= 0; i--) {
     const prev = route[i]
+    if (prev === 'prepress') continue
     const cfg = STAGE_FIELDS[prev]
     if (!cfg) continue
     // На предыдущем этапе считаем по его quantityField и трек-фильтру.

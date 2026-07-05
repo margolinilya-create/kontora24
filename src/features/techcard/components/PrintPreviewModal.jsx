@@ -14,7 +14,9 @@ import { orderFileSlug } from '@/shared/lib/utils'
 const CONFIG = {
   techcard: {
     title: 'Тех. карта',
-    pdf: { scale: 2, orientation: 'p', format: 'a4', width: 210, height: 297 },
+    // JPEG: A4 в PNG@2x давал PDF ~6 МБ — тяжело для телефонов в цеху.
+    // Стикеры-этикетки ниже остаются PNG (мелкий текст, файлы маленькие).
+    pdf: { scale: 2, orientation: 'p', format: 'a4', width: 210, height: 297, imageFormat: 'JPEG', quality: 0.92 },
     print: { scale: 2, pageSize: 'A4', width: '210mm', height: '297mm' },
     filenamePrefix: 'techcard',
     maxWidth: 'max-w-3xl',

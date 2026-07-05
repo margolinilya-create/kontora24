@@ -377,6 +377,19 @@ export default function CreateOrderPage() {
         return
       }
     }
+    // Аудит 05.07: плёнка обязательна конкретной позицией склада. Без неё
+    // себестоимость плёнки в отчётах считалась по 0 ₽ (ходовые позиции без
+    // material_code) — маржа завышалась у ~трети заказов. Требуем выбор
+    // позиции с ценой; для 3D-пака ещё и плёнку стикеров (её код/цена
+    // отличаются от фонов).
+    if (!values.film_material_id) {
+      toast.error('Выберите плёнку со склада (конкретную позицию) — без неё себестоимость считается неверно')
+      return
+    }
+    if (isStickerpack3D && !values.film_stickers_material_id) {
+      toast.error('Выберите плёнку стикеров со склада — у 3D-пака это отдельная позиция')
+      return
+    }
     // R11.4: если на складе не хватает заявленных материалов — спросить подтверждение.
     if (shortages.length > 0) {
       setPendingShortageValues(values)
@@ -752,7 +765,7 @@ export default function CreateOrderPage() {
             {isStickerpack3D ? (
               <div className="grid grid-cols-2 gap-3">
                 <FilmSelect
-                  label="Плёнка фонов"
+                  label="Плёнка фонов *"
                   id="film_type"
                   value={watch('film_material_id') || filmType}
                   onChange={({ materialId, code }) => {
@@ -763,7 +776,7 @@ export default function CreateOrderPage() {
                   includeOutOfStock
                 />
                 <FilmSelect
-                  label="Плёнка стикеров"
+                  label="Плёнка стикеров *"
                   id="film_type_stickers"
                   value={watch('film_stickers_material_id') || watch('film_type_stickers')}
                   onChange={({ materialId, code }) => {
@@ -777,7 +790,7 @@ export default function CreateOrderPage() {
             <div className="grid grid-cols-2 gap-3">
               {!isStickerpack3D && (
                 <FilmSelect
-                  label="Плёнка"
+                  label="Плёнка *"
                   id="film_type"
                   value={watch('film_material_id') || filmType}
                   onChange={({ materialId, code }) => {

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { updateMaterial } from '../hooks/useMaterials'
 import { MATERIAL_TYPES } from '@/shared/constants'
+import { FilmFields } from './FilmFields'
+import { composeMaterialName, isStructuredFilmType } from '../lib/material-name'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
@@ -10,33 +12,52 @@ import Button from '@/shared/components/Button'
 // R13.1 (бриф 02.06): менеджер может править любое поле позиции склада.
 // Список допустимых единиц вынесен в общую константу — используется тут
 // и в MaterialForm.
-export const UNIT_OPTIONS = ['m', 'm2', 'ml', 'g', 'kg', 'шт', 'рулон', 'упаковка', 'литр']
+export const UNIT_OPTIONS = ['м', 'm', 'm2', 'ml', 'g', 'kg', 'шт', 'рулон', 'упаковка', 'литр']
 
 export function MaterialEditModal({ material, onClose, onUpdated }) {
   const [form, setForm] = useState({
     name: material.name || '',
     type: material.type || 'film',
-    unit: material.unit || 'm2',
+    unit: material.unit || 'м',
     minQty: Number(material.min_qty) || 0,
     // R20.1 (бриф 3.07): себестоимость редактируется вручную (например,
     // чтобы исправить испорченный WAC у «Duckson белая (Глянцевая)»).
     unitCost: Number(material.unit_cost) || 0,
+    // Структурные поля плёнки/ламинации (05.07).
+    manufacturer: material.manufacturer || '',
+    product_line: material.product_line || '',
+    roll_width_m: material.roll_width_m ?? '',
+    finish: material.finish || null,
+    color: material.color || '',
   })
   const [loading, setLoading] = useState(false)
 
   function update(k, v) { setForm((p) => ({ ...p, [k]: v })) }
+  const isFilm = isStructuredFilmType(form.type)
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name.trim()) return
+    // Плёнка/ламинация — имя собирается из структурных полей; иначе свободный текст.
+    const name = isFilm ? composeMaterialName(form) : form.name.trim()
+    if (!name) {
+      toast.error(isFilm ? 'Заполните параметры плёнки (хотя бы производителя/серию)' : 'Укажите название')
+      return
+    }
     setLoading(true)
     try {
       await updateMaterial(material.id, {
-        name: form.name.trim(),
+        name,
         type: form.type,
         unit: form.unit,
         min_qty: form.minQty,
         unit_cost: Math.max(0, Number(form.unitCost) || 0),
+        // Структурные поля пишем только для плёнки/ламинации; для прочих —
+        // очищаем (на случай смены типа), чтобы не тянулись чужие значения.
+        manufacturer: isFilm ? (form.manufacturer || null) : null,
+        product_line: isFilm ? (form.product_line || null) : null,
+        roll_width_m: isFilm && form.roll_width_m ? Number(form.roll_width_m) : null,
+        finish: isFilm ? (form.finish || null) : null,
+        color: isFilm ? (form.color || null) : null,
       })
       toast.success('Позиция сохранена')
       onUpdated()
@@ -50,14 +71,18 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
   return (
     <Modal isOpen={true} onClose={onClose} title="Редактировать позицию" maxWidth="max-w-sm">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Название *"
-          id="medit-name"
-          value={form.name}
-          onChange={(e) => update('name', e.target.value)}
-          required
-          autoFocus
-        />
+        {isFilm ? (
+          <FilmFields value={form} onChange={update} />
+        ) : (
+          <Input
+            label="Название *"
+            id="medit-name"
+            value={form.name}
+            onChange={(e) => update('name', e.target.value)}
+            required
+            autoFocus
+          />
+        )}
 
         <div>
           <label htmlFor="medit-type" className="block text-sm font-medium text-text mb-1">Тип</label>

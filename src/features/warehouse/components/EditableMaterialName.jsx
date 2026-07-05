@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { updateMaterial } from '../hooks/useMaterials'
+import { isStructuredFilmType } from '../lib/material-name'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 
@@ -7,6 +8,17 @@ export function EditableMaterialName({ material, onUpdated, tableMode = false })
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(material.name || '')
   const [saving, setSaving] = useState(false)
+
+  // Плёнка/ламинация: имя собирается из структурных полей (05.07), инлайн-правка
+  // свободным текстом рассинхронила бы его — показываем неизменяемое имя,
+  // редактирование только через «⋯ → Редактировать» (модалка со структурой).
+  if (isStructuredFilmType(material.type)) {
+    return (
+      <span className={tableMode ? '' : 'font-bold text-base leading-tight'}>
+        {material.name}
+      </span>
+    )
+  }
 
   async function save() {
     if (saving) return

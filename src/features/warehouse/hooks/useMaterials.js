@@ -228,7 +228,7 @@ export async function updateMaterial(id, fields) {
 }
 
 export async function createMaterial({
-  type, name, unit, stockQty, minQty, unitCost,
+  type, name, unit, stockQty, minQty, unitCost, supplier,
   // Структурные поля плёнки/ламинации (05.07) — опциональны для прочих типов.
   manufacturer, product_line, roll_width_m, finish, color,
 }) {
@@ -241,6 +241,7 @@ export async function createMaterial({
       stock_qty: stockQty || 0,
       min_qty: minQty || 0,
       unit_cost: unitCost || 0,
+      supplier: supplier ?? null,
       manufacturer: manufacturer ?? null,
       product_line: product_line ?? null,
       roll_width_m: roll_width_m ?? null,

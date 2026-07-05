@@ -23,6 +23,7 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
     // R20.1 (бриф 3.07): себестоимость редактируется вручную (например,
     // чтобы исправить испорченный WAC у «Duckson белая (Глянцевая)»).
     unitCost: Number(material.unit_cost) || 0,
+    supplier: material.supplier || '',
     // Структурные поля плёнки/ламинации (05.07).
     manufacturer: material.manufacturer || '',
     product_line: material.product_line || '',
@@ -51,6 +52,7 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
         unit: form.unit,
         min_qty: form.minQty,
         unit_cost: Math.max(0, Number(form.unitCost) || 0),
+        supplier: form.supplier || null,
         // Структурные поля пишем только для плёнки/ламинации; для прочих —
         // очищаем (на случай смены типа), чтобы не тянулись чужие значения.
         manufacturer: isFilm ? (form.manufacturer || null) : null,
@@ -111,6 +113,14 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
             ))}
           </select>
         </div>
+
+        <Input
+          label="Поставщик"
+          id="medit-supplier"
+          value={form.supplier}
+          onChange={(e) => update('supplier', e.target.value)}
+          placeholder="У кого закупаем"
+        />
 
         <Input
           label={`Минимум (${form.unit})`}

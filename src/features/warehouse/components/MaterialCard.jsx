@@ -21,7 +21,10 @@ export function MaterialCard({ material, onAddStock, onUpdated, plannedInfo }) {
           ) : (
             <h3 className={`font-bold text-base leading-tight ${isArchived ? 'text-text-muted' : ''}`}>{material.name}</h3>
           )}
-          <p className="text-xs text-text-muted mt-0.5">{typeInfo?.label || material.type}</p>
+          <p className="text-xs text-text-muted mt-0.5">
+            {typeInfo?.label || material.type}
+            {material.supplier && <span> · {material.supplier}</span>}
+          </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {isArchived && (

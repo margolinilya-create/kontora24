@@ -2,31 +2,54 @@ import { useState } from 'react'
 import { createMaterial } from '../hooks/useMaterials'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import { UNIT_OPTIONS } from './MaterialEditModal'
+import { FilmFields } from './FilmFields'
+import { composeMaterialName, isStructuredFilmType } from '../lib/material-name'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
 
+const EMPTY_FILM = { manufacturer: '', product_line: '', roll_width_m: '', finish: null, color: '' }
+
 export function MaterialForm({ onClose, onCreated }) {
-  const [form, setForm] = useState({ type: 'film', name: '', unit: 'm2', stockQty: 0, minQty: 0, unitCost: 0 })
+  const [form, setForm] = useState({
+    type: 'film', name: '', unit: 'м', stockQty: 0, minQty: 0, unitCost: 0, ...EMPTY_FILM,
+  })
   const [loading, setLoading] = useState(false)
 
   function update(k, v) { setForm((p) => ({ ...p, [k]: v })) }
+  const isFilm = isStructuredFilmType(form.type)
 
-  // Auto-set unit when type changes (но можно переопределить через select)
+  // Auto-set unit when type changes (но можно переопределить через select).
+  // Плёнка/ламинация — погонные метры ('м').
   function handleTypeChange(type) {
-    const unitMap = { film: 'm2', ink: 'ml', lam_film: 'm2', resin: 'g', blade: 'шт' }
+    const unitMap = { film: 'м', lam_film: 'м', ink: 'ml', resin: 'g', blade: 'шт' }
     update('type', type)
-    update('unit', unitMap[type] || 'm2')
+    update('unit', unitMap[type] || 'шт')
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name.trim()) return
+    // Для плёнки/ламинации имя собирается из структурных полей, иначе — свободный текст.
+    const name = isFilm ? composeMaterialName(form) : form.name.trim()
+    if (!name) {
+      toast.error(isFilm ? 'Заполните параметры плёнки (хотя бы производителя/серию)' : 'Укажите название')
+      return
+    }
     setLoading(true)
     try {
-      await createMaterial(form)
+      await createMaterial({
+        type: form.type, name, unit: form.unit,
+        stockQty: form.stockQty, minQty: form.minQty, unitCost: form.unitCost,
+        ...(isFilm ? {
+          manufacturer: form.manufacturer || null,
+          product_line: form.product_line || null,
+          roll_width_m: form.roll_width_m ? Number(form.roll_width_m) : null,
+          finish: form.finish || null,
+          color: form.color || null,
+        } : {}),
+      })
       toast.success('Материал добавлен')
       onCreated()
     } catch (err) {
@@ -70,15 +93,18 @@ export function MaterialForm({ onClose, onCreated }) {
           </div>
         </div>
 
-        <Input
-          label="Название *"
-          id="mat-name"
-          value={form.name}
-          onChange={(e) => update('name', e.target.value)}
-          required
-          placeholder="Плёнка белая глянцевая"
-          autoFocus
-        />
+        {isFilm ? (
+          <FilmFields value={form} onChange={update} />
+        ) : (
+          <Input
+            label="Название *"
+            id="mat-name"
+            value={form.name}
+            onChange={(e) => update('name', e.target.value)}
+            placeholder="Смола эпоксидная"
+            autoFocus
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Input

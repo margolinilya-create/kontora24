@@ -227,7 +227,11 @@ export async function updateMaterial(id, fields) {
   return data
 }
 
-export async function createMaterial({ type, name, unit, stockQty, minQty, unitCost }) {
+export async function createMaterial({
+  type, name, unit, stockQty, minQty, unitCost,
+  // Структурные поля плёнки/ламинации (05.07) — опциональны для прочих типов.
+  manufacturer, product_line, roll_width_m, finish, color,
+}) {
   const { data, error } = await supabase
     .from('k24_materials')
     .insert({
@@ -237,6 +241,11 @@ export async function createMaterial({ type, name, unit, stockQty, minQty, unitC
       stock_qty: stockQty || 0,
       min_qty: minQty || 0,
       unit_cost: unitCost || 0,
+      manufacturer: manufacturer ?? null,
+      product_line: product_line ?? null,
+      roll_width_m: roll_width_m ?? null,
+      finish: finish ?? null,
+      color: color ?? null,
     })
     .select()
     .single()

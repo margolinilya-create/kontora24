@@ -607,6 +607,13 @@ export const STICKER_SHAPES = {
   complex_big: { label: 'Сложная и большая' },
 }
 
+// Структурные поля плёнки/ламинации (запрос менеджера 05.07). Название позиции
+// собирается из них через composeMaterialName. finish — мат/глянец.
+export const FILM_FINISHES = { M: 'Матовая', G: 'Глянцевая' }
+// Подсказки для datalist (не ограничивают ввод — менеджер может вписать своё).
+export const FILM_MANUFACTURERS = ['Orajet', 'Oracal', 'Duckson', 'Dickson', 'Oraguard']
+export const FILM_COLORS = ['Белая', 'Прозрачная', 'Чёрная', 'Золото', 'Серебро', 'Голографическая']
+
 // R19: перевод настроек bonus_rates ({pouring, selection, assembly_3d, packaging,
 // pouring_shapes}) в форму WORKER_RATES для calculateWorkerPayout.opts.rates.
 export function settingsToRates(bonusRates) {

@@ -59,8 +59,10 @@ export function useClientOrders(clientId) {
       setLoading(true)
       setError(null)
       try {
+        // Через маскирующее view: select('*') на таблице после миграции 072
+        // упал бы 42501. (Хук сейчас не импортируется — правка на будущее.)
         const { data, error: err } = await supabase
-          .from('k24_orders')
+          .from('k24_orders_full')
           .select('*')
           .eq('client_id', clientId)
           .order('created_at', { ascending: false })

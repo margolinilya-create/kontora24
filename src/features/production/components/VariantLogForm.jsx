@@ -62,9 +62,18 @@ function VariantLogFormImpl({ items, logs = [], stage, route, order, onSubmitIte
   }
 
   async function handleSubmitAll() {
+    // Идемпотентный авторетрай (паттерн PackDesignsForm, ревью 04.07):
+    // каждому виду выдаётся клиентский logId (PK лога), который живёт в
+    // драфте (sessionStorage) до подтверждённого успеха — переживает вторую
+    // волну, ручной повтор по тосту и reload. Повтор с тем же PK упирается
+    // в 23505 вместо создания дубля, который завысил бы прогресс, сдельную
+    // оплату И задвоил списание коробок/БОПП (триггер 031). Guard: на старых
+    // WebView randomUUID нет — тогда без id (как раньше), Math.random-фолбэк
+    // не годится для uuid-колонки.
     const pending = []
+    const draftsWithIds = { ...drafts }
     for (const it of items) {
-      const d = drafts[it.idx] || {}
+      const d = draftsWithIds[it.idx] || {}
       const values = {}
       let hasValue = false
       for (const f of fields) {
@@ -79,6 +88,9 @@ function VariantLogFormImpl({ items, logs = [], stage, route, order, onSubmitIte
         if (num > 0) hasValue = true
       }
       if (!hasValue) continue
+      const logId = d._logId || globalThis.crypto?.randomUUID?.() || null
+      draftsWithIds[it.idx] = { ...d, _logId: logId }
+      if (logId) values.id = logId
       pending.push({ idx: it.idx, values })
     }
     if (pending.length === 0) {
@@ -86,31 +98,69 @@ function VariantLogFormImpl({ items, logs = [], stage, route, order, onSubmitIte
       return
     }
 
-    // Упаковочные материалы: пакет — в каждую строку (списание БОПП идёт по
-    // packs_packaged той же строки лога, триггер 031); коробки — только в
-    // первую строку, иначе списание задвоится.
+    // Упаковочные материалы. Пакет — в каждую строку (списание БОПП по
+    // packs_packaged той же строки, триггер 031; идемпотентно по logId
+    // строки). Коробки — на ОДНУ строку-«носитель», закреплённую по её logId
+    // в _materials._boxLogId: при ручном повторе коробка едет на том же logId
+    // (23505 гасит дубль), а после успеха строки-носителя больше ни к кому не
+    // прикрепляется. Раньше был позиционный i===0 — при пересборке pending
+    // после частичного успеха коробка перескакивала на другой вид и списывалась
+    // вторично (ревью 05.07).
     if (isPackaging) {
-      pending.forEach((p, i) => {
+      pending.forEach((p) => {
         if (materials.packaging_bag_material_id) {
           p.values.packaging_bag_material_id = materials.packaging_bag_material_id
         }
-        if (i === 0 && materials.box_material_id) {
-          p.values.box_material_id = materials.box_material_id
-          p.values.boxes_used = Math.max(0, Number(materials.boxes_used) || 0)
-        }
       })
+      if (materials.box_material_id) {
+        let boxLogId = materials._boxLogId || null
+        let carrier = boxLogId ? pending.find((p) => p.values.id === boxLogId) : null
+        if (!carrier && !boxLogId) {
+          carrier = pending[0]
+          boxLogId = carrier?.values.id || null
+        }
+        // boxLogId задан, но носителя нет в pending → он уже сохранён, коробку
+        // повторно не прикрепляем (иначе двойное списание).
+        if (carrier) {
+          carrier.values.box_material_id = materials.box_material_id
+          carrier.values.boxes_used = Math.max(0, Number(materials.boxes_used) || 0)
+          draftsWithIds._materials = { ...materials, _boxLogId: boxLogId }
+        }
+      }
     }
+    setDrafts(draftsWithIds)
 
     setSavingAll(true)
     const succeeded = []
-    const failed = []
+    let retriedOk = 0
+    let failed = []
     for (const p of pending) {
       try {
         await onSubmitItem(p.idx, p.values)
         succeeded.push(p.idx)
       } catch (err) {
-        failed.push({ idx: p.idx, message: translateError(err).message })
+        failed.push({ ...p, message: translateError(err).message })
       }
+    }
+    // Вторая волна — по упавшим, с теми же id.
+    if (failed.length > 0) {
+      const stillFailed = []
+      for (const p of failed) {
+        try {
+          await onSubmitItem(p.idx, p.values)
+          succeeded.push(p.idx)
+          retriedOk++
+        } catch (err) {
+          if (err?.code === '23505') {
+            // Дубликат PK: первый insert прошёл, потерялся только ответ.
+            succeeded.push(p.idx)
+            retriedOk++
+          } else {
+            stillFailed.push({ ...p, message: translateError(err).message })
+          }
+        }
+      }
+      failed = stillFailed
     }
     setSavingAll(false)
 
@@ -123,9 +173,10 @@ function VariantLogFormImpl({ items, logs = [], stage, route, order, onSubmitIte
       })
     }
     if (failed.length === 0) {
-      toast.success(`Сохранено: ${succeeded.length} вид(ов)`)
+      const base = `Сохранено: ${succeeded.length} вид(ов)`
+      toast.success(retriedOk > 0 ? `${base} (часть — со 2-й попытки)` : base)
     } else {
-      toast.error(`Не сохранилось ${failed.length} из ${pending.length}: ${failed.map((f) => `Вид ${f.idx} — ${f.message}`).join('; ')}`)
+      toast.error(`Не сохранились виды: ${failed.map((f) => `${f.idx} — ${f.message}`).join('; ')}. Данные не потеряны — проверьте связь и нажмите «Сохранить» ещё раз`)
     }
   }
 

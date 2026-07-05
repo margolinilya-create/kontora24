@@ -602,8 +602,8 @@ Kontora24 — внутренний инструмент для 6 сотрудн�
 - **OrderStepper визуальное раздвоение** (фидбэк #5): после prepress показывать две параллельные линии чипов (Фон/Стикер) до assembly_3d. Текущий степпер — одна линия, подзадачи отдельным блоком SubtaskTrackBlock.
 - **Mobile UX переключатель подзадач** (Tabs/Dropdown): зависит от полной переработки виджетов учёта.
 - **ExtraStickerLogForm для extras** (R14.7 отложено): inline-форма в ExtraStickerBlock для записи лога с track='extra_stickers' per design. Сейчас R14.7 временно снял gate — менеджер сам решает когда жать «Завершить». Когда форма появится, gate в hasSubtaskLog вернётся.
-- **k24_orders RLS SELECT USING (true)** (code-review #5): известная дыра. Воркер через DevTools читает price_final/cost_total. Требует переписать SELECT через k24_get_orders_safe RPC. Отдельная сессия с e2e регрессией. Security phase 3.
-- **k24_plan_overrides SELECT открыт всем authenticated** (code-review #6): минорная утечка плана производства через DevTools для воркеров без view:planning. Требует переписать RLS с учётом роли.
+- ~~**k24_orders RLS SELECT USING (true)** (code-review #5)~~: **ЗАКРЫТО (security phase 3, 2026-07)**. Финансовые колонки (price_final/cost_*/markup/discount_pct/price_per_unit) читаются только через маскирующее view `k24_orders_full` (owner postgres, CASE по admin/manager) — миграция 071. Миграция 072 отзывает табличную SELECT-привилегию финколонок у authenticated (REVOKE + GRANT нефинансовых) — прямой DevTools-запрос и realtime-payload финансов закрыты. **Процесс для новых колонок k24_orders: (1) `GRANT SELECT (new_col)` если нефинансовая; (2) добавить в конец списка `CREATE OR REPLACE VIEW k24_orders_full`.**
+- ~~**k24_plan_overrides SELECT открыт всем authenticated** (code-review #6)~~: **ЗАКРЫТО (миграция 071)**. SELECT-политика следует за динамическим правом `view:planning` из k24_role_permissions.
 
 636 unit-тестов + e2e. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects` (DEBUG=* workaround).
 

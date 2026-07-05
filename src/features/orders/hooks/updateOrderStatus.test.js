@@ -160,16 +160,16 @@ describe('updateOrderStatus', () => {
       updateOrderStatus('order-1', 'print', 'pouring', { force: true })
     ).resolves.toBeUndefined()
 
-    const ordersQuery = mockSupabase._recentQueriesByTable['k24_orders']
-    // Last call to `from('k24_orders')` is for notifyBitrix select, but
-    // the update was performed on an earlier k24_orders query. Check the
-    // overall from() history to confirm an update happened.
-    const updatedCalls = mockSupabase.from.mock.calls.filter(([t]) => t === 'k24_orders')
-    expect(updatedCalls.length).toBeGreaterThanOrEqual(2) // at least update + notifyBitrix select
+    // Security phase 3: под admin (canSeeFinance) notifyBitrix читает финансы
+    // через маскирующее view k24_orders_full, а UPDATE статуса идёт по базовой
+    // k24_orders. Подтверждаем, что оба обращения произошли.
+    const orderUpdateCalls = mockSupabase.from.mock.calls.filter(([t]) => t === 'k24_orders')
+    expect(orderUpdateCalls.length).toBeGreaterThanOrEqual(1) // status update
+    const notifyQuery = mockSupabase._recentQueriesByTable['k24_orders_full']
+    expect(notifyQuery).toBeDefined() // notifyBitrix finance select via view
+    expect(notifyQuery.select).toHaveBeenCalled()
     // history insert was called on the right table
     expect(mockSupabase._recentQueriesByTable['k24_order_status_history']).toBeDefined()
-    // sanity: the most-recent k24_orders query did call .select (notifyBitrix)
-    expect(ordersQuery.select).toHaveBeenCalled()
   })
 
   it('with { isRollback: true } skips route + STAGES_REQUIRING_COMPLETION RPC (cutting → print)', async () => {

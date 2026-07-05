@@ -3,6 +3,14 @@ import { Link } from 'react-router-dom'
 import Modal from '@/shared/components/Modal'
 import { formatOrderNumber } from '@/shared/lib/utils'
 
+// Погонные метры суммируются как float → накапливается ошибка представления
+// (59.3 → 59.30000000000900084) и цифра вылезает за плитку. Округляем до 1
+// знака при выводе; целые (штуки) остаются целыми.
+function fmtMetric(n) {
+  const r = Math.round((Number(n) || 0) * 10) / 10
+  return String(r)
+}
+
 /**
  * 4 production-виджета на AnalyticsPage: залито / выбрано / собрано / упаковано.
  * Каждый кликабельный → Modal с табами «По заказам» / «По сотрудникам».
@@ -61,7 +69,7 @@ export function ProductionWidgets({ productionTotals }) {
               onClick={() => setOpenOp(t.op)}
               className={`${t.bg} rounded-xl p-3 text-left transition-all hover:ring-2 hover:ring-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
             >
-              <p className={`text-2xl font-bold font-display tracking-tight ${t.fg}`}>{value}</p>
+              <p className={`text-2xl font-bold font-display tracking-tight tabular-nums break-all ${t.fg}`}>{fmtMetric(value)}</p>
               <p className="text-xs text-text-muted">{t.label}</p>
               <p className="text-[10px] text-text-muted mt-1 opacity-60">— открыть</p>
             </button>
@@ -133,7 +141,7 @@ function ProductionDetailsModal({ label, unit, byOrder, byWorker, ordersById, on
                   #{o.order ? formatOrderNumber(o.order) : o.orderId.slice(0, 6)}
                   {o.order?.client?.name && <span className="text-text-muted text-xs ml-2">{o.order.client.name}</span>}
                 </Link>
-                <span className="text-text-muted tabular-nums whitespace-nowrap">{o.count} {unit}</span>
+                <span className="text-text-muted tabular-nums whitespace-nowrap">{fmtMetric(o.count)} {unit}</span>
               </li>
             ))}
           </ul>
@@ -148,7 +156,7 @@ function ProductionDetailsModal({ label, unit, byOrder, byWorker, ordersById, on
             {workersList.map((w) => (
               <li key={w.workerId} className="flex items-center justify-between gap-3 py-1.5 border-b border-border last:border-0">
                 <span className="font-medium text-text truncate">{w.name}</span>
-                <span className="text-text-muted tabular-nums whitespace-nowrap">{w.count} {unit}</span>
+                <span className="text-text-muted tabular-nums whitespace-nowrap">{fmtMetric(w.count)} {unit}</span>
               </li>
             ))}
           </ul>

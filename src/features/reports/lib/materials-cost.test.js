@@ -84,4 +84,29 @@ describe('costForOrder (R20.2: приоритет позиции склада)',
     }
     expect(costForOrder(row, costMap).film).toBe(10 * 230)
   })
+
+  it('ревью 05.07: выбрана только позиция фонов — метры плёнки стикеров НЕ ценятся по ней', () => {
+    // 3D-пак: film_material_id задан (фоны, 150 ₽/м), film_stickers_material_id
+    // NULL. Раньше все 15 м (включая 5 м стикеров кода M) шли по 150 ₽ —
+    // теперь стикеры падают на legacy-фолбэк material_code (M = 230).
+    const row = {
+      film_type: 'G', film_type_stickers: 'M',
+      actual_film: 15, actual_film_by_type: { G: 10, M: 5 },
+      film_material: { unit_cost: 150 },
+      film_stickers_material: null,
+      actual_lam_by_type: {}, actual_resin: 0, boxes_used: 0,
+    }
+    expect(costForOrder(row, costMap).film).toBe(10 * 150 + 5 * 230)
+  })
+
+  it('ревью 05.07: одинаковый код двух треков — метры не различимы, идут по позиции фонов', () => {
+    const row = {
+      film_type: 'G', film_type_stickers: 'G',
+      actual_film: 12, actual_film_by_type: { G: 12 },
+      film_material: { unit_cost: 150 },
+      film_stickers_material: { unit_cost: 999 },
+      actual_lam_by_type: {}, actual_resin: 0, boxes_used: 0,
+    }
+    expect(costForOrder(row, costMap).film).toBe(12 * 150)
+  })
 })

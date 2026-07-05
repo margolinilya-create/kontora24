@@ -360,6 +360,23 @@ export default function CreateOrderPage() {
         return
       }
     }
+    // R19 ревью 05.07: номера спец-стикеров — дубли и выход за диапазон раньше
+    // молча проходили (update по несуществующему design_index трогает 0 строк,
+    // форма «не сохранялась» без сигнала; при дубле один из видов оставался standard).
+    if (isStickerpack3D && validStickerTypes.length > 0) {
+      const totalInPack = (Number(values.stickers_per_pack) || 0) + validStickerTypes.length
+      const nums = validStickerTypes.map((t) => Number(t.number))
+      const dupes = [...new Set(nums.filter((n, i) => nums.indexOf(n) !== i))]
+      if (dupes.length > 0) {
+        toast.error(`Номера спец-стикеров повторяются: ${dupes.join(', ')}`)
+        return
+      }
+      const outOfRange = nums.filter((n) => n < 1 || n > totalInPack)
+      if (outOfRange.length > 0) {
+        toast.error(`Номер спец-стикера вне диапазона 1–${totalInPack}: ${outOfRange.join(', ')}`)
+        return
+      }
+    }
     // R11.4: если на складе не хватает заявленных материалов — спросить подтверждение.
     if (shortages.length > 0) {
       setPendingShortageValues(values)

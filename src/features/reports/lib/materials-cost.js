@@ -49,23 +49,27 @@ export function costForOrder(row, costMap) {
   const stickersUnit = Number(row.film_stickers_material?.unit_cost) || 0
 
   let film = 0
-  if (filmUnit > 0 && stickersUnit > 0 && row.film_type_stickers && row.film_type_stickers !== row.film_type) {
-    // 3D-пак с разными плёнками фонов/стикеров: метры разделены по кодам треков.
-    for (const [code, m] of Object.entries(row.actual_film_by_type || {})) {
-      const unit = code === row.film_type_stickers ? stickersUnit : filmUnit
+  const filmByType = Object.entries(row.actual_film_by_type || {})
+  if (filmByType.length > 0) {
+    // Метры разделены по кодам треков (для 3D-пака стикеры падают в
+    // film_type_stickers). Каждый код ценится своей позицией: стикеры —
+    // film_stickers_material, остальное — film_material; при отсутствии
+    // выбранной позиции — legacy-фолбэк по material_code. Раньше при
+    // выбранной только позиции фонов ВСЕ метры (включая плёнку стикеров
+    // другого типа) умножались на unit_cost фонов (ревью 05.07).
+    // Ограничение: при film_type_stickers === film_type метры двух треков
+    // сливаются в один код — различить позиции невозможно, идём по film_material.
+    const isStickersCode = (code) =>
+      row.film_type_stickers && code === row.film_type_stickers && row.film_type_stickers !== row.film_type
+    for (const [code, m] of filmByType) {
+      const unit = isStickersCode(code)
+        ? (stickersUnit > 0 ? stickersUnit : (costMap.byCode[code] || 0))
+        : (filmUnit > 0 ? filmUnit : (costMap.byCode[code] || 0))
       film += (Number(m) || 0) * unit
     }
   } else if (filmUnit > 0) {
-    // Одна выбранная плёнка — все метры по её цене.
+    // Нет разбивки по типам (легаси-агрегат) — все метры по выбранной позиции.
     film = (Number(row.actual_film) || 0) * filmUnit
-  } else {
-    // Legacy-фолбэк по material_code (+ плёнка стикеров по позиции, если выбрана только она).
-    for (const [code, m] of Object.entries(row.actual_film_by_type || {})) {
-      const unit = (stickersUnit > 0 && code === row.film_type_stickers)
-        ? stickersUnit
-        : (costMap.byCode[code] || 0)
-      film += (Number(m) || 0) * unit
-    }
   }
 
   let lam = 0

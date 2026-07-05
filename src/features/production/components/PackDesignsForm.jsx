@@ -4,6 +4,8 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { computeIncomingPerDesign } from '../lib/production-logs'
 import { STICKER_SHAPES } from '@/shared/constants'
+import { generateUuid } from '@/shared/lib/uuid'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 
 /**
  * Виджет ввода по видам стикеров для 3D-стикерпака.
@@ -57,6 +59,10 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
   // которая записывает все непустые ряды одной транзакцией.
   const [savingAll, setSavingAll] = useState(false)
   const [editingNameId, setEditingNameId] = useState(null)
+  // Форма стикера определяет ставку заливки — менять её могут только роли с
+  // order:edit (ревью 05.07: работник мог поднять себе ставку на 2× прямо из
+  // формы заливки; в БД это же правило держит триггер protect_pack_design_shape).
+  const canEditShape = useCanDo('order:edit')
 
   // Persist drafts to sessionStorage по (orderId, stage). При смене заказа/этапа
   // — другой ключ, старые drafts остаются в storage (изолированно) до закрытия вкладки.
@@ -109,7 +115,7 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
       const value = Number(draft.value || 0)
       const defects = labels.showDefects ? Number(draft.defects || 0) : 0
       if (value === 0 && defects === 0) continue
-      const logId = draft.logId || globalThis.crypto?.randomUUID?.() || null
+      const logId = draft.logId || generateUuid()
       draftsWithIds[d.design_index] = { ...draft, logId }
       pending.push({ designIndex: d.design_index, payload: { value, defects, logId } })
     }
@@ -234,7 +240,7 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
               </div>
               <div className="flex items-center gap-2">
                 {/* R19: форма стикера (влияет на ставку заливки) */}
-                {updateShape && (
+                {updateShape && canEditShape ? (
                   <select
                     value={d.shape_type || 'standard'}
                     disabled={readOnly}
@@ -249,7 +255,11 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
                       <option key={key} value={key}>{s.label}</option>
                     ))}
                   </select>
-                )}
+                ) : (d.shape_type && d.shape_type !== 'standard' && (
+                  <span className="text-xs text-text-muted" title="Форма стикера">
+                    {STICKER_SHAPES[d.shape_type]?.label || d.shape_type}
+                  </span>
+                ))}
                 <span className={`text-xs ${isComplete ? 'text-success font-medium' : 'text-text-muted'}`}>
                   {total} / {d.qty_target} ({pct}%)
                 </span>

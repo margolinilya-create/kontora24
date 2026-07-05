@@ -602,7 +602,7 @@ Kontora24 — внутренний инструмент для 6 сотрудн�
 - **OrderStepper визуальное раздвоение** (фидбэк #5): после prepress показывать две параллельные линии чипов (Фон/Стикер) до assembly_3d. Текущий степпер — одна линия, подзадачи отдельным блоком SubtaskTrackBlock.
 - **Mobile UX переключатель подзадач** (Tabs/Dropdown): зависит от полной переработки виджетов учёта.
 - **ExtraStickerLogForm для extras** (R14.7 отложено): inline-форма в ExtraStickerBlock для записи лога с track='extra_stickers' per design. Сейчас R14.7 временно снял gate — менеджер сам решает когда жать «Завершить». Когда форма появится, gate в hasSubtaskLog вернётся.
-- ~~**k24_orders RLS SELECT USING (true)** (code-review #5)~~: **ЗАКРЫТО (security phase 3, 2026-07)**. Финансовые колонки (price_final/cost_*/markup/discount_pct/price_per_unit) читаются только через маскирующее view `k24_orders_full` (owner postgres, CASE по admin/manager) — миграция 071. Миграция 072 отзывает табличную SELECT-привилегию финколонок у authenticated (REVOKE + GRANT нефинансовых) — прямой DevTools-запрос и realtime-payload финансов закрыты. **Процесс для новых колонок k24_orders: (1) `GRANT SELECT (new_col)` если нефинансовая; (2) добавить в конец списка `CREATE OR REPLACE VIEW k24_orders_full`.**
+- ~~**k24_orders RLS SELECT USING (true)** (code-review #5)~~: **ЗАКРЫТО (security phase 3, шаг B применён 2026-07-05)**. Финансовые колонки (price_final/cost_*/markup/discount_pct/price_per_unit) читаются только через маскирующее view `k24_orders_full` (owner postgres, CASE по праву view:finance) — миграция 071. Миграция 072 (применена в прод 05.07) отозвала табличную SELECT-привилегию у authenticated и все гранты у anon, вернула колоночный GRANT на 53 нефинансовые колонки — прямой DevTools-запрос финансов закрыт (проверено по information_schema.column_privileges). Остаточная realtime-утечка (walrus авторизует по row-RLS, не по колоночным привилегиям) сохраняется — приложение финансы из realtime не читает; полное закрытие — отдельная задача. **Процесс для новых колонок k24_orders: (1) `GRANT SELECT (new_col) ON k24_orders TO authenticated` если нефинансовая — иначе воркерский запрос упадёт 42501; (2) добавить в конец списка `CREATE OR REPLACE VIEW k24_orders_full`.**
 - ~~**k24_plan_overrides SELECT открыт всем authenticated** (code-review #6)~~: **ЗАКРЫТО (миграция 071)**. SELECT-политика следует за динамическим правом `view:planning` из k24_role_permissions.
 
 636 unit-тестов + e2e. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects` (DEBUG=* workaround).
@@ -713,6 +713,26 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 - **k24_orders RLS SELECT** — известная дыра R14.8+ open question, security phase 3.
 
 645 unit-тестов. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects` (DEBUG=* workaround).
+
+## R21 — Аудит 05.07 (полная проверка + фиксы, 4 миграции)
+
+Полный аудит по запросу «проверь все»: lint/tests/build зелёные, ревью R19/R20/security phase 3 двумя агентами, Supabase advisors, сверка репо↔прод. Главная находка: CLAUDE.md заявлял миграцию 072 применённой, а в проде её не было — финколонки читались воркером из DevTools. Все находки закрыты одной серией:
+
+| Что | Где |
+|-----|-----|
+| **072** — REVOKE финколонок k24_orders (см. блок R14 выше — теперь реально применена) | [072_orders_finance_revoke.sql](supabase/migrations/072_orders_finance_revoke.sql) |
+| **073** — check_stage_completion: target multi-variant = SUM(k24_order_items.qty) при items>1; все SUM по production_logs фильтруют `deleted_at IS NULL` | [073_completion_multivariant_and_deleted.sql](supabase/migrations/073_completion_multivariant_and_deleted.sql) |
+| **074** — смена формы стикера (ставка заливки) только с правом `order:edit`: триггер на k24_pack_designs.shape_type + sticker_shape добавлен в k24_protect_order_columns. Работник больше не может поднять себе ставку из формы заливки. UI: селект формы в PackDesignsForm скрыт без order:edit | [074_protect_sticker_shape.sql](supabase/migrations/074_protect_sticker_shape.sql), [PackDesignsForm.jsx](src/features/production/components/PackDesignsForm.jsx) |
+| **075** — гигиена: 5 дублей индексов дропнуты; UPDATE-политики k24_orders консолидированы в одну (ушла легаси-роль assembler, designer сохранён); `REVOKE EXECUTE ... FROM anon` на все функции public + default privileges; удалены public-политики PinheadOS `foto i1iz3l_*` на sku-photos (бакет с 4 файлами остался — удаление за владельцем) | [075_db_hygiene.sql](supabase/migrations/075_db_hygiene.sql) |
+| Отчёты: `.is('deleted_at', null)` в useBonusReport/useEmployeeReport/useQualityReport (удалённый лог больше не оплачивается); фолбэк ставок дополнен pouring_shapes (синхрон с WORKER_RATES); targetStickers/излишки multi-variant = сумма qty видов | [useReports.js](src/features/reports/hooks/useReports.js) |
+| costForOrder: метры плёнки стикеров 3D-пака больше не ценятся по позиции фонов — per-code разбор с фолбэком на material_code; ограничение film_type_stickers===film_type задокументировано | [materials-cost.js](src/features/reports/lib/materials-cost.js) |
+| OrderProgressTab: order-level линии на VARIANT_STAGES при multi-variant исключают per-item логи (`excludeItemLogs`) — «Напечатано 300/100» ушло | [OrderProgressTab.jsx](src/features/orders/components/OrderProgressTab.jsx) |
+| VariantLogForm/PackDesignsForm: общий `generateUuid()` (getRandomValues-фолбэк для старых WebView — идемпотентный ретрай работает и там); правка значений драфта сбрасывает `_logId` (повтор после потерянного ответа больше не выбрасывает новые цифры молча) + открепляет коробку-носителя | [uuid.js](src/shared/lib/uuid.js), [VariantLogForm.jsx](src/features/production/components/VariantLogForm.jsx) |
+| CreateOrderPage: валидация номеров спец-стикеров (дубли/диапазон 1–N) до submit; applyPackShapes детектит update с 0 строк через `.select('id')` | [CreateOrderPage.jsx](src/features/orders/pages/CreateOrderPage.jsx), [usePackDesigns.js](src/features/production/hooks/usePackDesigns.js) |
+| computeIncoming пропускает sample_print (метры образца ≠ штуки — класс бага prepress); бейдж item_idx в истории — «Размер #N» (не путается с дизайн-видом) | [production-logs.js](src/features/production/lib/production-logs.js), [ProductionLogHistory.jsx](src/features/production/components/logs/ProductionLogHistory.jsx) |
+| security-тест: проверка «нет прямого чтения финансов из k24_orders» видит многострочные select-цепочки и embed'ы (старый построчный grep был вакуумным) | [rls-policies.test.js](security/rls-policies.test.js) |
+
+**Осознанно отложено:** фиксация формы/ставки в логе на момент работы (ретроактивность легитимных смен формы менеджером); realtime-утечка финколонок (walrus); split себестоимости при одинаковом коде плёнок двух треков; удаление содержимого sku-photos (за владельцем); включение leaked password protection в Auth (дашборд, вручную).
 
 ## Обработка ошибок
 

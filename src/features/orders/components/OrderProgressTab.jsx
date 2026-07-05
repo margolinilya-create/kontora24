@@ -120,6 +120,15 @@ function getProgressLines(order, items) {
     lines.push({ key: 'packaging', stage: 'packaging', track: null, qtyField: 'packs_packaged', label: is3D ? 'Упаковано стикеров' : 'Упаковано' })
     pushItemLines('packaging')
   }
+  // Ревью 05.07: order-level линии на этапах с поэвидовым учётом не суммируют
+  // per-item логи — иначе «Напечатано» = сумма всех видов против target =
+  // тиража вида 1 (например 300/100 = 300%). Им остаются только легаси-логи
+  // без item_idx; поэвидовые линии выше считают каждая свой вид.
+  if (isMultiVariant) {
+    for (const l of lines) {
+      if (l.itemIdx == null && VARIANT_LINE[l.stage]) l.excludeItemLogs = true
+    }
+  }
   return lines
 }
 
@@ -146,6 +155,7 @@ function aggregateLine(logs, line) {
   if (line.track) stageLogs = stageLogs.filter((l) => l.track === line.track)
   // R20.5: per-вид линии считают только логи своего размерного вида.
   if (line.itemIdx != null) stageLogs = stageLogs.filter((l) => l.item_idx === line.itemIdx)
+  if (line.excludeItemLogs) stageLogs = stageLogs.filter((l) => l.item_idx == null)
   const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[line.qtyField]) || 0), 0)
   const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
   const total = SUBTRACT_DEFECTS_STAGES.has(line.stage) ? Math.max(0, totalRaw - defects) : totalRaw

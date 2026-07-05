@@ -3,7 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfMonth, startOfDay, endOfDay, format, parseISO } from 'date-fns'
-import { calculateWorkerPayout, settingsToRates } from '@/shared/constants'
+import { calculateWorkerPayout, settingsToRates, WORKER_RATES } from '@/shared/constants'
 import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog, pouringRateForShape } from '@/shared/lib/payout-context'
 
 // R13.3 (бриф 02.06): период расширен — `today` (с начала дня), `custom:from:to`
@@ -191,7 +191,15 @@ export function useOrdersCostReport(period = '30') {
         // qty × stickers_per_pack (qty у пака — число паков, а заливка — штучная),
         // для остальных типов тираж = qty. % — от тиража (решение пользователя).
         const isPack = o.order_type === 'stickerpack' || o.order_type === 'stickerpack3D'
-        const targetStickers = isPack ? (o.qty || 0) * (Number(o.stickers_per_pack) || 1) : (o.qty || 0)
+        // Multi-variant (R20.5): произведённое суммируется по всем размерным
+        // видам, поэтому и база тиража = сумма qty видов (o.qty — тираж вида 1).
+        // Для single-variant items может рассинхронизироваться с o.qty после
+        // ручной правки заказа (триггер 038 не обновляет item) — берём o.qty.
+        const orderItems = itemsByOrder[o.id] || []
+        const baseQty = orderItems.length > 1
+          ? orderItems.reduce((s, it) => s + (Number(it.qty) || 0), 0)
+          : (o.qty || 0)
+        const targetStickers = isPack ? baseQty * (Number(o.stickers_per_pack) || 1) : baseQty
         const surplus = lg.stickers_poured > 0 && targetStickers > 0 ? lg.stickers_poured - targetStickers - dryingDefects : 0
         const surplusPct = targetStickers > 0 ? Math.round((surplus / targetStickers) * 100) : 0
         // Стоимость труда — фактический сдельный расчёт по всем логам заказа
@@ -247,6 +255,7 @@ export function useBonusReport(period = '30') {
       const [logsRes, ratesRes] = await Promise.all([
         supabase.from('k24_production_logs')
           .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack, sticker_shape)')
+          .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
@@ -254,8 +263,11 @@ export function useBonusReport(period = '30') {
       // ratesRes.error может быть PGRST116 (no rows) — это норм, используем default rates
       if (ratesRes.error && ratesRes.error.code !== 'PGRST116') throw ratesRes.error
 
+      // Фолбэк синхронизирован с WORKER_RATES: без pouring_shapes сложные формы
+      // оплачивались бы по 1 ₽, расходясь с calculateWorkerPayout (Unit Economics).
       const rates = ratesRes.data?.value || {
         pouring: 1, assembly_3d: 0.5, packaging: 1.5, selection: 0.5,
+        pouring_shapes: WORKER_RATES.pouring_by_shape,
       }
       // R19: формы стикеров для дифф. оплаты заливки.
       const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
@@ -324,6 +336,7 @@ export function useEmployeeReport(period = '30') {
           .gte('started_at', getSince(period)).lte('started_at', getUntil(period) ?? '9999-12-31T23:59:59Z'),
         supabase.from('k24_production_logs')
           .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack, sticker_shape)')
+          .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
@@ -332,7 +345,10 @@ export function useEmployeeReport(period = '30') {
       if (logsRes.error) throw logsRes.error
       if (ratesRes.error && ratesRes.error.code !== 'PGRST116') throw ratesRes.error
 
-      const rates = ratesRes.data?.value || { pouring: 1, assembly_3d: 0.5, packaging: 1.5, selection: 0.5 }
+      const rates = ratesRes.data?.value || {
+        pouring: 1, assembly_3d: 0.5, packaging: 1.5, selection: 0.5,
+        pouring_shapes: WORKER_RATES.pouring_by_shape,
+      }
       // R19: формы стикеров для дифф. оплаты заливки.
       const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
       const orderShape = orderShapeFromLogs(logsRes.data)
@@ -406,6 +422,7 @@ export function useQualityReport(period = '30') {
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').order('number').limit(500),
         supabase.from('k24_production_logs')
           .select('order_id, stickers_printed, stickers_poured, stickers_good')
+          .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
       ])
       if (ordersRes.error) throw ordersRes.error

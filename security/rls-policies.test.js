@@ -159,14 +159,34 @@ describe('Security phase 3: маскирование финансов k24_orders
 
   it('фронт НЕ читает финансовые колонки напрямую из k24_orders (только через view)', () => {
     const { execSync } = require('child_process')
-    // Ищем финансовые колонки в .from('k24_orders').select(...) без _full.
-    // Разрешено: k24_orders_full, embed order:k24_orders(...) без финансов.
-    const hits = execSync(
-      `grep -rn "from('k24_orders')" src/ || true`,
+    const finRe = /price_final|cost_total|cost_labor|cost_materials|markup|discount_pct|price_per_unit/
+    // Ревью 05.07: старый построчный grep не видел многострочные select'ы
+    // (типичный стиль кодовой базы — .select(...) следующей строкой после
+    // .from('k24_orders')). Теперь смотрим окно после каждого вызова + все
+    // embed'ы k24_orders!fk(...). После миграции 072 такое чтение упало бы
+    // 42501 — тест ловит регресс до прода.
+    const files = execSync(
+      `grep -rl "k24_orders" src/ --include="*.js" --include="*.jsx" || true`,
       { encoding: 'utf-8' },
-    )
-    // Ни одна строка с from('k24_orders') не должна содержать price_final/cost_*.
-    const leaky = hits.split('\n').filter((l) => /price_final|cost_total|cost_labor|cost_materials|markup|discount_pct|price_per_unit/.test(l))
-    expect(leaky, `финансы читаются напрямую из таблицы:\n${leaky.join('\n')}`).toHaveLength(0)
+    ).split('\n').filter(Boolean)
+    const leaks = []
+    for (const f of files) {
+      const src = readFileSync(resolve(process.cwd(), f), 'utf-8')
+      // 1) .from('k24_orders') — проверяем 600 символов после вызова (цепочка
+      // .select(...) укладывается в это окно). 'k24_orders_full' не матчится —
+      // литерал требует закрывающей кавычки сразу после s.
+      const fromRe = /from\('k24_orders'\)/g
+      let m
+      while ((m = fromRe.exec(src))) {
+        const windowStr = src.slice(m.index, m.index + 600)
+        if (finRe.test(windowStr)) leaks.push(`${f}: from('k24_orders') с финколонкой в select-цепочке`)
+      }
+      // 2) embed order:k24_orders!fk(колонки)
+      const embedRe = /k24_orders!\w+\(([^)]*)\)/g
+      while ((m = embedRe.exec(src))) {
+        if (finRe.test(m[1])) leaks.push(`${f}: embed k24_orders!(…) с финколонкой: ${m[1].trim().slice(0, 80)}`)
+      }
+    }
+    expect(leaks, `финансы читаются напрямую из таблицы:\n${leaks.join('\n')}`).toHaveLength(0)
   })
 })

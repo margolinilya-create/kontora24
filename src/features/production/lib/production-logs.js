@@ -283,7 +283,10 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
   // (ревью фиксов QA 04.07).
   for (let i = idx - 1; i >= 0; i--) {
     const prev = route[i]
-    if (prev === 'prepress') continue
+    // sample_print пропускаем по той же причине: его sample_film_meters —
+    // метры плёнки образца, не штуки (лог сейчас не пишется — SamplePrintWidget
+    // сохраняет только фото, но поле живо в STAGE_FIELDS).
+    if (prev === 'prepress' || prev === 'sample_print') continue
     const cfg = STAGE_FIELDS[prev]
     if (!cfg) continue
     // На предыдущем этапе считаем по его quantityField и трек-фильтру.

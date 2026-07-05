@@ -4,6 +4,7 @@ import Input from '@/shared/components/Input'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { FILM_TYPES } from '@/shared/constants'
+import { generateUuid } from '@/shared/lib/uuid'
 import { usePackagingMaterials } from '../hooks/usePackagingMaterials'
 import { STAGE_FIELDS, computeStageProgressPerItem, computeIncomingPerItem } from '../lib/production-logs'
 
@@ -45,7 +46,23 @@ function VariantLogFormImpl({ items, logs = [], stage, route, order, onSubmitIte
   }, [drafts])
 
   function setField(itemIdx, key, value) {
-    setDrafts((p) => ({ ...p, [itemIdx]: { ...(p[itemIdx] || {}), [key]: value } }))
+    setDrafts((p) => {
+      const prev = p[itemIdx] || {}
+      const next = { ...prev, [key]: value }
+      // Правка значений = новый лог: сбрасываем клиентский PK, иначе повтор
+      // после потерянного ответа упрётся в 23505 и молча выбросит новые цифры,
+      // показав «Сохранено» со старыми данными в БД (ревью 05.07). Цена —
+      // редкий дубль, если insert на самом деле прошёл: он виден в истории
+      // и удаляется, тогда как тихая потеря правки невидима.
+      delete next._logId
+      const out = { ...p, [itemIdx]: next }
+      // Если этот вид был носителем коробки — открепляем, чтобы коробка
+      // не потерялась при пересборке pending с новым PK.
+      if (prev._logId && p._materials?._boxLogId === prev._logId) {
+        out._materials = { ...p._materials, _boxLogId: null }
+      }
+      return out
+    })
   }
   function setMaterial(key, value) {
     setDrafts((p) => ({ ...p, _materials: { ...(p._materials || {}), [key]: value } }))
@@ -67,9 +84,9 @@ function VariantLogFormImpl({ items, logs = [], stage, route, order, onSubmitIte
     // драфте (sessionStorage) до подтверждённого успеха — переживает вторую
     // волну, ручной повтор по тосту и reload. Повтор с тем же PK упирается
     // в 23505 вместо создания дубля, который завысил бы прогресс, сдельную
-    // оплату И задвоил списание коробок/БОПП (триггер 031). Guard: на старых
-    // WebView randomUUID нет — тогда без id (как раньше), Math.random-фолбэк
-    // не годится для uuid-колонки.
+    // оплату И задвоил списание коробок/БОПП (триггер 031). generateUuid
+    // покрывает и старые WebView (getRandomValues-фолбэк); без crypto вовсе —
+    // идём без id, как до фикса.
     const pending = []
     const draftsWithIds = { ...drafts }
     for (const it of items) {
@@ -88,7 +105,7 @@ function VariantLogFormImpl({ items, logs = [], stage, route, order, onSubmitIte
         if (num > 0) hasValue = true
       }
       if (!hasValue) continue
-      const logId = d._logId || globalThis.crypto?.randomUUID?.() || null
+      const logId = d._logId || generateUuid()
       draftsWithIds[it.idx] = { ...d, _logId: logId }
       if (logId) values.id = logId
       pending.push({ idx: it.idx, values })

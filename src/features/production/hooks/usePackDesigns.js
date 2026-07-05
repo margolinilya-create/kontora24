@@ -114,17 +114,24 @@ export function usePackDesigns(orderId) {
  */
 export async function applyPackShapes(orderId, shapes) {
   if (!orderId || !Array.isArray(shapes) || shapes.length === 0) return
+  const targets = shapes.filter((s) => s && s.shape && s.shape !== 'standard' && s.design_index > 0)
   const results = await Promise.allSettled(
-    shapes
-      .filter((s) => s && s.shape && s.shape !== 'standard' && s.design_index > 0)
-      .map((s) =>
-        supabase
-          .from('k24_pack_designs')
-          .update({ shape_type: s.shape })
-          .eq('order_id', orderId)
-          .eq('design_index', s.design_index)
-      )
+    targets.map((s) =>
+      supabase
+        .from('k24_pack_designs')
+        .update({ shape_type: s.shape })
+        .eq('order_id', orderId)
+        .eq('design_index', s.design_index)
+        // Ревью 05.07: без .select() update по несуществующему design_index
+        // трогает 0 строк и не считается ошибкой — форма «терялась» молча.
+        .select('id')
+    )
   )
-  const failed = results.filter((r) => r.status === 'rejected' || r.value?.error)
-  if (failed.length) throw new Error(`Не удалось сохранить форму ${failed.length} стикер(ов)`)
+  const failed = []
+  results.forEach((r, i) => {
+    if (r.status === 'rejected' || r.value?.error || !(r.value?.data?.length > 0)) {
+      failed.push(targets[i].design_index)
+    }
+  })
+  if (failed.length) throw new Error(`Не удалось сохранить форму стикеров №${failed.join(', ')} — проверьте номера видов`)
 }

@@ -14,7 +14,7 @@ const EMPTY_FILM = { manufacturer: '', product_line: '', roll_width_m: '', finis
 
 export function MaterialForm({ onClose, onCreated }) {
   const [form, setForm] = useState({
-    type: 'film', name: '', unit: 'м', stockQty: 0, minQty: 0, unitCost: 0, ...EMPTY_FILM,
+    type: 'film', name: '', unit: 'м', stockQty: 0, minQty: 0, unitCost: 0, supplier: '', ...EMPTY_FILM,
   })
   const [loading, setLoading] = useState(false)
 
@@ -42,6 +42,7 @@ export function MaterialForm({ onClose, onCreated }) {
       await createMaterial({
         type: form.type, name, unit: form.unit,
         stockQty: form.stockQty, minQty: form.minQty, unitCost: form.unitCost,
+        supplier: form.supplier || null,
         ...(isFilm ? {
           manufacturer: form.manufacturer || null,
           product_line: form.product_line || null,
@@ -105,6 +106,14 @@ export function MaterialForm({ onClose, onCreated }) {
             autoFocus
           />
         )}
+
+        <Input
+          label="Поставщик"
+          id="mat-supplier"
+          value={form.supplier}
+          onChange={(e) => update('supplier', e.target.value)}
+          placeholder="У кого закупаем"
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <Input

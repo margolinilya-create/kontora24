@@ -56,7 +56,7 @@ export function FilmFields({ value, onChange }) {
           </datalist>
         </div>
         <div>
-          <label htmlFor="film-finish" className="block text-sm font-medium text-text mb-1">Финиш</label>
+          <label htmlFor="film-finish" className="block text-sm font-medium text-text mb-1">Поверхность</label>
           <select
             id="film-finish"
             value={value.finish ?? ''}

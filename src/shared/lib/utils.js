@@ -34,6 +34,20 @@ export function formatNumber(n, decimals = 2) {
   }).format(n)
 }
 
+// Количество (метры / граммы / штуки) для отображения. Гасит float-шум
+// накопленных сумм (59.30000000000900084 → «59,3») и добавляет разрядные
+// пробелы. В отличие от formatNumber, null/NaN → «0» (для метрик пустота
+// это ноль, а не прочерк). decimals=1 подходит метрам/граммам; для штук
+// передавай decimals=0.
+export function formatQty(n, decimals = 1) {
+  const num = Number(n)
+  if (!Number.isFinite(num)) return '0'
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  }).format(num)
+}
+
 export function cn(...classes) {
   return classes.filter(Boolean).join(' ')
 }

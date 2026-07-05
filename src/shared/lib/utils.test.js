@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatDate, formatDateTime, formatPrice, formatNumber, cn, formatOrderNumber, formatOrderNumberShort, orderFileSlug } from './utils'
+import { formatDate, formatDateTime, formatPrice, formatNumber, formatQty, cn, formatOrderNumber, formatOrderNumberShort, orderFileSlug } from './utils'
 
 describe('formatDate', () => {
   it('formats a valid date string', () => {
@@ -64,6 +64,33 @@ describe('formatPrice', () => {
     const result = formatPrice(1500000)
     // Russian locale uses non-breaking space as thousands separator
     expect(result.replace(/\s/g, '')).toContain('1500000')
+  })
+})
+
+describe('formatQty', () => {
+  // Intl ru-RU разделяет разряды неразрывным пробелом — нормализуем к обычному.
+  const norm = (s) => s.replace(/\s/g, ' ')
+
+  it('гасит float-шум накопленной суммы', () => {
+    // 0.1 + 0.2 === 0.30000000000000004 — классический float-хвост.
+    expect(formatQty(0.1 + 0.2, 1)).toBe('0,3')
+    // накопление метров: сумма даёт длинный хвост, округляем до 1 знака.
+    const noisy = Array(3).fill(19.766666666667).reduce((a, b) => a + b, 0)
+    expect(formatQty(noisy, 1)).toBe('59,3')
+  })
+
+  it('целые метрики без дробной части', () => {
+    expect(norm(formatQty(30260, 1))).toBe('30 260')
+  })
+
+  it('null/undefined/NaN → «0» (не прочерк)', () => {
+    expect(formatQty(null)).toBe('0')
+    expect(formatQty(undefined)).toBe('0')
+    expect(formatQty(NaN)).toBe('0')
+  })
+
+  it('decimals=0 округляет до целого', () => {
+    expect(norm(formatQty(21124.6, 0))).toBe('21 125')
   })
 })
 

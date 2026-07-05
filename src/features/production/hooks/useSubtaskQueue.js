@@ -33,9 +33,14 @@ export function useSubtaskQueue(stage) {
       return
     }
     setLoading(true)
+    // Явный НЕфинансовый список колонок заказа вместо `order:...(*)`:
+    // (1) embed `*` отдавал воркерским очередям все финансовые колонки —
+    // живая утечка (security phase 3); (2) после миграции 072 `*` на
+    // k24_orders вернул бы 42501, а ошибка здесь проглатывается (setItems([]))
+    // → подзадачи молча исчезли бы из очередей.
     const { data, error } = await supabase
       .from('k24_order_subtasks')
-      .select('id, track, status, item_idx, order:k24_orders!order_id(*, client:k24_clients(name))')
+      .select('id, track, status, item_idx, order:k24_orders!order_id(id, number, custom_number, client_id, status, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, need_lam, design_status, priority, deadline, created_at, updated_at, assigned_to, created_by, bopp_bag, is_urgent, notes, deal_name, mockup_path, stickers_per_pack, design_variants, sticker_shape, client:k24_clients(name))')
       .in('status', allowed)
     if (error) {
       setItems([])

@@ -90,9 +90,12 @@ export function useOrders(filters = {}) {
     try {
       // Только поля, необходимые для списков/канбана/календаря/дашборда.
       // Полная карточка заказа подгружается через useOrderDetail.
+      // Финансовые колонки читаем ТОЛЬКО через маскирующее view k24_orders_full
+      // (security phase 3): на базовой таблице после миграции 072 их SELECT
+      // отозван. Воркер (без view:finance) ходит в таблицу без финколонок.
       const SELECT_LIST = `${LIST_FIELDS_BASE}${canSeeFinance ? LIST_FIELDS_FINANCE : ''}${LIST_RELATIONS}`
       let query = supabase
-        .from('k24_orders')
+        .from(canSeeFinance ? 'k24_orders_full' : 'k24_orders')
         .select(SELECT_LIST, { count: 'exact' })
 
       // Filters
@@ -198,10 +201,11 @@ export function useOrderDetail(id) {
     setLoading(true)
     setError(null)
     try {
+      // Финансы — через маскирующее view (см. useOrders списки выше).
       const detailSelect = `${DETAIL_FIELDS_BASE}${canSeeFinance ? DETAIL_FIELDS_FINANCE : ''}${DETAIL_RELATIONS}`
       const [orderRes, historyRes] = await Promise.all([
         supabase
-          .from('k24_orders')
+          .from(canSeeFinance ? 'k24_orders_full' : 'k24_orders')
           .select(detailSelect)
           .eq('id', id)
           .single(),
@@ -270,10 +274,14 @@ export async function createOrder(orderData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
+  // .select('id, number, custom_number') — не `.select()` (=RETURNING *):
+  // после миграции 072 финансовые колонки таблицы недоступны authenticated,
+  // RETURNING * упал бы 42501. Наверх нужны id (навигация) + number/
+  // custom_number (formatOrderNumber в тосте).
   const { data, error } = await supabase
     .from('k24_orders')
     .insert({ ...orderData, created_by: user.id, status: 'new' })
-    .select()
+    .select('id, number, custom_number')
     .single()
   if (error) throw error
 
@@ -404,7 +412,11 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
     const notifySelect = canSeeFinance
       ? 'number, bitrix_deal_id, price_final, cost_total'
       : 'number, bitrix_deal_id'
-    const { data: order } = await supabase.from('k24_orders').select(notifySelect).eq('id', orderId).single()
+    // Финансовую ветку читаем через маскирующее view (базовая таблица после
+    // 072 не отдаёт финколонки authenticated).
+    const { data: order } = await supabase
+      .from(canSeeFinance ? 'k24_orders_full' : 'k24_orders')
+      .select(notifySelect).eq('id', orderId).single()
     if (order?.bitrix_deal_id) {
       fetchWithRetry('/api/bitrix/status-update', {
         method: 'POST',

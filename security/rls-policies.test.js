@@ -136,3 +136,37 @@ describe('Security: RLS policy expectations', () => {
     expect(migrations).toContain('SECURITY DEFINER')
   })
 })
+
+describe('Security phase 3: маскирование финансов k24_orders', () => {
+  const financeCols = [
+    'cost_materials', 'cost_labor', 'cost_total',
+    'markup', 'discount_pct', 'price_final', 'price_per_unit',
+  ]
+
+  it('view k24_orders_full маскирует все 7 финансовых колонок через CASE', () => {
+    const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/071_orders_finance_masking_view.sql'), 'utf-8')
+    expect(sql).toContain('CREATE OR REPLACE VIEW public.k24_orders_full')
+    // Каждая финансовая колонка обёрнута в CASE по праву view:finance
+    // (динамическое L2, консистентно с фронтом useCanDo('view:finance')).
+    for (const col of financeCols) {
+      const re = new RegExp(`CASE WHEN EXISTS[\\s\\S]*?view:finance[\\s\\S]*?THEN o\\.${col} END AS ${col}`)
+      expect(sql, `нет маски для ${col}`).toMatch(re)
+    }
+    // view не должен раздавать доступ анониму
+    expect(sql).toMatch(/REVOKE ALL ON public\.k24_orders_full FROM PUBLIC, anon/)
+    expect(sql).toMatch(/GRANT SELECT ON public\.k24_orders_full TO authenticated/)
+  })
+
+  it('фронт НЕ читает финансовые колонки напрямую из k24_orders (только через view)', () => {
+    const { execSync } = require('child_process')
+    // Ищем финансовые колонки в .from('k24_orders').select(...) без _full.
+    // Разрешено: k24_orders_full, embed order:k24_orders(...) без финансов.
+    const hits = execSync(
+      `grep -rn "from('k24_orders')" src/ || true`,
+      { encoding: 'utf-8' },
+    )
+    // Ни одна строка с from('k24_orders') не должна содержать price_final/cost_*.
+    const leaky = hits.split('\n').filter((l) => /price_final|cost_total|cost_labor|cost_materials|markup|discount_pct|price_per_unit/.test(l))
+    expect(leaky, `финансы читаются напрямую из таблицы:\n${leaky.join('\n')}`).toHaveLength(0)
+  })
+})

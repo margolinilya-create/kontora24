@@ -95,7 +95,9 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       const [ordersRes, materialsRes, activityRes] = await Promise.all([
-        supabase.from('k24_orders').select('*, client:k24_clients(name)').order('created_at', { ascending: false }).limit(50),
+        // Через view: select('*') на таблице после миграции 072 → 42501.
+        // Дашборд — admin/manager (воркеры редиректятся в /cabinet).
+        supabase.from('k24_orders_full').select('*, client:k24_clients(name)').order('created_at', { ascending: false }).limit(50),
         supabase.from('k24_materials').select('*'),
         supabase.from('k24_order_status_history').select('*, changed_by_profile:k24_profiles!changed_by(display_name), order:k24_orders!order_id(number)').order('created_at', { ascending: false }).limit(15),
       ])

@@ -151,4 +151,11 @@ SavedFilters; календарь-вид заказов; PDF-отчёты каб�
 
 **Follow-ups (не в этом PR):** VariantLogForm — тот же batch-паттерн без идемпотентного ретрая, что был в PackDesignsForm (найдено ревью, верификация не завершилась); RPC `check_stage_completion` не имеет ветки для prepress (авто-предложение перехода на препрессе не появится); наблюдать звук `useProductionBoard` после оживления realtime; security phase 3 (RLS k24_orders / k24_plan_overrides).
 
+## Дополнение 05.07: follow-ups закрыты (отдельный PR)
+
+Все три follow-up'а из блока выше сделаны:
+- **VariantLogForm** получил идемпотентный авторетрай (клон PackDesignsForm: клиентский `logId`-PK в drafts до успеха, `23505`=успех — заодно исключает двойное списание коробок/БОПП).
+- **prepress-ветка в `check_stage_completion`** (миграция 070): для stickerpack3D — по `qty_planned` всех видов, для остальных — `SUM(prepared_qty) ≥ max(1, design_variants)`. Проверено на боевых заказах (5/5, 9/9, 0/5).
+- **Security phase 3** (миграции 071+072): финансовые колонки `k24_orders` читаются только через маскирующее view `k24_orders_full` (owner postgres, CASE по admin/manager); миграция 072 отзывает табличную SELECT-привилегию финколонок у authenticated — прямой DevTools-запрос и realtime-payload финансов закрыты. Серверно проверено: воркер видит NULL-финансы, менеджер — реальные (22423 ₽). `k24_plan_overrides` SELECT сужен до права `view:planning`. Принятый realtime-риск из PR #13 закрыт.
+
 *Все скрипты прогона — в некоммитимой папке `.qa/` (исключена через `.git/info/exclude`). Скриншоты — `docs/screenshots/qa-2026-07-04/` (48 файлов, включая доказательные: `bug-analytics-400.png`, `order-c-print-dualcards.png`, `techcard-ORD-0109.png`, `planner.png`).*

@@ -81,8 +81,11 @@ const EXPORT_LIMIT = 5000
 
 async function exportOrdersFull() {
   const [{ data: orders, error, count }, { data: logs, error: logsErr }] = await Promise.all([
+    // Через маскирующее view: select('*') на базовой таблице после миграции
+    // 072 упал бы 42501 (финколонки отозваны). На view '*' легален (грант
+    // цельный, финансы NULL для не-менеджера). Экспорт — admin/manager.
     supabase
-      .from('k24_orders')
+      .from('k24_orders_full')
       .select('*, client:k24_clients(name, phone), creator:k24_profiles!created_by(display_name), assignee:k24_profiles!assigned_to(display_name)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .limit(EXPORT_LIMIT),

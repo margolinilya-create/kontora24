@@ -84,7 +84,8 @@ export function useOrdersCostReport(period = '30') {
       // (R8.5 серии 25.05). Подтягиваем клиента, ламинацию, плёнку, оплату,
       // дедлайны, доставку — всё нужно для итоговых таблиц.
       const [ordersRes, logsRes, ratesRes] = await Promise.all([
-        supabase.from('k24_orders')
+        // Финансы — через маскирующее view k24_orders_full (security phase 3).
+        supabase.from('k24_orders_full')
           .select(`id, number, custom_number, order_type, qty, price_final,
                    cost_materials, cost_labor, cost_total, status,
                    created_at, deadline, width_mm, height_mm,

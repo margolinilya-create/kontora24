@@ -32,8 +32,12 @@ async function loadInitial(store) {
   try {
     // Активные заказы (исключаем done/cancelled — они не планируются)
     const [ordersR, logsR, itemsR, overridesR, settingsR] = await Promise.all([
+      // Финансы (price_final) — через маскирующее view (security phase 3).
+      // Планировщик — admin/manager (view:planning). Realtime-подписка ниже
+      // остаётся на базовой таблице (view подписать нельзя); при INSERT новый
+      // заказ прилетит без price_final до refetch — приемлемая деградация.
       supabase
-        .from('k24_orders')
+        .from('k24_orders_full')
         .select('id, number, custom_number, order_type, status, width_mm, height_mm, qty, design_variants, stickers_per_pack, need_lam, design_status, film_type, bopp_bag, priority, is_urgent, deadline, client_id, price_final, created_at, client:k24_clients!client_id(name)')
         .in('status', ACTIVE_STATUSES)
         .order('deadline', { ascending: true, nullsFirst: false }),

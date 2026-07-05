@@ -1,4 +1,17 @@
 /**
+ * Имя файла для download-атрибута: запрещённые в именах файлов символы
+ * (Windows-набор) браузер молча отбрасывает вместе со всем атрибутом и
+ * сохраняет как «download». Ловило период «Свой» — `custom:YYYY-MM-DD:…`
+ * с двоеточиями (QA 04.07, баг №6).
+ */
+export function sanitizeFilename(name) {
+  return String(name)
+    .replace(/[<>:"/\\|?*]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^[\s.-]+|[\s.-]+$/g, '')
+}
+
+/**
  * Lazy-load SheetJS (~600 KB) and download a single-sheet XLSX.
  *
  * @param {string} filename — без расширения
@@ -16,5 +29,5 @@ export async function downloadXlsx(filename, sheetName, aoa) {
   if (colWidths) ws['!cols'] = colWidths
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31))
-  XLSX.writeFile(wb, `${filename}.xlsx`)
+  XLSX.writeFile(wb, `${sanitizeFilename(filename) || 'report'}.xlsx`)
 }

@@ -289,7 +289,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
     selection_pouring: { stickers: ['stickers_poured', 'defects'] },
     pouring: { single: ['stickers_poured', 'defects'] },
   }
-  async function handlePackDesignSubmit(designIndex, { value, defects }, stageOverride) {
+  async function handlePackDesignSubmit(designIndex, { value, defects, logId }, stageOverride) {
     // stageOverride используется в dual-cards-mode (R-фидбэк 04-05.06):
     // карточка СТИКЕР может быть на ином stage, чем order.status (если подзадача
     // опередила/отстала). Без override — пишем на текущий order.status.
@@ -303,14 +303,16 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
     // R14.4: на drying value — это «брак после сушки», пишем как defects лог
     // с track='stickers' + design_index. Логика вычитания — см. aggregateLine.
     if (effectiveStage === 'drying') {
-      await handleSubmit(effectiveStage, { track: 'stickers', design_index: designIndex, defects: value })
+      await handleSubmit(effectiveStage, { track: 'stickers', design_index: designIndex, defects: value, ...(logId ? { id: logId } : {}) })
       return
     }
     const field = PACK_STICKER_FIELD[effectiveStage]
     // PackDesignsForm.designStats фильтрует по track='stickers', поэтому для
     // sticker3D multi-variant тоже пишем track='stickers' (логи группируются
     // только по design_index, семантика «фон/стикер» неактуальна).
-    const data = { track: 'stickers', design_index: designIndex, [field]: value }
+    // Клиентский id (PK) от PackDesignsForm делает авторетрай идемпотентным:
+    // повтор с тем же id упирается в 23505 вместо создания дубля лога.
+    const data = { track: 'stickers', design_index: designIndex, [field]: value, ...(logId ? { id: logId } : {}) }
     if ((effectiveStage === 'cutting' || effectiveStage === 'pouring' || effectiveStage === 'selection_pouring') && defects) {
       data.defects = defects
     }

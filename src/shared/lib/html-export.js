@@ -43,12 +43,16 @@ export async function exportAsPNG(element, filename, { scale = 2, pixelWidth, pi
  * pixelWidth/pixelHeight — explicit DOM-размеры для html2canvas; width/height —
  * размеры страницы PDF в миллиметрах.
  */
-export async function exportAsPDF(element, filename, { scale = 2, orientation = 'p', format = 'a4', pixelWidth, pixelHeight } = {}) {
+export async function exportAsPDF(element, filename, { scale = 2, orientation = 'p', format = 'a4', pixelWidth, pixelHeight, imageFormat = 'PNG', quality = 0.92 } = {}) {
   const [{ jsPDF }, canvas] = await Promise.all([
     import('jspdf'),
     renderCanvas(element, { scale, pixelWidth, pixelHeight }),
   ])
-  const imgData = canvas.toDataURL('image/png')
+  // imageFormat 'JPEG' — для больших страниц (тех-карта A4 в PNG@2x весила
+  // ~6 МБ). Фон canvas всегда белый, альфа не нужна. Стикеры-этикетки с
+  // мелким текстом остаются PNG (дефолт) — их размер и так мал.
+  const isJpeg = String(imageFormat).toUpperCase() === 'JPEG'
+  const imgData = canvas.toDataURL(isJpeg ? 'image/jpeg' : 'image/png', quality)
   const pdf = new jsPDF({ orientation, unit: 'mm', format })
   // Вписываем по самой ограниченной стороне, сохраняя пропорции canvas.
   const pageW = pdf.internal.pageSize.getWidth()
@@ -58,7 +62,7 @@ export async function exportAsPDF(element, filename, { scale = 2, orientation = 
   const renderH = canvas.height * ratio
   const offsetX = (pageW - renderW) / 2
   const offsetY = (pageH - renderH) / 2
-  pdf.addImage(imgData, 'PNG', offsetX, offsetY, renderW, renderH)
+  pdf.addImage(imgData, isJpeg ? 'JPEG' : 'PNG', offsetX, offsetY, renderW, renderH, undefined, 'FAST')
   pdf.save(`${filename}.pdf`)
 }
 

@@ -322,6 +322,17 @@ describe('computeIncoming', () => {
     expect(result.total).toBeNull()
   })
 
+  // Ревью фиксов QA 04.07: prepared_qty — это «подготовлено ВИДОВ», а не штук.
+  // prepress не должен становиться источником «поступило» для печати, иначе
+  // печатник видит «Поступило: 2 шт» при тираже 500 и ложный warning.
+  it('prepress (prepared_qty=виды) не считается источником incoming для печати', () => {
+    const logs = [{ stage: 'prepress', prepared_qty: 2, defects: 0 }]
+    const routeWithPrepress = ['new', 'prepress', 'print', 'cutting', 'otk', 'done']
+    const result = computeIncoming(logs, routeWithPrepress, 'print', 500, null)
+    expect(result.source).not.toBe('prepress')
+    expect(result.isStart).toBe(true)
+  })
+
   it('computes incoming from the previous quantity stage', () => {
     const logs = [
       { stage: 'print', stickers_printed: 80 },

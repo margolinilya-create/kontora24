@@ -10,6 +10,7 @@ import {
   getMaterialCategory, getStockStatus,
   SUBTASK_ROUTE_BACKGROUNDS, SUBTASK_ROUTE_STICKERS, SUBTASK_STATUS_LABELS,
   getSubtaskRoute, getNextSubtaskStatus,
+  canAdvanceFrom, PERMISSIONS, PERMISSION_LABELS,
 } from './constants'
 
 describe('IS_3D_TYPE', () => {
@@ -805,5 +806,30 @@ describe('SUBTASK extra_stickers (R11.3)', () => {
   it('getNextSubtaskStatus для extra_stickers ready — null (конец)', () => {
     const order = { order_type: 'sticker3D' }
     expect(getNextSubtaskStatus('extra_stickers', 'ready', order)).toBe(null)
+  })
+})
+
+// ─── QA 04.07: регрессии багов №3 (stage:new) ────────────────────────────
+describe('canAdvanceFrom / stage:new (QA 04.07, баг №3)', () => {
+  it('manager с динамическим правом stage:new может продвигать «Новый»', () => {
+    const dynamicPerms = { manager: new Set(['stage:new']) }
+    expect(canAdvanceFrom('manager', 'new', dynamicPerms)).toBe(true)
+  })
+
+  it('без права stage:new продвижение из «Новый» запрещено', () => {
+    const dynamicPerms = { printer: new Set(['stage:print']) }
+    expect(canAdvanceFrom('printer', 'new', dynamicPerms)).toBe(false)
+  })
+
+  it('stage:new входит в PERMISSIONS.stages (виден в редакторе прав)', () => {
+    expect(PERMISSIONS.stages).toContain('stage:new')
+  })
+
+  it('у каждого права из PERMISSIONS есть человекочитаемый лейбл', () => {
+    // Инвариант ловит забытые PERMISSION_LABELS при добавлении новых прав.
+    const all = Object.values(PERMISSIONS).flat()
+    for (const perm of all) {
+      expect(PERMISSION_LABELS[perm], `нет лейбла для ${perm}`).toBeTruthy()
+    }
   })
 })

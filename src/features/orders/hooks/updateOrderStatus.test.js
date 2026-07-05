@@ -98,7 +98,7 @@ vi.mock('@/shared/stores/role-switcher-store', () => ({
 }))
 
 // Now import the function under test.
-import { updateOrderStatus } from './useOrders'
+import { updateOrderStatus, addProductionLogAndCheckAdvance } from './useOrders'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function resetSingleQueue() {
@@ -241,5 +241,66 @@ describe('updateOrderStatus', () => {
     await updateOrderStatus('order-1', 'design', 'prepress')
 
     expect(globalThis.fetch).not.toHaveBeenCalled()
+  })
+
+  // ─── QA 04.07: регрессия бага №4 — bopp_bag в select маршрута ──────────
+  it('cutting → packaging проходит для не-3D заказа с БОПП (баг №4)', async () => {
+    singleQueue.push({ data: SAMPLE_REGULAR_ORDER, error: null }) // route (bopp_bag=true)
+    singleQueue.push({ data: ACTOR_ADMIN, error: null }) // actor
+    singleQueue.push({ data: { number: 42, bitrix_deal_id: null }, error: null }) // notifyBitrix
+
+    await expect(
+      updateOrderStatus('order-1', 'cutting', 'packaging')
+    ).resolves.toBeUndefined()
+  })
+
+  it('route-check запрашивает bopp_bag у k24_orders (баг №4: без него «Упаковка» терялась)', async () => {
+    const selects = []
+    mockSupabase.from.mockImplementation((table) => {
+      const q = mockSupabase._defaultFromImpl(table)
+      const orig = q.select
+      q.select = vi.fn().mockImplementation(function (...args) {
+        selects.push({ table, fields: args[0] })
+        return orig.apply(this, args)
+      })
+      return q
+    })
+    singleQueue.push({ data: SAMPLE_REGULAR_ORDER, error: null })
+    singleQueue.push({ data: ACTOR_ADMIN, error: null })
+    singleQueue.push({ data: { number: 42, bitrix_deal_id: null }, error: null })
+
+    await updateOrderStatus('order-1', 'cutting', 'packaging')
+
+    const routeSelect = selects.find((s) => s.table === 'k24_orders')
+    expect(routeSelect.fields).toContain('bopp_bag')
+  })
+})
+
+// ─── QA 04.07: регрессия бага №5 — p_track обязан присутствовать в RPC ────
+describe('addProductionLogAndCheckAdvance', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSingleQueue()
+    mockSupabase._resetState()
+    rpcResultRef.value = { data: { is_complete: true }, error: null }
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } }, error: null,
+    })
+    mockSupabase.from.mockImplementation(mockSupabase._defaultFromImpl)
+    mockSupabase.rpc.mockImplementation(() => Promise.resolve(rpcResultRef.value))
+  })
+
+  it('одиночный трек вызывает check_stage_completion с явным p_track (null)', async () => {
+    // Пока в БД жили две перегрузки функции, вызов без p_track падал с
+    // PGRST203 и completion молча не работал (баг №5).
+    singleQueue.push({ data: { role: 'printer' }, error: null }) // workerProfile
+
+    const order = { id: 'order-1', order_type: 'sticker_cut', status: 'print', bopp_bag: true }
+    await addProductionLogAndCheckAdvance('order-1', 'print', { stickers_printed: 10 }, order)
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith(
+      'check_stage_completion',
+      expect.objectContaining({ p_order_id: 'order-1', p_stage: 'print', p_track: null }),
+    )
   })
 })

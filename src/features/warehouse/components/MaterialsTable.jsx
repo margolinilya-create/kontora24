@@ -62,7 +62,9 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
                 {filtered.map((m) => {
                   const cat = getMaterialCategory(m)
                   const stStatus = getStockStatus(m)
-                  const unit = MATERIAL_TYPES[m.type]?.unit || m.unit || ''
+                  // Фактическая единица позиции важнее дефолта типа (см.
+                  // InventoryTab — эталонный порядок; QA 04.07, баг №7).
+                  const unit = m.unit || MATERIAL_TYPES[m.type]?.unit || ''
                   const catLabel = (cat && MATERIAL_CATEGORIES[cat]?.label) || '—'
                   const isArchived = !!m.archived_at
                   return (

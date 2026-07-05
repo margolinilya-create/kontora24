@@ -49,9 +49,20 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
 
   const designVariants = Math.max(1, Math.min(8, Number(order.design_variants) || 1))
 
+  // Приоритет — фактически выбранная позиция склада (R16.1 join). Маппинг по
+  // коду — только fallback: он печатал «Белая глянцевая (Duckson 1260)» даже
+  // когда для заказа выбрана другая плёнка (QA 04.07) — риск взять не тот
+  // материал в цеху. Гвард need_lam обязателен: lam_material_id может быть
+  // заполнен и у заказа без ламинации.
   const lamLabel = order.need_lam
-    ? (LAMINATION_TYPES[order.lam_type]?.label || 'Да')
+    ? (order.lam_material?.name || LAMINATION_TYPES[order.lam_type]?.label || 'Да')
     : 'Нет'
+  const filmLabel = order.film_material?.name || getFilmMaterialName(order.film_type)
+  // Если отдельная плёнка стикеров не задана вовсе — стикеры физически идут
+  // на плёнке фонов (так же списывает и триггер, миграция 057): печатаем
+  // filmLabel, а не обобщённый маппинг по коду фонов.
+  const stickersFilmLabel = order.film_stickers_material?.name
+    || (order.film_type_stickers ? getFilmMaterialName(order.film_type_stickers) : filmLabel)
 
   // Размер шрифта номера. Уменьшен 18.05 после фидбэка — шрифт Onder
   // высокий, при размере 42 верх букв обрезался в чёрной шапке 20мм.
@@ -152,14 +163,14 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
             {isPack3D ? (
               <>
-                <Field label="Плёнка фонов" value={getFilmMaterialName(order.film_type)} valueFontSize={9} />
-                <Field label="Плёнка стикеров" value={getFilmMaterialName(order.film_type_stickers || order.film_type)} valueFontSize={9} />
+                <Field label="Плёнка фонов" value={filmLabel} valueFontSize={9} />
+                <Field label="Плёнка стикеров" value={stickersFilmLabel} valueFontSize={9} />
                 <Field label="Ламинация" value={lamLabel} />
                 <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
               </>
             ) : (
               <>
-                <Field label="Материал" value={getFilmMaterialName(order.film_type)} valueFontSize={9} />
+                <Field label="Материал" value={filmLabel} valueFontSize={9} />
                 <Field label="Ламинация" value={lamLabel} />
                 <Field label="3D смола" value={is3D ? 'Да' : 'Нет'} />
                 <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />

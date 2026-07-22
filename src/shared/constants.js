@@ -21,15 +21,21 @@ export const ORDER_STATUSES = {
   sample_layout: { label: 'Вёрстка образца', color: _DEPT.design, order: 2 },
   sample_print: { label: 'Печать образца', color: _DEPT.print, order: 3 },
   color_approval: { label: 'Утверждение цвета', color: _DEPT.info, order: 4 },
-  batch_layout: { label: 'Вёрстка тиража', color: _DEPT.design, order: 5 },
+  // R22.4 (ТЗ 20.07 Фаза 4Б): batch_layout упразднён — метка «(устар.)»,
+  // ключ оставлен для истории/off-route. В маршрутах/меню/фильтрах отсутствует.
+  batch_layout: { label: 'Вёрстка тиража (устар.)', color: _DEPT.design, order: 5 },
   prepress: { label: 'Препресс', color: _DEPT.design, order: 6 },
   print: { label: 'Печать', color: _DEPT.print, order: 7 },
   lamination: { label: 'Ламинация', color: _DEPT.print, order: 8 },
   cutting: { label: 'Резка', color: _DEPT.print, order: 9 },
-  selection_pouring: { label: 'Выборка / Заливка', color: _DEPT.pouring, order: 10 },
+  // R22.4 (Фаза 4А): «Выборка» выше «Заливки» — порядок колонок канбана/
+  // PipelineSummary и меню. selection(10) → pouring(11) → drying(12).
+  selection: { label: 'Выборка', color: _DEPT.pouring, order: 10 },
   pouring: { label: 'Заливка', color: _DEPT.pouring, order: 11 },
   drying: { label: 'Сушка', color: _DEPT.pouring, order: 12 },
-  selection: { label: 'Выборка', color: _DEPT.pouring, order: 13 },
+  // R22.4 (Фаза 4Б): selection_pouring упразднён — метка «(устар.)», ключ
+  // оставлен для истории старых заказов и рендера логов.
+  selection_pouring: { label: 'Выборка / Заливка (устар.)', color: _DEPT.pouring, order: 13 },
   assembly_3d: { label: 'Сборка 3D', color: _DEPT.finish, order: 14 },
   packaging: { label: 'Упаковка', color: _DEPT.finish, order: 15 },
   otk: { label: 'ОТК / Выдача', color: _DEPT.finish, order: 16 },
@@ -56,9 +62,10 @@ const ROUTE_STICKERPACK  = [...HEAD, 'print', 'lamination', 'cutting', 'packagin
 const ROUTE_BIG          = [...HEAD, 'print', 'lamination', 'cutting', 'otk', 'done']
 const ROUTE_RECT         = [...HEAD, 'print', 'lamination', 'cutting', 'otk', 'done']
 const ROUTE_3D_STICKER   = [...HEAD, 'print', 'cutting', 'pouring', 'drying', 'selection', 'packaging', 'otk', 'done']
-// stickerpack3D: drying — это статус ПОДЗАДАЧИ STICKER, не основного маршрута заказа.
-// Order.status остаётся `selection_pouring` пока обе подзадачи не дойдут до 'ready'.
-const ROUTE_3D_STICKERPACK = [...HEAD, 'print', 'lamination', 'cutting', 'selection_pouring', 'assembly_3d', 'packaging', 'otk', 'done']
+// R22.4 (ТЗ 20.07 Фаза 4Б): stickerpack3D переведён с dual-track (подзадачи
+// фоны/стикеры + selection_pouring) на линейный маршрут с раздельными
+// «Выборка → Заливка → Сушка». selection_pouring упразднён.
+const ROUTE_3D_STICKERPACK = [...HEAD, 'print', 'lamination', 'cutting', 'selection', 'pouring', 'drying', 'assembly_3d', 'packaging', 'otk', 'done']
 
 export const ORDER_ROUTES = {
   sticker_cut: ROUTE_STICKER_CUT,
@@ -73,8 +80,10 @@ export const ORDER_ROUTES = {
 export const IS_3D_TYPE = (orderType) => orderType === 'sticker3D' || orderType === 'stickerpack3D'
 export const IS_3D_STICKERPACK = (orderType) => orderType === 'stickerpack3D'
 
-// Stages where stickerpack3D has two parallel tracks (backgrounds + stickers)
-export const DUAL_TRACK_STAGES = ['print', 'cutting', 'selection_pouring']
+// Stages where stickerpack3D has two parallel FILM tracks (backgrounds + stickers).
+// R22.4 (Фаза 4Б): selection_pouring убран — этап упразднён. print/cutting
+// сохраняют двухтрековые ПОЛЯ формы (две плёнки), это не подзадачи.
+export const DUAL_TRACK_STAGES = ['print', 'cutting']
 // Stages where only backgrounds track applies (for stickerpack3D)
 export const BACKGROUNDS_ONLY_STAGES = ['lamination']
 
@@ -810,8 +819,11 @@ export const NAV_ITEMS = [
   { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'], permission: 'stage:print' },
   { path: '/production/lamination', label: 'Ламинация', icon: 'Layers', roles: ['admin', 'manager', 'printer'], permission: 'stage:lamination' },
   { path: '/production/cutting', label: 'Резка', icon: 'Scissors', roles: ['admin', 'manager', 'printer'], permission: 'stage:cutting' },
+  // R22.4 (ТЗ 20.07 Фаза 4А): «Выборка» выше «Заливки», + новый этап «Сушка».
+  // permission Выборки исправлен на stage:selection (был устаревший selection_pouring).
+  { path: '/production/selection', label: 'Выборка', icon: 'Combine', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:selection' },
   { path: '/production/pouring', label: 'Заливка', icon: 'Droplets', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:pouring' },
-  { path: '/production/selection', label: 'Выборка', icon: 'Combine', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:selection_pouring' },
+  { path: '/production/drying', label: 'Сушка', icon: 'Wind', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:drying' },
   { path: '/production/assembly3d', label: 'Сборка 3D', icon: 'Hammer', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:assembly_3d' },
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:packaging' },
   { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'], permission: 'stage:otk' },

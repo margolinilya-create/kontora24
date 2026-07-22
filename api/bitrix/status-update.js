@@ -66,8 +66,10 @@ export default async function handler(req, res) {
       print: 'EXECUTING',
       lamination: 'EXECUTING',
       cutting: 'EXECUTING',
+      selection: 'EXECUTING',
       pouring: 'EXECUTING',
-      selection_pouring: 'EXECUTING',
+      drying: 'EXECUTING',
+      selection_pouring: 'EXECUTING', // legacy — историческая совместимость
       assembly_3d: 'FINAL_INVOICE',
       packaging: 'FINAL_INVOICE',
       otk: 'FINAL_INVOICE',

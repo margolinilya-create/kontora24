@@ -19,6 +19,7 @@ const ICONS = {
   Package: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
   Crosshair: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><line x1="22" y1="12" x2="18" y2="12" /><line x1="6" y1="12" x2="2" y2="12" /><line x1="12" y1="6" x2="12" y2="2" /><line x1="12" y1="22" x2="12" y2="18" /></svg>,
   Droplets: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 22c4-4 8-7.5 8-12a8 8 0 10-16 0c0 4.5 4 8 8 12z" /></svg>,
+  Wind: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8h11a2.5 2.5 0 10-2.5-2.5M3 16h15a2.5 2.5 0 11-2.5 2.5M3 12h8.5a2.5 2.5 0 10-2.5-2.5" /></svg>,
   FileCheck: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2 2 4-4m-2-8H8a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.828a2 2 0 00-.586-1.414l-3.828-3.828A2 2 0 0012.172 2H8z" /></svg>,
   Layers: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>,
   Combine: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="2" y="2" width="8" height="8" rx="1.5" /><rect x="14" y="14" width="8" height="8" rx="1.5" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 6h8m-4-4v8m-4 4h8m-4-4v8" /></svg>,
@@ -33,7 +34,7 @@ const ICONS = {
 }
 
 // Nav groups — all collapsible, collapsed by default
-const PRODUCTION_QUEUE_PATHS = ['/production/design', '/production/prepress', '/production/print', '/production/lamination', '/production/cutting', '/production/pouring', '/production/selection', '/production/assembly3d', '/production/packaging', '/production/otk', '/production/plan']
+const PRODUCTION_QUEUE_PATHS = ['/production/design', '/production/prepress', '/production/print', '/production/lamination', '/production/cutting', '/production/selection', '/production/pouring', '/production/drying', '/production/assembly3d', '/production/packaging', '/production/otk', '/production/plan']
 
 const NAV_GROUPS = [
   { id: 'manage', label: 'Управление', paths: ['/', '/orders'] },
@@ -52,6 +53,9 @@ function loadOpenGroups() {
   return {}
 }
 
+// R22.4 (ТЗ 20.07 Фаза 4А/4Б): «Выборка» → 'selection' (был selection_pouring),
+// добавлена «Сушка» → 'drying'. Счётчик «Препресс» включает sample_layout
+// (агрегация в sidebar-store.fetchCounts).
 const COUNT_MAP = {
   '/orders': 'new',
   '/production/design': 'design',
@@ -59,8 +63,9 @@ const COUNT_MAP = {
   '/production/print': 'print',
   '/production/lamination': 'lamination',
   '/production/cutting': 'cutting',
+  '/production/selection': 'selection',
   '/production/pouring': 'pouring',
-  '/production/selection': 'selection_pouring',
+  '/production/drying': 'drying',
   '/production/assembly3d': 'assembly_3d',
   '/production/packaging': 'packaging',
   '/production/otk': 'otk',

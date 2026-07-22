@@ -16,6 +16,9 @@ import {
 import { FilmSelect } from './FilmSelect'
 import { LaminationSelect } from './LaminationSelect'
 
+// R22.4 (ТЗ 20.07 Фаза 4Б): упразднённые этапы — недоступны для назначения.
+const DEPRECATED_STATUSES = ['batch_layout', 'selection_pouring']
+
 const SECTION_TITLE = 'text-xs uppercase tracking-wide text-text-muted font-medium'
 const FIELD_LABEL = 'block text-sm font-medium text-text mb-1.5'
 const SELECT_CLASS = 'w-full rounded-xl border border-border bg-surface text-text px-3.5 py-2.5 text-sm min-h-[44px] focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition-colors'
@@ -300,9 +303,15 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
           </Field>
           <Field label="Статус">
             <select value={form.status || 'new'} onChange={(e) => update('status', e.target.value)} className={SELECT_CLASS}>
-              {Object.entries(ORDER_STATUSES).map(([k, { label }]) => (
-                <option key={k} value={k}>{label}</option>
-              ))}
+              {/* R22.4 (ТЗ 20.07 Фаза 4Б): упразднённые этапы (batch_layout /
+                  selection_pouring) убраны из выбора. Если у заказа уже стоит
+                  устаревший статус (грязные данные) — показываем его disabled,
+                  чтобы select не «прыгал». */}
+              {Object.entries(ORDER_STATUSES)
+                .filter(([k]) => !DEPRECATED_STATUSES.includes(k) || k === form.status)
+                .map(([k, { label }]) => (
+                  <option key={k} value={k} disabled={DEPRECATED_STATUSES.includes(k)}>{label}</option>
+                ))}
             </select>
           </Field>
         </div>

@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { useSubtaskQueue } from '../hooks/useSubtaskQueue'
 import { useReprintQueue } from '../hooks/useReprintQueue'
 import { useBatchProductionLogs } from '../hooks/useProductionLogs'
 import { QueueCard } from '../components/QueueCard'
@@ -12,13 +11,9 @@ import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 
-// Этапы на которых stickerpack3D показывается как отдельные подзадачи
-// (фоны/стикеры идут параллельно) — фидбэк менеджера 17.05, расширено 18.05
-// на все dual-track этапы (включая печать).
-// R14.3: pouring добавлен — sticker-трек stickerpack3D в статусе pouring
-// должен видеться на /production/pouring наряду с обычными sticker3D заказами.
-const SUBTASK_ENABLED_STAGES = new Set(['print', 'lamination', 'cutting', 'selection_pouring', 'pouring'])
-
+// R22.4 (ТЗ 20.07 Фаза 4Б): dual-track очередь подзадач (фоны/стикеры) упразднена
+// вместе с selection_pouring. stickerpack3D теперь идёт линейно и показывается
+// обычной карточкой заказа. Допечатки (track='reprint') видны через useReprintQueue.
 const QUEUE_CONFIG = {
   design: { title: 'Дизайн', subtitle: 'Разработка макетов', status: 'design' },
   // R14.2 (бриф 03.06): на вкладке препресс показываем и «Вёрстка образца»
@@ -27,8 +22,10 @@ const QUEUE_CONFIG = {
   print: { title: 'Печать', subtitle: 'Печать на плёнке', status: 'print' },
   lamination: { title: 'Ламинация', subtitle: 'Ламинация плёнки', status: 'lamination' },
   cutting: { title: 'Резка', subtitle: 'Плоттерная резка', status: 'cutting' },
-  selection_pouring: { title: 'Выборка / Заливка', subtitle: 'Выборка фонов и заливка', status: 'selection_pouring' },
+  // R22.4: раздельные «Выборка» и «Заливка» + новый этап «Сушка».
+  selection: { title: 'Выборка', subtitle: 'Выборка изделий', status: 'selection' },
   pouring: { title: 'Заливка', subtitle: 'Заливка смолой', status: 'pouring' },
+  drying: { title: 'Сушка', subtitle: 'Сушка 36 часов', status: 'drying' },
   assembly_3d: { title: 'Сборка 3D', subtitle: 'Сборка 3D стикерпаков', status: 'assembly_3d' },
   packaging: { title: 'Упаковка', subtitle: 'Упаковка готовой продукции', status: 'packaging' },
   otk: { title: 'ОТК / Выдача', subtitle: 'Контроль качества и выдача заказа', status: 'otk' },
@@ -70,8 +67,6 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
   const { profile } = useAuth()
   const allStatuses = useMemo(() => [config.status, ...(config.extraStatuses || [])], [config.status, config.extraStatuses])
   const { orders: allOrders, loading, refetch } = useOrders({ statuses: allStatuses })
-  const useSubtasks = SUBTASK_ENABLED_STAGES.has(config.status)
-  const { items: subtaskItems, loading: subtasksLoading, refetch: refetchSubtasks } = useSubtaskQueue(useSubtasks ? config.status : null)
   // R22.1 (ТЗ 20.07 Фаза 1): допечатки (track='reprint') видны в очереди своего
   // текущего этапа наравне с заказами. Статус допечатки = ключ этапа.
   const { items: reprintItems, loading: reprintsLoading, refetch: refetchReprints } = useReprintQueue(config.status)
@@ -79,21 +74,11 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
   const [sortBy, setSortBy] = useState('deadline')
   const [viewMode, setViewMode] = useState('list')
 
-  // Виртуальные элементы очереди: обычные заказы + 3D-pack подзадачи.
-  // На subtask-этапах 3D-pack заказы СКРЫВАЕМ из allOrders (показываем по подзадачам),
-  // иначе будет дубль (одна общая карточка + 2 карточки треков).
+  // R22.4: все заказы (включая stickerpack3D) — обычными карточками. Двухтрековые
+  // подзадачи упразднены; допечатки идут отдельным списком (reprintItems).
   const queueItems = useMemo(() => {
-    const regular = useSubtasks
-      ? allOrders.filter((o) => o.order_type !== 'stickerpack3D')
-      : allOrders
-    const items = regular.map((o) => ({ key: o.id, order: o, track: null, deadline: o.deadline, priority: o.priority, created_at: o.created_at, assigned_to: o.assigned_to }))
-    if (useSubtasks) {
-      for (const it of subtaskItems) {
-        items.push({ key: `${it.order.id}-${it.track}`, order: it.order, track: it.track, deadline: it.order.deadline, priority: it.order.priority, created_at: it.order.created_at, assigned_to: it.order.assigned_to })
-      }
-    }
-    return items
-  }, [allOrders, subtaskItems, useSubtasks])
+    return allOrders.map((o) => ({ key: o.id, order: o, track: null, deadline: o.deadline, priority: o.priority, created_at: o.created_at, assigned_to: o.assigned_to }))
+  }, [allOrders])
 
   const items = useMemo(() => {
     let filtered = queueItems
@@ -115,7 +100,7 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
     [queueItems, profile]
   )
 
-  const handleRefetch = () => { refetch(); if (useSubtasks) refetchSubtasks(); refetchReprints() }
+  const handleRefetch = () => { refetch(); refetchReprints() }
 
   // Sound notification when new orders appear in queue
   const prevCountRef = useRef(totalInQueue)
@@ -176,7 +161,7 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
 
       {enableBatchView && viewMode === 'batch' ? (
         <BatchView orders={items.map((it) => it.order)} />
-      ) : loading || subtasksLoading || reprintsLoading ? (
+      ) : loading || reprintsLoading ? (
         <div className="flex justify-center py-12">
           <Spinner />
         </div>

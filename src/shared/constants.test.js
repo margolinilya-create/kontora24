@@ -107,20 +107,23 @@ describe('getOrderRoute', () => {
     expect(selIdx).toBeLessThan(packIdx)
   })
 
-  it('stickerpack3D имеет selection_pouring и assembly_3d (drying — это статус подзадачи)', () => {
+  // R22.4 (ТЗ 20.07 Фаза 4Б): stickerpack3D переведён на линейный маршрут
+  // с раздельными «Выборка → Заливка → Сушка». selection_pouring упразднён.
+  it('stickerpack3D: раздельные selection/pouring/drying + assembly_3d, без selection_pouring', () => {
     const route = getOrderRoute({ order_type: 'stickerpack3D', need_lam: true })
-    expect(route).toContain('selection_pouring')
+    expect(route).not.toContain('selection_pouring')
+    expect(route).toContain('selection')
+    expect(route).toContain('pouring')
+    expect(route).toContain('drying')
     expect(route).toContain('assembly_3d')
     expect(route).toContain('lamination')
-    expect(route).not.toContain('pouring')
-    // drying для stickerpack3D живёт в subtask STICKER trek, не в основном маршруте
-    expect(route).not.toContain('drying')
   })
 
   it('3D stickerpack skips lamination when need_lam=false', () => {
     const route = getOrderRoute({ order_type: 'stickerpack3D', need_lam: false })
     expect(route).not.toContain('lamination')
-    expect(route).toContain('selection_pouring')
+    expect(route).not.toContain('selection_pouring')
+    expect(route).toContain('selection')
   })
 
   it('fallback for unknown order type', () => {
@@ -157,7 +160,8 @@ describe('getOrderRoute', () => {
   it('3D stickerpack with provided mockup skips design but keeps 3D stages', () => {
     const route = getOrderRoute({ order_type: 'stickerpack3D', need_lam: true, design_status: 'provided' })
     expect(route).not.toContain('design')
-    expect(route).toContain('selection_pouring')
+    expect(route).toContain('selection')
+    expect(route).toContain('pouring')
     expect(route).toContain('assembly_3d')
   })
 })
@@ -193,12 +197,40 @@ describe('isStageAllowed', () => {
   })
 })
 
+describe('R22.4 — упразднение selection_pouring / порядок меню', () => {
+  it('«Выборка» идёт выше «Заливки» (.order)', () => {
+    expect(ORDER_STATUSES.selection.order).toBeLessThan(ORDER_STATUSES.pouring.order)
+    expect(ORDER_STATUSES.pouring.order).toBeLessThan(ORDER_STATUSES.drying.order)
+  })
+
+  it('устаревшие статусы сохранены с меткой «(устар.)» для истории', () => {
+    expect(ORDER_STATUSES.selection_pouring.label).toContain('устар')
+    expect(ORDER_STATUSES.batch_layout.label).toContain('устар')
+  })
+
+  it('sticker3D маршрут не изменился: pouring → drying → selection', () => {
+    const route = getOrderRoute({ order_type: 'sticker3D', need_lam: false })
+    const pi = route.indexOf('pouring')
+    const di = route.indexOf('drying')
+    const si = route.indexOf('selection')
+    expect(pi).toBeGreaterThanOrEqual(0)
+    expect(di).toBe(pi + 1)
+    expect(si).toBe(di + 1)
+  })
+
+  it('getNextStatus: sticker3D drying → selection (по маршруту, не по .order)', () => {
+    const order = { order_type: 'sticker3D', need_lam: false }
+    expect(getNextStatus('post_printer', 'drying', order)).toBe('selection')
+  })
+})
+
 describe('isDualTrack', () => {
   it('true for stickerpack3D at dual-track stages', () => {
     const order = { order_type: 'stickerpack3D' }
     expect(isDualTrack('print', order)).toBe(true)
     expect(isDualTrack('cutting', order)).toBe(true)
-    expect(isDualTrack('selection_pouring', order)).toBe(true)
+    // R22.4: selection_pouring упразднён — больше не dual-track.
+    expect(isDualTrack('selection_pouring', order)).toBe(false)
   })
 
   it('false for stickerpack3D at non-dual-track stages', () => {
@@ -248,11 +280,11 @@ describe('getNextStatus', () => {
     }
   })
 
-  it('admin full path — stickerpack3D с lamination (drying только в подзадаче, не в основном)', () => {
+  it('admin full path — stickerpack3D с lamination (R22.4: раздельные выборка/заливка/сушка)', () => {
     const order = { order_type: 'stickerpack3D', need_lam: true }
     const path = [
       'new', 'design', 'sample_layout', 'sample_print', 'color_approval',
-      'prepress', 'print', 'lamination', 'cutting', 'selection_pouring',
+      'prepress', 'print', 'lamination', 'cutting', 'selection', 'pouring', 'drying',
       'assembly_3d', 'packaging', 'otk', 'done',
     ]
     for (let i = 0; i < path.length - 1; i++) {
@@ -298,9 +330,11 @@ describe('getNextStatus', () => {
     expect(getNextStatus('post_printer', 'selection', order3d)).toBe('packaging')
     expect(getNextStatus('post_printer', 'packaging', order3d)).toBe('otk')
 
-    // stickerpack3D — packaging всегда есть
+    // stickerpack3D (R22.4): линейный маршрут selection→pouring→drying→assembly_3d
     const orderPack = { order_type: 'stickerpack3D', need_lam: true }
-    expect(getNextStatus('post_printer', 'selection_pouring', orderPack)).toBe('assembly_3d')
+    expect(getNextStatus('post_printer', 'selection', orderPack)).toBe('pouring')
+    expect(getNextStatus('post_printer', 'pouring', orderPack)).toBe('drying')
+    expect(getNextStatus('post_printer', 'drying', orderPack)).toBe('assembly_3d')
     expect(getNextStatus('post_printer', 'assembly_3d', orderPack)).toBe('packaging')
     expect(getNextStatus('post_printer', 'packaging', orderPack)).toBe('otk')
   })

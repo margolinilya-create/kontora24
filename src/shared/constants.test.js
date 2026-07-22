@@ -615,6 +615,20 @@ describe('calculateWorkerPayout', () => {
     expect(r.breakdown.selection.amount).toBe(10 * 6 * 0.5)
   })
 
+  // R22.7 (ТЗ 20.07 Фаза 8): для stickerpack3D «Выборка» (stage='selection') —
+  // это выборка фонов, оплата ×stickers_per_pack (как selection_pouring).
+  it('selection stickerpack3D: ×stickers_per_pack (выборка фонов)', () => {
+    const logs = [{ stage: 'selection', order: { order_type: 'stickerpack3D', stickers_per_pack: 6 }, qty_selected: 10 }]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.selection.amount).toBe(10 * 6 * 0.5)
+  })
+
+  it('selection sticker3D: штучная выборка ×1 (без stickers_per_pack)', () => {
+    const logs = [{ stage: 'selection', order: { order_type: 'sticker3D', stickers_per_pack: 6 }, qty_selected: 10 }]
+    const r = calculateWorkerPayout(logs)
+    expect(r.breakdown.selection.amount).toBe(10 * 1 * 0.5)
+  })
+
   it('packaging at 1.5₽ per pack', () => {
     const logs = [{ stage: 'packaging', packs_packaged: 20 }]
     const r = calculateWorkerPayout(logs)

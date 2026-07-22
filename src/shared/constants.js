@@ -741,11 +741,17 @@ export function calculateWorkerPayout(logs, opts = {}) {
       selectionStickers += bgs * perPack
     }
     if (l.stage === 'selection') {
-      // R11: выборка штучных стикеров sticker3D после сушки — каждая
-      // qty_selected = один стикер, без умножения на stickers_per_pack.
+      // R11: выборка штучных стикеров sticker3D после сушки — qty_selected =
+      // один стикер, без умножения на stickers_per_pack.
+      // R22.7 (ТЗ 20.07 Фаза 8): для stickerpack3D (после упразднения
+      // selection_pouring «Выборка» — это выборка фонов) оплата =
+      // qty_selected × stickers_per_pack, как исторический selection_pouring.
       const qty = Number(l.qty_selected) || 0
       selectionBgs += qty
-      selectionStickers += qty
+      const order = opts.ordersById?.[l.order_id] || l.order || null
+      const perPack = order?.order_type === 'stickerpack3D'
+        ? (Number(order?.stickers_per_pack) || 1) : 1
+      selectionStickers += qty * perPack
     }
     if (l.stage === 'assembly_3d') {
       const packs = Number(l.packs_assembled) || 0

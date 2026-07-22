@@ -26,11 +26,13 @@ export const STAGE_FIELDS = {
   // стикеров/изделий к печати». Поле prepared_qty добавлено миграцией 051.
   // «видов»: таргет прогресс-линии — design_variants, не тираж; со старым
   // лейблом «к печати (шт)» вводили штуки и получали 999% (QA 04.07).
+  // R22.7 (ТЗ 20.07 Фаза 8): «Файлов подготовлено к печати». Прогресс —
+  // X / design_variants файлов. Колонку prepared_qty не переименовываем.
   prepress: {
     label: 'Препресс',
     quantityField: 'prepared_qty',
     fields: [
-      { key: 'prepared_qty', label: 'Подготовлено видов', unit: 'видов' },
+      { key: 'prepared_qty', label: 'Файлов подготовлено к печати', unit: 'файлов' },
     ],
   },
 
@@ -116,9 +118,12 @@ export const STAGE_FIELDS = {
         ],
       },
     ],
+    // R22.7 (ТЗ 20.07 Фаза 8): «Нарезано изделий» + «Брак». Поле брака неактивно,
+    // пока не введено количество нарезанных (disabledUntil). Брак уменьшает
+    // прогресс (cutting ∈ SUBTRACT_DEFECTS_STAGES).
     fields: [
-      { key: 'qty_cut', label: 'Нарезано', unit: 'шт' },
-      { key: 'defects', label: 'Брак', unit: 'шт' },
+      { key: 'qty_cut', label: 'Нарезано изделий', unit: 'шт' },
+      { key: 'defects', label: 'Брак', unit: 'шт', disabledUntil: 'qty_cut' },
     ],
   },
 
@@ -163,11 +168,13 @@ export const STAGE_FIELDS = {
     resinExtra: { key: 'resin_grams', label: 'Расход смолы', unit: 'г', step: '0.1' },
   },
 
+  // R22.7 (ТЗ 20.07 Фаза 8): «Собрано изделий», без прогресс-бара (noProgressBar).
   assembly_3d: {
     label: 'Сборка 3D',
     quantityField: 'packs_assembled',
+    noProgressBar: true,
     fields: [
-      { key: 'packs_assembled', label: 'Собрано паков', unit: 'шт' },
+      { key: 'packs_assembled', label: 'Собрано изделий', unit: 'шт' },
     ],
   },
 

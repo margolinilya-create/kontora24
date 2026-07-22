@@ -400,6 +400,101 @@ export function computeIncomingPerItem(logs, route, stage, itemIdx) {
   return { total: null, source: null, isStart: true }
 }
 
+// ============================================================================
+// R22.1 (ТЗ 20.07 Фаза 1) — подзадачи-допечатки (track='reprint').
+// Допечатка всегда single-track. Прогресс этапа считается по логам с
+// subtask_id (а не order-level логам). Поле количества — по этапу.
+// ============================================================================
+
+// Поле количества «годных» по этапу допечатки. Совпадает с маппингом в
+// advance_reprint_subtask (миграция 081) — держать синхронно.
+export const REPRINT_STAGE_QTY_FIELD = {
+  print: 'stickers_printed',
+  lamination: 'lamination_qty',
+  cutting: 'qty_cut',
+  selection: 'qty_selected',
+  pouring: 'stickers_good',
+  drying: 'qty_dried',
+  assembly_3d: 'packs_assembled',
+  packaging: 'packs_packaged',
+}
+
+// Этапы допечатки, где брак вычитается из годных (в т.ч. сушка: годные =
+// высушено − брак). Для pouring stickers_good уже = poured − defects.
+const REPRINT_SUBTRACT_DEFECTS = new Set(['print', 'cutting', 'lamination', 'packaging', 'drying'])
+
+/**
+ * Поля формы учёта для этапа допечатки (single-track). Переиспользуем
+ * STAGE_FIELDS.fields, но: печать без per-трек/плёнки фонов (одно изделие),
+ * сушка = «Высушено» + «Брак».
+ */
+export function reprintStageFields(stage) {
+  if (stage === 'drying') {
+    return [
+      { key: 'qty_dried', label: 'Высушено', unit: 'шт' },
+      { key: 'defects', label: 'Брак', unit: 'шт' },
+    ]
+  }
+  if (stage === 'print') {
+    return [
+      { key: 'stickers_printed', label: 'Напечатано', unit: 'шт' },
+      { key: 'film_meters', label: 'Плёнка', unit: 'м', step: '0.1', filmFrom: 'backgrounds' },
+    ]
+  }
+  return STAGE_FIELDS[stage]?.fields || []
+}
+
+/**
+ * Прогресс одного этапа допечатки по её логам (subtask_id уже отфильтрован
+ * вызывающим). total = Σ поля этапа − брак (для REPRINT_SUBTRACT_DEFECTS).
+ */
+export function computeSubtaskStageProgress(subtaskLogs, stage, qty) {
+  const field = REPRINT_STAGE_QTY_FIELD[stage]
+  const stageLogs = (subtaskLogs || []).filter((l) => l.stage === stage && !l.deleted_at)
+  const raw = field ? stageLogs.reduce((s, l) => s + (Number(l[field]) || 0), 0) : 0
+  const defects = stageLogs.reduce((s, l) => s + (Number(l.defects) || 0), 0)
+  const total = REPRINT_SUBTRACT_DEFECTS.has(stage) ? Math.max(0, raw - defects) : raw
+  const target = qty || 0
+  const percentage = target > 0 ? Math.round((total / target) * 100) : 0
+  return { total, target, percentage, isComplete: total >= target }
+}
+
+/**
+ * Общий прогресс допечатки по её маршруту (0–100%). Завершённые этапы дают
+ * полную долю, текущий — частичную (produced/qty). Даёт плавную шкалу по route.
+ * @param {object} subtask — { status, qty, route: string[] }
+ * @param {Array} subtaskLogs — логи этой подзадачи
+ */
+export function computeSubtaskOverallProgress(subtask, subtaskLogs) {
+  const route = Array.isArray(subtask?.route) ? subtask.route : []
+  const prodStages = route.filter((s) => s !== 'done')
+  const n = prodStages.length
+  if (n === 0) return { percentage: subtask?.status === 'done' ? 100 : 0, done: subtask?.status === 'done' }
+  if (subtask?.status === 'done') return { percentage: 100, done: true }
+  const curIdx = prodStages.indexOf(subtask?.status)
+  if (curIdx < 0) return { percentage: 0, done: false }
+  const curFrac = Math.min(1, computeSubtaskStageProgress(subtaskLogs, subtask.status, subtask.qty).total / (subtask.qty || 1))
+  const percentage = Math.round(((curIdx + curFrac) / n) * 100)
+  return { percentage, done: false }
+}
+
+/**
+ * UI-статус допечатки: Завершено / Приостановлено / В работе / В очереди.
+ */
+export function reprintUiStatus(subtask, subtaskLogs) {
+  if (subtask?.status === 'done') return 'done'
+  if (subtask?.paused) return 'paused'
+  const hasCurrentLog = (subtaskLogs || []).some((l) => l.stage === subtask?.status && !l.deleted_at)
+  return hasCurrentLog ? 'in_progress' : 'queued'
+}
+
+export const REPRINT_UI_STATUS_LABELS = {
+  queued: 'В очереди',
+  in_progress: 'В работе',
+  paused: 'Приостановлено',
+  done: 'Завершено',
+}
+
 /**
  * Validate a log entry for a given stage.
  *

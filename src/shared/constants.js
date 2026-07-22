@@ -181,6 +181,48 @@ export function getOrderRoute(order) {
   return route
 }
 
+// --- R22.1 (ТЗ 20.07 Фаза 1): подзадачи-допечатки ---
+// Допечатка — ручная доработка части тиража по браку/недостаче. Стартует
+// всегда с 'print', проходит производственную часть маршрута заказа до
+// упаковки включительно и завершается терминальным 'done'. ОТК в маршрут
+// допечатки НЕ входит — это этап заказа целиком (допечатанные изделия
+// проверяются вместе с заказом; гейт не даёт закрыть заказ раньше допечаток).
+//
+// Для stickerpack3D применяем НОВУЮ форму маршрута досрочно (до R22.4):
+// выборка/заливка/сушка раздельными этапами — снапшот route делает допечатку
+// иммунной к смене констант в R22.4.
+const REPRINT_ROUTE_3D_STICKERPACK = ['print', 'lamination', 'cutting', 'selection', 'pouring', 'drying', 'assembly_3d', 'packaging']
+
+export const REPRINT_REASONS = { defect: 'Брак', shortage: 'Недостача' }
+
+// Статусы допечатки = ключи ORDER-этапов (print…packaging) + терминальный done.
+export const REPRINT_STATUS_LABELS = {
+  print: 'Печать',
+  lamination: 'Ламинация',
+  cutting: 'Резка',
+  selection: 'Выборка',
+  pouring: 'Заливка',
+  drying: 'Сушка',
+  assembly_3d: 'Сборка 3D',
+  packaging: 'Упаковка',
+  done: 'Завершено',
+}
+
+export function getReprintRoute(order) {
+  let stages
+  if (order?.order_type === 'stickerpack3D') {
+    stages = REPRINT_ROUTE_3D_STICKERPACK.slice()
+    if (!order?.need_lam) stages = stages.filter((s) => s !== 'lamination')
+  } else {
+    const full = getOrderRoute(order)
+    const start = full.indexOf('print')
+    stages = start >= 0
+      ? full.slice(start).filter((s) => s !== 'otk' && s !== 'done')
+      : []
+  }
+  return [...stages, 'done']
+}
+
 // Whether a stage is part of the order's effective route.
 // Used for DnD validation in the kanban and for the server-side guard in updateOrderStatus.
 export function isStageAllowed(order, stage) {

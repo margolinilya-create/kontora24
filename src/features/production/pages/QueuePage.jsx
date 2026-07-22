@@ -2,8 +2,10 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSubtaskQueue } from '../hooks/useSubtaskQueue'
+import { useReprintQueue } from '../hooks/useReprintQueue'
 import { useBatchProductionLogs } from '../hooks/useProductionLogs'
 import { QueueCard } from '../components/QueueCard'
+import { SubtaskCard } from '../components/SubtaskCard'
 import { BatchView } from '../components/BatchView'
 import { playNotificationSound } from '@/shared/lib/sound'
 import Spinner from '@/shared/components/Spinner'
@@ -70,6 +72,9 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
   const { orders: allOrders, loading, refetch } = useOrders({ statuses: allStatuses })
   const useSubtasks = SUBTASK_ENABLED_STAGES.has(config.status)
   const { items: subtaskItems, loading: subtasksLoading, refetch: refetchSubtasks } = useSubtaskQueue(useSubtasks ? config.status : null)
+  // R22.1 (ТЗ 20.07 Фаза 1): допечатки (track='reprint') видны в очереди своего
+  // текущего этапа наравне с заказами. Статус допечатки = ключ этапа.
+  const { items: reprintItems, loading: reprintsLoading, refetch: refetchReprints } = useReprintQueue(config.status)
   const [showMine, setShowMine] = useState(false)
   const [sortBy, setSortBy] = useState('deadline')
   const [viewMode, setViewMode] = useState('list')
@@ -103,14 +108,14 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
   const orderIds = useMemo(() => [...new Set(items.map((it) => it.order.id))], [items])
   const { getStageProgress, error: logsError } = useBatchProductionLogs(orderIds)
 
-  const totalInQueue = queueItems.length
+  const totalInQueue = queueItems.length + reprintItems.length
 
   const myCount = useMemo(
     () => profile ? queueItems.filter((it) => it.assigned_to === profile.id).length : 0,
     [queueItems, profile]
   )
 
-  const handleRefetch = () => { refetch(); if (useSubtasks) refetchSubtasks() }
+  const handleRefetch = () => { refetch(); if (useSubtasks) refetchSubtasks(); refetchReprints() }
 
   // Sound notification when new orders appear in queue
   const prevCountRef = useRef(totalInQueue)
@@ -171,11 +176,11 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
 
       {enableBatchView && viewMode === 'batch' ? (
         <BatchView orders={items.map((it) => it.order)} />
-      ) : loading || subtasksLoading ? (
+      ) : loading || subtasksLoading || reprintsLoading ? (
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && reprintItems.length === 0 ? (
         <div className="bg-surface rounded-xl border border-border p-12 text-center">
           <div className="text-4xl mb-3 text-text-muted/30" aria-hidden="true">
             {showMine ? '📋' : '✓'}
@@ -207,6 +212,14 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
               onUpdated={handleRefetch}
               progress={getStageProgress(it.order.id, it.order.status, it.order.qty, it.track)}
               logsError={logsError}
+            />
+          ))}
+          {reprintItems.map((it) => (
+            <SubtaskCard
+              key={`reprint-${it.subtask.id}`}
+              subtask={it.subtask}
+              order={it.order}
+              overall={it.overall}
             />
           ))}
         </div>

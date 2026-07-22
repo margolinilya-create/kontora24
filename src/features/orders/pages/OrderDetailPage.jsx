@@ -13,6 +13,7 @@ import { ColorApprovalControls } from '../components/ColorApprovalControls'
 import { OrderStepper } from '../components/OrderStepper'
 import { OrderComments } from '../components/OrderComments'
 import { OrderProgressTab } from '../components/OrderProgressTab'
+import { OrderSubtasksTab } from '../components/OrderSubtasksTab'
 import { OrderReportsTab } from '../components/OrderReportsTab'
 import { OrderHistoryTab } from '../components/OrderHistoryTab'
 import { FinanceTab } from '../components/FinanceTab'
@@ -422,6 +423,7 @@ export default function OrderDetailPage() {
   const tabs = [
     { key: 'overview', label: 'Обзор' },
     { key: 'progress', label: 'Прогресс' },
+    { key: 'subtasks', label: 'Подзадачи' },
     { key: 'reports', label: 'Расход материалов' },
     { key: 'history', label: 'История' },
     ...(isFinance ? [{ key: 'finance', label: 'Финансы' }] : []),
@@ -506,6 +508,9 @@ export default function OrderDetailPage() {
         {tab === 'overview' && <OverviewTab order={order} onUpdated={refetch} />}
         {tab === 'progress' && (
           <OrderProgressTab order={order} history={history} onUpdated={refetch} />
+        )}
+        {tab === 'subtasks' && (
+          <OrderSubtasksTab order={order} />
         )}
         {tab === 'reports' && (
           <OrderReportsTab order={order} onUpdated={refetch} />

@@ -47,6 +47,14 @@ export function translateError(err) {
     return { title: 'Нет прав', message: 'У вас нет прав на это действие.' }
   }
 
+  // Case 4c — заказ с открытыми допечатками (триггер fn_block_done_with_open_reprints)
+  if (/REPRINTS_NOT_DONE/i.test(message)) {
+    return {
+      title: 'Есть незавершённые допечатки',
+      message: 'Нельзя завершить заказ, пока не завершены все допечатки. Откройте вкладку «Подзадачи».',
+    }
+  }
+
   // Case 4a — склад: право material:add_transaction (RPC update_stock / RLS 079)
   if (/material:add_transaction/i.test(message)) {
     return {

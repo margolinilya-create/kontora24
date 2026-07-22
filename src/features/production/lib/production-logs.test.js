@@ -494,6 +494,30 @@ describe('compute3DPouringReport (CSV сводка по 3D-заливке)', () 
     expect(rows[0].defects).toBe(20)
     expect(rows[0].pouredRaw).toBe(100)
   })
+
+  // R22.5 (ТЗ 20.07 Фаза 5): брак с этапа «Сушка» попадает в колонку «Брак».
+  it('брак сушки добавляется к браку заливки', () => {
+    const order = { qty: 100, order_type: 'stickerpack3D' }
+    const designs = [{ design_index: 1, name: '' }]
+    const logs = [
+      { stage: 'pouring', track: 'stickers', design_index: 1, stickers_good: 90, defects: 5 },
+      { stage: 'drying', track: 'stickers', design_index: 1, defects: 8 },
+    ]
+    const rows = compute3DPouringReport(order, logs, designs)
+    expect(rows[0].good).toBe(90)
+    expect(rows[0].defects).toBe(13) // 5 (заливка) + 8 (сушка)
+  })
+
+  it('новый маршрут: заливка на stage=pouring учитывается наравне с selection_pouring', () => {
+    const order = { qty: 100, order_type: 'stickerpack3D' }
+    const designs = [{ design_index: 1, name: '' }]
+    const logs = [
+      { stage: 'pouring', track: 'stickers', design_index: 1, stickers_good: 100, defects: 0 },
+    ]
+    const rows = compute3DPouringReport(order, logs, designs)
+    expect(rows[0].good).toBe(100)
+    expect(rows[0].surplus).toBe(0)
+  })
 })
 
 describe('R20.5: computeStageProgressPerItem (учёт по размерным видам)', () => {

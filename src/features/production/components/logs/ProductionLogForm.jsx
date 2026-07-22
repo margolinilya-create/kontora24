@@ -79,8 +79,16 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   function clearAll() { setForms({}) }
 
   function fieldLabel(field, _trackKey) {
+    // R22.0 (ТЗ 20.07 Фаза 6.3): имя плёнки — из выбранной позиции склада
+    // (film_material / film_stickers_material, R16.1), enum FILM_TYPES — фолбэк
+    // для заказов без привязки к позиции. Паттерн VariantLogForm.fieldLabel.
     function resolveFilmLabel(source) {
-      const filmType = source === 'stickers'
+      const isStickers = source === 'stickers'
+      const material = isStickers
+        ? (order?.film_stickers_material || order?.film_material)
+        : order?.film_material
+      if (material?.name) return material.name
+      const filmType = isStickers
         ? (order?.film_type_stickers || order?.film_type)
         : order?.film_type
       return FILM_TYPES[filmType]?.label || filmType || ''
@@ -201,6 +209,10 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
     // Десятичные поля (с step содержащим точку) — текстовый input с поддержкой запятой
     // и numeric-клавиатурой на мобильнике (фидбэк менеджера 17.05).
     const isDecimal = !!field.step && /\./.test(field.step)
+    // R22.7 (ТЗ Фаза 8): поле брака на резке неактивно, пока не введено
+    // количество нарезанных (disabledUntil).
+    const gate = field.disabledUntil
+    const disabled = gate ? !(Number(getForm(formKey)[gate]) > 0) : false
     return (
       <Input
         key={`${formKey}-${field.key}`}
@@ -209,6 +221,7 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
         type={isDecimal ? 'text' : 'number'}
         inputMode={isDecimal ? 'decimal' : 'numeric'}
         value={value}
+        disabled={disabled}
         onChange={(e) => {
           const raw = e.target.value
           if (isDecimal) {
@@ -240,7 +253,7 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
     <div className="bg-surface rounded-xl border border-border p-5">
       <h3 className="font-semibold mb-2">{config.label}</h3>
 
-      {!useTracks && <ProgressBar p={progress} />}
+      {!useTracks && !config.noProgressBar && <ProgressBar p={progress} />}
       {singleIncoming && (
         <p className="text-xs text-text-muted mb-3">
           Поступило на этап: {singleIncoming.total} шт

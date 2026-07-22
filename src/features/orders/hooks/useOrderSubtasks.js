@@ -46,9 +46,16 @@ export function useOrderSubtasks(orderId, _isMulti) {
       const vars = []
       const exts = []
       for (const row of data || []) {
+        // R22.4 (ТЗ 20.07 Фаза 4Б): старая система подзадач (bg/stickers/extra)
+        // упразднена и помечена is_legacy — не отдаём её в интерактивный UI
+        // (Stepper-развилка, SubtaskIndicator). Архив доступен на вкладке
+        // «Подзадачи» через useReprintSubtasks. Допечатки (track='reprint') —
+        // отдельный хук. Multi-variant (variant) не помечается legacy — активен.
+        if (row.is_legacy) continue
+        if (row.track === 'reprint') continue
         if (row.track === 'variant') vars.push(row)
         else if (row.track === 'extra_stickers') exts.push(row)
-        else next[row.track] = row
+        else if (row.track === 'backgrounds' || row.track === 'stickers') next[row.track] = row
       }
       setSubtasks(next)
       setVariants(vars)

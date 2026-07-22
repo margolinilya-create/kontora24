@@ -195,10 +195,14 @@ export function useOrderDetail(id) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const canSeeFinance = useCanDo('view:finance')
+  // R22.0 (ТЗ 20.07 Фаза 6.1): скелетон показываем только при первом заходе
+  // на заказ — повторные refetch (после сохранения лога, по фокусу вкладки,
+  // по realtime) тихие, иначе вся страница «перезагружается» и ремоунтит формы.
+  const loadedIdRef = useRef(null)
 
   const fetchDetail = useCallback(async () => {
     if (!id) return
-    setLoading(true)
+    if (loadedIdRef.current !== id) setLoading(true)
     setError(null)
     try {
       // Финансы — через маскирующее view (см. useOrders списки выше).
@@ -229,6 +233,7 @@ export function useOrderDetail(id) {
       }
       setOrder(orderData)
       setHistory(historyRes.data || [])
+      loadedIdRef.current = id
     } catch (err) {
       setError(err)
     } finally {
@@ -382,6 +387,24 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
       const stageLabel = ORDER_STATUSES[fromStatus]?.label || fromStatus
       const suffix = incompleteTracks.filter(Boolean).join(',')
       toast.info(`Этап «${stageLabel}»${suffix} не завершён — данные не введены, но заказ продвинут.`)
+    }
+  }
+
+  // R22.1 (ТЗ 20.07 Фаза 1): заказ нельзя завершить, пока есть незавершённые
+  // допечатки. Клиентская проверка даёт понятное сообщение до обращения к БД;
+  // жёсткую гарантию держит триггер fn_block_done_with_open_reprints (миграция
+  // 081) — он сработает и при force/rollback/канбане.
+  if (toStatus === 'done') {
+    const { data: openReprints } = await supabase
+      .from('k24_order_subtasks')
+      .select('id')
+      .eq('order_id', orderId)
+      .eq('track', 'reprint')
+      .eq('is_legacy', false)
+      .neq('status', 'done')
+      .limit(1)
+    if (openReprints && openReprints.length > 0) {
+      throw new Error('Нельзя завершить заказ: есть незавершённые допечатки. Завершите их на вкладке «Подзадачи».')
     }
   }
 

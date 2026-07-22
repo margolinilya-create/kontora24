@@ -12,7 +12,6 @@ import { VariantLogForm } from '@/features/production/components/VariantLogForm'
 import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import { DryingTimer } from './DryingTimer'
-import { CreateExtraStickersButton } from './CreateExtraStickersButton'
 import { SamplePrintWidget } from './SamplePrintWidget'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
@@ -1121,10 +1120,6 @@ export function OrderProgressTab({ order, onUpdated }) {
       )}
 
       <SubtaskIndicator order={order} onUpdated={onUpdated} items={items} />
-
-      <div className="flex justify-end">
-        <CreateExtraStickersButton order={order} onCreated={onUpdated} />
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} items={items} />

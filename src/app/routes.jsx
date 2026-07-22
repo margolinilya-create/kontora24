@@ -30,10 +30,12 @@ const PrintQueuePage = lazy(() => import('@/features/production/pages/PrintQueue
 const LaminationQueuePage = lazy(() => import('@/features/production/pages/LaminationQueuePage'))
 const CuttingQueuePage = lazy(() => import('@/features/production/pages/CuttingQueuePage'))
 const PouringQueuePage = lazy(() => import('@/features/production/pages/PouringQueuePage'))
-const SelectionPouringQueuePage = lazy(() => import('@/features/production/pages/SelectionPouringQueuePage'))
+const SelectionQueuePage = lazy(() => import('@/features/production/pages/SelectionQueuePage'))
+const DryingQueuePage = lazy(() => import('@/features/production/pages/DryingQueuePage'))
 const Assembly3dQueuePage = lazy(() => import('@/features/production/pages/Assembly3dQueuePage'))
 const PackagingQueuePage = lazy(() => import('@/features/production/pages/PackagingQueuePage'))
 const OtkQueuePage = lazy(() => import('@/features/production/pages/OtkQueuePage'))
+const SubtaskDetailPage = lazy(() => import('@/features/production/pages/SubtaskDetailPage'))
 const PlannerPage = lazy(() => import('@/features/production-planner/pages/PlannerPage'))
 const WarehousePage = lazy(() => import('@/features/warehouse/pages/WarehousePage'))
 const AnalyticsPage = lazy(() => import('@/features/analytics/pages/AnalyticsPage'))
@@ -63,11 +65,13 @@ export const routes = [
       { path: 'production/print', element: <AuthGuard permission="stage:print"><ErrorBoundary><PrintQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/lamination', element: <AuthGuard permission="stage:lamination"><ErrorBoundary><LaminationQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/cutting', element: <AuthGuard permission="stage:cutting"><ErrorBoundary><CuttingQueuePage /></ErrorBoundary></AuthGuard> },
+      { path: 'production/selection', element: <AuthGuard permission="stage:selection"><ErrorBoundary><SelectionQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/pouring', element: <AuthGuard permission="stage:pouring"><ErrorBoundary><PouringQueuePage /></ErrorBoundary></AuthGuard> },
-      { path: 'production/selection', element: <AuthGuard permission="stage:selection_pouring"><ErrorBoundary><SelectionPouringQueuePage /></ErrorBoundary></AuthGuard> },
+      { path: 'production/drying', element: <AuthGuard permission="stage:drying"><ErrorBoundary><DryingQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/assembly3d', element: <AuthGuard permission="stage:assembly_3d"><ErrorBoundary><Assembly3dQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/packaging', element: <AuthGuard permission="stage:packaging"><ErrorBoundary><PackagingQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/otk', element: <AuthGuard permission="stage:otk"><ErrorBoundary><OtkQueuePage /></ErrorBoundary></AuthGuard> },
+      { path: 'production/subtask/:subtaskId', element: <ErrorBoundary><SubtaskDetailPage /></ErrorBoundary> },
       { path: 'production/plan', element: <AuthGuard permission="view:planning"><ErrorBoundary><PlannerPage /></ErrorBoundary></AuthGuard> },
       { path: 'warehouse', element: <AuthGuard permission="view:warehouse"><ErrorBoundary><WarehousePage /></ErrorBoundary></AuthGuard> },
       { path: 'analytics', element: <AuthGuard permission="view:analytics"><ErrorBoundary><AnalyticsPage /></ErrorBoundary></AuthGuard> },

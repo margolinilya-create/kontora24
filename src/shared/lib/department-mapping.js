@@ -50,9 +50,11 @@ export const DEPARTMENTS = [
     color: 'bg-cyan-500/15 text-cyan-400',
     borderColor: 'border-cyan-500',
     dotColor: 'bg-cyan-500',
+    // R22.4 (ТЗ 20.07 Фаза 4Б): selection_pouring упразднён — раздельные этапы.
     stages: [
-      { label: 'Выборка / Заливка', status: 'selection_pouring' },
+      { label: 'Выборка', status: 'selection' },
       { label: 'Заливка', status: 'pouring' },
+      { label: 'Сушка', status: 'drying' },
       { label: 'Сборка 3D', status: 'assembly_3d' },
     ],
   },

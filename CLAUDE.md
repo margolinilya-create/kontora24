@@ -734,6 +734,27 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 
 **Осознанно отложено:** фиксация формы/ставки в логе на момент работы (ретроактивность легитимных смен формы менеджером); realtime-утечка финколонок (walrus); split себестоимости при одинаковом коде плёнок двух треков; удаление содержимого sku-photos (за владельцем); включение leaked password protection в Auth (дашборд, вручную).
 
+## R22 — ТЗ v1.0 от 20.07.2026 (8 релизов, миграции 079–085)
+
+Формализованное ТЗ менеджера (27 стр., 8 фаз). Главный разворот: **отказ от параллельных подзадач стикеры/фоны → подзадачи-допечатки**. Реализовано серией R22.0–R22.7.
+
+| Релиз | Фаза ТЗ | Что | Миграция |
+|-------|---------|-----|----------|
+| R22.0 | 6 | Баг-фиксы: перезагрузка страницы при сохранении прогресса (useOrderDetail `loadedIdRef` — Skeleton только при 1-м заходе); имя плёнки на печати из `order.film_material.name` (ProductionLogForm.resolveFilmLabel); «нет прав» на расходе склада — RLS INSERT `k24_material_transactions` переписана на `material:add_transaction` через k24_role_permissions (был дрифт репо↔прод: `role IN (admin,manager)`) + preflight в MaterialConsumption | 079 |
+| R22.1 | 1 | **Подзадачи-допечатки** (`track='reprint'`): ручная допечатка по браку, старт с 'print', полный маршрут заказа, страница `/production/subtask/:id` с формой учёта, гейт «заказ не завершён пока есть незавершённые допечатки». `k24_production_logs.subtask_id`+`qty_dried`. RPC `create_reprint_subtask`/`advance_reprint_subtask` (все роли, optimistic-lock, серверная сверка qty). Триггер `fn_block_done_with_open_reprints`. `getReprintRoute`. Хуки `useReprintSubtasks`/`useReprintSubtask`/`useReprintQueue`. Старая система (bg/stickers/extra) → `is_legacy` read-only | 080, 081 |
+| R22.2 | 2 | Excel-отчёт сотрудника по дням: `useEmployeeReport.days` стал подневным объектом (минуты+штуки+заработок), `buildEmployeeReportAoa` ([employee-report.js](src/features/reports/lib/employee-report.js)), кнопка «Выгрузить отчёт» + выбор периода на карточке | — |
+| R22.3 | 3 | «Образец» (цветопроба) A5 PNG/PDF: [SampleProof.jsx](src/features/techcard/components/SampleProof.jsx) на присланной подложке-шаблоне (`sample-proof-template.png`) + динамика (номер/дата/тип/материал/размер). Тип `sample` в PrintPreviewModal. Шрифт Akt — слот @font-face (файлов пока нет, системный фолбэк) | — |
+| R22.4 | 4А+4Б | **Маршрут stickerpack3D** линейный: cutting→selection→pouring→drying→assembly_3d (selection_pouring упразднён). `.order`: selection 10 < pouring 11 < drying 12 (меню «Выборка выше Заливки»). Новый этап/очередь «Сушка» (`/production/drying`). Ключи selection_pouring/batch_layout сохранены с меткой «(устар.)». Демонтаж dual-track: `useOrderSubtasks` фильтрует `is_legacy` (старый UI инертен), StatusSwitcher показывается для stickerpack3D, useSubtaskQueue удалён. Payroll/аналитика/цвета — ветки selection_pouring СОХРАНЕНЫ для истории. Бейджи: prepress+sample_layout, selection/drying | 082, 083 |
+| R22.5 | 5 | Брак сушки в «3D отделе»: `compute3DPouringReport` колонка «Брак» = заливка + сушка (stage='drying', track='stickers'); ThreeDPouringTab запрос + pouring/drying | — |
+| R22.6 | 7 | Настройки склада: `k24_warehouse_categories`/`k24_warehouse_statuses` (сид В наличии/Заказано/Ожидает поставки), `k24_materials.category_id`/`wh_status_id` (FK ON DELETE SET NULL), вкладка [WarehouseSettings.jsx](src/features/settings/components/WarehouseSettings.jsx) с CRUD + предупреждение при удалении используемого | 084 |
+| R22.7 | 8 | Формы учёта: препресс «Файлов подготовлено к печати» (`prepared_qty`, unit файлов); резка «Нарезано изделий» + брак (`disabledUntil`) — брак уменьшает прогресс (check_stage_completion v4); сборка 3D «Собрано изделий» без прогресс-бара (`noProgressBar`); **выборка stickerpack3D** оплата ×stickers_per_pack (calculateWorkerPayout/useReports/useCabinetStats — embed +order_type). Поля БД не переименованы | 085 |
+
+**Решения пользователя (22.07):** всё ТЗ одной серией; ассеты образца (шаблон + шрифты Akt) — шаблон получен, шрифты позже; новый маршрут stickerpack3D после резки = selection→pouring→drying→assembly_3d; sticker3D без изменений.
+
+**Осознанно отложено (R22):** печать/резка stickerpack3D остаются dual-track (две плёнки) ради корректного списания материалов — ТЗ-упрощение до одного поля сломало бы `deduct_materials_from_log`; шрифты Akt (ждём файлы от менеджера — сейчас системный фолбэк); backfill `category_id` материалов (пока NULL → фолбэк на `getMaterialCategory`).
+
+732 unit-теста. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects`.
+
 ## Обработка ошибок
 
 - **toast.error в action handlers:** `toast.error(translateError(err).message)` — перевод Supabase ошибок на человеческий русский

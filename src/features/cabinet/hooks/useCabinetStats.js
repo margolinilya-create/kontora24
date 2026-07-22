@@ -51,7 +51,7 @@ export function useCabinetStats(period = '30') {
           .order('started_at', { ascending: false }),
         supabase
           .from('k24_production_logs')
-          .select('stage, order_id, design_index, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, defects, created_at, order:k24_orders!order_id(stickers_per_pack, sticker_shape)')
+          .select('stage, order_id, design_index, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, defects, created_at, order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', sixMonthsAgo),
@@ -90,7 +90,7 @@ export function useCabinetStats(period = '30') {
         if (l.stage === 'pouring' || l.stage === 'selection_pouring') {
           headline.poured += Number(l.stickers_good) || 0
         }
-        if (l.stage === 'selection_pouring') {
+        if (l.stage === 'selection_pouring' || l.stage === 'selection') {
           headline.selected += Number(l.qty_selected) || 0
         }
         if (l.stage === 'assembly_3d') {

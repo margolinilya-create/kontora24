@@ -3,6 +3,7 @@ import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
 import { TechCard } from './TechCard'
 import { Sticker } from './Sticker'
+import { SampleProof } from './SampleProof'
 import { exportAsPNG, exportAsPDF, printElement } from '@/shared/lib/html-export'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -33,6 +34,14 @@ const CONFIG = {
     pdf: { scale: 3, orientation: 'l', format: [75, 120], pixelWidth: 340, pixelHeight: 213 },
     print: { scale: 3, pageSize: '120mm 75mm', width: '120mm', height: '75mm', pixelWidth: 340, pixelHeight: 213 },
     filenamePrefix: 'sticker-delivery',
+    maxWidth: 'max-w-md',
+  },
+  // R22.3 (ТЗ 20.07 Фаза 3): образец-цветопроба A5 148×210 мм.
+  sample: {
+    title: 'Образец (цветопроба)',
+    pdf: { scale: 3, orientation: 'p', format: [148, 210], pixelWidth: 419, pixelHeight: 593 },
+    print: { scale: 3, pageSize: 'A5', width: '148mm', height: '210mm', pixelWidth: 419, pixelHeight: 593 },
+    filenamePrefix: 'obrazec',
     maxWidth: 'max-w-md',
   },
 }
@@ -86,7 +95,9 @@ export function PrintPreviewModal({ isOpen, onClose, type, order, onUpdated }) {
         <div className="mx-auto" style={{ width: 'fit-content' }}>
           {type === 'techcard'
             ? <TechCard ref={ref} order={order} editable onUpdated={onUpdated} />
-            : <Sticker ref={ref} order={order} type={type} />}
+            : type === 'sample'
+              ? <SampleProof ref={ref} order={order} />
+              : <Sticker ref={ref} order={order} type={type} />}
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">

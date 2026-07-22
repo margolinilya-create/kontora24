@@ -13,6 +13,7 @@ import { ColorApprovalControls } from '../components/ColorApprovalControls'
 import { OrderStepper } from '../components/OrderStepper'
 import { OrderComments } from '../components/OrderComments'
 import { OrderProgressTab } from '../components/OrderProgressTab'
+import { OrderSubtasksTab } from '../components/OrderSubtasksTab'
 import { OrderReportsTab } from '../components/OrderReportsTab'
 import { OrderHistoryTab } from '../components/OrderHistoryTab'
 import { FinanceTab } from '../components/FinanceTab'
@@ -26,7 +27,6 @@ import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
 import {
   ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES,
-  IS_3D_STICKERPACK,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
@@ -422,6 +422,7 @@ export default function OrderDetailPage() {
   const tabs = [
     { key: 'overview', label: 'Обзор' },
     { key: 'progress', label: 'Прогресс' },
+    { key: 'subtasks', label: 'Подзадачи' },
     { key: 'reports', label: 'Расход материалов' },
     { key: 'history', label: 'История' },
     ...(isFinance ? [{ key: 'finance', label: 'Финансы' }] : []),
@@ -461,12 +462,9 @@ export default function OrderDetailPage() {
           {order.status === 'color_approval' ? (
             <ColorApprovalControls order={order} onUpdated={refetch} />
           ) : (
-            /* Для stickerpack3D на стадиях подзадач движение через SubtaskIndicator
-               (R8.4 серии 25.05) — основная кнопка StatusSwitcher скрыта чтобы
-               не было «двух способов одно и то же». */
-            !(IS_3D_STICKERPACK(order.order_type) && ['print','lamination','cutting','selection_pouring'].includes(order.status)) && (
-              <StatusSwitcher order={order} onUpdated={refetch} />
-            )
+            /* R22.4 (ТЗ 20.07 Фаза 4Б): dual-track подзадачи упразднены —
+               stickerpack3D продвигается обычной кнопкой StatusSwitcher. */
+            <StatusSwitcher order={order} onUpdated={refetch} />
           )}
           {canEdit && (
             <button
@@ -485,6 +483,7 @@ export default function OrderDetailPage() {
         <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('techcard')}>Тех. карта</Button>
         <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('production')}>На бокс</Button>
         <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('delivery')}>На выдачу</Button>
+        <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('sample')}>Образец</Button>
       </div>
 
       {/* Stepper */}
@@ -506,6 +505,9 @@ export default function OrderDetailPage() {
         {tab === 'overview' && <OverviewTab order={order} onUpdated={refetch} />}
         {tab === 'progress' && (
           <OrderProgressTab order={order} history={history} onUpdated={refetch} />
+        )}
+        {tab === 'subtasks' && (
+          <OrderSubtasksTab order={order} />
         )}
         {tab === 'reports' && (
           <OrderReportsTab order={order} onUpdated={refetch} />

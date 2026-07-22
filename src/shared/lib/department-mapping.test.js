@@ -76,15 +76,20 @@ describe('getDepartment', () => {
     expect(getDepartment('cutting').stageLabel).toBe('Резка')
   })
 
-  it('returns 3d department for selection_pouring, pouring, assembly_3d', () => {
-    const sp = getDepartment('selection_pouring')
-    expect(sp.departmentId).toBe('3d')
-    expect(sp.departmentLabel).toBe('3D отдел')
-    expect(sp.stageLabel).toBe('Выборка / Заливка')
+  // R22.4 (ТЗ 20.07 Фаза 4Б): selection_pouring упразднён — раздельные этапы.
+  it('returns 3d department for selection, pouring, drying, assembly_3d', () => {
+    const s = getDepartment('selection')
+    expect(s.departmentId).toBe('3d')
+    expect(s.departmentLabel).toBe('3D отдел')
+    expect(s.stageLabel).toBe('Выборка')
 
     const p = getDepartment('pouring')
     expect(p.departmentId).toBe('3d')
     expect(p.stageLabel).toBe('Заливка')
+
+    const d = getDepartment('drying')
+    expect(d.departmentId).toBe('3d')
+    expect(d.stageLabel).toBe('Сушка')
 
     const a = getDepartment('assembly_3d')
     expect(a.departmentId).toBe('3d')
@@ -124,8 +129,9 @@ describe('getDepartmentLabel', () => {
     expect(getDepartmentLabel('print')).toBe('Печать')
     expect(getDepartmentLabel('lamination')).toBe('Постпечатная обработка')
     expect(getDepartmentLabel('cutting')).toBe('Постпечатная обработка')
-    expect(getDepartmentLabel('selection_pouring')).toBe('3D отдел')
+    expect(getDepartmentLabel('selection')).toBe('3D отдел')
     expect(getDepartmentLabel('pouring')).toBe('3D отдел')
+    expect(getDepartmentLabel('drying')).toBe('3D отдел')
     expect(getDepartmentLabel('assembly_3d')).toBe('3D отдел')
     expect(getDepartmentLabel('packaging')).toBe('ОСК')
     expect(getDepartmentLabel('otk')).toBe('ОСК')
@@ -146,8 +152,9 @@ describe('getStageLabel', () => {
     expect(getStageLabel('print')).toBe('Печать')
     expect(getStageLabel('lamination')).toBe('Ламинация')
     expect(getStageLabel('cutting')).toBe('Резка')
-    expect(getStageLabel('selection_pouring')).toBe('Выборка / Заливка')
+    expect(getStageLabel('selection')).toBe('Выборка')
     expect(getStageLabel('pouring')).toBe('Заливка')
+    expect(getStageLabel('drying')).toBe('Сушка')
     expect(getStageLabel('assembly_3d')).toBe('Сборка 3D')
     expect(getStageLabel('packaging')).toBe('Упаковка')
     expect(getStageLabel('otk')).toBe('ОТК / Выдача')
@@ -167,23 +174,26 @@ describe('getAllFilterStatuses', () => {
     expect(new Set(statuses).size).toBe(statuses.length)
   })
 
-  it('contains all expected DB statuses (12 unique)', () => {
+  // R22.4 (ТЗ 20.07 Фаза 4Б): selection_pouring упразднён → раздельные
+  // selection/drying (13 уникальных вместо 12).
+  it('contains all expected DB statuses (13 unique)', () => {
     const statuses = getAllFilterStatuses()
     const expected = [
       'new', 'design', 'prepress', 'print',
       'lamination', 'cutting',
-      'selection_pouring', 'pouring', 'assembly_3d',
+      'selection', 'pouring', 'drying', 'assembly_3d',
       'packaging', 'otk', 'done',
     ]
     for (const s of expected) {
       expect(statuses).toContain(s)
     }
-    expect(statuses).toHaveLength(12)
+    expect(statuses).toHaveLength(13)
   })
 
-  it('does not contain cancelled or old statuses', () => {
+  it('does not contain cancelled or deprecated statuses', () => {
     const statuses = getAllFilterStatuses()
     expect(statuses).not.toContain('cancelled')
+    expect(statuses).not.toContain('selection_pouring') // R22.4 упразднён
     expect(statuses).not.toContain('design_done')
     expect(statuses).not.toContain('print_done')
     expect(statuses).not.toContain('post_processing')
@@ -210,7 +220,7 @@ describe('getStatusesForDepartment', () => {
   })
 
   it('returns correct statuses for 3d', () => {
-    expect(getStatusesForDepartment('3d')).toEqual(['selection_pouring', 'pouring', 'assembly_3d'])
+    expect(getStatusesForDepartment('3d')).toEqual(['selection', 'pouring', 'drying', 'assembly_3d'])
   })
 
   it('returns correct statuses for osk', () => {

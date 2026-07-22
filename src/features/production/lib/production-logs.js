@@ -26,11 +26,13 @@ export const STAGE_FIELDS = {
   // стикеров/изделий к печати». Поле prepared_qty добавлено миграцией 051.
   // «видов»: таргет прогресс-линии — design_variants, не тираж; со старым
   // лейблом «к печати (шт)» вводили штуки и получали 999% (QA 04.07).
+  // R22.7 (ТЗ 20.07 Фаза 8): «Файлов подготовлено к печати». Прогресс —
+  // X / design_variants файлов. Колонку prepared_qty не переименовываем.
   prepress: {
     label: 'Препресс',
     quantityField: 'prepared_qty',
     fields: [
-      { key: 'prepared_qty', label: 'Подготовлено видов', unit: 'видов' },
+      { key: 'prepared_qty', label: 'Файлов подготовлено к печати', unit: 'файлов' },
     ],
   },
 
@@ -116,9 +118,12 @@ export const STAGE_FIELDS = {
         ],
       },
     ],
+    // R22.7 (ТЗ 20.07 Фаза 8): «Нарезано изделий» + «Брак». Поле брака неактивно,
+    // пока не введено количество нарезанных (disabledUntil). Брак уменьшает
+    // прогресс (cutting ∈ SUBTRACT_DEFECTS_STAGES).
     fields: [
-      { key: 'qty_cut', label: 'Нарезано', unit: 'шт' },
-      { key: 'defects', label: 'Брак', unit: 'шт' },
+      { key: 'qty_cut', label: 'Нарезано изделий', unit: 'шт' },
+      { key: 'defects', label: 'Брак', unit: 'шт', disabledUntil: 'qty_cut' },
     ],
   },
 
@@ -163,11 +168,13 @@ export const STAGE_FIELDS = {
     resinExtra: { key: 'resin_grams', label: 'Расход смолы', unit: 'г', step: '0.1' },
   },
 
+  // R22.7 (ТЗ 20.07 Фаза 8): «Собрано изделий», без прогресс-бара (noProgressBar).
   assembly_3d: {
     label: 'Сборка 3D',
     quantityField: 'packs_assembled',
+    noProgressBar: true,
     fields: [
-      { key: 'packs_assembled', label: 'Собрано паков', unit: 'шт' },
+      { key: 'packs_assembled', label: 'Собрано изделий', unit: 'шт' },
     ],
   },
 
@@ -400,6 +407,101 @@ export function computeIncomingPerItem(logs, route, stage, itemIdx) {
   return { total: null, source: null, isStart: true }
 }
 
+// ============================================================================
+// R22.1 (ТЗ 20.07 Фаза 1) — подзадачи-допечатки (track='reprint').
+// Допечатка всегда single-track. Прогресс этапа считается по логам с
+// subtask_id (а не order-level логам). Поле количества — по этапу.
+// ============================================================================
+
+// Поле количества «годных» по этапу допечатки. Совпадает с маппингом в
+// advance_reprint_subtask (миграция 081) — держать синхронно.
+export const REPRINT_STAGE_QTY_FIELD = {
+  print: 'stickers_printed',
+  lamination: 'lamination_qty',
+  cutting: 'qty_cut',
+  selection: 'qty_selected',
+  pouring: 'stickers_good',
+  drying: 'qty_dried',
+  assembly_3d: 'packs_assembled',
+  packaging: 'packs_packaged',
+}
+
+// Этапы допечатки, где брак вычитается из годных (в т.ч. сушка: годные =
+// высушено − брак). Для pouring stickers_good уже = poured − defects.
+const REPRINT_SUBTRACT_DEFECTS = new Set(['print', 'cutting', 'lamination', 'packaging', 'drying'])
+
+/**
+ * Поля формы учёта для этапа допечатки (single-track). Переиспользуем
+ * STAGE_FIELDS.fields, но: печать без per-трек/плёнки фонов (одно изделие),
+ * сушка = «Высушено» + «Брак».
+ */
+export function reprintStageFields(stage) {
+  if (stage === 'drying') {
+    return [
+      { key: 'qty_dried', label: 'Высушено', unit: 'шт' },
+      { key: 'defects', label: 'Брак', unit: 'шт' },
+    ]
+  }
+  if (stage === 'print') {
+    return [
+      { key: 'stickers_printed', label: 'Напечатано', unit: 'шт' },
+      { key: 'film_meters', label: 'Плёнка', unit: 'м', step: '0.1', filmFrom: 'backgrounds' },
+    ]
+  }
+  return STAGE_FIELDS[stage]?.fields || []
+}
+
+/**
+ * Прогресс одного этапа допечатки по её логам (subtask_id уже отфильтрован
+ * вызывающим). total = Σ поля этапа − брак (для REPRINT_SUBTRACT_DEFECTS).
+ */
+export function computeSubtaskStageProgress(subtaskLogs, stage, qty) {
+  const field = REPRINT_STAGE_QTY_FIELD[stage]
+  const stageLogs = (subtaskLogs || []).filter((l) => l.stage === stage && !l.deleted_at)
+  const raw = field ? stageLogs.reduce((s, l) => s + (Number(l[field]) || 0), 0) : 0
+  const defects = stageLogs.reduce((s, l) => s + (Number(l.defects) || 0), 0)
+  const total = REPRINT_SUBTRACT_DEFECTS.has(stage) ? Math.max(0, raw - defects) : raw
+  const target = qty || 0
+  const percentage = target > 0 ? Math.round((total / target) * 100) : 0
+  return { total, target, percentage, isComplete: total >= target }
+}
+
+/**
+ * Общий прогресс допечатки по её маршруту (0–100%). Завершённые этапы дают
+ * полную долю, текущий — частичную (produced/qty). Даёт плавную шкалу по route.
+ * @param {object} subtask — { status, qty, route: string[] }
+ * @param {Array} subtaskLogs — логи этой подзадачи
+ */
+export function computeSubtaskOverallProgress(subtask, subtaskLogs) {
+  const route = Array.isArray(subtask?.route) ? subtask.route : []
+  const prodStages = route.filter((s) => s !== 'done')
+  const n = prodStages.length
+  if (n === 0) return { percentage: subtask?.status === 'done' ? 100 : 0, done: subtask?.status === 'done' }
+  if (subtask?.status === 'done') return { percentage: 100, done: true }
+  const curIdx = prodStages.indexOf(subtask?.status)
+  if (curIdx < 0) return { percentage: 0, done: false }
+  const curFrac = Math.min(1, computeSubtaskStageProgress(subtaskLogs, subtask.status, subtask.qty).total / (subtask.qty || 1))
+  const percentage = Math.round(((curIdx + curFrac) / n) * 100)
+  return { percentage, done: false }
+}
+
+/**
+ * UI-статус допечатки: Завершено / Приостановлено / В работе / В очереди.
+ */
+export function reprintUiStatus(subtask, subtaskLogs) {
+  if (subtask?.status === 'done') return 'done'
+  if (subtask?.paused) return 'paused'
+  const hasCurrentLog = (subtaskLogs || []).some((l) => l.stage === subtask?.status && !l.deleted_at)
+  return hasCurrentLog ? 'in_progress' : 'queued'
+}
+
+export const REPRINT_UI_STATUS_LABELS = {
+  queued: 'В очереди',
+  in_progress: 'В работе',
+  paused: 'Приостановлено',
+  done: 'Завершено',
+}
+
 /**
  * Validate a log entry for a given stage.
  *
@@ -499,12 +601,19 @@ export function hasSubtaskLog(logs, track, subtaskStatus) {
  * Сводка по 3D-заливке одного stickerpack3D заказа. По строке на каждый вид
  * стикера (design_index). Источники данных:
  *   - stage='print',             track='stickers' → stickers_printed
- *   - stage='selection_pouring', track='stickers' → stickers_good (хорошие), defects (брак)
+ *   - stage IN ('selection_pouring','pouring'), track='stickers' → stickers_good, defects
+ *   - stage='drying',            track='stickers' → defects (брак после сушки)
+ *
+ * R22.5 (ТЗ 20.07 Фаза 5): брак с этапа «Сушка» попадает в колонку «Брак».
+ * Исторические selection_pouring-логи сохраняются; новый линейный маршрут
+ * пишет заливку на stage='pouring'.
  *
  * Запас 15% — Math.ceil(qty * 1.15). Излишки = good − qty (отрицательное → недостача).
  * % брака от произведённых = defects / (good + defects).
  * % излишков = surplus / qty.
  */
+const POURING_STAGES_3D = ['selection_pouring', 'pouring']
+
 export function compute3DPouringReport(order, logs, designs) {
   const qty = Number(order?.qty || 0)
   const target15 = Math.ceil(qty * 1.15)
@@ -517,10 +626,15 @@ export function compute3DPouringReport(order, logs, designs) {
     const printed = printLogs.reduce((s, l) => s + Number(l.stickers_printed || 0), 0)
 
     const pourLogs = (logs || []).filter(
-      (l) => l.stage === 'selection_pouring' && l.track === 'stickers' && l.design_index === di && !l.deleted_at,
+      (l) => POURING_STAGES_3D.includes(l.stage) && l.track === 'stickers' && l.design_index === di && !l.deleted_at,
     )
     const good = pourLogs.reduce((s, l) => s + Number(l.stickers_good || 0), 0)
+    // Брак = брак на заливке + брак после сушки (R22.5).
+    const dryLogs = (logs || []).filter(
+      (l) => l.stage === 'drying' && l.track === 'stickers' && l.design_index === di && !l.deleted_at,
+    )
     const defects = pourLogs.reduce((s, l) => s + Number(l.defects || 0), 0)
+      + dryLogs.reduce((s, l) => s + Number(l.defects || 0), 0)
 
     const pouredRaw = good + defects
     const surplus = good - qty

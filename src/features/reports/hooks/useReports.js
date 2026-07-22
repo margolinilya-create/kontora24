@@ -254,7 +254,7 @@ export function useBonusReport(period = '30') {
     try {
       const [logsRes, ratesRes] = await Promise.all([
         supabase.from('k24_production_logs')
-          .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack, sticker_shape)')
+          .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape)')
           .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
@@ -290,11 +290,13 @@ export function useBonusReport(period = '30') {
         }
         if (l.packs_packaged) { byWorker[name].packaging += l.packs_packaged; byWorker[name].total += l.packs_packaged * (rates.packaging || 0) }
         if (l.qty_selected) {
-          // Выборка фонов (selection_pouring) — каждый фон = N стикеров (×stickers_per_pack).
-          // Выборка штучных (R11 stage='selection' для sticker3D) — qty_selected уже = шт.
-          const perPack = l.stage === 'selection_pouring'
-            ? (Number(l.order?.stickers_per_pack) || 1)
-            : 1
+          // Выборка фонов — каждый фон = N стикеров (×stickers_per_pack).
+          // R22.7 (ТЗ Фаза 8): для stickerpack3D «Выборка» (stage='selection')
+          // = выборка фонов, оплата ×stickers_per_pack (как исторический
+          // selection_pouring). sticker3D «Выборка» штучная — ×1.
+          const isBgSelection = l.stage === 'selection_pouring'
+            || (l.stage === 'selection' && l.order?.order_type === 'stickerpack3D')
+          const perPack = isBgSelection ? (Number(l.order?.stickers_per_pack) || 1) : 1
           byWorker[name].selection += l.qty_selected
           byWorker[name].total += l.qty_selected * perPack * (rates.selection || 0)
         }
@@ -335,7 +337,7 @@ export function useEmployeeReport(period = '30') {
           .not('ended_at', 'is', null)
           .gte('started_at', getSince(period)).lte('started_at', getUntil(period) ?? '9999-12-31T23:59:59Z'),
         supabase.from('k24_production_logs')
-          .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(stickers_per_pack, sticker_shape)')
+          .select('worker_id, stage, order_id, design_index, created_at, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape)')
           .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),
@@ -367,26 +369,55 @@ export function useEmployeeReport(period = '30') {
         return byWorker[workerId]
       }
 
+      // R22.2 (ТЗ 20.07 Фаза 2): подневная детализация для Excel-отчёта.
+      // days[dd.MM.yy] = { minutes, poured, selected, assembled, packaged, payout }.
+      function ensureDay(w, day) {
+        if (!w.days[day]) {
+          w.days[day] = { minutes: 0, poured: 0, selected: 0, assembled: 0, packaged: 0, payout: 0 }
+        }
+        return w.days[day]
+      }
+
       ;(shiftsRes.data || []).forEach((s) => {
         const w = ensure(s.worker_id, s.worker?.display_name || 'Неизвестный')
         w.totalMinutes += s.duration_minutes || 0
         const day = format(new Date(s.started_at), 'dd.MM.yy')
-        w.days[day] = (w.days[day] || 0) + (s.duration_minutes || 0)
+        ensureDay(w, day).minutes += s.duration_minutes || 0
       })
 
       ;(logsRes.data || []).forEach((l) => {
         if (!l.worker_id) return
         const w = ensure(l.worker_id, l.worker?.display_name || 'Неизвестный')
+        const day = l.created_at ? format(new Date(l.created_at), 'dd.MM.yy') : null
+        const d = day ? ensureDay(w, day) : null
         const perPack = Number(l.order?.stickers_per_pack) || 1
-        // R14.6 hotfix: selection (штучные R11) множитель =1, selection_pouring (фоны) =perPack.
-        const selectionMult = l.stage === 'selection_pouring' ? perPack : 1
+        // R14.6/R22.7: выборка фонов (selection_pouring ИЛИ selection у
+        // stickerpack3D) множится на stickers_per_pack; штучная выборка
+        // sticker3D (selection) — ×1.
+        const isBgSelection = l.stage === 'selection_pouring'
+          || (l.stage === 'selection' && l.order?.order_type === 'stickerpack3D')
+        const selectionMult = isBgSelection ? perPack : 1
         if (l.stickers_good) {
           const pRate = pouringRateForShape(shapeForLog(l, shapeByDesign, orderShape), rates)
-          w.poured += l.stickers_good; w.payout += l.stickers_good * pRate
+          const pay = l.stickers_good * pRate
+          w.poured += l.stickers_good; w.payout += pay
+          if (d) { d.poured += l.stickers_good; d.payout += pay }
         }
-        if (l.qty_selected) { w.selected += l.qty_selected; w.payout += l.qty_selected * selectionMult * (rates.selection || 0) }
-        if (l.packs_assembled) { w.assembled += l.packs_assembled; w.payout += l.packs_assembled * perPack * (rates.assembly_3d || 0) }
-        if (l.packs_packaged) { w.packaged += l.packs_packaged; w.payout += l.packs_packaged * (rates.packaging || 0) }
+        if (l.qty_selected) {
+          const pay = l.qty_selected * selectionMult * (rates.selection || 0)
+          w.selected += l.qty_selected; w.payout += pay
+          if (d) { d.selected += l.qty_selected; d.payout += pay }
+        }
+        if (l.packs_assembled) {
+          const pay = l.packs_assembled * perPack * (rates.assembly_3d || 0)
+          w.assembled += l.packs_assembled; w.payout += pay
+          if (d) { d.assembled += l.packs_assembled; d.payout += pay }
+        }
+        if (l.packs_packaged) {
+          const pay = l.packs_packaged * (rates.packaging || 0)
+          w.packaged += l.packs_packaged; w.payout += pay
+          if (d) { d.packaged += l.packs_packaged; d.payout += pay }
+        }
         if (l.stickers_printed) w.printed += l.stickers_printed
         if (l.lamination_qty) w.laminated += l.lamination_qty
         if (l.qty_cut) w.cut += l.qty_cut

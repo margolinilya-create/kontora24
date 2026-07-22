@@ -3,6 +3,8 @@ import { useOrdersCostReport, useEmployeeReport } from '../hooks/useReports'
 import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
 import { ThreeDPouringTab } from '../components/ThreeDPouringTab'
 import { buildCostMap, costForOrder } from '../lib/materials-cost'
+import { buildEmployeeReportAoa, parseDayKey } from '../lib/employee-report'
+import Input from '@/shared/components/Input'
 import { ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PAYMENT_STATUSES } from '@/shared/constants'
 import { formatPrice, formatOrderNumber, formatDate } from '@/shared/lib/utils'
 import { downloadXlsx } from '@/shared/lib/export-xlsx'
@@ -277,28 +279,78 @@ function EmployeesTab({ period }) {
     <ReportFrame title="Учёт работы сотрудников" onXlsx={handleExport}>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {data.map((w) => (
-          <button
+          <div
             key={w.worker_id}
-            onClick={() => setOpenWorker(w)}
-            className="text-left bg-surface-2 hover:bg-surface-dim border border-border rounded-xl p-4 transition-colors"
+            className="relative bg-surface-2 border border-border rounded-xl p-4"
           >
-            <p className="font-semibold text-sm">{w.name}</p>
-            <p className="text-2xl font-display font-bold mt-1 tabular-nums">
-              {(w.totalMinutes / 60).toFixed(1)}<span className="text-sm text-text-muted font-sans"> ч</span>
-            </p>
-            <p className="text-sm text-accent font-medium">{formatPrice(w.payout)}</p>
-            <div className="grid grid-cols-2 gap-1 mt-2 text-xs text-text-muted">
-              <span>Залито: <b className="text-text">{w.poured}</b></span>
-              <span>Выбрано: <b className="text-text">{w.selected}</b></span>
-              <span>Собрано: <b className="text-text">{w.assembled}</b></span>
-              <span>Упаковано: <b className="text-text">{w.packaged}</b></span>
-            </div>
-            <p className="text-xs text-accent mt-2">Подробнее →</p>
-          </button>
+            {/* R22.2 (ТЗ 20.07 Фаза 2): выгрузка подневного Excel-отчёта */}
+            <EmployeeXlsxExport worker={w} period={period} />
+            <button
+              onClick={() => setOpenWorker(w)}
+              className="text-left w-full hover:opacity-90 transition-opacity"
+            >
+              <p className="font-semibold text-sm pr-24">{w.name}</p>
+              <p className="text-2xl font-display font-bold mt-1 tabular-nums">
+                {(w.totalMinutes / 60).toFixed(1)}<span className="text-sm text-text-muted font-sans"> ч</span>
+              </p>
+              <p className="text-sm text-accent font-medium">{formatPrice(w.payout)}</p>
+              <div className="grid grid-cols-2 gap-1 mt-2 text-xs text-text-muted">
+                <span>Залито: <b className="text-text">{w.poured}</b></span>
+                <span>Выбрано: <b className="text-text">{w.selected}</b></span>
+                <span>Собрано: <b className="text-text">{w.assembled}</b></span>
+                <span>Упаковано: <b className="text-text">{w.packaged}</b></span>
+              </div>
+              <p className="text-xs text-accent mt-2">Подробнее →</p>
+            </button>
+          </div>
         ))}
       </div>
       {openWorker && <EmployeeDetailModal worker={openWorker} onClose={() => setOpenWorker(null)} />}
     </ReportFrame>
+  )
+}
+
+function EmployeeXlsxExport({ worker }) {
+  const [open, setOpen] = useState(false)
+  // Границы по загруженным дням сотрудника (для дефолта пикера).
+  const bounds = useMemo(() => {
+    const dates = Object.keys(worker.days || {}).map(parseDayKey).filter(Boolean).sort((a, b) => a - b)
+    const iso = (d) => d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : ''
+    return { from: iso(dates[0]), to: iso(dates[dates.length - 1]) }
+  }, [worker.days])
+  const [from, setFrom] = useState(bounds.from)
+  const [to, setTo] = useState(bounds.to)
+
+  function handleDownload() {
+    const fromD = from ? new Date(`${from}T00:00:00`) : null
+    const toD = to ? new Date(`${to}T23:59:59`) : null
+    const aoa = buildEmployeeReportAoa(worker, { from: fromD, to: toD })
+    downloadXlsx(`отчёт-${worker.name}`, worker.name.slice(0, 28), aoa)
+      .then(() => setOpen(false))
+      .catch((err) => toast.error(translateError(err).message))
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => { setFrom(bounds.from); setTo(bounds.to); setOpen(true) }}
+        className="absolute top-3 right-3 text-xs px-2 py-1 rounded-lg border border-border bg-surface hover:bg-surface-dim text-text-muted hover:text-text transition-colors z-10"
+      >
+        Выгрузить отчёт
+      </button>
+      {open && (
+        <Modal isOpen onClose={() => setOpen(false)} title={`Отчёт: ${worker.name}`} maxWidth="max-w-sm">
+          <div className="space-y-4">
+            <p className="text-sm text-text-muted">Выберите период выгрузки.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input id="emp-from" label="С" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <Input id="emp-to" label="По" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
+            <Button onClick={handleDownload} className="w-full">Скачать .xlsx</Button>
+          </div>
+        </Modal>
+      )}
+    </>
   )
 }
 
@@ -322,10 +374,10 @@ function EmployeeDetailModal({ worker, onClose }) {
           <h3 className="font-semibold text-sm mb-2">График по дням</h3>
           <div className="bg-surface-2 rounded-xl divide-y divide-border max-h-96 overflow-y-auto">
             {days.length === 0 && <p className="p-4 text-sm text-text-muted">Нет смен</p>}
-            {days.map(([day, min]) => (
+            {days.map(([day, d]) => (
               <div key={day} className="flex items-center justify-between px-4 py-2 text-sm">
                 <span>{day}</span>
-                <span className="tabular-nums font-medium">{(min / 60).toFixed(1)} ч</span>
+                <span className="tabular-nums font-medium">{((d.minutes || 0) / 60).toFixed(1)} ч</span>
               </div>
             ))}
           </div>

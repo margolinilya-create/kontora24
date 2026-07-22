@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
+import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { MATERIAL_TYPES } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -12,6 +14,11 @@ import Modal from '@/shared/components/Modal'
 
 export function MaterialConsumption({ order }) {
   const { profile } = useAuth()
+  // R22.0 (ТЗ 20.07 Фаза 6.4): preflight-гейт вместо «нет прав» из RPC после
+  // заполнения формы. До загрузки стора прав кнопку не блокируем (permsLoaded).
+  const canAddTx = useCanDo('material:add_transaction')
+  const permsLoaded = useRolePermissionsStore((s) => s.loaded)
+  const txBlocked = permsLoaded && !canAddTx
   const [materials, setMaterials] = useState([])
   const [consumed, setConsumed] = useState([])
   const [showForm, setShowForm] = useState(false)
@@ -90,7 +97,18 @@ export function MaterialConsumption({ order }) {
       )}
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold">Расход материалов</h2>
-        <Button variant="secondary" size="sm" onClick={() => setShowForm(true)} disabled={!!loadError}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            if (txBlocked) {
+              toast.error('Нет права «Вносить приход/расход на складе» — обратитесь к менеджеру (Настройки → Права ролей)')
+              return
+            }
+            setShowForm(true)
+          }}
+          disabled={!!loadError}
+        >
           Записать расход
         </Button>
       </div>

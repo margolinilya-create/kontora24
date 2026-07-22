@@ -195,10 +195,14 @@ export function useOrderDetail(id) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const canSeeFinance = useCanDo('view:finance')
+  // R22.0 (ТЗ 20.07 Фаза 6.1): скелетон показываем только при первом заходе
+  // на заказ — повторные refetch (после сохранения лога, по фокусу вкладки,
+  // по realtime) тихие, иначе вся страница «перезагружается» и ремоунтит формы.
+  const loadedIdRef = useRef(null)
 
   const fetchDetail = useCallback(async () => {
     if (!id) return
-    setLoading(true)
+    if (loadedIdRef.current !== id) setLoading(true)
     setError(null)
     try {
       // Финансы — через маскирующее view (см. useOrders списки выше).
@@ -229,6 +233,7 @@ export function useOrderDetail(id) {
       }
       setOrder(orderData)
       setHistory(historyRes.data || [])
+      loadedIdRef.current = id
     } catch (err) {
       setError(err)
     } finally {

@@ -79,8 +79,16 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   function clearAll() { setForms({}) }
 
   function fieldLabel(field, _trackKey) {
+    // R22.0 (ТЗ 20.07 Фаза 6.3): имя плёнки — из выбранной позиции склада
+    // (film_material / film_stickers_material, R16.1), enum FILM_TYPES — фолбэк
+    // для заказов без привязки к позиции. Паттерн VariantLogForm.fieldLabel.
     function resolveFilmLabel(source) {
-      const filmType = source === 'stickers'
+      const isStickers = source === 'stickers'
+      const material = isStickers
+        ? (order?.film_stickers_material || order?.film_material)
+        : order?.film_material
+      if (material?.name) return material.name
+      const filmType = isStickers
         ? (order?.film_type_stickers || order?.film_type)
         : order?.film_type
       return FILM_TYPES[filmType]?.label || filmType || ''

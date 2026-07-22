@@ -50,7 +50,8 @@ export function ThreeDPouringTab({ period }) {
             .from('k24_production_logs')
             .select('order_id, stage, track, design_index, stickers_printed, stickers_good, defects, deleted_at')
             .in('order_id', orderIds)
-            .in('stage', ['print', 'selection_pouring'])
+            // R22.5 (ТЗ 20.07 Фаза 5): + pouring (новый маршрут) и drying (брак сушки).
+            .in('stage', ['print', 'selection_pouring', 'pouring', 'drying'])
             .eq('track', 'stickers')
             .is('deleted_at', null)
           if (le) throw le

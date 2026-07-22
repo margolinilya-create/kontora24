@@ -594,12 +594,19 @@ export function hasSubtaskLog(logs, track, subtaskStatus) {
  * Сводка по 3D-заливке одного stickerpack3D заказа. По строке на каждый вид
  * стикера (design_index). Источники данных:
  *   - stage='print',             track='stickers' → stickers_printed
- *   - stage='selection_pouring', track='stickers' → stickers_good (хорошие), defects (брак)
+ *   - stage IN ('selection_pouring','pouring'), track='stickers' → stickers_good, defects
+ *   - stage='drying',            track='stickers' → defects (брак после сушки)
+ *
+ * R22.5 (ТЗ 20.07 Фаза 5): брак с этапа «Сушка» попадает в колонку «Брак».
+ * Исторические selection_pouring-логи сохраняются; новый линейный маршрут
+ * пишет заливку на stage='pouring'.
  *
  * Запас 15% — Math.ceil(qty * 1.15). Излишки = good − qty (отрицательное → недостача).
  * % брака от произведённых = defects / (good + defects).
  * % излишков = surplus / qty.
  */
+const POURING_STAGES_3D = ['selection_pouring', 'pouring']
+
 export function compute3DPouringReport(order, logs, designs) {
   const qty = Number(order?.qty || 0)
   const target15 = Math.ceil(qty * 1.15)
@@ -612,10 +619,15 @@ export function compute3DPouringReport(order, logs, designs) {
     const printed = printLogs.reduce((s, l) => s + Number(l.stickers_printed || 0), 0)
 
     const pourLogs = (logs || []).filter(
-      (l) => l.stage === 'selection_pouring' && l.track === 'stickers' && l.design_index === di && !l.deleted_at,
+      (l) => POURING_STAGES_3D.includes(l.stage) && l.track === 'stickers' && l.design_index === di && !l.deleted_at,
     )
     const good = pourLogs.reduce((s, l) => s + Number(l.stickers_good || 0), 0)
+    // Брак = брак на заливке + брак после сушки (R22.5).
+    const dryLogs = (logs || []).filter(
+      (l) => l.stage === 'drying' && l.track === 'stickers' && l.design_index === di && !l.deleted_at,
+    )
     const defects = pourLogs.reduce((s, l) => s + Number(l.defects || 0), 0)
+      + dryLogs.reduce((s, l) => s + Number(l.defects || 0), 0)
 
     const pouredRaw = good + defects
     const surplus = good - qty

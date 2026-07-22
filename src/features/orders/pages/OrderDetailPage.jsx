@@ -487,6 +487,7 @@ export default function OrderDetailPage() {
         <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('techcard')}>Тех. карта</Button>
         <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('production')}>На бокс</Button>
         <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('delivery')}>На выдачу</Button>
+        <Button variant="secondary" size="sm" className="whitespace-nowrap" onClick={() => setPrintType('sample')}>Образец</Button>
       </div>
 
       {/* Stepper */}

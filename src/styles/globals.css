@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* R22.3 (ТЗ 20.07 Фаза 3): образец-цветопроба использует шрифт Akt.
+ * Файлы шрифта менеджер пришлёт отдельно — раскомментировать при добавлении:
+ * @font-face { font-family: 'Akt'; src: url('../assets/fonts/Akt-Bold.ttf') format('truetype'); font-weight: 700; }
+ * @font-face { font-family: 'Akt'; src: url('../assets/fonts/Akt-Thin.ttf') format('truetype'); font-weight: 100; }
+ * До этого SampleProof использует системный жирный фолбэк (визуально совпадает). */
+
 /* Brand fonts — Onder for headings, Guidy for body.
  * size-adjust normalizes Onder's tall caps so it lines up with Guidy
  * at the same Tailwind text-* size. */

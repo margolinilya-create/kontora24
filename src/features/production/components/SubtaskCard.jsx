@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { REPRINT_STATUS_LABELS } from '@/shared/constants'
+import { REPRINT_STATUS_LABELS, reprintViewLabel } from '@/shared/constants'
 import { REPRINT_UI_STATUS_LABELS } from '../lib/production-logs'
 import { formatOrderNumber as fmtNum } from '@/shared/lib/utils'
 
@@ -15,9 +15,10 @@ const UI_STATUS_TONE = {
  * «Подзадачи» и в производственных очередях. Кликабельна → страница подзадачи.
  * Отмечена лейблом «Допечатка».
  */
-export function SubtaskCard({ subtask, order, overall, uiStatus }) {
+export function SubtaskCard({ subtask, order, overall, uiStatus, onDelete }) {
   const num = fmtNum(order)
   const pct = overall?.percentage ?? 0
+  const viewLabel = reprintViewLabel(order?.order_type, subtask.view_ref)
   return (
     <Link
       to={`/production/subtask/${subtask.id}`}
@@ -27,17 +28,33 @@ export function SubtaskCard({ subtask, order, overall, uiStatus }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-warning/15 text-warning">Допечатка</span>
+            {viewLabel && (
+              <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent">{viewLabel}</span>
+            )}
             <span className="text-sm font-semibold truncate">{subtask.title || `Допечатка к #${num}`}</span>
           </div>
           <p className="text-xs text-text-muted mt-0.5">
             Заказ #{num} · {subtask.qty} шт · {REPRINT_STATUS_LABELS[subtask.status] || subtask.status}
           </p>
         </div>
-        {uiStatus && (
-          <span className={`text-[11px] px-1.5 py-0.5 rounded shrink-0 ${UI_STATUS_TONE[uiStatus] || ''}`}>
-            {REPRINT_UI_STATUS_LABELS[uiStatus] || uiStatus}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {uiStatus && (
+            <span className={`text-[11px] px-1.5 py-0.5 rounded ${UI_STATUS_TONE[uiStatus] || ''}`}>
+              {REPRINT_UI_STATUS_LABELS[uiStatus] || uiStatus}
+            </span>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
+              className="text-xs text-text-muted hover:text-danger px-1.5 py-0.5 rounded hover:bg-danger/10 transition-colors"
+              title="Удалить допечатку"
+              aria-label="Удалить допечатку"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
       {order?.deadline && (
         <p className="text-xs text-text-muted mb-2">Срок: {new Date(order.deadline).toLocaleDateString('ru-RU')}</p>

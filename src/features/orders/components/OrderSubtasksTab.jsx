@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useReprintSubtasks } from '../hooks/useReprintSubtasks'
+import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
+import { useOrderItems } from '../hooks/useOrderItems'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { SubtaskCard } from '@/features/production/components/SubtaskCard'
 import { REPRINT_REASONS, REPRINT_STATUS_LABELS, SUBTASK_STATUS_LABELS, TRACK_LABELS } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
@@ -8,6 +11,7 @@ import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import Modal from '@/shared/components/Modal'
 import Spinner from '@/shared/components/Spinner'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
 /**
  * R22.1 (ТЗ 20.07 Фаза 1) — вкладка «Подзадачи» карточки заказа.
@@ -15,25 +19,63 @@ import Spinner from '@/shared/components/Spinner'
  * подзадачи. Старая система (bg/stickers/extra_stickers) — read-only архив.
  */
 export function OrderSubtasksTab({ order }) {
-  const { reprints, legacy, loading, createReprint } = useReprintSubtasks(order.id)
+  const { reprints, legacy, loading, createReprint, deleteReprint } = useReprintSubtasks(order.id)
+  const { hasRole } = useAuth()
+  const canManage = hasRole(['admin', 'manager'])
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ qty: '', reason: '', comment: '' })
+  const [form, setForm] = useState({ qty: '', reason: '', comment: '', view: '' })
   const [saving, setSaving] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState(null) // subtask | null
+
+  // R23.5: селектор вида — какой вид доделывает допечатка. Источник зависит от
+  // типа: stickerpack3D → k24_pack_designs (design_index), иначе → k24_order_items
+  // (idx мульти-вида). Оба хука вызываем всегда (правила хуков), «лишнему» — null.
+  const isPack3D = order.order_type === 'stickerpack3D'
+  const { designs } = usePackDesigns(isPack3D ? order.id : null)
+  const { items } = useOrderItems(isPack3D ? null : order.id)
+  const viewOptions = isPack3D
+    ? (designs || []).map((d) => ({
+        value: d.design_index,
+        label: `Вид #${d.design_index}${d.name ? ` · ${d.name}` : ''}`,
+      }))
+    : (items || []).map((it) => ({
+        value: it.idx,
+        label: `Размер #${it.idx} · ${Number(it.width_mm)}×${Number(it.height_mm)} мм`,
+      }))
+  const showViewSelect = viewOptions.length > 1
 
   async function handleCreate(e) {
     e.preventDefault()
     const qty = Number(form.qty)
     if (!qty || qty <= 0) { toast.error('Укажите количество к допечатке'); return }
+    if (showViewSelect && form.view === '') { toast.error('Выберите вид, к которому относится допечатка'); return }
     setSaving(true)
     try {
-      await createReprint(order, { qty, reason: form.reason || null, comment: form.comment || null })
+      await createReprint(order, {
+        qty,
+        reason: form.reason || null,
+        comment: form.comment || null,
+        viewRef: showViewSelect ? Number(form.view) : null,
+      })
       toast.success('Допечатка создана')
       setShowCreate(false)
-      setForm({ qty: '', reason: '', comment: '' })
+      setForm({ qty: '', reason: '', comment: '', view: '' })
     } catch (err) {
       toast.error(translateError(err).message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function confirmDelete() {
+    const st = pendingDelete
+    setPendingDelete(null)
+    if (!st) return
+    try {
+      await deleteReprint(st.id)
+      toast.success('Допечатка удалена')
+    } catch (err) {
+      toast.error(translateError(err).message)
     }
   }
 
@@ -69,7 +111,14 @@ export function OrderSubtasksTab({ order }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {reprints.map((r) => (
-            <SubtaskCard key={r.id} subtask={r} order={order} overall={r.overall} uiStatus={r.uiStatus} />
+            <SubtaskCard
+              key={r.id}
+              subtask={r}
+              order={order}
+              overall={r.overall}
+              uiStatus={r.uiStatus}
+              onDelete={canManage && r.status !== 'done' ? () => setPendingDelete(r) : undefined}
+            />
           ))}
         </div>
       )}
@@ -105,6 +154,24 @@ export function OrderSubtasksTab({ order }) {
               required
               placeholder="0"
             />
+            {showViewSelect && (
+              <div>
+                <label htmlFor="reprint-view" className="block text-sm font-medium text-text mb-1">
+                  {isPack3D ? 'Вид стикера' : 'Вид изделия'} <span className="text-danger">*</span>
+                </label>
+                <select
+                  id="reprint-view"
+                  value={form.view}
+                  onChange={(e) => setForm((p) => ({ ...p, view: e.target.value }))}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
+                >
+                  <option value="">— выберите вид —</option>
+                  {viewOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label htmlFor="reprint-reason" className="block text-sm font-medium text-text mb-1">Причина</label>
               <select
@@ -130,6 +197,18 @@ export function OrderSubtasksTab({ order }) {
           </form>
         </Modal>
       )}
+
+      <ConfirmDialog
+        isOpen={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+        title="Удалить допечатку?"
+        message={pendingDelete
+          ? `«${pendingDelete.title}» будет удалена. Действие доступно только пока по допечатке нет внесённых данных.`
+          : ''}
+        confirmText="Удалить"
+        variant="danger"
+      />
     </div>
   )
 }

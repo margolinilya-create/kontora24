@@ -11,6 +11,7 @@ import {
   SUBTASK_ROUTE_BACKGROUNDS, SUBTASK_ROUTE_STICKERS, SUBTASK_STATUS_LABELS,
   getSubtaskRoute, getNextSubtaskStatus,
   canAdvanceFrom, PERMISSIONS, PERMISSION_LABELS,
+  reprintViewLabel,
 } from './constants'
 
 describe('IS_3D_TYPE', () => {
@@ -221,6 +222,22 @@ describe('R22.4 — упразднение selection_pouring / порядок м
   it('getNextStatus: sticker3D drying → selection (по маршруту, не по .order)', () => {
     const order = { order_type: 'sticker3D', need_lam: false }
     expect(getNextStatus('post_printer', 'drying', order)).toBe('selection')
+  })
+})
+
+describe('reprintViewLabel', () => {
+  // R23.5: метка привязки допечатки к виду.
+  it('stickerpack3D → «Вид #N»', () => {
+    expect(reprintViewLabel('stickerpack3D', 2)).toBe('Вид #2')
+  })
+  it('прочие типы → «Размер #N»', () => {
+    expect(reprintViewLabel('sticker_cut', 1)).toBe('Размер #1')
+    expect(reprintViewLabel('sticker3D', 3)).toBe('Размер #3')
+  })
+  it('null/пусто → null (заказ с одним видом)', () => {
+    expect(reprintViewLabel('stickerpack3D', null)).toBe(null)
+    expect(reprintViewLabel('stickerpack3D', undefined)).toBe(null)
+    expect(reprintViewLabel('sticker_cut', '')).toBe(null)
   })
 })
 

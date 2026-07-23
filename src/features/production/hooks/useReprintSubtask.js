@@ -102,5 +102,30 @@ export function useReprintSubtask(subtaskId) {
     return { advanced, new_status: newStatus }
   }, [profile, subtask, fetchData])
 
-  return { subtask, order, logs, loading, error, refetch: fetchData, addLogAndAdvance }
+  // R23.5: досрочный переход (менеджер/админ) — минует qty-сверку. Отдельная RPC,
+  // advance_reprint_subtask не трогаем.
+  const forceAdvance = useCallback(async () => {
+    if (!subtask) throw new Error('Допечатка не загружена')
+    const { data, error: err } = await supabase.rpc('force_advance_reprint_subtask', {
+      p_subtask_id: subtask.id, p_expected_status: subtask.status,
+    })
+    if (err) throw err
+    if (data?.ok === false) throw new Error(data.error || 'Не удалось перейти на следующий этап')
+    await fetchData()
+    return data
+  }, [subtask, fetchData])
+
+  // R23.5: удаление допечатки (менеджер/админ; только пустой, не завершённой).
+  // Навигацию после успеха делает страница (подзадачи больше нет).
+  const deleteSubtask = useCallback(async () => {
+    if (!subtask) throw new Error('Допечатка не загружена')
+    const { data, error: err } = await supabase.rpc('delete_reprint_subtask', {
+      p_subtask_id: subtask.id,
+    })
+    if (err) throw err
+    if (data?.ok === false) throw new Error(data.error || 'Не удалось удалить допечатку')
+    return data
+  }, [subtask])
+
+  return { subtask, order, logs, loading, error, refetch: fetchData, addLogAndAdvance, forceAdvance, deleteSubtask }
 }

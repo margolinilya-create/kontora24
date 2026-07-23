@@ -237,6 +237,14 @@ export function getReprintRoute(order) {
   return [...stages, 'done']
 }
 
+// R23.5: лейбл привязки допечатки к виду. Для stickerpack3D — «Вид #N»
+// (design_index из k24_pack_designs), для мульти-вида — «Размер #N» (idx из
+// k24_order_items). Возвращает null если вид не задан (заказ с одним видом).
+export function reprintViewLabel(orderType, viewRef) {
+  if (viewRef == null || viewRef === '') return null
+  return orderType === 'stickerpack3D' ? `Вид #${viewRef}` : `Размер #${viewRef}`
+}
+
 // Whether a stage is part of the order's effective route.
 // Used for DnD validation in the kanban and for the server-side guard in updateOrderStatus.
 export function isStageAllowed(order, stage) {

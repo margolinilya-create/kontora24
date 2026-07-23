@@ -76,7 +76,7 @@ export function useReprintSubtasks(orderId) {
     return () => { supabase.removeChannel(channel) }
   }, [orderId])
 
-  const createReprint = useCallback(async (order, { qty, reason, comment }) => {
+  const createReprint = useCallback(async (order, { qty, reason, comment, viewRef }) => {
     const route = getReprintRoute(order)
     const { data, error: err } = await supabase.rpc('create_reprint_subtask', {
       p_order_id: orderId,
@@ -84,6 +84,8 @@ export function useReprintSubtasks(orderId) {
       p_reason: reason || null,
       p_comment: comment || null,
       p_route: route,
+      // R23.5: привязка допечатки к виду (design_index / idx). NULL если вид один.
+      p_view_ref: viewRef ?? null,
     })
     if (err) throw err
     if (data?.ok === false) throw new Error(data.error || 'Не удалось создать допечатку')
@@ -105,6 +107,17 @@ export function useReprintSubtasks(orderId) {
     await fetchData()
   }, [fetchData])
 
+  // R23.5: удаление допечатки (менеджер/админ; только пустую, не завершённую).
+  const deleteReprint = useCallback(async (id) => {
+    const { data, error: err } = await supabase.rpc('delete_reprint_subtask', {
+      p_subtask_id: id,
+    })
+    if (err) throw err
+    if (data?.ok === false) throw new Error(data.error || 'Не удалось удалить допечатку')
+    await fetchData()
+    return data
+  }, [fetchData])
+
   const reprints = rows
     .filter((s) => s.track === 'reprint')
     .map((s) => {
@@ -113,5 +126,5 @@ export function useReprintSubtasks(orderId) {
     })
   const legacy = rows.filter((s) => s.track !== 'reprint')
 
-  return { reprints, legacy, loading, error, refetch: fetchData, createReprint, renameReprint, pauseReprint }
+  return { reprints, legacy, loading, error, refetch: fetchData, createReprint, renameReprint, pauseReprint, deleteReprint }
 }

@@ -770,10 +770,24 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 **Ключевые решения R23:**
 - **Триггер `deduct_materials_from_log` не трогаем** (миграция 088 отменена): single-track печать пишет `track=null` → списывает с `film_material_id` (одна плёнка); warning-блок (`track='stickers'`+плёнка) стал недостижим для нового потока. Переписывать SECURITY DEFINER ради мёртвого кода — риск без пользы.
 - **Двухтрековые ПОЛЯ** в `STAGE_FIELDS.print/cutting` оставлены как документация исторической структуры логов (`track='backgrounds'/'stickers'`); формой не используются (`isDualTrack`→false), историю читаем через агрегации без фильтра по треку.
-- **Фаза 1 «доработки» (селектор вида при создании, удаление подзадачи, БОПП/таймер на подзадаче) не входят в ТЗ 23.07** — не реализованы (принцип «не добавлять функции без реальной потребности»). Три low-severity находки аудита (мёртвый SELECT, гонка item_idx с безопасным фейлом, недостижимая cron-ветка reprint-drying) не ломают поведение — оставлены как есть.
+- **Фаза 1 «доработки» изначально не входили в ТЗ 23.07** — но менеджер попросил три из них напрямую после демо → реализованы в **R23.5** (см. ниже). Три low-severity находки аудита (мёртвый SELECT, гонка item_idx с безопасным фейлом, недостижимая cron-ветка reprint-drying) не ломают поведение — оставлены как есть.
 - **filmTypeStickers** в forecast/CreateOrderPage — legacy-параметр, игнорируется (сохранён в сигнатурах для обратной совместимости).
 
 746 unit-тестов. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects`.
+
+### R23.5 — три доработки подзадач-допечаток (прямой запрос менеджера, миграции 089–090)
+
+Не из ТЗ 23.07 — заказаны напрямую после демо R23.0–R23.4.
+
+| # | Что | Миграция | Ключевые файлы |
+|---|-----|----------|----------------|
+| 1.1 | **Селектор вида при создании допечатки.** `k24_order_subtasks.view_ref INT` (nullable; `item_idx` занят под номер допечатки). `create_reprint_subtask` пересоздан с 6-м параметром `p_view_ref DEFAULT NULL` (DROP старой сигнатуры → без overload). `OrderSubtasksTab`: селектор «Вид» — источник `usePackDesigns` (stickerpack3D, «Вид #N») / `useOrderItems` (иначе, «Размер #N · WxH»), показ при >1 виде, обязателен. Метка «Вид #N»/«Размер #N» через `reprintViewLabel(orderType, viewRef)` на `SubtaskCard`/`SubtaskDetailPage`. view_ref — информационный, маршрут/оплата/логи не меняет | 089 | [089_...sql](supabase/migrations/089_r23_5_subtask_view_ref.sql), [useReprintSubtasks.js](src/features/orders/hooks/useReprintSubtasks.js), [OrderSubtasksTab.jsx](src/features/orders/components/OrderSubtasksTab.jsx), [SubtaskCard.jsx](src/features/production/components/SubtaskCard.jsx), [constants.js](src/shared/constants.js) |
+| 1.3 | **Таймер 36ч + досрочный переход на сушке подзадачи.** `subtask.drying_started_at` уже есть (043) и ставится триггером 044 — миграция для таймера не нужна. `DryingTimer` на `SubtaskDetailPage` при `status==='drying'`. Кнопка «Перейти на следующий этап →» (admin/manager, ConfirmDialog) → **отдельная** RPC `force_advance_reprint_subtask` (минует qty-гейт; критичный `advance_reprint_subtask` НЕ трогали) | 090 | [090_...sql](supabase/migrations/090_r23_5_subtask_force_advance_and_delete.sql), [useReprintSubtask.js](src/features/production/hooks/useReprintSubtask.js), [SubtaskDetailPage.jsx](src/features/production/pages/SubtaskDetailPage.jsx) |
+| 1.5 | **Удаление допечатки (admin/manager + аудит).** RPC `delete_reprint_subtask` — гейт роли, отказ при `status='done'` ИЛИ наличии не-удалённых логов («создана по ошибке» = пустая). Пишет `k24_order_audit(field_name='reprint_deleted')`, FK-safe детач soft-deleted логов, DELETE строки. UI: «✕» на `SubtaskCard` + «Удалить» на `SubtaskDetailPage` (скрыты для завершённой), ConfirmDialog | 090 | [090_...sql](supabase/migrations/090_r23_5_subtask_force_advance_and_delete.sql), [OrderSubtasksTab.jsx](src/features/orders/components/OrderSubtasksTab.jsx) |
+
+**Решения R23.5:** view_ref — только метка (не новая ось учёта); досрочный переход — отдельная RPC (advance не трогаем); удаление — только пустых допечаток (без потери данных/реверса склада). Миграции 089/090 backward-compatible (nullable колонка, 6-й параметр с DEFAULT → текущий фронт с 5 арг. резолвится), применены в прод через Supabase MCP.
+
+749 unit-тестов. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects`.
 
 ## Обработка ошибок
 

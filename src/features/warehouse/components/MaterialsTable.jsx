@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { MATERIAL_CATEGORIES, getMaterialCategory, getStockStatus, MATERIAL_TYPES } from '@/shared/constants'
 import { formatPrice } from '@/shared/lib/utils'
 import { WarehouseFilterBar } from './WarehouseFilterBar'
+import { useWarehouseCategories } from '../hooks/useWarehouseCategories'
 import { EditableMaterialName } from './EditableMaterialName'
 import { MaterialActionsMenu } from './MaterialActionsMenu'
 import { PlanFactBadge } from './PlanFactBadge'
@@ -14,12 +15,14 @@ import { useCanDo } from '@/features/auth/hooks/useCanDo'
  */
 export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdated, showArchived, onToggleArchived, planMap }) {
   const canEditName = useCanDo('material:edit_name')
+  const { categories } = useWarehouseCategories()
   const { category = 'all', status = 'all', search = '' } = filter || {}
 
   const filtered = useMemo(() => {
     return materials.filter((m) => {
       if (!m) return false
-      if (category !== 'all' && getMaterialCategory(m) !== category) return false
+      // R23.1 (ТЗ 23.07 Фаза 7): фильтр по category_id из БД.
+      if (category !== 'all' && m.category_id !== category) return false
       if (status !== 'all' && getStockStatus(m).key !== status) return false
       if (search && !(m.name || '').toLowerCase().includes(search.toLowerCase())) return false
       return true
@@ -37,6 +40,7 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
         onStatus={(v) => onFilter({ ...filter, status: v })}
         showArchived={showArchived}
         onToggleArchived={onToggleArchived}
+        categories={categories}
       />
 
       {filtered.length === 0 ? (
@@ -60,12 +64,13 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
               </thead>
               <tbody>
                 {filtered.map((m) => {
-                  const cat = getMaterialCategory(m)
                   const stStatus = getStockStatus(m)
                   // Фактическая единица позиции важнее дефолта типа (см.
                   // InventoryTab — эталонный порядок; QA 04.07, баг №7).
                   const unit = m.unit || MATERIAL_TYPES[m.type]?.unit || ''
-                  const catLabel = (cat && MATERIAL_CATEGORIES[cat]?.label) || '—'
+                  // R23.1: имя категории из join, фолбэк на regex-классификатор.
+                  const catLabel = m.category?.name
+                    || MATERIAL_CATEGORIES[getMaterialCategory(m)]?.label || '—'
                   const isArchived = !!m.archived_at
                   return (
                     <tr key={m.id} className={`border-b border-border last:border-0 hover:bg-surface-2 transition-colors ${isArchived ? 'opacity-60' : ''}`}>

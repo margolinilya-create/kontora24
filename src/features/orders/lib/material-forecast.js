@@ -149,44 +149,31 @@ export function forecastMaterials({
 
   if (itemList.length === 0) return rows
 
-  // 1. Плёнка для печати — суммируем по items
+  // 1. Плёнка для печати — суммируем по items.
+  // R23.3 (ТЗ 23.07 Фаза 8.4): для stickerpack3D теперь ОДНА плёнка на весь
+  // заказ — метры фонов (computeFilmMeters) и метры стикеров
+  // (computeStickerFilmMeters, формула менеджера R13.4) складываются в одну
+  // строку по единой позиции film_type. Отдельная строка «Плёнка (стикеры)»
+  // и суффикс «(фоны)» убраны. Параметр filmTypeStickers больше не используется
+  // (сохранён в сигнатуре для обратной совместимости вызовов).
+  void filmTypeStickers
   const blockW = getPrintBlockWidth(filmType)
-  const filmMeters = itemList.reduce((sum, it) => sum + computeFilmMeters({
+  let filmMeters = itemList.reduce((sum, it) => sum + computeFilmMeters({
     widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty, blockWidthMm: blockW,
   }), 0)
+  if (isStickerpack3D) {
+    filmMeters += itemList.reduce((sum, it) => sum + computeStickerFilmMeters({
+      widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty,
+    }), 0)
+  }
   const filmLabel = filmType ? (FILM_TYPES[filmType]?.label || filmType) : '—'
   rows.push({
     key: 'film',
-    label: `Плёнка${isStickerpack3D ? ' (фоны)' : ''}: ${filmLabel}`,
+    label: `Плёнка: ${filmLabel}`,
     expected: filmMeters,
     unit: 'м',
     lookup: filmType ? { by: 'code', value: filmType } : null,
   })
-
-  // 1b. R13.4 (бриф 02.06): для 3D-стикерпака отдельная плёнка для СТИКЕРОВ
-  // по формуле менеджера. Если filmTypeStickers не задан — lookup тоже null
-  // (виджет покажет «—», лимита склада не будет).
-  const filmTypeStickersEff = filmTypeStickers || null
-  if (isStickerpack3D) {
-    const stickerFilmMeters = itemList.reduce(
-      (sum, it) => sum + computeStickerFilmMeters({
-        widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty,
-      }),
-      0,
-    )
-    if (stickerFilmMeters > 0) {
-      const stickFilmLabel = filmTypeStickersEff
-        ? (FILM_TYPES[filmTypeStickersEff]?.label || filmTypeStickersEff)
-        : '—'
-      rows.push({
-        key: 'film_stickers',
-        label: `Плёнка (стикеры): ${stickFilmLabel}`,
-        expected: stickerFilmMeters,
-        unit: 'м',
-        lookup: filmTypeStickersEff ? { by: 'code', value: filmTypeStickersEff } : null,
-      })
-    }
-  }
 
   // 2. Плёнка для ламинации / переноса
   if (needLam) {

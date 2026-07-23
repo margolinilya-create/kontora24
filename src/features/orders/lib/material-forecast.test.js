@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   getPrintBlockWidth,
   computeFilmMeters,
+  computeStickerFilmMeters,
   computeLamMeters,
   computeResinGrams,
   computeBoppQty,
@@ -211,36 +212,39 @@ describe('forecastMaterials', () => {
     expect(resin.expected).toBeCloseTo(expected, 4)
   })
 
-  // R13.4 (бриф 02.06): плёнка стикеров для 3D-стикерпака
-  it('stickerpack3D: возвращает строку «Плёнка (стикеры)» с формулой 0.65 × 1.3', () => {
+  // R23.3 (ТЗ 23.07 Фаза 8.4): у stickerpack3D одна плёнка — метры стикеров
+  // (формула 0.65 × 1.3) слиты в единую строку «Плёнка» по filmType, отдельной
+  // строки «Плёнка (стикеры)» больше нет.
+  it('stickerpack3D: метры стикеров слиты в единую строку «Плёнка»', () => {
     const rows = forecastMaterials({
       orderType: 'stickerpack3D',
       widthMm: 100,
       heightMm: 100,
       qty: 100,
       filmType: 'G',
-      filmTypeStickers: 'Holo',
     })
-    const stickFilm = rows.find((r) => r.key === 'film_stickers')
-    expect(stickFilm).toBeTruthy()
-    // (100×100×0.65×100×1.3) / 1_000_000 / 1.23 = 0.6863 м
-    const expected = (100 * 100 * 0.65 * 100 * 1.3) / 1_000_000 / 1.23
-    expect(stickFilm.expected).toBeCloseTo(expected, 4)
-    expect(stickFilm.lookup).toEqual({ by: 'code', value: 'Holo' })
-    expect(stickFilm.label).toContain('стикеры')
+    expect(rows.find((r) => r.key === 'film_stickers')).toBeUndefined()
+    const film = rows.find((r) => r.key === 'film')
+    expect(film).toBeTruthy()
+    const bg = computeFilmMeters({ widthMm: 100, heightMm: 100, qty: 100, blockWidthMm: getPrintBlockWidth('G') })
+    const st = computeStickerFilmMeters({ widthMm: 100, heightMm: 100, qty: 100 })
+    expect(film.expected).toBeCloseTo(bg + st, 4)
+    expect(film.lookup).toEqual({ by: 'code', value: 'G' })
+    expect(film.label).not.toContain('фоны')
   })
 
-  it('stickerpack3D без filmTypeStickers: строка появляется, но lookup=null', () => {
+  it('stickerpack3D: filmTypeStickers игнорируется — расход по единой плёнке filmType', () => {
     const rows = forecastMaterials({
       orderType: 'stickerpack3D',
       widthMm: 50,
       heightMm: 50,
       qty: 200,
       filmType: 'G',
+      filmTypeStickers: 'Holo', // legacy-параметр, должен игнорироваться
     })
-    const stickFilm = rows.find((r) => r.key === 'film_stickers')
-    expect(stickFilm).toBeTruthy()
-    expect(stickFilm.lookup).toBe(null)
+    expect(rows.find((r) => r.key === 'film_stickers')).toBeUndefined()
+    const film = rows.find((r) => r.key === 'film')
+    expect(film.lookup).toEqual({ by: 'code', value: 'G' })
   })
 
   it('sticker3D: плёнка стикеров НЕ добавляется (отдельная только у 3D-пака)', () => {

@@ -81,9 +81,14 @@ export const IS_3D_TYPE = (orderType) => orderType === 'sticker3D' || orderType 
 export const IS_3D_STICKERPACK = (orderType) => orderType === 'stickerpack3D'
 
 // Stages where stickerpack3D has two parallel FILM tracks (backgrounds + stickers).
-// R22.4 (Фаза 4Б): selection_pouring убран — этап упразднён. print/cutting
-// сохраняют двухтрековые ПОЛЯ формы (две плёнки), это не подзадачи.
-export const DUAL_TRACK_STAGES = ['print', 'cutting']
+// R22.4 (Фаза 4Б): selection_pouring убран — этап упразднён.
+// R23.3 (ТЗ 23.07 Фаза 8.1/8.4): печать и резка stickerpack3D переведены на
+// ОДНУ плёнку и single-track форму («напечатано изделий» + плёнка / «нарезано»
+// + брак, виды убраны). Список пуст → isDualTrack всегда false; двухтрековые
+// ПОЛЯ в STAGE_FIELDS.print/cutting остаются как документация исторической
+// структуры логов (track='backgrounds'/'stickers'), но формой больше не
+// используются. Историю читаем через агрегации без фильтра по треку.
+export const DUAL_TRACK_STAGES = []
 // Stages where only backgrounds track applies (for stickerpack3D)
 export const BACKGROUNDS_ONLY_STAGES = ['lamination']
 

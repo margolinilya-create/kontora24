@@ -225,15 +225,17 @@ describe('R22.4 — упразднение selection_pouring / порядок м
 })
 
 describe('isDualTrack', () => {
-  it('true for stickerpack3D at dual-track stages', () => {
+  // R23.3 (ТЗ 23.07 Фаза 8.1/8.4): DUAL_TRACK_STAGES опустошён — печать и резка
+  // stickerpack3D стали одиночными (одна плёнка). isDualTrack всегда false.
+  it('false for stickerpack3D at print/cutting (dual-track снят в R23.3)', () => {
     const order = { order_type: 'stickerpack3D' }
-    expect(isDualTrack('print', order)).toBe(true)
-    expect(isDualTrack('cutting', order)).toBe(true)
-    // R22.4: selection_pouring упразднён — больше не dual-track.
+    expect(isDualTrack('print', order)).toBe(false)
+    expect(isDualTrack('cutting', order)).toBe(false)
+    // R22.4: selection_pouring упразднён — тоже не dual-track.
     expect(isDualTrack('selection_pouring', order)).toBe(false)
   })
 
-  it('false for stickerpack3D at non-dual-track stages', () => {
+  it('false for stickerpack3D at other stages', () => {
     const order = { order_type: 'stickerpack3D' }
     expect(isDualTrack('design', order)).toBe(false)
     expect(isDualTrack('lamination', order)).toBe(false)

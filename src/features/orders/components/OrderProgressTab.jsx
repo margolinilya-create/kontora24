@@ -191,7 +191,13 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
   // каждому виду. Это запускает полноценный учёт на следующих этапах.
   // R14.4 (бриф 03.06): drying добавлен для sticker3D — менеджер вносит брак
   // после сушки по каждому виду.
-  const PACK_STAGES_3D_PACK = ['prepress', 'print', 'cutting', 'selection_pouring']
+  // R23.3 (ТЗ 23.07 Фаза 8): для stickerpack3D учёт по видам оставлен на
+  // prepress (план) + заливке/сушке (выход/брак по каждому виду). Печать и
+  // резка стали одиночными («напечатано изделий» / «нарезано» — виды убраны),
+  // поэтому print/cutting из списка исключены. selection_pouring упразднён
+  // (R22.4). Виды на pouring пишут stickers_poured/stickers_good per design,
+  // на drying — defects per design (см. handlePackDesignSubmit + PACK_STICKER_FIELD).
+  const PACK_STAGES_3D_PACK = ['prepress', 'pouring', 'drying']
   const PACK_STAGES_STICKER3D = ['prepress', 'print', 'cutting', 'pouring', 'drying']
   const showPackDesigns =
     (isPack3D && PACK_STAGES_3D_PACK.includes(stage)) ||
@@ -551,7 +557,11 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
         <h2 className="font-semibold mb-3">Учёт работы на этапе: {stageLabel}</h2>
         {showPackDesigns && designs.length > 0 ? (
           <div>
-            <p className="text-xs text-text-muted mb-2">Стикеры — по каждому виду отдельно</p>
+            <p className="text-xs text-text-muted mb-2">
+              {stage === 'drying'
+                ? 'Брак после сушки — по каждому виду отдельно'
+                : 'Стикеры — по каждому виду отдельно'}
+            </p>
             <PackDesignsForm
               designs={designs}
               logs={logs}
@@ -562,16 +572,22 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
               updateShape={updateShape}
               mode={packMode}
             />
-            <div className="mt-4 pt-4 border-t border-border">
-              <ProductionLogForm
-                stage={stage}
-                order={order}
-                progress={progressProp}
-                incoming={incomingProp}
-                onSubmit={handleSubmit}
-                omitFields={PACK_OMIT_FIELDS[stage]}
-              />
-            </div>
+            {/* На сушке единственное поле — брак, вводится поэвидово выше.
+                Нижняя одиночная форма продублировала бы «Брак» (фидбэк 29.06,
+                dual-card ветка выше делает так же). На заливке нижняя форма
+                нужна для общего расхода смолы (PACK_OMIT_FIELDS.pouring). */}
+            {stage !== 'drying' && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <ProductionLogForm
+                  stage={stage}
+                  order={order}
+                  progress={progressProp}
+                  incoming={incomingProp}
+                  onSubmit={handleSubmit}
+                  omitFields={PACK_OMIT_FIELDS[stage]}
+                />
+              </div>
+            )}
           </div>
         ) : showVariantForm ? (
           /* R20.5 (бриф 3.07): поэвидовой учёт по размерным видам изделий.

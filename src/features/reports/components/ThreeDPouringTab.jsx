@@ -1,21 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { compute3DPouringReport } from '@/features/production/lib/production-logs'
+import { getSince, getUntil } from '@/features/reports/hooks/useReports'
 import { downloadXlsx } from '@/shared/lib/export-xlsx'
 import { formatOrderNumber } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
 import { translateError } from '@/shared/lib/error-translator'
 import { toast } from '@/shared/stores/toast-store'
-
-function rangeFromPeriod(period) {
-  const to = new Date()
-  const from = new Date()
-  if (period === '7')      from.setDate(to.getDate() - 7)
-  else if (period === '30') from.setDate(to.getDate() - 30)
-  else if (period === 'month') from.setDate(1)
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
-}
 
 const COLUMN_LABELS = [
   '№ заказа', 'Сделка', 'Тираж', 'Вид стикера',
@@ -24,7 +16,11 @@ const COLUMN_LABELS = [
 ]
 
 export function ThreeDPouringTab({ period }) {
-  const range = rangeFromPeriod(period)
+  // R23.0 (ТЗ 23.07 Фаза 5): используем общие getSince/getUntil (парсят custom:).
+  // Локальный rangeFromPeriod не знал формат custom:YYYY-MM-DD:YYYY-MM-DD и
+  // схлопывал период до «сегодня» → таблица была пуста при своём периоде.
+  const since = getSince(period)
+  const until = getUntil(period) ?? '9999-12-31T23:59:59Z'
   const [orders, setOrders] = useState([])
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -39,8 +35,8 @@ export function ThreeDPouringTab({ period }) {
           .select('id, number, custom_number, qty, deal_name, order_type, status, created_at, designs:k24_pack_designs(design_index, name, qty_target, order_id)')
           .eq('order_type', 'stickerpack3D')
           .eq('status', 'done')
-          .gte('created_at', range.from)
-          .lte('created_at', range.to + 'T23:59:59')
+          .gte('created_at', since)
+          .lte('created_at', until)
           .order('created_at', { ascending: false })
         if (oe) throw oe
         const orderIds = (o || []).map((x) => x.id)
@@ -63,7 +59,7 @@ export function ThreeDPouringTab({ period }) {
       }
     })()
     return () => { cancelled = true }
-  }, [range.from, range.to])
+  }, [since, until])
 
   async function handleExportAll() {
     // R9.2B (бриф 26.05): xlsx вместо CSV.
@@ -92,7 +88,7 @@ export function ThreeDPouringTab({ period }) {
     }
     if (aoa.length <= 1) { toast.error('Нет данных за период'); return }
     try {
-      await downloadXlsx(`3d-pouring-${range.from}_${range.to}`, '3D-заливка', aoa)
+      await downloadXlsx(`3d-pouring-${since.slice(0, 10)}_${until.slice(0, 10)}`, '3D-заливка', aoa)
     } catch (err) {
       toast.error(translateError(err).message || err.message)
     }

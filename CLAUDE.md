@@ -789,6 +789,14 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 
 749 unit-тестов. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects`.
 
+### R23.6 — виджет «Прогресс по этапам» после R22.4/R23.3 (фидбэк 24.07, миграция 091)
+
+Виджет `ProgressLinesWidget` (getProgressLines/aggregateLine в [OrderProgressTab.jsx](src/features/orders/components/OrderProgressTab.jsx)) не был обновлён под R23.3/R22.4 для stickerpack3D:
+
+- **Печать/резка показывали 0**: строки фильтровали `track='stickers'`, а single-track формы R23.3 пишут `track=null`. Теперь фильтра по треку нет (`excludeTrack: 'backgrounds'` отсекает только legacy-логи фонов), и по решению менеджера показываются **обе** строки: «Напечатано/Нарезано изделий X / тираж» + производная «Напечатано/Нарезано стикеров X×stickers_per_pack / тираж×в паке» (`line.multiplier`). Строки «фонов» остались для истории dual-track заказов (`hideWhenEmpty`).
+- **«Залито стикеров» и «Годных после сушки» показывали тираж после слеша**: после линейного маршрута R22.4 stickerpack3D попадает на строки `pouring`/`drying`, у которых не было `target` → fallback `order.qty`. Обеим строкам задан `target: packStickerTarget` (qty × stickers_per_pack; для sticker3D = qty — без изменений). Таргет формы заливки в `CurrentStageWidget` синхронизирован.
+- **Миграция 091** — `check_stage_completion` v5: ветка `pouring` для stickerpack3D сравнивает залитые с qty × stickers_per_pack (раньше диалог «Завершить этап?» всплывал при тираже залитых). Применена в прод через Supabase MCP. Печать/резка серверно остаются по qty (изделия) — консистентно с первой строкой виджета.
+
 ## Обработка ошибок
 
 - **toast.error в action handlers:** `toast.error(translateError(err).message)` — перевод Supabase ошибок на человеческий русский

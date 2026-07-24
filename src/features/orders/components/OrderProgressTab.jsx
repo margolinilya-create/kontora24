@@ -77,10 +77,19 @@ function getProgressLines(order, items) {
     const prepressTarget = Math.max(1, Number(order.design_variants) || 1)
     lines.push({ key: 'prepress', stage: 'prepress', track: null, qtyField: 'prepared_qty', label: 'Препресс (видов)', target: prepressTarget })
   }
+  // R23.6 (фидбэк 24.07): печать/резка stickerpack3D с R23.3 пишут логи
+  // single-track (track=null) — старый фильтр track='stickers' обнулял строки.
+  // Считаем все логи кроме фонов (excludeTrack: legacy-логи стикеров тоже
+  // попадают) и показываем ДВЕ строки: изделия / тираж + производную
+  // стикеры / тираж × в паке (multiplier). Строки фонов оставлены для истории
+  // старых dual-track заказов (hideWhenEmpty — у новых заказов всегда 0).
   if (route.includes('print')) {
-    lines.push({ key: 'print_stickers', stage: 'print', track: isPack3D ? 'stickers' : null, qtyField: 'stickers_printed', label: 'Напечатано стикеров', target: isPack3D ? packStickerTarget : undefined })
     if (isPack3D) {
-      lines.push({ key: 'print_backgrounds', stage: 'print', track: 'backgrounds', qtyField: 'backgrounds_printed', label: 'Напечатано фонов' })
+      lines.push({ key: 'print_stickers', stage: 'print', track: null, excludeTrack: 'backgrounds', qtyField: 'stickers_printed', label: 'Напечатано изделий', target: order.qty })
+      lines.push({ key: 'print_stickers_total', stage: 'print', track: null, excludeTrack: 'backgrounds', qtyField: 'stickers_printed', multiplier: order.stickers_per_pack || 1, label: 'Напечатано стикеров', target: packStickerTarget })
+      lines.push({ key: 'print_backgrounds', stage: 'print', track: 'backgrounds', qtyField: 'backgrounds_printed', label: 'Напечатано фонов', hideWhenEmpty: true })
+    } else {
+      lines.push({ key: 'print_stickers', stage: 'print', track: null, qtyField: 'stickers_printed', label: 'Напечатано стикеров' })
     }
     pushItemLines('print')
   }
@@ -88,9 +97,12 @@ function getProgressLines(order, items) {
     lines.push({ key: 'lamination_qty', stage: 'lamination', track: null, qtyField: 'lamination_qty', label: isPack3D ? 'Заламинировано фонов' : 'Заламинировано' })
   }
   if (route.includes('cutting')) {
-    lines.push({ key: 'cutting', stage: 'cutting', track: isPack3D ? 'stickers' : null, qtyField: 'qty_cut', label: isPack3D ? 'Нарезано стикеров' : 'Нарезано', target: isPack3D ? packStickerTarget : undefined })
     if (isPack3D) {
-      lines.push({ key: 'cutting_bg', stage: 'cutting', track: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано фонов' })
+      lines.push({ key: 'cutting', stage: 'cutting', track: null, excludeTrack: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано изделий', target: order.qty })
+      lines.push({ key: 'cutting_stickers_total', stage: 'cutting', track: null, excludeTrack: 'backgrounds', qtyField: 'qty_cut', multiplier: order.stickers_per_pack || 1, label: 'Нарезано стикеров', target: packStickerTarget })
+      lines.push({ key: 'cutting_bg', stage: 'cutting', track: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано фонов', hideWhenEmpty: true })
+    } else {
+      lines.push({ key: 'cutting', stage: 'cutting', track: null, qtyField: 'qty_cut', label: 'Нарезано' })
     }
     pushItemLines('cutting')
   }
@@ -98,14 +110,17 @@ function getProgressLines(order, items) {
     lines.push({ key: 'selection', stage: 'selection_pouring', track: 'backgrounds', qtyField: 'qty_selected', label: 'Выбрано фонов' })
     lines.push({ key: 'pouring_pack', stage: 'selection_pouring', track: 'stickers', qtyField: 'stickers_good', label: 'Залито стикеров', target: packStickerTarget })
   }
+  // R23.6: с линейного маршрута R22.4 stickerpack3D идёт через pouring/drying —
+  // таргет этих строк должен быть в стикерах (тираж × в паке), а не в тираже.
+  // Для sticker3D packStickerTarget = qty, поведение не меняется.
   if (route.includes('pouring')) {
-    lines.push({ key: 'pouring', stage: 'pouring', track: null, qtyField: 'stickers_good', label: 'Залито стикеров (хороших)' })
+    lines.push({ key: 'pouring', stage: 'pouring', track: null, qtyField: 'stickers_good', label: 'Залито стикеров (хороших)', target: packStickerTarget })
     pushItemLines('pouring')
   }
   // R14.4: для sticker3D — отдельная линия «После сушки» = залитые − брак сушки.
   // Кастомная агрегация (см. aggregateLine — ветка для stage='drying').
   if (route.includes('drying')) {
-    lines.push({ key: 'drying', stage: 'drying', track: null, qtyField: '__drying', label: 'Годных после сушки' })
+    lines.push({ key: 'drying', stage: 'drying', track: null, qtyField: '__drying', label: 'Годных после сушки', target: packStickerTarget })
   }
   // R20.5 (попутный фикс): у этапа selection раньше вообще не было линии.
   if (route.includes('selection')) {
@@ -152,13 +167,19 @@ function aggregateLine(logs, line) {
   }
   let stageLogs = logs.filter((l) => l.stage === line.stage)
   if (line.track) stageLogs = stageLogs.filter((l) => l.track === line.track)
+  // R23.6: single-track строки печати/резки pack3D считают track=null вместе с
+  // legacy track='stickers', исключая только логи фонов.
+  if (line.excludeTrack) stageLogs = stageLogs.filter((l) => l.track !== line.excludeTrack)
   // R20.5: per-вид линии считают только логи своего размерного вида.
   if (line.itemIdx != null) stageLogs = stageLogs.filter((l) => l.item_idx === line.itemIdx)
   if (line.excludeItemLogs) stageLogs = stageLogs.filter((l) => l.item_idx == null)
   const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[line.qtyField]) || 0), 0)
   const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
   const total = SUBTRACT_DEFECTS_STAGES.has(line.stage) ? Math.max(0, totalRaw - defects) : totalRaw
-  return { total, defects }
+  // R23.6: производная строка «в стикерах» (изделия × stickers_per_pack) —
+  // множитель применяется и к браку, чтобы бейдж был в единицах строки.
+  const mult = line.multiplier || 1
+  return { total: total * mult, defects: defects * mult }
 }
 
 // Расход плёнки сгруппированный по типу — для виджета на этапе печати.
@@ -505,8 +526,13 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
     progressProp = computeStageProgress(logs, stage, order.qty)
     incomingProp = computeIncoming(logs, route, stage, order.qty, 'backgrounds')
   } else {
-    progressProp = computeStageProgress(logs, stage, order.qty)
-    incomingProp = computeIncoming(logs, route, stage, order.qty, null)
+    // R23.6: на заливке stickerpack3D таргет формы — в стикерах (тираж × в паке),
+    // как у строки виджета и серверной check_stage_completion (миграция 091).
+    const singleTarget = isPack3D && stage === 'pouring'
+      ? order.qty * (order.stickers_per_pack || 1)
+      : order.qty
+    progressProp = computeStageProgress(logs, stage, singleTarget)
+    incomingProp = computeIncoming(logs, route, stage, singleTarget, null)
   }
 
   const confirmDialogs = (
@@ -637,6 +663,8 @@ function ProgressLinesWidget({ order, logs, items = [] }) {
       <div className="space-y-3">
         {lines.map((line) => {
           const { total, defects, allowNegative } = aggregateLine(logs, line)
+          // R23.6: строки фонов — только история старых dual-track заказов.
+          if (line.hideWhenEmpty && !total && !defects) return null
           const isQty = !line.unit
           const lineTarget = line.target ?? target
           const targetForLine = isQty ? lineTarget : null

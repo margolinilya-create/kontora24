@@ -43,7 +43,7 @@ const VARIANT_LINE = {
   packaging: { qtyField: 'packs_packaged', label: 'Упаковка' },
 }
 
-function getProgressLines(order, items) {
+function getProgressLines(order, items, logs) {
   const route = getOrderRoute(order)
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const is3D = isPack3D || order.order_type === 'sticker3D'
@@ -77,10 +77,47 @@ function getProgressLines(order, items) {
     const prepressTarget = Math.max(1, Number(order.design_variants) || 1)
     lines.push({ key: 'prepress', stage: 'prepress', track: null, qtyField: 'prepared_qty', label: 'Препресс (видов)', target: prepressTarget })
   }
+  // R23.6 (фидбэк 24.07): печать/резка stickerpack3D — единицы лога зависят от
+  // эпохи и источника записи:
+  //   track='backgrounds'     — фоны старой dual-track формы (поле bgField);
+  //   track='stickers'        — стикеры старой формы (до R23.3);
+  //   track=null + subtask_id — допечатка R22.1: её тираж для пака — в СТИКЕРАХ
+  //                             (создаётся из брака сушки, который в стикерах);
+  //   track=null              — одиночная форма R23.3, ИЗДЕЛИЯ.
+  // Итог считается в стикерах с приведением единиц (× / ÷ stickers_per_pack),
+  // поэтому переходные заказы (логи обеих эпох) и допечатки корректны.
+  // Отображение — два режима (решение менеджера 24.07): заказ со старыми
+  // логами этапа видит старый набор строк (стикеры + фоны), без них — новый
+  // (изделия + стикеры). Логи допечаток включаются в общий прогресс.
+  const perPack = order.stickers_per_pack || 1
+  const pushPackPrintCutLines = (stage, mainField, bgField, labels) => {
+    const sum = { order: { v: 0, d: 0 }, legacy: { v: 0, d: 0 }, reprint: { v: 0, d: 0 }, bg: { v: 0, d: 0 } }
+    for (const l of logs || []) {
+      if (l.stage !== stage) continue
+      const g = l.track === 'backgrounds' ? 'bg'
+        : l.track === 'stickers' ? 'legacy'
+        : l.subtask_id ? 'reprint'
+        : 'order'
+      sum[g].v += Number(l[g === 'bg' ? bgField : mainField]) || 0
+      sum[g].d += Number(l.defects) || 0
+    }
+    const stkRaw = sum.order.v * perPack + sum.legacy.v + sum.reprint.v
+    const stkDef = sum.order.d * perPack + sum.legacy.d + sum.reprint.d
+    const stkNet = Math.max(0, stkRaw - stkDef)
+    const hasLegacyLogs = sum.legacy.v > 0 || sum.legacy.d > 0 || sum.bg.v > 0 || sum.bg.d > 0
+    if (hasLegacyLogs) {
+      lines.push({ key: `${stage}_stickers`, stage, label: labels.stickers, target: packStickerTarget, precomputed: { total: stkNet, defects: stkDef } })
+      lines.push({ key: `${stage}_bg`, stage, track: 'backgrounds', qtyField: bgField, label: labels.bg })
+    } else {
+      lines.push({ key: `${stage}_units`, stage, label: labels.units, target: order.qty, precomputed: { total: Math.floor(stkNet / perPack), defects: Math.round(stkDef / perPack) } })
+      lines.push({ key: `${stage}_stickers`, stage, label: labels.stickers, target: packStickerTarget, precomputed: { total: stkNet, defects: stkDef } })
+    }
+  }
   if (route.includes('print')) {
-    lines.push({ key: 'print_stickers', stage: 'print', track: isPack3D ? 'stickers' : null, qtyField: 'stickers_printed', label: 'Напечатано стикеров', target: isPack3D ? packStickerTarget : undefined })
     if (isPack3D) {
-      lines.push({ key: 'print_backgrounds', stage: 'print', track: 'backgrounds', qtyField: 'backgrounds_printed', label: 'Напечатано фонов' })
+      pushPackPrintCutLines('print', 'stickers_printed', 'backgrounds_printed', { units: 'Напечатано изделий', stickers: 'Напечатано стикеров', bg: 'Напечатано фонов' })
+    } else {
+      lines.push({ key: 'print_stickers', stage: 'print', track: null, qtyField: 'stickers_printed', label: 'Напечатано стикеров' })
     }
     pushItemLines('print')
   }
@@ -88,9 +125,10 @@ function getProgressLines(order, items) {
     lines.push({ key: 'lamination_qty', stage: 'lamination', track: null, qtyField: 'lamination_qty', label: isPack3D ? 'Заламинировано фонов' : 'Заламинировано' })
   }
   if (route.includes('cutting')) {
-    lines.push({ key: 'cutting', stage: 'cutting', track: isPack3D ? 'stickers' : null, qtyField: 'qty_cut', label: isPack3D ? 'Нарезано стикеров' : 'Нарезано', target: isPack3D ? packStickerTarget : undefined })
     if (isPack3D) {
-      lines.push({ key: 'cutting_bg', stage: 'cutting', track: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано фонов' })
+      pushPackPrintCutLines('cutting', 'qty_cut', 'qty_cut', { units: 'Нарезано изделий', stickers: 'Нарезано стикеров', bg: 'Нарезано фонов' })
+    } else {
+      lines.push({ key: 'cutting', stage: 'cutting', track: null, qtyField: 'qty_cut', label: 'Нарезано' })
     }
     pushItemLines('cutting')
   }
@@ -98,14 +136,17 @@ function getProgressLines(order, items) {
     lines.push({ key: 'selection', stage: 'selection_pouring', track: 'backgrounds', qtyField: 'qty_selected', label: 'Выбрано фонов' })
     lines.push({ key: 'pouring_pack', stage: 'selection_pouring', track: 'stickers', qtyField: 'stickers_good', label: 'Залито стикеров', target: packStickerTarget })
   }
+  // R23.6: с линейного маршрута R22.4 stickerpack3D идёт через pouring/drying —
+  // таргет этих строк должен быть в стикерах (тираж × в паке), а не в тираже.
+  // Для sticker3D packStickerTarget = qty, поведение не меняется.
   if (route.includes('pouring')) {
-    lines.push({ key: 'pouring', stage: 'pouring', track: null, qtyField: 'stickers_good', label: 'Залито стикеров (хороших)' })
+    lines.push({ key: 'pouring', stage: 'pouring', track: null, qtyField: 'stickers_good', label: 'Залито стикеров (хороших)', target: packStickerTarget })
     pushItemLines('pouring')
   }
   // R14.4: для sticker3D — отдельная линия «После сушки» = залитые − брак сушки.
   // Кастомная агрегация (см. aggregateLine — ветка для stage='drying').
   if (route.includes('drying')) {
-    lines.push({ key: 'drying', stage: 'drying', track: null, qtyField: '__drying', label: 'Годных после сушки' })
+    lines.push({ key: 'drying', stage: 'drying', track: null, qtyField: '__drying', label: 'Годных после сушки', target: packStickerTarget })
   }
   // R20.5 (попутный фикс): у этапа selection раньше вообще не было линии.
   if (route.includes('selection')) {
@@ -137,6 +178,9 @@ function getProgressLines(order, items) {
 // (incoming − dryingDefects, allowNegative), сет не читается. Dead code убран.
 
 function aggregateLine(logs, line) {
+  // R23.6: строки печати/резки stickerpack3D приходят с готовыми числами —
+  // единицы зависят от эпохи/источника лога (см. pushPackPrintCutLines).
+  if (line.precomputed) return line.precomputed
   // R14.4: drying — total начинается от incoming (залитых на pouring/selection_pouring)
   // минус брак на drying. Отрицательные значения НЕ обрезаются — пусть менеджер
   // видит «−N перепечатать» если брак превысил тираж.
@@ -505,8 +549,13 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
     progressProp = computeStageProgress(logs, stage, order.qty)
     incomingProp = computeIncoming(logs, route, stage, order.qty, 'backgrounds')
   } else {
-    progressProp = computeStageProgress(logs, stage, order.qty)
-    incomingProp = computeIncoming(logs, route, stage, order.qty, null)
+    // R23.6: на заливке stickerpack3D таргет формы — в стикерах (тираж × в паке),
+    // как у строки виджета и серверной check_stage_completion (миграция 091).
+    const singleTarget = isPack3D && stage === 'pouring'
+      ? order.qty * (order.stickers_per_pack || 1)
+      : order.qty
+    progressProp = computeStageProgress(logs, stage, singleTarget)
+    incomingProp = computeIncoming(logs, route, stage, singleTarget, null)
   }
 
   const confirmDialogs = (
@@ -626,7 +675,7 @@ function StageJumperBlock({ order, onUpdated }) {
 }
 
 function ProgressLinesWidget({ order, logs, items = [] }) {
-  const lines = getProgressLines(order, items)
+  const lines = getProgressLines(order, items, logs)
   const target = order.qty
   const isOnPrint = order.status === 'print'
   const filmUsage = isOnPrint ? aggregateFilmUsage(logs, order) : null

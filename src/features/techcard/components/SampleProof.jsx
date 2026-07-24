@@ -86,24 +86,28 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
           вордмарк «Контора» справа (по эталону менеджера). Высота капсулы с
           запасом + lineHeight>1 — номер и дата не обрезаются. */}
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {/* 2.1 Капсула номера */}
+        {/* 2.1 Капсула номера — текст строго по центру (H+V).
+            lineHeight:1 + flex-центрирование корректно рендерится и в
+            html2canvas (при lineHeight>1 текст «уезжает» вверх при экспорте). */}
         <div style={{
           minWidth: '500px', height: '96px', padding: '0 40px',
           background: CARD_BG, borderRadius: '48px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center',
         }}>
-          <span style={{ fontSize: '52px', fontWeight: 700, color: '#000', lineHeight: 1.15, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '52px', fontWeight: 700, color: '#000', lineHeight: 1, whiteSpace: 'nowrap' }}>
             #{number}
           </span>
         </div>
-        {/* 2.2 Дата (тёмная капсула) + крупный тёмный вордмарк «Контора» справа */}
+        {/* 2.2 Дата (тёмная капсула, текст по центру) + вордмарк «Контора» справа */}
         <div style={{ marginTop: '-22px', display: 'flex', alignItems: 'center', gap: '18px' }}>
           <div style={{
             height: '48px', padding: '0 26px',
             background: DATE_BG, borderRadius: '24px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            textAlign: 'center',
           }}>
-            <span style={{ color: '#fff', fontWeight: 600, fontSize: '23px', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+            <span style={{ color: '#fff', fontWeight: 600, fontSize: '23px', lineHeight: 1, whiteSpace: 'nowrap' }}>
               {dateStr}
             </span>
           </div>

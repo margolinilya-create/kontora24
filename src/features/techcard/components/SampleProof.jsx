@@ -1,6 +1,5 @@
 import { forwardRef, useRef, useImperativeHandle } from 'react'
 import logoWhite from '@/assets/kontora-logo-white.png'
-import logoDark from '@/assets/kontora-logo.png'
 import { formatOrderNumberShort } from '@/shared/lib/utils'
 import { findPreviewAttachment, getAttachmentUrl } from '@/features/orders/lib/order-attachments'
 import { ORDER_TYPES, FILM_TYPES } from '@/shared/constants'
@@ -17,8 +16,10 @@ const CARD_BG = '#ECECEC'
 const DATE_BG = '#5C5C5C'
 const LABEL_COLOR = '#000000'
 const VALUE_COLOR = '#000000'
-const NADSECHKA = '#5566D6'
-const SKVOZNOY = '#63B32F'
+// Цвета фирменных иконок реза (по дизайну менеджера 24.07).
+const NADSECHKA = '#E6007E' // розовый — надсечка (kiss-cut, уголок отгибается)
+const SKVOZNOY = '#2ECC00'  // зелёный — сквозной рез
+const GLAZA = '#2B2B2B'     // фирменная иконка «глаза»
 
 /**
  * Программная A5-цветопроба (без PNG-шаблона): рамка, капсула номера,
@@ -144,27 +145,52 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
               ))}
             </tbody>
           </table>
-          <img src={logoDark} alt="" crossOrigin="anonymous" style={{ height: '50px', width: 'auto', display: 'block', flexShrink: 0, marginRight: '15px', marginBottom: '15px' }} />
+          <div style={{ flexShrink: 0, marginRight: '15px', marginBottom: '15px' }}>
+            <EyesIcon size={50} />
+          </div>
         </div>
       </div>
     </div>
   )
 })
 
-// Иконка легенды реза (файлов геометрии нет — рисуем контур изделия кодом).
-// Надсечка — пунктирный (kiss-cut) контур; сквозной рез — сплошной контур.
-// Размер 50px ÷2 = 25px.
+// Иконки легенды реза — воспроизведены кодом по дизайну менеджера (файлы SVG
+// не приложены). Надсечка — розовая капсула с отогнутым уголком (kiss-cut);
+// сквозной рез — зелёная сплошная капсула, слегка повёрнута. Заливка #ECECEC
+// (сливается с карточкой — виден цветной контур, как в оригинале).
 function Legend({ color, label, notch }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <svg width="42" height="26" viewBox="0 0 42 26" fill="none" aria-hidden="true">
-        <rect
-          x="2" y="2" width="38" height="22" rx="11"
-          stroke={color} strokeWidth="2.5" fill="none"
-          strokeDasharray={notch ? '4 3' : undefined}
-        />
+      <svg width="46" height="26" viewBox="0 0 92 52" aria-hidden="true">
+        {notch ? (
+          <>
+            <rect x="4" y="4" width="84" height="40" rx="20" fill={CARD_BG} stroke={color} strokeWidth="5" />
+            {/* отогнутый уголок надсечки */}
+            <path d="M62 4 Q 74 22 88 28" fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" />
+          </>
+        ) : (
+          <g transform="rotate(-9 46 26)">
+            <rect x="6" y="9" width="80" height="34" rx="17" fill={CARD_BG} stroke={color} strokeWidth="5" />
+          </g>
+        )}
       </svg>
       <span style={{ fontSize: '15px', fontWeight: 700, color: '#000' }}>{label}</span>
     </div>
+  )
+}
+
+// Фирменная иконка «глаза» (Icon-glaza) — воспроизведена кодом по дизайну:
+// тёмный овальный блок + два белых глаза со зрачками и бликами.
+function EyesIcon({ size = 50 }) {
+  return (
+    <svg width={size * 1.3} height={size} viewBox="0 0 120 92" aria-hidden="true">
+      <ellipse cx="63" cy="47" rx="55" ry="43" fill={GLAZA} />
+      <ellipse cx="36" cy="47" rx="16" ry="27" fill="#fff" />
+      <ellipse cx="73" cy="45" rx="18" ry="30" fill="#fff" />
+      <ellipse cx="34" cy="53" rx="9" ry="15" fill={GLAZA} />
+      <ellipse cx="70" cy="53" rx="10" ry="17" fill={GLAZA} />
+      <circle cx="39" cy="45" r="3" fill="#fff" />
+      <circle cx="75" cy="43" r="3.5" fill="#fff" />
+    </svg>
   )
 }

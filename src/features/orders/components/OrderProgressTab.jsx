@@ -43,7 +43,7 @@ const VARIANT_LINE = {
   packaging: { qtyField: 'packs_packaged', label: 'Упаковка' },
 }
 
-function getProgressLines(order, items) {
+function getProgressLines(order, items, logs) {
   const route = getOrderRoute(order)
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
   const is3D = isPack3D || order.order_type === 'sticker3D'
@@ -77,17 +77,45 @@ function getProgressLines(order, items) {
     const prepressTarget = Math.max(1, Number(order.design_variants) || 1)
     lines.push({ key: 'prepress', stage: 'prepress', track: null, qtyField: 'prepared_qty', label: 'Препресс (видов)', target: prepressTarget })
   }
-  // R23.6 (фидбэк 24.07): печать/резка stickerpack3D с R23.3 пишут логи
-  // single-track (track=null) — старый фильтр track='stickers' обнулял строки.
-  // Считаем все логи кроме фонов (excludeTrack: legacy-логи стикеров тоже
-  // попадают) и показываем ДВЕ строки: изделия / тираж + производную
-  // стикеры / тираж × в паке (multiplier). Строки фонов оставлены для истории
-  // старых dual-track заказов (hideWhenEmpty — у новых заказов всегда 0).
+  // R23.6 (фидбэк 24.07): печать/резка stickerpack3D — единицы лога зависят от
+  // эпохи и источника записи:
+  //   track='backgrounds'     — фоны старой dual-track формы (поле bgField);
+  //   track='stickers'        — стикеры старой формы (до R23.3);
+  //   track=null + subtask_id — допечатка R22.1: её тираж для пака — в СТИКЕРАХ
+  //                             (создаётся из брака сушки, который в стикерах);
+  //   track=null              — одиночная форма R23.3, ИЗДЕЛИЯ.
+  // Итог считается в стикерах с приведением единиц (× / ÷ stickers_per_pack),
+  // поэтому переходные заказы (логи обеих эпох) и допечатки корректны.
+  // Отображение — два режима (решение менеджера 24.07): заказ со старыми
+  // логами этапа видит старый набор строк (стикеры + фоны), без них — новый
+  // (изделия + стикеры). Логи допечаток включаются в общий прогресс.
+  const perPack = order.stickers_per_pack || 1
+  const pushPackPrintCutLines = (stage, mainField, bgField, labels) => {
+    const sum = { order: { v: 0, d: 0 }, legacy: { v: 0, d: 0 }, reprint: { v: 0, d: 0 }, bg: { v: 0, d: 0 } }
+    for (const l of logs || []) {
+      if (l.stage !== stage) continue
+      const g = l.track === 'backgrounds' ? 'bg'
+        : l.track === 'stickers' ? 'legacy'
+        : l.subtask_id ? 'reprint'
+        : 'order'
+      sum[g].v += Number(l[g === 'bg' ? bgField : mainField]) || 0
+      sum[g].d += Number(l.defects) || 0
+    }
+    const stkRaw = sum.order.v * perPack + sum.legacy.v + sum.reprint.v
+    const stkDef = sum.order.d * perPack + sum.legacy.d + sum.reprint.d
+    const stkNet = Math.max(0, stkRaw - stkDef)
+    const hasLegacyLogs = sum.legacy.v > 0 || sum.legacy.d > 0 || sum.bg.v > 0 || sum.bg.d > 0
+    if (hasLegacyLogs) {
+      lines.push({ key: `${stage}_stickers`, stage, label: labels.stickers, target: packStickerTarget, precomputed: { total: stkNet, defects: stkDef } })
+      lines.push({ key: `${stage}_bg`, stage, track: 'backgrounds', qtyField: bgField, label: labels.bg })
+    } else {
+      lines.push({ key: `${stage}_units`, stage, label: labels.units, target: order.qty, precomputed: { total: Math.floor(stkNet / perPack), defects: Math.round(stkDef / perPack) } })
+      lines.push({ key: `${stage}_stickers`, stage, label: labels.stickers, target: packStickerTarget, precomputed: { total: stkNet, defects: stkDef } })
+    }
+  }
   if (route.includes('print')) {
     if (isPack3D) {
-      lines.push({ key: 'print_stickers', stage: 'print', track: null, excludeTrack: 'backgrounds', qtyField: 'stickers_printed', label: 'Напечатано изделий', target: order.qty })
-      lines.push({ key: 'print_stickers_total', stage: 'print', track: null, excludeTrack: 'backgrounds', qtyField: 'stickers_printed', multiplier: order.stickers_per_pack || 1, label: 'Напечатано стикеров', target: packStickerTarget })
-      lines.push({ key: 'print_backgrounds', stage: 'print', track: 'backgrounds', qtyField: 'backgrounds_printed', label: 'Напечатано фонов', hideWhenEmpty: true })
+      pushPackPrintCutLines('print', 'stickers_printed', 'backgrounds_printed', { units: 'Напечатано изделий', stickers: 'Напечатано стикеров', bg: 'Напечатано фонов' })
     } else {
       lines.push({ key: 'print_stickers', stage: 'print', track: null, qtyField: 'stickers_printed', label: 'Напечатано стикеров' })
     }
@@ -98,9 +126,7 @@ function getProgressLines(order, items) {
   }
   if (route.includes('cutting')) {
     if (isPack3D) {
-      lines.push({ key: 'cutting', stage: 'cutting', track: null, excludeTrack: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано изделий', target: order.qty })
-      lines.push({ key: 'cutting_stickers_total', stage: 'cutting', track: null, excludeTrack: 'backgrounds', qtyField: 'qty_cut', multiplier: order.stickers_per_pack || 1, label: 'Нарезано стикеров', target: packStickerTarget })
-      lines.push({ key: 'cutting_bg', stage: 'cutting', track: 'backgrounds', qtyField: 'qty_cut', label: 'Нарезано фонов', hideWhenEmpty: true })
+      pushPackPrintCutLines('cutting', 'qty_cut', 'qty_cut', { units: 'Нарезано изделий', stickers: 'Нарезано стикеров', bg: 'Нарезано фонов' })
     } else {
       lines.push({ key: 'cutting', stage: 'cutting', track: null, qtyField: 'qty_cut', label: 'Нарезано' })
     }
@@ -152,6 +178,9 @@ function getProgressLines(order, items) {
 // (incoming − dryingDefects, allowNegative), сет не читается. Dead code убран.
 
 function aggregateLine(logs, line) {
+  // R23.6: строки печати/резки stickerpack3D приходят с готовыми числами —
+  // единицы зависят от эпохи/источника лога (см. pushPackPrintCutLines).
+  if (line.precomputed) return line.precomputed
   // R14.4: drying — total начинается от incoming (залитых на pouring/selection_pouring)
   // минус брак на drying. Отрицательные значения НЕ обрезаются — пусть менеджер
   // видит «−N перепечатать» если брак превысил тираж.
@@ -167,19 +196,13 @@ function aggregateLine(logs, line) {
   }
   let stageLogs = logs.filter((l) => l.stage === line.stage)
   if (line.track) stageLogs = stageLogs.filter((l) => l.track === line.track)
-  // R23.6: single-track строки печати/резки pack3D считают track=null вместе с
-  // legacy track='stickers', исключая только логи фонов.
-  if (line.excludeTrack) stageLogs = stageLogs.filter((l) => l.track !== line.excludeTrack)
   // R20.5: per-вид линии считают только логи своего размерного вида.
   if (line.itemIdx != null) stageLogs = stageLogs.filter((l) => l.item_idx === line.itemIdx)
   if (line.excludeItemLogs) stageLogs = stageLogs.filter((l) => l.item_idx == null)
   const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[line.qtyField]) || 0), 0)
   const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
   const total = SUBTRACT_DEFECTS_STAGES.has(line.stage) ? Math.max(0, totalRaw - defects) : totalRaw
-  // R23.6: производная строка «в стикерах» (изделия × stickers_per_pack) —
-  // множитель применяется и к браку, чтобы бейдж был в единицах строки.
-  const mult = line.multiplier || 1
-  return { total: total * mult, defects: defects * mult }
+  return { total, defects }
 }
 
 // Расход плёнки сгруппированный по типу — для виджета на этапе печати.
@@ -652,7 +675,7 @@ function StageJumperBlock({ order, onUpdated }) {
 }
 
 function ProgressLinesWidget({ order, logs, items = [] }) {
-  const lines = getProgressLines(order, items)
+  const lines = getProgressLines(order, items, logs)
   const target = order.qty
   const isOnPrint = order.status === 'print'
   const filmUsage = isOnPrint ? aggregateFilmUsage(logs, order) : null
@@ -663,8 +686,6 @@ function ProgressLinesWidget({ order, logs, items = [] }) {
       <div className="space-y-3">
         {lines.map((line) => {
           const { total, defects, allowNegative } = aggregateLine(logs, line)
-          // R23.6: строки фонов — только история старых dual-track заказов.
-          if (line.hideWhenEmpty && !total && !defects) return null
           const isQty = !line.unit
           const lineTarget = line.target ?? target
           const targetForLine = isQty ? lineTarget : null

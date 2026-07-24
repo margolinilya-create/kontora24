@@ -1,20 +1,32 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useReprintSubtask } from '../hooks/useReprintSubtask'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { SubtaskRouteChain } from '../components/SubtaskRouteChain'
 import { SubtaskLogForm } from '../components/logs/SubtaskLogForm'
 import { computeSubtaskOverallProgress } from '../lib/production-logs'
 import {
-  REPRINT_STATUS_LABELS, REPRINT_REASONS, ORDER_TYPES, FILM_TYPES,
+  REPRINT_STATUS_LABELS, REPRINT_REASONS, ORDER_TYPES, FILM_TYPES, reprintViewLabel,
 } from '@/shared/constants'
 import { formatOrderNumber } from '@/shared/lib/utils'
+import { DryingTimer } from '@/features/orders/components/DryingTimer'
+import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 import Spinner from '@/shared/components/Spinner'
 import ErrorState from '@/shared/components/ErrorState'
+import Button from '@/shared/components/Button'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
 export default function SubtaskDetailPage() {
   const { subtaskId } = useParams()
-  const { subtask, order, logs, loading, error, refetch, addLogAndAdvance } = useReprintSubtask(subtaskId)
+  const navigate = useNavigate()
+  const { hasRole } = useAuth()
+  const canManage = hasRole(['admin', 'manager'])
+  const { subtask, order, logs, loading, error, refetch, addLogAndAdvance, forceAdvance, deleteSubtask } = useReprintSubtask(subtaskId)
   const [savedFlash, setSavedFlash] = useState(false)
+  const [pendingForce, setPendingForce] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
   if (error) return <ErrorState error={error} onRetry={refetch} />
@@ -31,12 +43,39 @@ export default function SubtaskDetailPage() {
   const isDone = subtask.status === 'done'
   const overall = computeSubtaskOverallProgress(subtask, logs)
   const filmName = order.film_material?.name || FILM_TYPES[order.film_type]?.label || order.film_type
+  const viewLabel = reprintViewLabel(order.order_type, subtask.view_ref)
 
   async function handleSubmit(stage, data) {
     const res = await addLogAndAdvance(stage, data)
     setSavedFlash(true)
     setTimeout(() => setSavedFlash(false), 1500)
     return res
+  }
+
+  async function confirmForce() {
+    setPendingForce(false)
+    setBusy(true)
+    try {
+      const res = await forceAdvance()
+      toast.success(res?.done ? 'Допечатка завершена' : `Этап завершён → ${REPRINT_STATUS_LABELS[res?.new_status] || res?.new_status}`)
+    } catch (err) {
+      toast.error(translateError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmDelete() {
+    setPendingDelete(false)
+    setBusy(true)
+    try {
+      await deleteSubtask()
+      toast.success('Допечатка удалена')
+      navigate(`/orders/${order.id}`)
+    } catch (err) {
+      toast.error(translateError(err).message)
+      setBusy(false)
+    }
   }
 
   return (
@@ -51,6 +90,9 @@ export default function SubtaskDetailPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-warning/15 text-warning">Допечатка</span>
+              {viewLabel && (
+                <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent">{viewLabel}</span>
+              )}
               <h1 className="text-xl font-bold font-display truncate">{subtask.title}</h1>
             </div>
             <p className="text-text-muted text-sm mt-1">
@@ -58,11 +100,24 @@ export default function SubtaskDetailPage() {
               {order.client?.name ? ` · ${order.client.name}` : ''}
             </p>
           </div>
-          <span className={`text-sm px-2.5 py-1 rounded-lg font-medium shrink-0 ${
-            isDone ? 'bg-success/15 text-success' : 'bg-accent/15 text-accent'
-          }`}>
-            {REPRINT_STATUS_LABELS[subtask.status] || subtask.status}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={`text-sm px-2.5 py-1 rounded-lg font-medium ${
+              isDone ? 'bg-success/15 text-success' : 'bg-accent/15 text-accent'
+            }`}>
+              {REPRINT_STATUS_LABELS[subtask.status] || subtask.status}
+            </span>
+            {canManage && !isDone && (
+              <button
+                type="button"
+                onClick={() => setPendingDelete(true)}
+                disabled={busy}
+                className="text-xs text-text-muted hover:text-danger px-2 py-1 rounded hover:bg-danger/10 transition-colors disabled:opacity-50"
+                title="Удалить допечатку"
+              >
+                Удалить
+              </button>
+            )}
+          </div>
         </div>
 
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
@@ -101,10 +156,29 @@ export default function SubtaskDetailPage() {
             <h2 className="font-semibold">Учёт: {REPRINT_STATUS_LABELS[subtask.status] || subtask.status}</h2>
             {savedFlash && <span className="text-xs text-success">✓ Сохранено</span>}
           </div>
+          {/* R23.5: таймер 36ч на сушке допечатки (drying_started_at ставит триггер 044). */}
+          {subtask.status === 'drying' && (
+            <div className="mb-4">
+              <DryingTimer startedAt={subtask.drying_started_at} />
+            </div>
+          )}
           {isDone ? (
             <p className="text-sm text-text-muted">Допечатка завершена. Учёт закрыт.</p>
           ) : (
-            <SubtaskLogForm stage={subtask.status} subtask={subtask} order={order} logs={logs} onSubmit={handleSubmit} />
+            <>
+              <SubtaskLogForm stage={subtask.status} subtask={subtask} order={order} logs={logs} onSubmit={handleSubmit} />
+              {/* R23.5: досрочный переход (менеджер/админ) — минует количественную сверку. */}
+              {canManage && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <Button variant="secondary" size="sm" onClick={() => setPendingForce(true)} loading={busy} className="w-full">
+                    Перейти на следующий этап →
+                  </Button>
+                  <p className="text-[11px] text-text-muted mt-1.5">
+                    Досрочный переход без ожидания количества (только руководитель).
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -123,6 +197,25 @@ export default function SubtaskDetailPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={pendingForce}
+        onClose={() => setPendingForce(false)}
+        onConfirm={confirmForce}
+        title="Перейти на следующий этап?"
+        message={`Допечатка перейдёт на следующий этап маршрута без проверки внесённого количества (этап «${REPRINT_STATUS_LABELS[subtask.status] || subtask.status}»).`}
+        confirmText="Перейти"
+        variant="primary"
+      />
+      <ConfirmDialog
+        isOpen={pendingDelete}
+        onClose={() => setPendingDelete(false)}
+        onConfirm={confirmDelete}
+        title="Удалить допечатку?"
+        message={`«${subtask.title}» будет удалена. Доступно, только пока по допечатке нет внесённых данных.`}
+        confirmText="Удалить"
+        variant="danger"
+      />
     </div>
   )
 }

@@ -331,7 +331,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               ))}
             </select>
           </Field>
-          <Field label={isStickerpack3D ? 'Плёнка фонов' : 'Плёнка'}>
+          <Field label="Плёнка">
             <FilmSelect
               value={form.film_material_id || form.film_type || 'G'}
               onChange={({ materialId, code }) => {
@@ -341,18 +341,10 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               includeOutOfStock
             />
           </Field>
-          {isStickerpack3D && (
-            <Field label="Плёнка стикеров">
-              <FilmSelect
-                value={form.film_stickers_material_id || form.film_type_stickers || form.film_type || 'G'}
-                onChange={({ materialId, code }) => {
-                  update('film_stickers_material_id', materialId)
-                  if (code) update('film_type_stickers', code)
-                }}
-                includeOutOfStock
-              />
-            </Field>
-          )}
+          {/* R23.3 (ТЗ 23.07 Фаза 8.4): у stickerpack3D одна плёнка на заказ —
+              отдельное поле «Плёнка стикеров» убрано. Историческое значение
+              film_type_stickers/film_stickers_material_id сохраняется в БД
+              (форма его не трогает), но новым заказам не задаётся. */}
           <Field label="Дизайн макета">
             <select value={form.design_status || 'provided'} onChange={(e) => update('design_status', e.target.value)} className={SELECT_CLASS}>
               {Object.entries(DESIGN_STATUSES).map(([k, { label }]) => (

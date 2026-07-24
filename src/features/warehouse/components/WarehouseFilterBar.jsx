@@ -1,6 +1,8 @@
 import { MATERIAL_CATEGORIES } from '@/shared/constants'
 
-const CATEGORY_OPTIONS = [
+// Legacy-опции (regex-ключи) — для табов, ещё не переведённых на БД-категории
+// (Инвентаризация, Архив). Основной склад/таблица передают categories из БД.
+const LEGACY_CATEGORY_OPTIONS = [
   { value: 'all', label: 'Все категории' },
   ...Object.entries(MATERIAL_CATEGORIES).map(([key, { label }]) => ({ value: key, label })),
 ]
@@ -24,7 +26,12 @@ export function WarehouseFilterBar({
   showArchived, onToggleArchived,
   showStatus = true,
   className = '',
+  // R23.1 (ТЗ 23.07 Фаза 7): категории из БД (k24_warehouse_categories).
+  categories = [],
 }) {
+  const categoryOptions = categories.length
+    ? [{ value: 'all', label: 'Все категории' }, ...categories.map((c) => ({ value: c.id, label: c.name }))]
+    : LEGACY_CATEGORY_OPTIONS
   return (
     <div className={`flex flex-col sm:flex-row gap-2 ${className}`}>
       <input
@@ -40,7 +47,7 @@ export function WarehouseFilterBar({
         className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
         aria-label="Категория"
       >
-        {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {categoryOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       {showStatus && (
         <select

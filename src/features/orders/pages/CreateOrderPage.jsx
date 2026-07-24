@@ -327,7 +327,7 @@ export default function CreateOrderPage() {
     }
     if (orderType === 'stickerpack3D') {
       setValue('bopp_bag', true)
-      setValue('film_type_stickers', 'G')
+      // R23.3 (Фаза 8.4): одна плёнка — film_type_stickers больше не заполняем.
     }
   }, [orderType, setValue])
 
@@ -386,10 +386,8 @@ export default function CreateOrderPage() {
       toast.error('Выберите плёнку со склада (конкретную позицию) — без неё себестоимость считается неверно')
       return
     }
-    if (isStickerpack3D && !values.film_stickers_material_id) {
-      toast.error('Выберите плёнку стикеров со склада — у 3D-пака это отдельная позиция')
-      return
-    }
+    // R23.3 (ТЗ 23.07 Фаза 8.4): у stickerpack3D больше нет отдельной плёнки
+    // стикеров — одна плёнка на весь заказ, отдельная валидация убрана.
     // R11.4: если на складе не хватает заявленных материалов — спросить подтверждение.
     if (shortages.length > 0) {
       setPendingShortageValues(values)
@@ -427,8 +425,10 @@ export default function CreateOrderPage() {
         lam_material_id: needLam ? (values.lam_material_id || null) : null,
         film_type: values.film_type,
         film_material_id: values.film_material_id || null,
-        film_type_stickers: isStickerpack3D ? (values.film_type_stickers || values.film_type) : null,
-        film_stickers_material_id: isStickerpack3D ? (values.film_stickers_material_id || null) : null,
+        // R23.3 (Фаза 8.4): одна плёнка на заказ — плёнка стикеров больше не
+        // хранится (колонки остаются nullable для исторических заказов).
+        film_type_stickers: null,
+        film_stickers_material_id: null,
         client_id: clientId,
         deadline: values.deadline || null,
         priority: values.is_urgent ? 'urgent' : 'normal',
@@ -761,46 +761,21 @@ export default function CreateOrderPage() {
               </div>
             )}
 
-            {/* Плёнка(и) + Ламинация/перенос на монтаж */}
-            {isStickerpack3D ? (
-              <div className="grid grid-cols-2 gap-3">
-                <FilmSelect
-                  label="Плёнка фонов *"
-                  id="film_type"
-                  value={watch('film_material_id') || filmType}
-                  onChange={({ materialId, code }) => {
-                    setValue('film_material_id', materialId, { shouldDirty: true })
-                    if (code) setValue('film_type', code, { shouldDirty: true })
-                  }}
-                  expected={filmType ? expectedByCode[filmType] : undefined}
-                  includeOutOfStock
-                />
-                <FilmSelect
-                  label="Плёнка стикеров *"
-                  id="film_type_stickers"
-                  value={watch('film_stickers_material_id') || watch('film_type_stickers')}
-                  onChange={({ materialId, code }) => {
-                    setValue('film_stickers_material_id', materialId, { shouldDirty: true })
-                    if (code) setValue('film_type_stickers', code, { shouldDirty: true })
-                  }}
-                  includeOutOfStock
-                />
-              </div>
-            ) : null}
+            {/* Плёнка + Ламинация/перенос на монтаж.
+                R23.3 (ТЗ 23.07 Фаза 8.4): для stickerpack3D тоже ОДНА плёнка
+                (раньше были отдельные «Плёнка фонов» + «Плёнка стикеров»). */}
             <div className="grid grid-cols-2 gap-3">
-              {!isStickerpack3D && (
-                <FilmSelect
-                  label="Плёнка *"
-                  id="film_type"
-                  value={watch('film_material_id') || filmType}
-                  onChange={({ materialId, code }) => {
-                    setValue('film_material_id', materialId, { shouldDirty: true })
-                    if (code) setValue('film_type', code, { shouldDirty: true })
-                  }}
-                  expected={filmType ? expectedByCode[filmType] : undefined}
-                  includeOutOfStock
-                />
-              )}
+              <FilmSelect
+                label="Плёнка *"
+                id="film_type"
+                value={watch('film_material_id') || filmType}
+                onChange={({ materialId, code }) => {
+                  setValue('film_material_id', materialId, { shouldDirty: true })
+                  if (code) setValue('film_type', code, { shouldDirty: true })
+                }}
+                expected={filmType ? expectedByCode[filmType] : undefined}
+                includeOutOfStock
+              />
               <LaminationSelect
                 value={watch('lam_material_id') || lamType}
                 onChange={({ materialId, code }) => {

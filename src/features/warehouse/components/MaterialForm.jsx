@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createMaterial } from '../hooks/useMaterials'
-import { MATERIAL_TYPES } from '@/shared/constants'
+import { useWarehouseCategories } from '../hooks/useWarehouseCategories'
+import { deriveTypeFromCategory, defaultUnitForType } from '../lib/category-type'
 import { UNIT_OPTIONS } from './MaterialEditModal'
 import { FilmFields } from './FilmFields'
 import { composeMaterialName, isStructuredFilmType } from '../lib/material-name'
@@ -13,20 +14,22 @@ import Button from '@/shared/components/Button'
 const EMPTY_FILM = { manufacturer: '', product_line: '', roll_width_m: '', finish: null, color: '' }
 
 export function MaterialForm({ onClose, onCreated }) {
+  const { categories } = useWarehouseCategories()
   const [form, setForm] = useState({
-    type: 'film', name: '', unit: 'м', stockQty: 0, minQty: 0, unitCost: 0, supplier: '', ...EMPTY_FILM,
+    // R23.1 (ТЗ 23.07 Фаза 7): основное поле — «Категория» (БД). `type`
+    // выводится из категории (для FilmFields/единиц/списания).
+    categoryId: '', type: 'film', name: '', unit: 'м', stockQty: 0, minQty: 0, unitCost: 0, supplier: '', ...EMPTY_FILM,
   })
   const [loading, setLoading] = useState(false)
 
   function update(k, v) { setForm((p) => ({ ...p, [k]: v })) }
   const isFilm = isStructuredFilmType(form.type)
 
-  // Auto-set unit when type changes (но можно переопределить через select).
-  // Плёнка/ламинация — погонные метры ('м').
-  function handleTypeChange(type) {
-    const unitMap = { film: 'м', lam_film: 'м', ink: 'ml', resin: 'g', blade: 'шт' }
-    update('type', type)
-    update('unit', unitMap[type] || 'шт')
+  // Смена категории → derive type + единица (можно переопределить через select).
+  function handleCategoryChange(categoryId) {
+    const cat = categories.find((c) => c.id === categoryId)
+    const type = deriveTypeFromCategory(cat?.name)
+    setForm((p) => ({ ...p, categoryId, type, unit: defaultUnitForType(type) }))
   }
 
   async function handleSubmit(e) {
@@ -37,10 +40,11 @@ export function MaterialForm({ onClose, onCreated }) {
       toast.error(isFilm ? 'Заполните параметры плёнки (хотя бы производителя/серию)' : 'Укажите название')
       return
     }
+    if (!form.categoryId) { toast.error('Выберите категорию'); return }
     setLoading(true)
     try {
       await createMaterial({
-        type: form.type, name, unit: form.unit,
+        type: form.type, name, unit: form.unit, categoryId: form.categoryId,
         stockQty: form.stockQty, minQty: form.minQty, unitCost: form.unitCost,
         supplier: form.supplier || null,
         ...(isFilm ? {
@@ -65,15 +69,17 @@ export function MaterialForm({ onClose, onCreated }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="mat-type" className="block text-sm font-medium text-text mb-1">Тип</label>
+            <label htmlFor="mat-category" className="block text-sm font-medium text-text mb-1">Категория</label>
             <select
-              id="mat-type"
-              value={form.type}
-              onChange={(e) => handleTypeChange(e.target.value)}
+              id="mat-category"
+              value={form.categoryId}
+              onChange={(e) => handleCategoryChange(e.target.value)}
               className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
+              required
             >
-              {Object.entries(MATERIAL_TYPES).map(([key, m]) => (
-                <option key={key} value={key}>{m.label}</option>
+              <option value="">Выберите…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>

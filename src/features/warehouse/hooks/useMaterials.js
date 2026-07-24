@@ -21,7 +21,7 @@ export function useMaterials(opts = {}) {
     try {
       let materialsQuery = supabase
         .from('k24_materials')
-        .select('*')
+        .select('*, category:k24_warehouse_categories(name)')
         .order('type', { ascending: true })
       if (!includeArchived) {
         materialsQuery = materialsQuery.is('archived_at', null)
@@ -228,7 +228,7 @@ export async function updateMaterial(id, fields) {
 }
 
 export async function createMaterial({
-  type, name, unit, stockQty, minQty, unitCost, supplier,
+  type, name, unit, stockQty, minQty, unitCost, supplier, categoryId,
   // Структурные поля плёнки/ламинации (05.07) — опциональны для прочих типов.
   manufacturer, product_line, roll_width_m, finish, color,
 }) {
@@ -238,6 +238,7 @@ export async function createMaterial({
       type,
       name,
       unit,
+      category_id: categoryId ?? null,
       stock_qty: stockQty || 0,
       min_qty: minQty || 0,
       unit_cost: unitCost || 0,

@@ -9,7 +9,8 @@ import { TransactionsHistory } from '../components/TransactionsHistory'
 import { InventoryTab } from '../components/InventoryTab'
 import { ArchivedMaterialsTab } from '../components/ArchivedMaterialsTab'
 import { WarehouseFilterBar } from '../components/WarehouseFilterBar'
-import { MATERIAL_TYPES, getMaterialCategory, getStockStatus } from '@/shared/constants'
+import { useWarehouseCategories } from '../hooks/useWarehouseCategories'
+import { MATERIAL_TYPES, getStockStatus } from '@/shared/constants'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
@@ -23,6 +24,7 @@ const ConsumptionChart = lazy(() => import('../components/ConsumptionChart').the
 export default function WarehousePage() {
   const [showArchived, setShowArchived] = useState(false)
   const { materials, loading, error, refetch } = useMaterials({ includeArchived: showArchived })
+  const { categories } = useWarehouseCategories()
   // План трат: сумма прогноза forecastMaterials по активным заказам без логов.
   const { plan: planMap } = usePlannedConsumption(materials)
   const canCreateMaterial = useCanDo('material:manage') // создание новых позиций — для admin/manager (UI guard)
@@ -40,7 +42,7 @@ export default function WarehousePage() {
   // Фильтрация для таба «Состояние склада» (bento + карточки).
   const filteredMaterials = useMemo(() => {
     return materials.filter((m) => {
-      if (filter.category !== 'all' && getMaterialCategory(m) !== filter.category) return false
+      if (filter.category !== 'all' && m.category_id !== filter.category) return false
       if (filter.status !== 'all' && getStockStatus(m).key !== filter.status) return false
       if (filter.search && !(m.name || '').toLowerCase().includes(filter.search.toLowerCase())) return false
       return true
@@ -120,6 +122,7 @@ export default function WarehousePage() {
             onStatus={(v) => setFilter({ ...filter, status: v })}
             showArchived={showArchived}
             onToggleArchived={setShowArchived}
+            categories={categories}
           />
 
           {/* Summary tiles — суммы остатков по типам, агрегируем по отфильтрованным */}

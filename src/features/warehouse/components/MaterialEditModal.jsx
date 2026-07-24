@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { updateMaterial } from '../hooks/useMaterials'
-import { MATERIAL_TYPES } from '@/shared/constants'
+import { useWarehouseCategories } from '../hooks/useWarehouseCategories'
+import { deriveTypeFromCategory, defaultUnitForType } from '../lib/category-type'
 import { FilmFields } from './FilmFields'
 import { composeMaterialName, isStructuredFilmType } from '../lib/material-name'
 import { toast } from '@/shared/stores/toast-store'
@@ -15,8 +16,12 @@ import Button from '@/shared/components/Button'
 export const UNIT_OPTIONS = ['м', 'm', 'm2', 'ml', 'g', 'kg', 'шт', 'рулон', 'упаковка', 'литр']
 
 export function MaterialEditModal({ material, onClose, onUpdated }) {
+  const { categories } = useWarehouseCategories()
   const [form, setForm] = useState({
     name: material.name || '',
+    // R23.1 (ТЗ 23.07 Фаза 7): категория — основное поле; type сохраняем и
+    // меняем только при смене категории (иначе type='ink' не превратится в resin).
+    categoryId: material.category_id || '',
     type: material.type || 'film',
     unit: material.unit || 'м',
     minQty: Number(material.min_qty) || 0,
@@ -36,6 +41,14 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
   function update(k, v) { setForm((p) => ({ ...p, [k]: v })) }
   const isFilm = isStructuredFilmType(form.type)
 
+  // Смена категории → derive type + единица. Если категория не менялась —
+  // исходный type сохраняется (напр. ink остаётся ink).
+  function handleCategoryChange(categoryId) {
+    const cat = categories.find((c) => c.id === categoryId)
+    const type = deriveTypeFromCategory(cat?.name)
+    setForm((p) => ({ ...p, categoryId, type, unit: defaultUnitForType(type) }))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     // Плёнка/ламинация — имя собирается из структурных полей; иначе свободный текст.
@@ -49,6 +62,7 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
       await updateMaterial(material.id, {
         name,
         type: form.type,
+        category_id: form.categoryId || null,
         unit: form.unit,
         min_qty: form.minQty,
         unit_cost: Math.max(0, Number(form.unitCost) || 0),
@@ -87,15 +101,16 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
         )}
 
         <div>
-          <label htmlFor="medit-type" className="block text-sm font-medium text-text mb-1">Тип</label>
+          <label htmlFor="medit-category" className="block text-sm font-medium text-text mb-1">Категория</label>
           <select
-            id="medit-type"
-            value={form.type}
-            onChange={(e) => update('type', e.target.value)}
+            id="medit-category"
+            value={form.categoryId}
+            onChange={(e) => handleCategoryChange(e.target.value)}
             className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
           >
-            {Object.entries(MATERIAL_TYPES).map(([key, m]) => (
-              <option key={key} value={key}>{m.label}</option>
+            <option value="">Без категории</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>

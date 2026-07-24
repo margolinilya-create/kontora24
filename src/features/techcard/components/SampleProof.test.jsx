@@ -26,11 +26,14 @@ describe('SampleProof', () => {
     expect(screen.getByText('#1042')).toBeInTheDocument()
   })
 
-  it('дата берётся из created_at, а не из сегодня', () => {
+  it('верхняя капсула = дата генерации образца (сегодня), таблица = дата создания заказа', () => {
+    // R24 (фидбэк 24.07): капсула показывает дату нажатия «Образец», а не created_at.
     render(<SampleProof order={ORDER} />)
-    // Капсула даты — формат ДД/ММ/ГГ
-    expect(screen.getByText('15/07/26')).toBeInTheDocument()
-    // Инфо-таблица — локализованная дата создания
+    const now = new Date()
+    const gen = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`
+    // Капсула даты — формат ДД/ММ/ГГ, дата генерации
+    expect(screen.getByText(gen)).toBeInTheDocument()
+    // Инфо-таблица «Дата создания» — по-прежнему дата создания заказа (created_at)
     expect(screen.getByText('15.07.2026')).toBeInTheDocument()
   })
 

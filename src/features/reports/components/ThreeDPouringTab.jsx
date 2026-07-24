@@ -16,18 +16,21 @@ const COLUMN_LABELS = [
 ]
 
 export function ThreeDPouringTab({ period }) {
-  // R23.0 (ТЗ 23.07 Фаза 5): используем общие getSince/getUntil (парсят custom:).
-  // Локальный rangeFromPeriod не знал формат custom:YYYY-MM-DD:YYYY-MM-DD и
-  // схлопывал период до «сегодня» → таблица была пуста при своём периоде.
-  const since = getSince(period)
-  const until = getUntil(period) ?? '9999-12-31T23:59:59Z'
   const [orders, setOrders] = useState([])
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // R24 (фидбэк 24.07): зависим ТОЛЬКО от стабильного примитива `period`.
+  // Раньше since/until считались в теле рендера через getSince(period), а для
+  // '7'/'30' getSince возвращает subDays(new Date(), N).toISOString() — новая
+  // строка (со свежими мс) на каждый рендер. Эти строки стояли в deps useEffect
+  // → бесконечный рефетч → «постоянная перезагрузка», таблица не устаканивалась.
+  // Считаем границы ВНУТРИ эффекта (как остальные вкладки через useCallback([period])).
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    const since = getSince(period)
+    const until = getUntil(period) ?? '9999-12-31T23:59:59Z'
     ;(async () => {
       try {
         const { data: o, error: oe } = await supabase
@@ -59,10 +62,13 @@ export function ThreeDPouringTab({ period }) {
       }
     })()
     return () => { cancelled = true }
-  }, [since, until])
+  }, [period])
 
   async function handleExportAll() {
-    // R9.2B (бриф 26.05): xlsx вместо CSV.
+    // R9.2B (бриф 26.05): xlsx вместо CSV. Границы периода считаем локально
+    // (нужны только для имени файла) — from/to стабильно парсятся из `period`.
+    const since = getSince(period)
+    const until = getUntil(period) ?? '9999-12-31T23:59:59Z'
     const aoa = [COLUMN_LABELS]
     for (const order of orders) {
       const olog = logs.filter((l) => l.order_id === order.id)

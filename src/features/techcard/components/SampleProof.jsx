@@ -1,4 +1,4 @@
-import { forwardRef, useRef, useImperativeHandle } from 'react'
+import { forwardRef, useRef, useState, useImperativeHandle } from 'react'
 import sampleLogo from '@/assets/sample-logo-dark.png'
 import iconNadsechka from '@/assets/sample-nadsechka.png'
 import iconSkvoznoy from '@/assets/sample-skvoznoy.png'
@@ -35,11 +35,15 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
 
   const number = order ? formatOrderNumberShort(order) : ''
 
+  // R24 (фидбэк 24.07): верхняя капсула показывает дату ГЕНЕРАЦИИ образца
+  // (дата нажатия кнопки «Образец»), а не дату создания заказа. Захватываем
+  // «сейчас» один раз при монтировании — переэкспорт не сдвинет дату.
+  const [genDate] = useState(() => new Date())
   const created = order?.created_at ? new Date(order.created_at) : null
   const fmtDate = (d) => d
     ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`
     : '—'
-  const dateStr = fmtDate(created)
+  const dateStr = fmtDate(genDate)
 
   const typeLabel = ORDER_TYPES[order?.order_type]?.label || order?.order_type || '—'
   const materialLabel = order?.film_material?.name
@@ -87,15 +91,15 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
           запасом + lineHeight>1 — номер и дата не обрезаются. */}
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* 2.1 Капсула номера — текст строго по центру (H+V).
-            lineHeight:1 + flex-центрирование корректно рендерится и в
-            html2canvas (при lineHeight>1 текст «уезжает» вверх при экспорте). */}
+            R24 (фидбэк 24.07): flex-центрирование одиночной строки в html2canvas
+            рендерится нестабильно (текст «уезжает»). Надёжнее — блок с
+            text-align:center (гориз.) + line-height = высота капсулы (верт.). */}
         <div style={{
           minWidth: '500px', height: '96px', padding: '0 40px',
           background: CARD_BG, borderRadius: '48px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
           textAlign: 'center',
         }}>
-          <span style={{ fontSize: '52px', fontWeight: 700, color: '#000', lineHeight: 1, whiteSpace: 'nowrap' }}>
+          <span style={{ display: 'block', fontSize: '52px', fontWeight: 700, color: '#000', lineHeight: '96px', whiteSpace: 'nowrap' }}>
             #{number}
           </span>
         </div>
@@ -104,10 +108,9 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
           <div style={{
             height: '48px', padding: '0 26px',
             background: DATE_BG, borderRadius: '24px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
             textAlign: 'center',
           }}>
-            <span style={{ color: '#fff', fontWeight: 600, fontSize: '23px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+            <span style={{ display: 'block', color: '#fff', fontWeight: 600, fontSize: '23px', lineHeight: '48px', whiteSpace: 'nowrap' }}>
               {dateStr}
             </span>
           </div>

@@ -36,15 +36,16 @@ const CONFIG = {
     filenamePrefix: 'sticker-delivery',
     maxWidth: 'max-w-md',
   },
-  // R23.2 (ТЗ 23.07 Фаза 3): образец-цветопроба A4 210×297 мм, программная вёрстка.
-  // CSS-холст 826×1169 px; scale 3 → ~2478×3507 (≈8.7 Mpx, 300 DPI). JPEG чтобы
-  // PDF не раздувался (A4 PNG@3x ~ несколько МБ).
+  // R23.7 (детальный спек 24.07): образец-цветопроба A5 148×210 мм, программная
+  // вёрстка. CSS-холст 874×1240 px; scale 2 → ровно 1748×2480 (300 DPI, ≈4.3 Mpx).
+  // JPEG q0.95 (почти без потерь) чтобы PDF не раздувался. CMYK недостижим через
+  // html2canvas/jsPDF (браузерный canvas всегда RGB) — вывод RGB.
   sample: {
     title: 'Образец (цветопроба)',
-    pdf: { scale: 3, orientation: 'p', format: [210, 297], pixelWidth: 826, pixelHeight: 1169, imageFormat: 'JPEG', quality: 0.92 },
-    print: { scale: 3, pageSize: 'A4', width: '210mm', height: '297mm', pixelWidth: 826, pixelHeight: 1169 },
+    pdf: { scale: 2, orientation: 'p', format: [148, 210], pixelWidth: 874, pixelHeight: 1240, imageFormat: 'JPEG', quality: 0.95 },
+    print: { scale: 2, pageSize: 'A5', width: '148mm', height: '210mm', pixelWidth: 874, pixelHeight: 1240 },
     filenamePrefix: 'obrazec',
-    maxWidth: 'max-w-2xl',
+    maxWidth: 'max-w-xl',
   },
 }
 

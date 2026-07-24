@@ -5,22 +5,27 @@ import { formatOrderNumberShort } from '@/shared/lib/utils'
 import { findPreviewAttachment, getAttachmentUrl } from '@/features/orders/lib/order-attachments'
 import { ORDER_TYPES, FILM_TYPES } from '@/shared/constants'
 
-// A4 210×297 мм. CSS-холст 826×1169 px; при экспорте scale≈3 → ~2480×3508
-// (300 DPI, ≈8.7 Mpx). НЕ ставить pixelWidth 2480 + scale 3 (даст 78 Mpx → OOM
-// на телефонах). См. PrintPreviewModal CONFIG.sample.
-const W = 826
-const H = 1169
+// R23.7 (детальный спек 24.07) — производственная цветопроба A5 Portrait.
+// Спек задаёт холст 1748×2480 px (300 DPI, 148×210 мм). Рендерим DOM в
+// половинном масштабе (874×1240 CSS) и экспортируем со scale 2 → ровно
+// 1748×2480 (≈4.3 Mpx, безопасно на телефонах). Все размеры из спека — ÷2.
+// См. PrintPreviewModal CONFIG.sample.
+const W = 874
+const H = 1240
 
-const LABEL_COLOR = '#8a8a8a'
-const VALUE_COLOR = '#3a3a3a'
+const CARD_BG = '#ECECEC'
+const DATE_BG = '#5C5C5C'
+const LABEL_COLOR = '#000000'
+const VALUE_COLOR = '#000000'
+const NADSECHKA = '#5566D6'
+const SKVOZNOY = '#63B32F'
 
 /**
- * R23.2 (ТЗ 23.07 Фаза 3) — «Образец» (цветопроба) A4, программная вёрстка.
- *
- * Всё строится DOM'ом (без PNG-шаблона): рамка, капсула номера, тёмная капсула
- * даты+лого, центральное превью изделия, нижняя карточка с легендой
- * (Надсечка/Сквозной рез — статичные иконки, геометрии реза в БД нет),
- * инфо-таблицей (7 полей) и фирменной иконкой. Все данные — из карточки заказа.
+ * Программная A5-цветопроба (без PNG-шаблона): рамка, капсула номера,
+ * перекрывающая тёмная капсула даты+лого, центральное превью изделия, нижняя
+ * карточка с легендой реза (Надсечка/Сквозной рез — иконки рисуются кодом,
+ * файлов геометрии реза нет), инфо-таблицей из 7 полей и фирменной иконкой.
+ * Данные — из карточки заказа; отсутствующие показываем как «—».
  */
 export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
   const rootRef = useRef(null)
@@ -50,14 +55,14 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
   const rows = [
     ['Тип изделия', typeLabel],
     ['Материал', materialLabel],
-    ['Размер изделия', sizeLabel],
+    ['Размер', sizeLabel],
     ['Количество', qtyLabel],
     ['Заказчик', clientLabel],
     ['Дата создания', createdLabel],
     ['Исполнитель', assigneeLabel],
   ]
 
-  const font = "'Akt', 'Helvetica Neue', Arial, sans-serif"
+  const font = "'Helvetica Neue', Arial, sans-serif"
 
   return (
     <div
@@ -67,94 +72,99 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
         width: `${W}px`, height: `${H}px`,
         background: '#fff',
         border: '2px solid #000',
-        borderRadius: '14px',
+        borderRadius: '15px', // спек 30px ÷2
         boxSizing: 'border-box',
         fontFamily: font,
         display: 'flex', flexDirection: 'column',
-        padding: '46px 46px 40px',
+        padding: '40px', // безопасная зона 80px ÷2
         overflow: 'hidden',
       }}
     >
-      {/* Верхняя зона: капсула номера + перекрывающая капсула даты/лого */}
+      {/* 2. Верхняя зона: капсула номера + перекрывающая капсула даты/лого */}
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* 2.1 Большая капсула номера — 900×120 ÷2, радиус 60 ÷2 */}
         <div style={{
-          width: '62%', height: '62px',
-          background: '#ECECEC', borderRadius: '31px',
+          width: '450px', height: '60px',
+          background: CARD_BG, borderRadius: '30px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <span style={{ fontSize: '40px', fontWeight: 800, color: '#000', letterSpacing: '-1px' }}>
+          <span style={{ fontSize: '40px', fontWeight: 700, color: '#000', lineHeight: 1 }}>
             #{number}
           </span>
         </div>
-        {/* Тёмная капсула: дата + лого, перекрывает низ капсулы номера */}
+        {/* 2.2 Капсула даты + лого — 650×80 ÷2, радиус 40 ÷2, перекрывает низ */}
         <div style={{
           marginTop: '-16px',
-          background: '#5C5C5C', borderRadius: '22px',
-          height: '44px', padding: '0 16px',
-          display: 'flex', alignItems: 'center', gap: '14px',
+          width: '325px', height: '40px',
+          background: DATE_BG, borderRadius: '20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px',
         }}>
-          <span style={{ color: '#fff', fontWeight: 700, fontSize: '19px', letterSpacing: '0.5px' }}>
+          <span style={{ color: '#fff', fontWeight: 600, fontSize: '19px', lineHeight: 1 }}>
             {dateStr}
           </span>
-          <img src={logoWhite} alt="" crossOrigin="anonymous" style={{ height: '28px', width: 'auto', display: 'block' }} />
+          <img src={logoWhite} alt="" crossOrigin="anonymous" style={{ height: '27px', width: 'auto', display: 'block' }} />
         </div>
       </div>
 
-      {/* Центральная зона: превью изделия */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
+      {/* 3. Центральная зона: превью изделия (75% ширины, 55% высоты) */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, padding: '20px 0' }}>
         {previewUrl ? (
           <img
             src={previewUrl}
             alt=""
             crossOrigin="anonymous"
-            style={{ maxWidth: '80%', maxHeight: '100%', objectFit: 'contain' }}
+            style={{ maxWidth: '75%', maxHeight: '100%', objectFit: 'contain' }}
           />
         ) : (
-          <div style={{ color: '#c4c4c4', fontSize: '18px' }}>Нет изображения изделия</div>
+          <div style={{ color: '#c4c4c4', fontSize: '16px' }}>Изображение отсутствует</div>
         )}
       </div>
 
-      {/* Нижняя карточка */}
-      <div style={{ background: '#ECECEC', borderRadius: '18px', padding: '24px 28px' }}>
-        {/* Легенда */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '36px', marginBottom: '18px' }}>
-          <Legend color="#5566D6" label="НАДСЕЧКА" notch />
-          <Legend color="#63B32F" label="СКВОЗНОЙ РЕЗ" />
+      {/* 4. Нижняя карточка — #ECECEC, радиус 35 ÷2, поля 40 ÷2 */}
+      <div style={{ background: CARD_BG, borderRadius: '17px', padding: '20px' }}>
+        {/* 4.2 Легенда типов резки */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '32px', marginBottom: '16px' }}>
+          <Legend color={NADSECHKA} label="НАДСЕЧКА" notch />
+          <Legend color={SKVOZNOY} label="СКВОЗНОЙ РЕЗ" />
         </div>
 
-        {/* Таблица + иконка */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '20px' }}>
+        {/* 4.3 таблица (слева) + 4.4 фирменная иконка (справа снизу) */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px' }}>
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
               {rows.map(([label, value]) => (
                 <tr key={label}>
-                  <td style={{ color: LABEL_COLOR, fontSize: '15px', fontWeight: 700, padding: '2px 18px 2px 0', whiteSpace: 'nowrap', verticalAlign: 'top' }}>
-                    {label}:
+                  <td style={{ color: LABEL_COLOR, fontSize: '13px', fontWeight: 700, padding: '2px 16px 2px 0', whiteSpace: 'nowrap', verticalAlign: 'top' }}>
+                    {label}
                   </td>
-                  <td style={{ color: VALUE_COLOR, fontSize: '15px', padding: '2px 0' }}>
+                  <td style={{ color: VALUE_COLOR, fontSize: '13px', fontWeight: 400, padding: '2px 0' }}>
                     {value}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <img src={logoDark} alt="" crossOrigin="anonymous" style={{ height: '68px', width: 'auto', display: 'block', flexShrink: 0 }} />
+          <img src={logoDark} alt="" crossOrigin="anonymous" style={{ height: '50px', width: 'auto', display: 'block', flexShrink: 0, marginRight: '15px', marginBottom: '15px' }} />
         </div>
       </div>
     </div>
   )
 })
 
-// Статичная иконка легенды: скруглённый контур изделия. Надсечка — с диагональю
-// «надреза» внутри; сквозной рез — только контур.
+// Иконка легенды реза (файлов геометрии нет — рисуем контур изделия кодом).
+// Надсечка — пунктирный (kiss-cut) контур; сквозной рез — сплошной контур.
+// Размер 50px ÷2 = 25px.
 function Legend({ color, label, notch }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-      <svg width="58" height="34" viewBox="0 0 58 34" fill="none" aria-hidden="true">
-        <rect x="2" y="2" width="54" height="30" rx="15" stroke={color} strokeWidth="2.5" fill="none" />
-        {notch && <line x1="40" y1="6" x2="52" y2="18" stroke={color} strokeWidth="2.5" />}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <svg width="42" height="26" viewBox="0 0 42 26" fill="none" aria-hidden="true">
+        <rect
+          x="2" y="2" width="38" height="22" rx="11"
+          stroke={color} strokeWidth="2.5" fill="none"
+          strokeDasharray={notch ? '4 3' : undefined}
+        />
       </svg>
-      <span style={{ fontSize: '18px', fontWeight: 800, color: '#111' }}>{label}</span>
+      <span style={{ fontSize: '15px', fontWeight: 700, color: '#000' }}>{label}</span>
     </div>
   )
 }

@@ -46,8 +46,8 @@ describe('SampleProof', () => {
 
   it('показывает легенду надсечка/сквозной рез', () => {
     render(<SampleProof order={ORDER} />)
-    expect(screen.getByText('НАДСЕЧКА')).toBeInTheDocument()
-    expect(screen.getByText('СКВОЗНОЙ РЕЗ')).toBeInTheDocument()
+    expect(screen.getByText(/НАДСЕЧКА/)).toBeInTheDocument()
+    expect(screen.getByText(/СКВОЗНОЙ РЕЗ/)).toBeInTheDocument()
   })
 
   it('плейсхолдер если нет превью изделия', () => {

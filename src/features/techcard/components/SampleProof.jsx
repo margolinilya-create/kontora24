@@ -1,5 +1,5 @@
 import { forwardRef, useRef, useImperativeHandle } from 'react'
-import sampleLogo from '@/assets/sample-logo-white.png'
+import sampleLogo from '@/assets/sample-logo-dark.png'
 import iconNadsechka from '@/assets/sample-nadsechka.png'
 import iconSkvoznoy from '@/assets/sample-skvoznoy.png'
 import iconGlaza from '@/assets/sample-glaza.png'
@@ -82,29 +82,32 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
         overflow: 'hidden',
       }}
     >
-      {/* 2. Верхняя зона: капсула номера + перекрывающая капсула даты/лого */}
+      {/* 2. Верхняя зона: крупная капсула номера + под ней капсула даты и
+          вордмарк «Контора» справа (по эталону менеджера). Высота капсулы с
+          запасом + lineHeight>1 — номер и дата не обрезаются. */}
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {/* 2.1 Большая капсула номера — 900×120 ÷2, радиус 60 ÷2 */}
+        {/* 2.1 Капсула номера */}
         <div style={{
-          width: '450px', height: '60px',
-          background: CARD_BG, borderRadius: '30px',
+          minWidth: '500px', height: '96px', padding: '0 40px',
+          background: CARD_BG, borderRadius: '48px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <span style={{ fontSize: '40px', fontWeight: 700, color: '#000', lineHeight: 1 }}>
+          <span style={{ fontSize: '52px', fontWeight: 700, color: '#000', lineHeight: 1.15, whiteSpace: 'nowrap' }}>
             #{number}
           </span>
         </div>
-        {/* 2.2 Капсула даты + лого — 650×80 ÷2, радиус 40 ÷2, перекрывает низ */}
-        <div style={{
-          marginTop: '-16px',
-          width: '325px', height: '40px',
-          background: DATE_BG, borderRadius: '20px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px',
-        }}>
-          <span style={{ color: '#fff', fontWeight: 600, fontSize: '19px', lineHeight: 1 }}>
-            {dateStr}
-          </span>
-          <img src={sampleLogo} alt="" style={{ height: '20px', width: 'auto', display: 'block' }} />
+        {/* 2.2 Дата (тёмная капсула) + крупный тёмный вордмарк «Контора» справа */}
+        <div style={{ marginTop: '-22px', display: 'flex', alignItems: 'center', gap: '18px' }}>
+          <div style={{
+            height: '48px', padding: '0 26px',
+            background: DATE_BG, borderRadius: '24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ color: '#fff', fontWeight: 600, fontSize: '23px', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+              {dateStr}
+            </span>
+          </div>
+          <img src={sampleLogo} alt="" style={{ height: '58px', width: 'auto', display: 'block' }} />
         </div>
       </div>
 
@@ -153,12 +156,12 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
   )
 })
 
-// Легенда реза: фирменная иконка (PNG менеджера, фон убран) + подпись.
+// Легенда реза: фирменная иконка (PNG менеджера, фон убран) + « — подпись».
 function Legend({ src, label }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <img src={src} alt="" style={{ height: '30px', width: 'auto', display: 'block' }} />
-      <span style={{ fontSize: '15px', fontWeight: 700, color: '#000' }}>{label}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <img src={src} alt="" style={{ height: '34px', width: 'auto', display: 'block' }} />
+      <span style={{ fontSize: '18px', fontWeight: 700, color: '#000', whiteSpace: 'nowrap' }}>— {label}</span>
     </div>
   )
 }

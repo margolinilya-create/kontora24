@@ -1,5 +1,8 @@
 import { forwardRef, useRef, useImperativeHandle } from 'react'
-import logoWhite from '@/assets/kontora-logo-white.png'
+import sampleLogo from '@/assets/sample-logo-white.png'
+import iconNadsechka from '@/assets/sample-nadsechka.png'
+import iconSkvoznoy from '@/assets/sample-skvoznoy.png'
+import iconGlaza from '@/assets/sample-glaza.png'
 import { formatOrderNumberShort } from '@/shared/lib/utils'
 import { findPreviewAttachment, getAttachmentUrl } from '@/features/orders/lib/order-attachments'
 import { ORDER_TYPES, FILM_TYPES } from '@/shared/constants'
@@ -8,6 +11,8 @@ import { ORDER_TYPES, FILM_TYPES } from '@/shared/constants'
 // Спек задаёт холст 1748×2480 px (300 DPI, 148×210 мм). Рендерим DOM в
 // половинном масштабе (874×1240 CSS) и экспортируем со scale 2 → ровно
 // 1748×2480 (≈4.3 Mpx, безопасно на телефонах). Все размеры из спека — ÷2.
+// Фирменные иконки (лого/надсечка/сквозной/глаза) — присланные менеджером
+// PNG (обработаны: белый фон убран флуд-заливкой, лого перекрашен в белый).
 // См. PrintPreviewModal CONFIG.sample.
 const W = 874
 const H = 1240
@@ -16,17 +21,13 @@ const CARD_BG = '#ECECEC'
 const DATE_BG = '#5C5C5C'
 const LABEL_COLOR = '#000000'
 const VALUE_COLOR = '#000000'
-// Цвета фирменных иконок реза (по дизайну менеджера 24.07).
-const NADSECHKA = '#E6007E' // розовый — надсечка (kiss-cut, уголок отгибается)
-const SKVOZNOY = '#2ECC00'  // зелёный — сквозной рез
-const GLAZA = '#2B2B2B'     // фирменная иконка «глаза»
 
 /**
- * Программная A5-цветопроба (без PNG-шаблона): рамка, капсула номера,
- * перекрывающая тёмная капсула даты+лого, центральное превью изделия, нижняя
- * карточка с легендой реза (Надсечка/Сквозной рез — иконки рисуются кодом,
- * файлов геометрии реза нет), инфо-таблицей из 7 полей и фирменной иконкой.
- * Данные — из карточки заказа; отсутствующие показываем как «—».
+ * Программная A5-цветопроба (без PNG-шаблона всей страницы): рамка, капсула
+ * номера, перекрывающая тёмная капсула даты+лого, центральное превью изделия,
+ * нижняя карточка с легендой реза (Надсечка/Сквозной рез), инфо-таблицей из
+ * 7 полей и фирменной иконкой «глаза». Данные из карточки заказа; отсутствующие
+ * показываем как «—».
  */
 export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
   const rootRef = useRef(null)
@@ -103,7 +104,7 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
           <span style={{ color: '#fff', fontWeight: 600, fontSize: '19px', lineHeight: 1 }}>
             {dateStr}
           </span>
-          <img src={logoWhite} alt="" crossOrigin="anonymous" style={{ height: '27px', width: 'auto', display: 'block' }} />
+          <img src={sampleLogo} alt="" style={{ height: '20px', width: 'auto', display: 'block' }} />
         </div>
       </div>
 
@@ -123,13 +124,13 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
 
       {/* 4. Нижняя карточка — #ECECEC, радиус 35 ÷2, поля 40 ÷2 */}
       <div style={{ background: CARD_BG, borderRadius: '17px', padding: '20px' }}>
-        {/* 4.2 Легенда типов резки */}
+        {/* 4.2 Легенда типов резки — фирменные иконки менеджера */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '32px', marginBottom: '16px' }}>
-          <Legend color={NADSECHKA} label="НАДСЕЧКА" notch />
-          <Legend color={SKVOZNOY} label="СКВОЗНОЙ РЕЗ" />
+          <Legend src={iconNadsechka} label="НАДСЕЧКА" />
+          <Legend src={iconSkvoznoy} label="СКВОЗНОЙ РЕЗ" />
         </div>
 
-        {/* 4.3 таблица (слева) + 4.4 фирменная иконка (справа снизу) */}
+        {/* 4.3 таблица (слева) + 4.4 фирменная иконка «глаза» (справа снизу) */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px' }}>
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
@@ -145,52 +146,19 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
               ))}
             </tbody>
           </table>
-          <div style={{ flexShrink: 0, marginRight: '15px', marginBottom: '15px' }}>
-            <EyesIcon size={50} />
-          </div>
+          <img src={iconGlaza} alt="" style={{ height: '54px', width: 'auto', display: 'block', flexShrink: 0, marginRight: '15px', marginBottom: '15px' }} />
         </div>
       </div>
     </div>
   )
 })
 
-// Иконки легенды реза — воспроизведены кодом по дизайну менеджера (файлы SVG
-// не приложены). Надсечка — розовая капсула с отогнутым уголком (kiss-cut);
-// сквозной рез — зелёная сплошная капсула, слегка повёрнута. Заливка #ECECEC
-// (сливается с карточкой — виден цветной контур, как в оригинале).
-function Legend({ color, label, notch }) {
+// Легенда реза: фирменная иконка (PNG менеджера, фон убран) + подпись.
+function Legend({ src, label }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <svg width="46" height="26" viewBox="0 0 92 52" aria-hidden="true">
-        {notch ? (
-          <>
-            <rect x="4" y="4" width="84" height="40" rx="20" fill={CARD_BG} stroke={color} strokeWidth="5" />
-            {/* отогнутый уголок надсечки */}
-            <path d="M62 4 Q 74 22 88 28" fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" />
-          </>
-        ) : (
-          <g transform="rotate(-9 46 26)">
-            <rect x="6" y="9" width="80" height="34" rx="17" fill={CARD_BG} stroke={color} strokeWidth="5" />
-          </g>
-        )}
-      </svg>
+      <img src={src} alt="" style={{ height: '30px', width: 'auto', display: 'block' }} />
       <span style={{ fontSize: '15px', fontWeight: 700, color: '#000' }}>{label}</span>
     </div>
-  )
-}
-
-// Фирменная иконка «глаза» (Icon-glaza) — воспроизведена кодом по дизайну:
-// тёмный овальный блок + два белых глаза со зрачками и бликами.
-function EyesIcon({ size = 50 }) {
-  return (
-    <svg width={size * 1.3} height={size} viewBox="0 0 120 92" aria-hidden="true">
-      <ellipse cx="63" cy="47" rx="55" ry="43" fill={GLAZA} />
-      <ellipse cx="36" cy="47" rx="16" ry="27" fill="#fff" />
-      <ellipse cx="73" cy="45" rx="18" ry="30" fill="#fff" />
-      <ellipse cx="34" cy="53" rx="9" ry="15" fill={GLAZA} />
-      <ellipse cx="70" cy="53" rx="10" ry="17" fill={GLAZA} />
-      <circle cx="39" cy="45" r="3" fill="#fff" />
-      <circle cx="75" cy="43" r="3.5" fill="#fff" />
-    </svg>
   )
 }

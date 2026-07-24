@@ -52,7 +52,7 @@ describe('SampleProof', () => {
 
   it('плейсхолдер если нет превью изделия', () => {
     render(<SampleProof order={ORDER} />)
-    expect(screen.getByText('Нет изображения изделия')).toBeInTheDocument()
+    expect(screen.getByText('Изображение отсутствует')).toBeInTheDocument()
   })
 
   it('материал берётся из film_type если нет film_material', () => {

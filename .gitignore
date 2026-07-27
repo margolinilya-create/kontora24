@@ -27,3 +27,6 @@ dist-ssr
 # Test artifacts
 playwright-report/
 test-results/
+
+# Superpowers brainstorming (визуальный компаньон) — runtime
+.superpowers/

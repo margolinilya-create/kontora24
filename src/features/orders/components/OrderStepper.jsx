@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import {
-  ORDER_STATUSES, getOrderRoute,
-  IS_3D_STICKERPACK, SUBTASK_STATUS_TO_STAGE, SUBTASK_STATUS_LABELS,
-  TRACK_LABELS, getSubtaskRoute,
+  getOrderRoute, IS_3D_STICKERPACK, SUBTASK_STATUS_TO_STAGE, SUBTASK_STATUS_LABELS, TRACK_LABELS, getSubtaskRoute, getStatusMeta,
 } from '@/shared/constants'
 import { formatDateTime, formatOrderType } from '@/shared/lib/utils'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
@@ -119,7 +117,7 @@ function OrderRow({ statuses, currentIdx, tsByStatus }) {
       {statuses.map((status, i) => {
         const isCompleted = currentIdx >= 0 && i < currentIdx
         const isCurrent = i === currentIdx
-        const s = ORDER_STATUSES[status]
+        const s = getStatusMeta(status)
         const ts = tsByStatus[status]
         const tooltip = ts
           ? `${formatDateTime(ts.created_at)}${ts.changed_by_profile?.display_name ? ` · ${ts.changed_by_profile.display_name}` : ''}`
@@ -163,7 +161,7 @@ export function OrderStepper({ order, history, subtasks, extras, onUpdated }) {
     try {
       await updateOrderStatus(order.id, order.status, recoveryTarget, { isRollback: true })
       if (!isMountedRef.current) return
-      toast.success(`Заказ возвращён на «${ORDER_STATUSES[recoveryTarget]?.label || recoveryTarget}»`)
+      toast.success(`Заказ возвращён на «${getStatusMeta(recoveryTarget)?.label || recoveryTarget}»`)
       onUpdated?.()
     } catch (err) {
       if (isMountedRef.current) toast.error(translateError(err).message)
@@ -173,9 +171,9 @@ export function OrderStepper({ order, history, subtasks, extras, onUpdated }) {
   }
 
   if (isOffRoute) {
-    const currentLabel = ORDER_STATUSES[order.status]?.label || order.status
+    const currentLabel = getStatusMeta(order.status)?.label || order.status
     const orderTypeLabel = formatOrderType(order)
-    const recoveryLabel = recoveryTarget ? (ORDER_STATUSES[recoveryTarget]?.label || recoveryTarget) : null
+    const recoveryLabel = recoveryTarget ? (getStatusMeta(recoveryTarget)?.label || recoveryTarget) : null
     return (
       <div className="bg-warning/10 border border-warning/40 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1 text-sm">

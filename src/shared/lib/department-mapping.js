@@ -9,6 +9,11 @@
 // stages — {label, status} для фильтра (порядок = канонический порядок этапов).
 // legacyStatuses — устаревшие ключи (batch_layout/selection_pouring): не
 // показываются в фильтре, но красятся цветом отдела и попадают в группу.
+//
+// R25.7D: свои этапы (custom_<N>) берут отдел из каталога k24_stage_defs
+// (department: sales / prepress / print / 3d / osk) — фолбэк во всех геттерах.
+
+import { getStageDef, isCustomStageKey, listActiveStageDefs } from './route-registry'
 
 export const ORG_DEPARTMENTS = [
   {
@@ -143,19 +148,41 @@ for (const dept of DEPARTMENTS) {
   }
 }
 
+/** R25.7D: отдел своего этапа из каталога (ORG_DEPARTMENTS по id) или null. */
+function customStageDept(status) {
+  if (!isCustomStageKey(status)) return null
+  const def = getStageDef(status)
+  if (!def) return null
+  const dept = ORG_DEPARTMENTS.find((d) => d.id === def.department)
+  return dept ? { dept, def } : null
+}
+
 /** Get department info for a DB status */
 export function getDepartment(status) {
-  return _statusToDept[status] || null
+  if (_statusToDept[status]) return _statusToDept[status]
+  const c = customStageDept(status)
+  if (!c) return null
+  return {
+    departmentId: c.dept.id,
+    departmentLabel: c.dept.label,
+    stageLabel: c.def.name || status,
+    color: c.dept.color,
+  }
 }
 
 /** Get department label for a DB status */
 export function getDepartmentLabel(status) {
-  return _statusToDept[status]?.departmentLabel || status
+  return getDepartment(status)?.departmentLabel || status
 }
 
 /** Get stage label within department for a DB status */
 export function getStageLabel(status) {
-  return _statusToDept[status]?.stageLabel || status
+  return getDepartment(status)?.stageLabel || status
+}
+
+/** Свои этапы каталога отдела (неархивные), ключи. */
+function customStatusesForDepartment(departmentId) {
+  return listActiveStageDefs().filter((s) => s.department === departmentId).map((s) => s.key)
 }
 
 /** Get all unique DB statuses used in the department filter */
@@ -165,6 +192,7 @@ export function getAllFilterStatuses() {
     for (const stage of dept.stages) {
       statuses.add(stage.status)
     }
+    for (const key of customStatusesForDepartment(dept.id)) statuses.add(key)
   }
   return [...statuses]
 }
@@ -173,7 +201,7 @@ export function getAllFilterStatuses() {
 export function getStatusesForDepartment(departmentId) {
   const dept = DEPARTMENTS.find(d => d.id === departmentId)
   if (!dept) return []
-  return [...new Set(dept.stages.map(s => s.status))]
+  return [...new Set([...dept.stages.map(s => s.status), ...customStatusesForDepartment(departmentId)])]
 }
 
 // --- Production department color groups (built from ORG_DEPARTMENTS) ---
@@ -209,12 +237,12 @@ for (const [key, group] of Object.entries(DEPT_GROUPS)) {
 /** Department token (color theme name) for a production stage */
 export function getStageDeptToken(status) {
   if (status === 'cancelled') return 'danger'
-  return _stageToGroup[status]?.token || null
+  return _stageToGroup[status]?.token || customStageDept(status)?.dept.token || null
 }
 
 /** Ключ группы отдела (sales/design/print/pouring/finish) для статуса. */
 export function getStageGroupKey(status) {
-  return _stageToGroup[status]?.key || null
+  return _stageToGroup[status]?.key || customStageDept(status)?.dept.groupKey || null
 }
 
 // Literal Tailwind classes — kept verbatim so the content scanner picks them up.
@@ -261,4 +289,29 @@ export function stageDotClass(status) {
 export function stageBorderClass(status) {
   const token = getStageDeptToken(status)
   return STAGE_BORDER_CLASSES[token] || 'border-border'
+}
+
+/**
+ * R25.7D (ТЗ 7.4): колонки канбана / PipelineSummary со своими этапами —
+ * каждый неархивный свой этап встаёт после последней встроенной колонки
+ * своего отдела (ORG_DEPARTMENTS.stages, без устаревших ключей), свои этапы
+ * одного отдела — в порядке каталога. Отдел без колонок в списке → в конец.
+ * @param {string[]} cols — встроенные колонки в каноническом порядке
+ * @param {object[]} [stageDefs] — каталог (по умолчанию — реестр)
+ */
+export function insertCustomStageColumns(cols, stageDefs = listActiveStageDefs()) {
+  const result = [...cols]
+  for (const def of stageDefs || []) {
+    if (!isCustomStageKey(def?.key) || def.archived_at || result.includes(def.key)) continue
+    const dept = ORG_DEPARTMENTS.find((d) => d.id === def.department)
+    const deptStatuses = new Set([
+      ...(dept?.stages || []).map((s) => s.status),
+      ...stageDefs.filter((s) => s.department === def.department).map((s) => s.key),
+    ])
+    let at = -1
+    result.forEach((s, i) => { if (deptStatuses.has(s)) at = i })
+    if (at < 0) result.push(def.key)
+    else result.splice(at + 1, 0, def.key)
+  }
+  return result
 }

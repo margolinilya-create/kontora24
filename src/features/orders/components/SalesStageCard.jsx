@@ -7,8 +7,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import {
-  ORDER_STATUSES, PAYMENT_STATUSES, DELIVERY_TYPES, canAdvanceFrom, getNextStatus, isOrderPaid,
-  NO_PAYMENT_CONFIRM_MESSAGE,
+  PAYMENT_STATUSES, DELIVERY_TYPES, canAdvanceFrom, getNextStatus, isOrderPaid, NO_PAYMENT_CONFIRM_MESSAGE, getStatusMeta,
 } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import Modal from '@/shared/components/Modal'
@@ -40,7 +39,7 @@ export function SalesStageCard({ order, onUpdated }) {
   const perms = dynamicLoaded ? dynamicPerms : null
   const canAdvance = canAdvanceFrom(profile.role, stage, perms)
   const next = getNextStatus(profile.role, stage, order, perms)
-  const nextLabel = next ? ORDER_STATUSES[next]?.label || next : null
+  const nextLabel = next ? getStatusMeta(next)?.label || next : null
 
   async function run(fn, successMsg) {
     setBusy(true)
@@ -109,7 +108,7 @@ export function SalesStageCard({ order, onUpdated }) {
 
   return (
     <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-4">
-      <h2 className="font-semibold">{ORDER_STATUSES[stage]?.label || stage}</h2>
+      <h2 className="font-semibold">{getStatusMeta(stage)?.label || stage}</h2>
 
       {stage === 'awaiting_payment' && canAdvance && (
         <>

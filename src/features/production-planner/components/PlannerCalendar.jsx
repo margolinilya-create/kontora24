@@ -7,7 +7,7 @@
 import { useMemo } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { formatOrderNumber } from '@/shared/lib/utils'
-import { ORDER_STATUSES } from '@/shared/constants'
+import { getStatusMeta } from '@/shared/constants'
 import { stageBadgeClasses, stageBorderClass } from '@/shared/lib/department-mapping'
 import { VISIBLE_BUCKETS, BUCKET_LABELS, BUCKETS } from '../lib/buckets'
 import { usePlanStore } from '../store/plan-store'
@@ -74,7 +74,7 @@ function StageChip({ item, ordersById, selectedOrderId, onSelectOrder }) {
   const palette = getOrderPalette(order.id)
   const isSelected = selectedOrderId === order.id
   const isDimmed = selectedOrderId && !isSelected
-  const label = ORDER_STATUSES[item.stage]?.label || item.stage
+  const label = getStatusMeta(item.stage)?.label || item.stage
   // R14 гибрид: фон/бордер/текст по департаменту стадии, левая полоска — по заказу.
   const stageClasses = stageBadgeClasses(item.stage) // bg-dept-*/15 text-dept-*
   const stageBorder = stageBorderClass(item.stage)
@@ -144,7 +144,7 @@ export function DragOverlayChip({ orderId, stage, hours, ordersById }) {
   const order = ordersById[orderId]
   if (!order) return null
   const palette = getOrderPalette(order.id)
-  const label = ORDER_STATUSES[stage]?.label || stage
+  const label = getStatusMeta(stage)?.label || stage
   const stageClasses = stageBadgeClasses(stage)
   const stageBorder = stageBorderClass(stage)
   return (

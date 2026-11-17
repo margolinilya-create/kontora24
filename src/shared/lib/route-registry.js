@@ -126,3 +126,35 @@ export function resolveTypeRoute(order) {
   if (stages) return { stages, production: asStageList(def.production), source: 'registry' }
   return null
 }
+
+// ── R25.7D: свои этапы (custom_<N>) ─────────────────────────────
+
+/** Ключ своего этапа из каталога k24_stage_defs (формат custom_<N>, миграция 102). */
+export function isCustomStageKey(key) {
+  return typeof key === 'string' && /^custom_[0-9]+$/.test(key)
+}
+
+/** Неархивные свои этапы каталога в порядке sort_order (меню, конструктор, канбан). */
+export function listActiveStageDefs() {
+  return listStageDefs()
+    .filter((s) => !s.archived_at)
+    .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0)
+      || String(a.key).localeCompare(String(b.key), 'en', { numeric: true }))
+}
+
+/** Заказ своего (не встроенного) типа — по корректному снимку маршрута. */
+export function isCustomTypeOrder(order) {
+  const snap = order?.route_snapshot
+  return isValidRouteSnapshot(snap) && snap.builtin === false
+}
+
+/**
+ * Сдельные ставки типа из снимка заказа — только у своего (не встроенного)
+ * типа (ТЗ 7.6). Встроенные платятся по calculateWorkerPayout как раньше.
+ * @returns {object|null} { [stage]: { rate, base: 'item'|'sticker' } }
+ */
+export function getSnapshotRates(order) {
+  const snap = order?.route_snapshot
+  if (!isCustomTypeOrder(order)) return null
+  return snap.rates && typeof snap.rates === 'object' && !Array.isArray(snap.rates) ? snap.rates : null
+}

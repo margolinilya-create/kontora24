@@ -8,7 +8,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
 import Button from '@/shared/components/Button'
 import {
-  OTK_DEFECT_STAGES, OTK_DEFECT_LABELS, buildOtkLogPayloads, buildOtkReprintPrefill,
+  otkDefectStagesForRoute, otkDefectLabel, buildOtkLogPayloads, buildOtkReprintPrefill,
   computeOtkSummary, otkTargetQty,
 } from '../../lib/production-logs'
 
@@ -33,7 +33,8 @@ export function OtkDefectsForm({ order, logs, items = [], route, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [reprintPrefill, setReprintPrefill] = useState(null)
 
-  const allowedStages = OTK_DEFECT_STAGES.filter((x) => route.includes(x))
+  // R25.7D: + свои этапы маршрута с отметкой «Тип брака на ТК».
+  const allowedStages = otkDefectStagesForRoute(route)
   // Вид — размерные виды заказа (k24_order_items), только если их больше одного.
   const views = order.order_type !== 'stickerpack3D' && items.length > 1 ? items : []
   const viewRequired = views.length > 0
@@ -90,7 +91,7 @@ export function OtkDefectsForm({ order, logs, items = [], route, onSaved }) {
                 >
                   <option value="">— тип —</option>
                   {allowedStages.map((x) => (
-                    <option key={x} value={x}>{OTK_DEFECT_LABELS[x]}</option>
+                    <option key={x} value={x}>{otkDefectLabel(x)}</option>
                   ))}
                 </select>
               </label>

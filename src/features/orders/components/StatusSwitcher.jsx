@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { updateOrderStatus, PAYMENT_CONFIRM_REQUIRED } from '../hooks/useOrders'
-import { ORDER_STATUSES, getNextStatus, needsNoPaymentConfirm, NO_PAYMENT_CONFIRM_MESSAGE } from '@/shared/constants'
+import { getNextStatus, needsNoPaymentConfirm, NO_PAYMENT_CONFIRM_MESSAGE, getStatusMeta } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
@@ -77,7 +77,7 @@ export function StatusSwitcher({ order, onUpdated }) {
           <span className="flex items-center gap-2">
             <span className="animate-spin rounded-full border-2 border-white border-t-transparent h-3.5 w-3.5" aria-hidden="true" />
           </span>
-        ) : `→ ${ORDER_STATUSES[nextStatus]?.label || nextStatus}`}
+        ) : `→ ${getStatusMeta(nextStatus)?.label || nextStatus}`}
       </button>
       <ConfirmDialog
         isOpen={!!confirmTo}

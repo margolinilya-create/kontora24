@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
-import { PERMISSIONS, PERMISSION_LABELS, ROLES } from '@/shared/constants'
+import { ROLES, getPermissionList, getPermissionLabel } from '@/shared/constants'
+import { useOrderTypesStore } from '@/features/order-types/store'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 
@@ -20,6 +21,8 @@ const SECTIONS = [
  */
 export function RolePermissionsTable() {
   const { permissions, loaded, error, load, setPermission } = useRolePermissionsStore()
+  // R25.7D: подписка на каталог этапов — права stage:custom_<N> в секции этапов.
+  useOrderTypesStore((s) => s.stages)
 
   useEffect(() => {
     if (!loaded) load()
@@ -82,10 +85,10 @@ export function RolePermissionsTable() {
                     {section.title}
                   </td>
                 </tr>
-                {PERMISSIONS[section.key].map((perm) => (
+                {getPermissionList(section.key).map((perm) => (
                   <tr key={perm} className="border-b border-border last:border-0 hover:bg-surface-2/40">
                     <td className="py-2 pr-3 sticky left-0 bg-surface z-10 group-hover:bg-surface-2/40">
-                      <div className="text-sm">{PERMISSION_LABELS[perm] || perm}</div>
+                      <div className="text-sm">{getPermissionLabel(perm)}</div>
                       <div className="text-xs text-text-muted font-mono">{perm}</div>
                     </td>
                     {ROLE_KEYS.map((role) => {
@@ -98,7 +101,7 @@ export function RolePermissionsTable() {
                             checked={isAdmin || checked}
                             disabled={isAdmin}
                             onChange={() => toggle(role, perm, checked)}
-                            aria-label={`${ROLES[role]?.label}: ${PERMISSION_LABELS[perm] || perm}`}
+                            aria-label={`${ROLES[role]?.label}: ${getPermissionLabel(perm)}`}
                             title={isAdmin ? 'admin имеет все права (нельзя изменить)' : ''}
                             className="w-5 h-5 rounded border-border text-accent focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                           />

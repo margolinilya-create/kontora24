@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import {
-  ORDER_STATUSES,
-  calculateActualMaterialsCost, calculateWorkerPayout, settingsToRates,
+  calculateActualMaterialsCost, calculateWorkerPayout, settingsToRates, getStatusMeta,
 } from '@/shared/constants'
 import { fetchShapeByDesign } from '@/shared/lib/payout-context'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
@@ -70,11 +69,11 @@ export function useAnalyticsData(period) {
         // phase 3): базовая таблица после миграции 072 не отдаёт финколонки
         // authenticated. У k24_orders НЕТ колонки deleted_at (soft-delete
         // только у логов) — фильтр по ней ронял страницу с 400 (QA 04.07 №1).
-        supabase.from('k24_orders_full').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, stickers_per_pack, sticker_shape, bopp_bag, route_version, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
+        supabase.from('k24_orders_full').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
         supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
         supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
         period !== 'all' ? supabase.from('k24_orders_full').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', sinceIso).limit(1000) : Promise.resolve({ data: [], error: null }),
-        supabase.from('k24_production_logs').select('id, order_id, stage, track, design_index, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, film_meters, film_type, lamination_meters, lamination_qty, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(10000),
+        supabase.from('k24_production_logs').select('id, order_id, stage, track, design_index, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, film_meters, film_type, lamination_meters, lamination_qty, qty_done, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (ordersRes.error) throw ordersRes.error
@@ -170,7 +169,7 @@ export function useAnalyticsData(period) {
   const statusData = useMemo(() => {
     const byStatus = {}
     orders.forEach((o) => { byStatus[o.status] = (byStatus[o.status] || 0) + 1 })
-    return Object.entries(byStatus).map(([s, v]) => ({ name: ORDER_STATUSES[s]?.label || s, value: v }))
+    return Object.entries(byStatus).map(([s, v]) => ({ name: getStatusMeta(s)?.label || s, value: v }))
   }, [orders])
 
   const avgStageData = useMemo(() => {
@@ -190,7 +189,7 @@ export function useAnalyticsData(period) {
       }
     })
     return Object.entries(stageTimes).map(([stage, times]) => ({
-      name: ORDER_STATUSES[stage]?.label || stage,
+      name: getStatusMeta(stage)?.label || stage,
       hours: Math.round(times.reduce((a, b) => a + b, 0) / times.length),
     })).filter((d) => d.hours > 0)
   }, [data.statusHistory])

@@ -3,7 +3,7 @@ import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
-import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
+import { getOrderRoute, getStatusMeta } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 
 /**
@@ -46,7 +46,7 @@ export function StageJumper({ order, onUpdated }) {
       const meta = optEntry.direction === 'back'
         ? { kind: 'rollback' }
         : skipped.length > 0
-          ? { kind: 'manual_skip', note: `Пропущен вручную: ${skipped.map((s) => ORDER_STATUSES[s]?.label || s).join(', ')}` }
+          ? { kind: 'manual_skip', note: `Пропущен вручную: ${skipped.map((s) => getStatusMeta(s)?.label || s).join(', ')}` }
           : {}
       await updateOrderStatus(order.id, order.status, target, {
         isRollback: optEntry.direction === 'back',
@@ -77,7 +77,7 @@ export function StageJumper({ order, onUpdated }) {
             <option value="">— выбрать —</option>
             {options.map((o) => (
               <option key={o.status} value={o.status}>
-                {o.direction === 'back' ? '↓' : '↑'} {ORDER_STATUSES[o.status]?.label || o.status}
+                {o.direction === 'back' ? '↓' : '↑'} {getStatusMeta(o.status)?.label || o.status}
               </option>
             ))}
           </select>

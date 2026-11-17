@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_STATUSES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES, ORDER_SOURCES, PAYMENT_STATUSES, calculateActualMaterialsCost } from '@/shared/constants'
+import { FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES, ORDER_SOURCES, PAYMENT_STATUSES, calculateActualMaterialsCost, getStatusMeta } from '@/shared/constants'
 import { downloadXlsx } from '@/shared/lib/export-xlsx'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -137,7 +137,7 @@ async function exportOrdersFull() {
       o.stickers_per_pack || '',
       o.design_variants || 1,
       PRIORITIES[o.priority]?.label || '',
-      ORDER_STATUSES[o.status]?.label || o.status,
+      getStatusMeta(o.status)?.label || o.status,
       o.created_at ? new Date(o.created_at).toLocaleDateString('ru-RU') : '',
       o.deadline ? new Date(o.deadline).toLocaleDateString('ru-RU') : '',
       o.creator?.display_name || '',
@@ -177,7 +177,7 @@ async function exportMaterialsLog() {
     .map((l) => [
       new Date(l.created_at).toLocaleString('ru-RU'),
       l.order?.number ?? '',
-      ORDER_STATUSES[l.stage]?.label || l.stage,
+      getStatusMeta(l.stage)?.label || l.stage,
       FILM_TYPES[l.film_type]?.label || l.film_type || '',
       Number(l.film_meters) > 0 ? Number(Number(l.film_meters).toFixed(2)) : '',
       Number(l.lamination_meters) > 0 ? Number(Number(l.lamination_meters).toFixed(2)) : '',

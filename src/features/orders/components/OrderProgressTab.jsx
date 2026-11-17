@@ -23,9 +23,7 @@ import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import {
-  ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK,
-  getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS, getSubtaskRoute,
-  DUAL_TRACK_STAGES, SUBTASK_STATUS_TO_STAGE, SALES_CARD_STAGES,
+  FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK, getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS, getSubtaskRoute, DUAL_TRACK_STAGES, SUBTASK_STATUS_TO_STAGE, SALES_CARD_STAGES, getStatusMeta,
 } from '@/shared/constants'
 import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -436,7 +434,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
   }
 
   if (NO_INPUT_STAGES.has(stage)) {
-    const label = ORDER_STATUSES[stage]?.label || stage
+    const label = getStatusMeta(stage)?.label || stage
     return (
       <div className="space-y-4">
         <StageJumperBlock order={order} onUpdated={onUpdated} />
@@ -466,7 +464,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
     // cardStage=order.status (обычно 'selection_pouring') и показывала форму
     // ЗАЛИВКИ. Для сушки нужен ввод брака по каждому виду → маппим явно в 'drying'.
     const cardStage = subStatus === 'drying' ? 'drying' : (SUBTASK_STATUS_TO_STAGE[subStatus] || stage)
-    const cardLabel = ORDER_STATUSES[cardStage]?.label || cardStage
+    const cardLabel = getStatusMeta(cardStage)?.label || cardStage
     const cardConfig = STAGE_FIELDS[cardStage]
     const isDualTrackStage = !!cardConfig?.tracks
     const otherTrack = trackKey === 'backgrounds' ? 'stickers' : 'backgrounds'
@@ -577,7 +575,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
     )
   }
 
-  const stageLabel = ORDER_STATUSES[stage]?.label || stage
+  const stageLabel = getStatusMeta(stage)?.label || stage
 
   // Прогресс по трекам (если dual-track) или общий.
   let progressProp, incomingProp
@@ -610,7 +608,7 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
         onClose={() => setPendingAdvance(null)}
         onConfirm={confirmAdvance}
         title="Все данные заполнены, завершить этап?"
-        message={pendingAdvance ? `Заказ перейдёт на этап «${ORDER_STATUSES[pendingAdvance.to]?.label || pendingAdvance.to}». Если нужно дозаполнить — нажмите «Отмена».` : ''}
+        message={pendingAdvance ? `Заказ перейдёт на этап «${getStatusMeta(pendingAdvance.to)?.label || pendingAdvance.to}». Если нужно дозаполнить — нажмите «Отмена».` : ''}
         confirmText="Завершить этап"
         variant="primary"
       />
@@ -980,7 +978,7 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
     setSaving(true)
     try {
       await onAdvance(item.idx, next)
-      toast.success(`Вид ${item.idx} → ${ORDER_STATUSES[next]?.label || next}`)
+      toast.success(`Вид ${item.idx} → ${getStatusMeta(next)?.label || next}`)
     } catch (err) {
       toast.error(translateError(err).message || err.message)
     } finally {
@@ -993,7 +991,7 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
     setSaving(true)
     try {
       await onAdvance(item.idx, target)
-      toast.success(`Вид ${item.idx} → ${ORDER_STATUSES[target]?.label || target}`)
+      toast.success(`Вид ${item.idx} → ${getStatusMeta(target)?.label || target}`)
       setTarget('')
     } catch (err) {
       toast.error(translateError(err).message || err.message)
@@ -1013,7 +1011,7 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
             {Number(item.width_mm)}×{Number(item.height_mm)} мм · {Number(item.qty)} шт
           </span>
         </div>
-        <span className="text-sm font-medium">{ORDER_STATUSES[status]?.label || status}</span>
+        <span className="text-sm font-medium">{getStatusMeta(status)?.label || status}</span>
       </div>
 
       {/* Mini-stepper по order.route */}
@@ -1028,7 +1026,7 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
                   'inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold',
                   done ? 'bg-accent text-on-accent' : current ? 'bg-accent text-on-accent ring-2 ring-offset-1 ring-offset-surface-2 ring-current' : 'bg-surface-dim text-text-muted border border-border',
                 ].join(' ')}
-                title={ORDER_STATUSES[s]?.label || s}
+                title={getStatusMeta(s)?.label || s}
               >
                 {i + 1}
               </span>
@@ -1045,7 +1043,7 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
             disabled={saving}
             className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50 min-h-[40px] flex-1 sm:flex-none"
           >
-            {saving ? '…' : `Завершить «${ORDER_STATUSES[status]?.label || status}» → ${ORDER_STATUSES[next]?.label || next}`}
+            {saving ? '…' : `Завершить «${getStatusMeta(status)?.label || status}» → ${getStatusMeta(next)?.label || next}`}
           </button>
         ) : (
           <span className="text-xs text-text-muted px-2 py-1">Вид завершён</span>
@@ -1061,7 +1059,7 @@ function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
             >
               <option value="">↺ откат / переход</option>
               {otherOptions.map((s) => (
-                <option key={s} value={s}>{ORDER_STATUSES[s]?.label || s}</option>
+                <option key={s} value={s}>{getStatusMeta(s)?.label || s}</option>
               ))}
             </select>
             {target && (

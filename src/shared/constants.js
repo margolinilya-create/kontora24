@@ -1,5 +1,6 @@
 import {
   ROUTE_V2_HEAD, ROUTE_V2_TAIL, resolveTypeRoute, getStageDef,
+  listStageDefs, listActiveStageDefs, getSnapshotRates, isCustomStageKey, isCustomTypeOrder,
 } from './lib/route-registry'
 
 // --- Time constants (ms) ---
@@ -94,6 +95,23 @@ export function getStatusMeta(status) {
     order: 100 + (Number(def.sort_order) || 0),
     custom: true,
   }
+}
+
+/**
+ * R25.7D: активные статусы с учётом своих этапов каталога (включая архивные —
+ * заказ может стоять на этапе, отправленном в архив). Для запросов списков
+ * заказов (Заказы, планировщик, счётчики меню): статичный ACTIVE_ORDER_STATUSES
+ * своих этапов не знает. Вызывать в момент запроса — реестр грузится после логина.
+ */
+let _activeStatusesCache = { key: '', value: ACTIVE_ORDER_STATUSES }
+export function getActiveOrderStatuses() {
+  const custom = listStageDefs().map((s) => s.key).filter(isCustomStageKey)
+  const key = custom.join(',')
+  // Тот же массив, пока каталог не изменился — безопасно для deps хуков.
+  if (key !== _activeStatusesCache.key) {
+    _activeStatusesCache = { key, value: custom.length ? [...ACTIVE_ORDER_STATUSES, ...custom] : ACTIVE_ORDER_STATUSES }
+  }
+  return _activeStatusesCache.value
 }
 
 // R25.1: этапы отдела продаж (менеджер), раздел «Продажи» (/sales).
@@ -560,6 +578,26 @@ export const PERMISSION_LABELS = {
   'user:manage': 'Управлять пользователями',
   'contractor:manage': 'Управлять подрядчиками',
   'order_type:manage': 'Настраивать типы заказов и этапы',
+}
+
+/**
+ * R25.7D: список прав секции с учётом своих этапов каталога — секция
+ * «stages» дополняется stage:custom_<N> (право заводит create_stage_def,
+ * миграция 104). Статичный PERMISSIONS не мутируется.
+ */
+export function getPermissionList(section) {
+  const base = PERMISSIONS[section] || []
+  if (section !== 'stages') return base
+  const custom = listActiveStageDefs().map((s) => `stage:${s.key}`)
+  return custom.length ? [...base, ...custom] : base
+}
+
+/** R25.7D: подпись права (своему этапу — «Продвигать «<название>»»). */
+export function getPermissionLabel(perm) {
+  if (PERMISSION_LABELS[perm]) return PERMISSION_LABELS[perm]
+  const m = /^stage:(custom_[0-9]+)$/.exec(perm || '')
+  const def = m ? getStageDef(m[1]) : null
+  return def ? `Продвигать «${def.name}»` : perm
 }
 
 // Legacy: hard-coded fallback. Используется до загрузки динамических прав
@@ -1061,6 +1099,46 @@ export function isPackagingPaid(order) {
  *   qty — исходное количество из лога (стикеры / фоны / паки), units — оплачиваемые
  *   единицы (qty × множитель), amount = units × rate. Пустой массив — лог не оплачивается.
  */
+// R25.7D (ТЗ 7.6): основное поле количества этапа для ставки своего типа.
+// Заливка — stickers_good (= залито − брак), свой этап — выполнено − брак.
+const TYPE_RATE_QTY_FIELD = {
+  print: 'stickers_printed',
+  lamination: 'lamination_qty',
+  cutting: 'qty_cut',
+  pouring: 'stickers_good',
+  selection: 'qty_selected',
+  assembly_3d: 'packs_assembled',
+  packaging: 'packs_packaged',
+}
+
+/** Количество лога для ставки своего типа (0 — этап без количества). */
+export function typeRateQty(log) {
+  const stage = log?.stage
+  if (isCustomStageKey(stage)) {
+    return Math.max(0, (Number(log.qty_done) || 0) - (Number(log.defects) || 0))
+  }
+  const field = TYPE_RATE_QTY_FIELD[stage]
+  return field ? Number(log[field]) || 0 : 0
+}
+
+/**
+ * R25.7D: оплата лога заказа своего типа по ставкам из снимка маршрута.
+ * units = qty × (stickers_per_pack, если база «за стикер» и тип — набор).
+ * Этап без ставки — без сдельной оплаты.
+ */
+export function computeTypeRatePayout(log, order, typeRates) {
+  const stage = log?.stage
+  const r = typeRates?.[stage]
+  const rate = Number(r?.rate)
+  if (!r || !Number.isFinite(rate) || rate <= 0) return []
+  const qty = typeRateQty(log)
+  if (!qty) return []
+  const perSticker = r.base === 'sticker' && order?.route_snapshot?.is_set === true
+  const mult = perSticker ? (Number(order?.stickers_per_pack) || 1) : 1
+  const units = qty * mult
+  return [{ category: 'type_rate', stage, base: perSticker ? 'sticker' : 'item', qty, units, rate, amount: units * rate }]
+}
+
 export function computeLogPayout(log, order, rates, ctx = {}) {
   const out = []
   if (!log) return out
@@ -1068,6 +1146,13 @@ export function computeLogPayout(log, order, rates, ctx = {}) {
   // R25.2 (ТЗ 2.5): записи брака ТК — контроль, не работа; сдельно не платятся.
   // Явное исключение: на них не должна сработать ни одна ветка ниже.
   if (stage === 'otk') return out
+  // R25.7D (ТЗ 7.6): свой тип — только ставки из снимка маршрута заказа
+  // (смена ставки в типе прошлую оплату не меняет). Правила встроенных типов
+  // (форма заливки, упаковка только у 3D/БОПП) к своим типам не применяются.
+  // Встроенные типы (snapshot.builtin / нет снимка) — ветки ниже без изменений.
+  if (isCustomTypeOrder(order)) {
+    return computeTypeRatePayout(log, order, getSnapshotRates(order))
+  }
   const perPack = Number(order?.stickers_per_pack) || 1
 
   if (stage === 'pouring' || stage === 'selection_pouring') {
@@ -1138,6 +1223,9 @@ export function calculateWorkerPayout(logs, opts = {}) {
   // Для отчётности храним сырые counts тоже
   let selectionBgs = 0
   let assemblyPacks = 0
+  // R25.7D: оплата по ставкам своих типов (разные ставки — суммой).
+  let typeRateUnits = 0
+  let typeRateAmount = 0
 
   for (const l of logs || []) {
     const order = opts.ordersById?.[l.order_id] || l.order || null
@@ -1146,6 +1234,7 @@ export function calculateWorkerPayout(logs, opts = {}) {
       else if (e.category === 'selection') { selectionBgs += e.qty; selectionStickers += e.units }
       else if (e.category === 'assembly') { assemblyPacks += e.qty; assemblyStickers += e.units }
       else if (e.category === 'packaging') packaging += e.units
+      else if (e.category === 'type_rate') { typeRateUnits += e.units; typeRateAmount += e.amount }
     }
   }
 
@@ -1158,6 +1247,13 @@ export function calculateWorkerPayout(logs, opts = {}) {
   breakdown.selection = { count: selectionStickers, rate: rates.selection_per_sticker, amount: selectionStickers * rates.selection_per_sticker, label: 'Выборка фонов', bgs: selectionBgs }
   breakdown.assembly  = { count: assemblyStickers,  rate: rates.assembly_per_pack,     amount: assemblyStickers  * rates.assembly_per_pack,     label: 'Сборка 3D-паков', packs: assemblyPacks }
   breakdown.packaging = { count: packaging,         rate: rates.packaging_per_pack,    amount: packaging         * rates.packaging_per_pack,    label: 'Упаковка паков' }
+  // Ключ добавляется только при наличии оплаты по своим типам — у встроенных
+  // типов breakdown прежний (эталонные тесты оплаты не меняются).
+  if (typeRateUnits > 0) {
+    // rate — средняя ставка (подпись «N шт × R ₽»); сумма — точная.
+    const avgRate = Math.round((typeRateAmount / typeRateUnits) * 100) / 100
+    breakdown.type_rates = { count: typeRateUnits, rate: avgRate, amount: typeRateAmount, label: 'Ставки своих типов' }
+  }
 
   const total = Object.values(breakdown).reduce((sum, b) => sum + b.amount, 0)
   return { breakdown, total }

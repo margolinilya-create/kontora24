@@ -8,6 +8,8 @@ import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { cn } from '@/shared/lib/utils'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { RoleSwitcher } from '@/shared/components/RoleSwitcher'
+import { useOrderTypesStore } from '@/features/order-types/store'
+import { withCustomStageNavItems } from '@/features/production/lib/queue-config'
 
 const ICONS = {
   LayoutDashboard: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>,
@@ -89,7 +91,9 @@ function Badge({ count, size = 'sm' }) {
 
 function NavItem({ item, counts, lowStockCount, collapsed, indent, isHelper }) {
   const Icon = ICONS[item.icon] || ICONS.LayoutDashboard
-  const count = COUNT_MAP[item.path] ? counts[COUNT_MAP[item.path]] : null
+  // R25.7D: свой этап — счётчик по его ключу (sidebar-store считает все активные статусы).
+  const countKey = COUNT_MAP[item.path] || item.customStage
+  const count = countKey ? counts[countKey] : null
   const hasAlert = item.path === '/warehouse' && lowStockCount > 0
 
   return (
@@ -159,7 +163,10 @@ export function Sidebar({ collapsed }) {
   // L2 RBAC: если у пункта есть permission — проверяем через k24_role_permissions.
   // Иначе fallback на роли (legacy). До загрузки прав используем roles, чтобы
   // меню не моргало пустым при первом рендере.
-  const visibleItems = NAV_ITEMS.filter((item) => {
+  // R25.7D: свои этапы с «Показывать в меню» — после этапов своего отдела.
+  const stageDefs = useOrderTypesStore((s) => s.stages)
+  const navItems = withCustomStageNavItems(NAV_ITEMS, stageDefs.filter((d) => !d.archived_at))
+  const visibleItems = navItems.filter((item) => {
     if (item.permission && permsLoaded) {
       return permissions[role]?.has(item.permission) || false
     }
@@ -168,7 +175,8 @@ export function Sidebar({ collapsed }) {
 
   const groupedNav = NAV_GROUPS.map((group) => ({
     ...group,
-    items: visibleItems.filter((item) => group.paths.includes(item.path)),
+    items: visibleItems.filter((item) => group.paths.includes(item.path)
+      || (group.id === 'production' && !!item.customStage)),
   })).filter((g) => g.items.length > 0)
 
   return (
@@ -203,7 +211,7 @@ export function Sidebar({ collapsed }) {
 
           // Badge total for collapsed state
           const groupTotal = group.items.reduce((sum, item) => {
-            const key = COUNT_MAP[item.path]
+            const key = COUNT_MAP[item.path] || item.customStage
             return sum + (key ? (counts[key] || 0) : 0)
           }, 0)
 

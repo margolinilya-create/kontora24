@@ -4,7 +4,7 @@ import { updateOrder } from '../hooks/useOrders'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
-import { ORDER_STATUSES, getOrderRoute, isRouteV2 } from '@/shared/constants'
+import { getOrderRoute, isRouteV2, getStatusMeta } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
@@ -57,8 +57,8 @@ export function RouteUpgradeButton({ order, onUpdated }) {
         onClose={() => setOpen(false)}
         onConfirm={handleUpgrade}
         title="Перевести на новый маршрут?"
-        message={`Заказ останется на этапе «${ORDER_STATUSES[order.status]?.label || order.status}». ${
-          added.length > 0 ? `В маршруте появятся этапы: ${added.map((s) => ORDER_STATUSES[s]?.label || s).join(', ')}.` : ''
+        message={`Заказ останется на этапе «${getStatusMeta(order.status)?.label || order.status}». ${
+          added.length > 0 ? `В маршруте появятся этапы: ${added.map((s) => getStatusMeta(s)?.label || s).join(', ')}.` : ''
         } Перевод будет записан в историю изменений заказа.`}
         confirmText="Перевести"
         variant="primary"

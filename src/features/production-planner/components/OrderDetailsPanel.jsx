@@ -5,7 +5,7 @@
 
 import { Link } from 'react-router-dom'
 import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
-import { ORDER_STATUSES, FILM_TYPES, LAMINATION_TYPES } from '@/shared/constants'
+import { FILM_TYPES, LAMINATION_TYPES, getStatusMeta } from '@/shared/constants'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { forecastMaterials } from '@/features/orders/lib/material-forecast'
 import { usePlanStore } from '../store/plan-store'
@@ -42,7 +42,7 @@ function StagesList({ stages }) {
   return (
     <ul className="space-y-1">
       {stages.map((ps) => {
-        const label = ORDER_STATUSES[ps.stage]?.label || ps.stage
+        const label = getStatusMeta(ps.stage)?.label || ps.stage
         const isPlanned = ps.days && ps.days.length > 0
         const isMilestone = ps.bucket === BUCKETS.milestone
         const isPassive = ps.bucket === BUCKETS.passive

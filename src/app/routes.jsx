@@ -37,6 +37,7 @@ const DryingQueuePage = lazy(() => import('@/features/production/pages/DryingQue
 const Assembly3dQueuePage = lazy(() => import('@/features/production/pages/Assembly3dQueuePage'))
 const PackagingQueuePage = lazy(() => import('@/features/production/pages/PackagingQueuePage'))
 const OtkQueuePage = lazy(() => import('@/features/production/pages/OtkQueuePage'))
+const CustomStageQueuePage = lazy(() => import('@/features/production/pages/CustomStageQueuePage'))
 const SubtaskDetailPage = lazy(() => import('@/features/production/pages/SubtaskDetailPage'))
 const PlannerPage = lazy(() => import('@/features/production-planner/pages/PlannerPage'))
 const WarehousePage = lazy(() => import('@/features/warehouse/pages/WarehousePage'))
@@ -75,6 +76,8 @@ export const routes = [
       { path: 'production/assembly3d', element: <AuthGuard permission="stage:assembly_3d"><ErrorBoundary><Assembly3dQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/packaging', element: <AuthGuard permission="stage:packaging"><ErrorBoundary><PackagingQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/otk', element: <AuthGuard permission="stage:otk"><ErrorBoundary><OtkQueuePage /></ErrorBoundary></AuthGuard> },
+      // R25.7D: очередь своего этапа (право stage:<ключ> — внутри страницы).
+      { path: 'production/stage/:key', element: <ErrorBoundary><CustomStageQueuePage /></ErrorBoundary> },
       { path: 'production/subtask/:subtaskId', element: <ErrorBoundary><SubtaskDetailPage /></ErrorBoundary> },
       { path: 'production/plan', element: <AuthGuard permission="view:planning"><ErrorBoundary><PlannerPage /></ErrorBoundary></AuthGuard> },
       { path: 'warehouse', element: <AuthGuard permission="view:warehouse"><ErrorBoundary><WarehousePage /></ErrorBoundary></AuthGuard> },

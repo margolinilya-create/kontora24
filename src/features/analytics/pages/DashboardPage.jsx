@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy, Suspense
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
-import { ROLES, getNextStatus, MS_PER_DAY, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
+import { ROLES, getNextStatus, MS_PER_DAY, getActiveOrderStatuses } from '@/shared/constants'
 import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
@@ -50,7 +50,6 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, onUpdated }) {
 // keeps useMemo deps stable).
 // R13.0 (бриф 02.06): добавлены R11-этапы для корректного подсчёта «в работе».
 // R25.1: все активные статусы кроме «Новый заказ» (включая этапы ОП v2).
-const WORK_STATUSES = ACTIVE_ORDER_STATUSES.filter((s) => s !== 'new')
 
 function StatCard({ label, value }) {
   return (
@@ -228,7 +227,7 @@ export default function DashboardPage() {
   }
 
   // Manager dashboard computed values
-  const ordersInWork = useMemo(() => data.orders.filter(o => WORK_STATUSES.includes(o.status)), [data.orders])
+  const ordersInWork = useMemo(() => data.orders.filter(o => o.status !== 'new' && getActiveOrderStatuses().includes(o.status)), [data.orders])
   const ordersDueToday = useMemo(() => {
     const today = startOfDay(new Date())
     const tomorrow = new Date(today.getTime() + MS_PER_DAY)

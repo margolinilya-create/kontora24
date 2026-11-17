@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { DEPARTMENTS } from '@/shared/lib/department-mapping'
-import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
+import { getOrderRoute, getStatusMeta } from '@/shared/constants'
 
 export function DepartmentTimeline({ order }) {
   const [hoveredDept, setHoveredDept] = useState(null)
@@ -29,7 +29,7 @@ export function DepartmentTimeline({ order }) {
   // Get the current stage label within the active department
   function getCurrentStageLabel(dept) {
     const stage = dept.stages.find(s => s.status === order.status)
-    return stage?.label || ORDER_STATUSES[order.status]?.label || order.status
+    return stage?.label || getStatusMeta(order.status)?.label || order.status
   }
 
   return (

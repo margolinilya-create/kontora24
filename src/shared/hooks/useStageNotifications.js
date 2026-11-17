@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { ORDER_STATUSES, NOTIFY_ROLES } from '@/shared/constants'
+import { NOTIFY_ROLES, getStatusMeta } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { playNotificationSound } from '@/shared/lib/sound'
 
@@ -39,7 +39,7 @@ export function useStageNotifications() {
 
         // Play sound and show toast
         playNotificationSound()
-        const statusLabel = ORDER_STATUSES[to_status]?.label || to_status
+        const statusLabel = getStatusMeta(to_status)?.label || to_status
         toast.info(`Новый заказ в очереди: ${statusLabel}`)
       })
       .subscribe()

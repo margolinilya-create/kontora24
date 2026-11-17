@@ -1,11 +1,17 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import {
-  calculateActualMaterialsCost, calculateWorkerPayout, settingsToRates, getStatusMeta,
+  calculateWorkerPayout, settingsToRates, getStatusMeta,
 } from '@/shared/constants'
-import { fetchShapeByDesign } from '@/shared/lib/payout-context'
+import { captureError } from '@/shared/lib/sentry'
+import {
+  aggregateMaterialUsage, buildCostMap, costForOrder, withMaterialUnitCosts,
+} from '@/features/reports/lib/materials-cost'
+import { fetchShapeByDesign, orderShapeFromLogs } from '@/shared/lib/payout-context'
+import { fetchAllRows } from '@/shared/lib/fetch-all'
+import { CONSUMPTION_KINDS } from '@/features/warehouse/lib/warehouse-journal'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
-import { subDays, subMonths, subWeeks, startOfWeek, startOfDay, endOfDay, format, differenceInHours, getISOWeek } from 'date-fns'
+import { subDays, subMonths, subWeeks, startOfWeek, startOfDay, endOfDay, format, differenceInHours, getISOWeek, parseISO } from 'date-fns'
 import { formatOrderType } from '@/shared/lib/utils'
 
 export const PERIODS = [
@@ -28,7 +34,7 @@ export function parsePeriod(period) {
   if (typeof period === 'string' && period.startsWith('custom:')) {
     const [, fromIso, toIso] = period.split(':')
     if (fromIso && toIso) {
-      return { startDate: startOfDay(new Date(fromIso)), endDate: endOfDay(new Date(toIso)) }
+      return { startDate: startOfDay(parseISO(fromIso)), endDate: endOfDay(parseISO(toIso)) }
     }
   }
   switch (period) {
@@ -49,7 +55,7 @@ export function parsePeriod(period) {
 export function useAnalyticsData(period) {
   const [data, setData] = useState({
     orders: [], statusHistory: [], materialTx: [], prevOrders: [], productionLogs: [],
-    payoutRates: undefined, shapeByDesign: {}, orderShape: {},
+    payoutRates: undefined, shapeByDesign: {}, orderShape: {}, materials: [],
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -64,41 +70,57 @@ export function useAnalyticsData(period) {
       const sinceIso = startDate.toISOString()
       const untilIso = endDate.toISOString()
 
-      const [ordersRes, historyRes, matTxRes, prevOrdersRes, logsRes, ratesRes] = await Promise.all([
+      // PostgREST отдаёт ≤ 1000 строк за запрос — `.limit(10000)` молча
+      // резался до тысячи (код-ревью 17.11). Всё грузим порциями с
+      // детерминированным порядком (created_at, id).
+      const ORDER_COLS = 'id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, lam_type, film_material_id, film_stickers_material_id, lam_material_id, montage_material_id, contractor_cost, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)'
+      // Embed заказа в логе: оплата лога по заказу, созданному ДО периода,
+      // иначе считалась бы с order=null (сборка/выборка ×1 вместо
+      // ×stickers_per_pack, упаковка v2 оплачивалась бы ошибочно).
+      // Колонки нефинансовые — доступны authenticated (GRANT 072/093).
+      const LOG_COLS = 'id, order_id, stage, track, design_index, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, film_meters, film_type, lamination_meters, montage_meters, boxes_used, lamination_qty, qty_done, resin_grams, defects, created_at, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot)'
+      const [orders, history, matTx, prevOrders, logs, ratesRes, materialsRes] = await Promise.all([
         // Финансы читаем через маскирующее view k24_orders_full (security
         // phase 3): базовая таблица после миграции 072 не отдаёт финколонки
         // authenticated. У k24_orders НЕТ колонки deleted_at (soft-delete
         // только у логов) — фильтр по ней ронял страницу с 400 (QA 04.07 №1).
-        supabase.from('k24_orders_full').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
-        supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
-        supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
-        period !== 'all' ? supabase.from('k24_orders_full').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', sinceIso).limit(1000) : Promise.resolve({ data: [], error: null }),
-        supabase.from('k24_production_logs').select('id, order_id, stage, track, design_index, worker_id, stickers_printed, backgrounds_printed, stickers_good, stickers_poured, qty_selected, qty_cut, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, film_meters, film_type, lamination_meters, lamination_qty, qty_done, resin_grams, defects, worker:k24_profiles!worker_id(display_name)').is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).limit(10000),
-        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
+        fetchAllRows(() => supabase.from('k24_orders_full').select(ORDER_COLS).gte('created_at', sinceIso).lte('created_at', untilIso).order('created_at').order('id')),
+        fetchAllRows(() => supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', sinceIso).lte('created_at', untilIso).order('created_at').order('id')),
+        // Расход материалов — только списания по заказам и ручной расход
+        // (инвентаризация/корректировка — не расход, R25.8 kind).
+        fetchAllRows(() => supabase.from('k24_material_transactions').select('id, material_id, delta, reason, kind, created_at, material:k24_materials(name, type, unit)').in('kind', CONSUMPTION_KINDS).gte('created_at', sinceIso).lte('created_at', untilIso).order('created_at').order('id')),
+        period !== 'all'
+          ? fetchAllRows(() => supabase.from('k24_orders_full').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', sinceIso).order('created_at').order('id'))
+          : Promise.resolve([]),
+        fetchAllRows(() => supabase.from('k24_production_logs').select(LOG_COLS).is('deleted_at', null).gte('created_at', sinceIso).lte('created_at', untilIso).order('created_at').order('id')),
+        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').maybeSingle(),
+        // Себестоимость материалов — по средней цене склада (WAC), как в
+        // отчётах. unit_cost маскируется view без view:finance (→ 0).
+        supabase.from('k24_materials_full').select('id, name, type, material_code, unit_cost, archived_at'),
       ])
-      if (ordersRes.error) throw ordersRes.error
-      if (historyRes.error) throw historyRes.error
-      if (matTxRes.error) throw matTxRes.error
-      if (prevOrdersRes.error) throw prevOrdersRes.error
-      if (logsRes.error) throw logsRes.error
+      if (ratesRes.error) throw ratesRes.error
+      if (materialsRes.error) throw materialsRes.error
 
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
       const payoutRates = settingsToRates(ratesRes.data?.value)
-      const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
-      const orderShape = {}
-      ;(ordersRes.data || []).forEach((o) => {
+      const shapeByDesign = await fetchShapeByDesign(logs.map((l) => l.order_id))
+      // Форма стикера: из embed'а лога (заказы вне периода) + из заказов периода.
+      const orderShape = orderShapeFromLogs(logs)
+      orders.forEach((o) => {
         if (o.sticker_shape && o.sticker_shape !== 'standard') orderShape[o.id] = o.sticker_shape
       })
 
       setData({
-        orders: ordersRes.data || [],
-        statusHistory: historyRes.data || [],
-        materialTx: matTxRes.data || [],
-        prevOrders: prevOrdersRes.data || [],
-        productionLogs: logsRes.data || [],
+        orders,
+        statusHistory: history,
+        materialTx: matTx,
+        prevOrders,
+        productionLogs: logs,
         payoutRates, shapeByDesign, orderShape,
+        materials: materialsRes.data || [],
       })
     } catch (err) {
+      captureError(err, { tags: { source: 'analytics.useAnalyticsData' }, extra: { period } })
       setError(err)
     } finally {
       setLoading(false)
@@ -127,19 +149,31 @@ export function useAnalyticsData(period) {
     return m
   }, [orders])
 
-  // Заказы с расчётной себестоимостью (приоритет: фактическая, fallback — ручная)
+  const costMap = useMemo(() => buildCostMap(data.materials), [data.materials])
+  const materialsById = useMemo(
+    () => Object.fromEntries((data.materials || []).map((m) => [m.id, m])),
+    [data.materials],
+  )
+
+  // Заказы с расчётной себестоимостью (приоритет: фактическая, fallback — ручная).
+  // Материалы — WAC (costForOrder, как в отчётах), а не жёсткий MATERIAL_COSTS.
+  // Расход — по логам периода (как и раньше в аналитике).
   const ordersEnriched = useMemo(() => orders.map((o) => {
     const logs = logsByOrder[o.id] || []
-    const materials = calculateActualMaterialsCost(logs, o.film_type)
+    const materials = costForOrder(
+      { ...withMaterialUnitCosts(o, materialsById), ...aggregateMaterialUsage(logs, o) },
+      costMap,
+    )
     const payout = calculateWorkerPayout(logs, { ordersById, rates: data.payoutRates, shapeByDesign: data.shapeByDesign, orderShape: data.orderShape })
-    const computedCost = materials.total + payout.total
+    // R25.4: работа подрядчика — часть себестоимости (как в P&L отчётов).
+    const computedCost = materials.total + payout.total + materials.contractor
     const fallbackCost = Number(o.cost_total) || (Number(o.cost_materials) || 0) + (Number(o.cost_labor) || 0)
     return {
       ...o,
       _computedCost: computedCost > 0 ? computedCost : fallbackCost,
       _payout: payout.total,
     }
-  }), [orders, logsByOrder, ordersById, data.payoutRates, data.shapeByDesign, data.orderShape])
+  }), [orders, logsByOrder, ordersById, costMap, materialsById, data.payoutRates, data.shapeByDesign, data.orderShape])
 
   const doneOrders = useMemo(() => ordersEnriched.filter((o) => o.status === 'done'), [ordersEnriched])
   const revenue = useMemo(() => doneOrders.reduce((s, o) => s + (Number(o.price_final) || 0), 0), [doneOrders])

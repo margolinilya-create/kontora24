@@ -12,6 +12,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
+import { fetchAllRows, fetchAllRowsByIds } from '@/shared/lib/fetch-all'
 import { forecastMaterials } from '@/features/orders/lib/material-forecast'
 import { getActiveOrderStatuses } from '@/shared/constants'
 import { fetchWarehouseCategories } from './useWarehouseCategories'
@@ -34,12 +35,16 @@ async function addExtraMaterialsPlan(orders, materials, result) {
       .map((c) => [c.id, Number(c.norm_per_item)]),
   )
   if (normByCat.size === 0) return
-  const [omRes, logsRes] = await Promise.all([
-    supabase.from('k24_order_materials').select('order_id, category_id, material_id').in('order_id', orderIds),
-    supabase.from('k24_production_logs').select('order_id, extra_consumption').in('order_id', orderIds).is('deleted_at', null),
+  // Пачками по id + порциями: один .in() на все активные заказы упирался
+  // в длину URL и в срез PostgREST 1000 строк.
+  const [omRows, extraLogs] = await Promise.all([
+    fetchAllRowsByIds(orderIds, (ids) => supabase.from('k24_order_materials')
+      .select('id, order_id, category_id, material_id').in('order_id', ids).order('id')),
+    fetchAllRowsByIds(orderIds, (ids) => supabase.from('k24_production_logs')
+      .select('id, order_id, extra_consumption').in('order_id', ids).is('deleted_at', null).order('id')),
   ])
-  if (omRes.error) throw omRes.error
-  if (logsRes.error) throw logsRes.error
+  const omRes = { data: omRows }
+  const logsRes = { data: extraLogs }
   const consumed = new Set()
   for (const l of logsRes.data || []) {
     for (const [mid, q] of Object.entries(l.extra_consumption || {})) {
@@ -78,21 +83,31 @@ export function usePlannedConsumption(materials) {
     setLoading(true)
     setError(null)
     try {
-      const [ordersRes, itemsRes, logsRes] = await Promise.all([
-        supabase
-          .from('k24_orders')
-          .select('id, number, custom_number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, bopp_bag, status, needs_montage_film, montage_material_id, is_subcontract')
-          .in('status', activeStatuses()),
-        supabase
+      // Код-ревью 17.11: раньше виды изделий и ВСЕ логи цеха грузились без
+      // фильтра (срез 1000 строк PostgREST → план «прыгал»: заказ с расходом
+      // попадал в план, если его лог не влез в первую тысячу), ошибки этих
+      // запросов не проверялись. Теперь — только по активным заказам, порциями.
+      const orders = await fetchAllRows(() => supabase
+        .from('k24_orders')
+        .select('id, number, custom_number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, bopp_bag, status, needs_montage_film, montage_material_id, is_subcontract')
+        .in('status', activeStatuses())
+        .order('id'))
+      const orderIds = orders.map((o) => o.id)
+      const [items, logs] = await Promise.all([
+        fetchAllRowsByIds(orderIds, (ids) => supabase
           .from('k24_order_items')
-          .select('order_id, width_mm, height_mm, qty'),
-        supabase
+          .select('order_id, idx, width_mm, height_mm, qty')
+          .in('order_id', ids)
+          .order('order_id').order('idx')),
+        fetchAllRowsByIds(orderIds, (ids) => supabase
           .from('k24_production_logs')
-          .select('order_id, film_meters, lamination_meters, montage_meters, resin_grams, qty_cut, lamination_qty')
-          .is('deleted_at', null),
+          .select('id, order_id, film_meters, lamination_meters, montage_meters, resin_grams, qty_cut, lamination_qty')
+          .in('order_id', ids)
+          .is('deleted_at', null)
+          .order('id')),
       ])
-      if (ordersRes.error) throw ordersRes.error
-      const orders = ordersRes.data || []
+      const itemsRes = { data: items }
+      const logsRes = { data: logs }
       const itemsByOrder = new Map()
       ;(itemsRes.data || []).forEach((it) => {
         const list = itemsByOrder.get(it.order_id) || []

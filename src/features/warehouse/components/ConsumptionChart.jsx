@@ -4,26 +4,35 @@ import { supabase } from '@/shared/lib/supabase'
 import { subDays, format } from 'date-fns'
 import { formatNumber } from '@/shared/lib/utils'
 import { captureError } from '@/shared/lib/sentry'
+import { translateError } from '@/shared/lib/error-translator'
+import { fetchAllRows } from '@/shared/lib/fetch-all'
+import { CONSUMPTION_KINDS } from '../lib/warehouse-journal'
 import Spinner from '@/shared/components/Spinner'
 
 export function ConsumptionChart() {
   const [data, setData] = useState({ daily: [], forecast: [] })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     async function fetch() {
       const since = subDays(new Date(), 30).toISOString()
       let txs
       try {
-        const { data, error } = await supabase
+        // Только расход (списания на заказы и ручной расход): минус по
+        // инвентаризации/корректировке — пересчёт остатка, а не потребление,
+        // и раньше раздувал график и прогноз «на сколько дней хватит».
+        // Порциями: без этого PostgREST отдавал лишь первые 1000 операций.
+        txs = await fetchAllRows(() => supabase
           .from('k24_material_transactions')
-          .select('delta, created_at, material:k24_materials(name, type, unit, stock_qty)')
+          .select('id, delta, kind, created_at, material:k24_materials(name, type, unit, stock_qty)')
+          .in('kind', CONSUMPTION_KINDS)
           .lt('delta', 0)
           .gte('created_at', since)
-        if (error) throw error
-        txs = data
+          .order('created_at').order('id'))
       } catch (err) {
         captureError(err, { tags: { source: 'ConsumptionChart.fetch' } })
+        setError(err)
         setLoading(false)
         return
       }
@@ -62,6 +71,10 @@ export function ConsumptionChart() {
 
   if (loading) {
     return <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+  }
+
+  if (error) {
+    return <p role="alert" className="text-sm text-danger py-4">Не удалось загрузить расход: {translateError(error).message}</p>
   }
 
   return (

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  ORDER_SOURCES, PAYMENT_STATUSES,
-  calculateActualMaterialsCost, getFilmCostPerMeter, FILM_TYPES,
+  ORDER_SOURCES, PAYMENT_STATUSES, FILM_TYPES, LAMINATION_TYPES,
   calculateWorkerPayout, settingsToRates,
 } from '@/shared/constants'
 import { supabase } from '@/shared/lib/supabase'
@@ -11,19 +10,47 @@ import { useProductionLogs } from '@/features/production/hooks/useProductionLogs
 import { InfoField } from './InfoField'
 import { CalcSnapshotCard } from './CalcSnapshotCard'
 import { fetchExtraMaterialsByOrder } from '@/features/reports/hooks/useReports'
+import {
+  aggregateMaterialUsage, buildCostMap, costForOrder, withMaterialUnitCosts,
+} from '@/features/reports/lib/materials-cost'
 import { captureError } from '@/shared/lib/sentry'
 
 /**
  * Финансы заказа: 3 крупных плитки (Итого / Себестоимость / Маржинальность),
  * детали ниже. Себестоимость материалов считается автоматически из production logs
- * (плёнка по типу × MATERIAL_COSTS, смола × RESIN_COST_PER_GRAM). Стоимость труда
+ * по средней цене склада (WAC, k24_materials_full.unit_cost) — та же модель, что
+ * в отчётах (aggregateMaterialUsage + costForOrder). Раньше — жёсткий прайс
+ * MATERIAL_COSTS, и цифры расходились с Unit Economics / P&L. Стоимость труда
  * считается через calculateWorkerPayout — только пост-печатные операции (заливка,
  * выборка, сборка, упаковка). На печать/ламинацию/резку — ручной cost_labor fallback.
  * Доступ — только для admin/manager.
  */
 export function FinanceTab({ order }) {
   const { logs } = useProductionLogs(order.id, order.qty)
-  const actual = calculateActualMaterialsCost(logs, order.film_type)
+  // Средние цены склада (unit_cost маскируется view без view:finance; вкладка
+  // и так открыта только с правом). Архивные позиции тоже нужны — заказ мог
+  // списывать с позиции, которую потом убрали в архив.
+  const [stock, setStock] = useState({ materials: [], error: null })
+  useEffect(() => {
+    let cancelled = false
+    supabase.from('k24_materials_full')
+      .select('id, name, type, material_code, unit_cost, archived_at')
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          captureError(error, { tags: { source: 'FinanceTab.materials' }, extra: { orderId: order.id } })
+          setStock({ materials: [], error })
+          return
+        }
+        setStock({ materials: data || [], error: null })
+      })
+    return () => { cancelled = true }
+  }, [order.id])
+  const costMap = buildCostMap(stock.materials)
+  const materialsById = Object.fromEntries(stock.materials.map((m) => [m.id, m]))
+  const usage = aggregateMaterialUsage(logs, order)
+  const actual = costForOrder({ ...withMaterialUnitCosts(order, materialsById), ...usage }, costMap)
+  // costForOrder.total без доп. материалов (их добавляем ниже отдельно) и без подрядчика.
   // R19: ставки из настроек + формы стикеров (async) для дифф. оплаты заливки.
   const [payoutExtra, setPayoutExtra] = useState({ rates: undefined, shapeByDesign: {}, orderShape: {} })
   useEffect(() => {
@@ -111,33 +138,39 @@ export function FinanceTab({ order }) {
       {/* R25.6: снимок расчёта калькулятора (если заказ создан из калькулятора) */}
       <CalcSnapshotCard order={order} />
 
-      {/* Actual materials breakdown */}
+      {/* Actual materials breakdown (WAC) */}
+      {stock.error && (
+        <p className="text-xs text-danger">
+          Не удалось загрузить средние цены склада — себестоимость материалов может быть неполной.
+        </p>
+      )}
       {actual.total > 0 && (
         <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
           <h2 className="font-semibold mb-3">Фактический расход материалов</h2>
           <div className="divide-y divide-border text-sm">
-            {Object.entries(actual.films).filter(([k]) => k !== '__lamination__').map(([ft, m]) => (
-              <div key={ft} className="py-2 flex items-center justify-between">
-                <span className="text-text-muted">{FILM_TYPES[ft]?.label || ft} · {m.toFixed(1)} м</span>
-                <span className="font-medium tabular-nums">{Math.round(m * getFilmCostPerMeter(ft))} ₽</span>
-              </div>
-            ))}
-            {actual.films.__lamination__ > 0 && (
-              <div className="py-2 flex items-center justify-between">
-                <span className="text-text-muted">Ламинация · {actual.films.__lamination__.toFixed(1)} м</span>
-                <span className="font-medium tabular-nums">{Math.round(actual.films.__lamination__ * 130)} ₽</span>
-              </div>
+            {usage.actual_film > 0 && (
+              <CostLine
+                label={`${order.film_material?.name || FILM_TYPES[order.film_type]?.label || 'Плёнка'} · ${usage.actual_film.toFixed(1)} м`}
+                amount={actual.film}
+              />
             )}
-            {actual.resinGrams > 0 && (
-              <div className="py-2 flex items-center justify-between">
-                <span className="text-text-muted">Смола · {actual.resinGrams.toFixed(0)} г</span>
-                <span className="font-medium tabular-nums">{Math.round(actual.resinCost)} ₽</span>
-              </div>
+            {(usage.actual_lam > 0 || usage.actual_montage > 0) && (
+              <CostLine
+                label={`${order.lam_material?.name || LAMINATION_TYPES[order.lam_type]?.label || 'Ламинация / монтаж'} · ${(usage.actual_lam + usage.actual_montage).toFixed(1)} м`}
+                amount={actual.lam}
+              />
+            )}
+            {usage.actual_resin > 0 && (
+              <CostLine label={`Смола · ${usage.actual_resin.toFixed(0)} г`} amount={actual.resin} />
+            )}
+            {usage.boxes_used > 0 && (
+              <CostLine label={`Коробки · ${usage.boxes_used} шт`} amount={actual.box} />
             )}
           </div>
+          <p className="text-xs text-text-muted mt-3">По средней цене склада (как в отчётах).</p>
           {manualMaterials > 0 && Math.abs(manualMaterials - actual.total) > 1 && (
-            <p className="text-xs text-text-muted mt-3">
-              Ручной cost_materials: {formatPrice(manualMaterials)} (используется фактический расход)
+            <p className="text-xs text-text-muted mt-1">
+              Ручная себестоимость материалов: {formatPrice(manualMaterials)} (используется фактический расход)
             </p>
           )}
         </div>
@@ -214,6 +247,15 @@ export function FinanceTab({ order }) {
           <InfoField label="Оплата" value={PAYMENT_STATUSES[order.payment_status]?.label || '—'} />
         </div>
       </div>
+    </div>
+  )
+}
+
+function CostLine({ label, amount }) {
+  return (
+    <div className="py-2 flex items-center justify-between gap-3">
+      <span className="text-text-muted">{label}</span>
+      <span className="font-medium tabular-nums">{formatPrice(Math.round(amount))}</span>
     </div>
   )
 }

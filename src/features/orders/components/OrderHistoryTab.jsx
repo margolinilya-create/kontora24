@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, PRIORITIES } from '@/shared/constants'
-import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
+import { STAGE_FIELDS, fieldValueLabel } from '@/features/production/lib/production-logs'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
@@ -189,7 +189,7 @@ function LogSummary({ log, stage }) {
   for (const f of config.fields) {
     const v = log[f.key]
     if (v === undefined || v === null || v === '' || v === 0) continue
-    parts.push(`${f.label}: ${v}${f.unit ? ' ' + f.unit : ''}`)
+    parts.push(`${f.label}: ${fieldValueLabel(f, v)}${f.unit ? ' ' + f.unit : ''}`)
   }
   if (parts.length === 0) return null
   return (

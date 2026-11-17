@@ -61,9 +61,11 @@ export function useCabinetStats(period = '30') {
       if (shiftsRes.error) throw shiftsRes.error
       if (monthlyRes.error) throw monthlyRes.error
 
-      const logs = logsRes.data || []
+      // R25.2 (ТЗ 2.5): записи брака ТК (stage='otk') — контроль менеджера,
+      // не работа сотрудника: не входят ни в заработок, ни в счётчики кабинета.
+      const logs = (logsRes.data || []).filter((l) => l.stage !== 'otk')
       const shifts = shiftsRes.data || []
-      const monthly = monthlyRes.data || []
+      const monthly = (monthlyRes.data || []).filter((l) => l.stage !== 'otk')
 
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
       const payoutRates = settingsToRates(ratesRes.data?.value)

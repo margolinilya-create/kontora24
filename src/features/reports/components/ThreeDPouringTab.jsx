@@ -13,11 +13,15 @@ const COLUMN_LABELS = [
   '№ заказа', 'Сделка', 'Тираж', 'Вид стикера',
   'Напечатано стикеров', 'С учётом запаса 15%', 'Итого зал. без учёта брака',
   'Забраковано', 'Итого хороших 3D', 'Излишки 3D', '% брака', '% излишков',
+  // R25.2 (ТЗ 2.4): брак ТК типа «Заливка» — по заказу (в паках), в оплату не входит.
+  'Брак ТК (заливка)',
 ]
 
 export function ThreeDPouringTab({ period }) {
   const [orders, setOrders] = useState([])
   const [logs, setLogs] = useState([])
+  // R25.2: брак ТК (заливка) по заказу — отдельная колонка, не в «Брак».
+  const [otkPouring, setOtkPouring] = useState({})
   const [loading, setLoading] = useState(true)
 
   // R24 (фидбэк 24.07): зависим ТОЛЬКО от стабильного примитива `period`.
@@ -44,6 +48,7 @@ export function ThreeDPouringTab({ period }) {
         if (oe) throw oe
         const orderIds = (o || []).map((x) => x.id)
         let l = []
+        const otk = {}
         if (orderIds.length) {
           const { data: rows, error: le } = await supabase
             .from('k24_production_logs')
@@ -55,8 +60,18 @@ export function ThreeDPouringTab({ period }) {
             .is('deleted_at', null)
           if (le) throw le
           l = rows || []
+          // Отдельный запрос: записи ТК без трека, основной фильтрует track='stickers'.
+          const { data: otkRows, error: ote } = await supabase
+            .from('k24_production_logs')
+            .select('order_id, defects')
+            .in('order_id', orderIds)
+            .eq('stage', 'otk')
+            .eq('defect_stage', 'pouring')
+            .is('deleted_at', null)
+          if (ote) throw ote
+          for (const r of otkRows || []) otk[r.order_id] = (otk[r.order_id] || 0) + (Number(r.defects) || 0)
         }
-        if (!cancelled) { setOrders(o || []); setLogs(l); setLoading(false) }
+        if (!cancelled) { setOrders(o || []); setLogs(l); setOtkPouring(otk); setLoading(false) }
       } catch (err) {
         if (!cancelled) { setLoading(false); toast.error(translateError(err).message || err.message) }
       }
@@ -75,7 +90,7 @@ export function ThreeDPouringTab({ period }) {
       const odes = (order.designs || []).sort((a, b) => a.design_index - b.design_index)
       const rows = compute3DPouringReport(order, olog, odes)
       const num = formatOrderNumber(order)
-      for (const r of rows) {
+      rows.forEach((r, i) => {
         aoa.push([
           num,
           order.deal_name || '',
@@ -89,8 +104,10 @@ export function ThreeDPouringTab({ period }) {
           r.surplus,
           Number(r.defectsPct.toFixed(2)),
           Number(r.surplusPct.toFixed(2)),
+          // По заказу — в первой строке заказа (суммы в Excel не двоятся).
+          i === 0 ? (otkPouring[order.id] || 0) : '',
         ])
-      }
+      })
     }
     if (aoa.length <= 1) { toast.error('Нет данных за период'); return }
     try {
@@ -129,6 +146,7 @@ export function ThreeDPouringTab({ period }) {
               <th className="text-right py-2 font-medium text-text-muted">Залито</th>
               <th className="text-right py-2 font-medium text-text-muted">Брак</th>
               <th className="text-right py-2 font-medium text-text-muted">% брака</th>
+              <th className="text-right py-2 font-medium text-text-muted">Брак ТК (заливка)</th>
             </tr>
           </thead>
           <tbody>
@@ -152,6 +170,7 @@ export function ThreeDPouringTab({ period }) {
                   <td className={`py-2 text-right tabular-nums ${pct > 20 ? 'text-danger font-medium' : pct > 10 ? 'text-warning' : ''}`}>
                     {pct > 0 ? `${pct.toFixed(1)}%` : '—'}
                   </td>
+                  <td className={`py-2 text-right tabular-nums ${otkPouring[o.id] > 0 ? 'text-danger' : ''}`}>{otkPouring[o.id] || '—'}</td>
                 </tr>
               )
             })}

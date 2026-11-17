@@ -1,17 +1,14 @@
 import { useState } from 'react'
 import { useReprintSubtasks } from '../hooks/useReprintSubtasks'
-import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
-import { useOrderItems } from '../hooks/useOrderItems'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { SubtaskCard } from '@/features/production/components/SubtaskCard'
-import { REPRINT_REASONS, REPRINT_STATUS_LABELS, SUBTASK_STATUS_LABELS, TRACK_LABELS } from '@/shared/constants'
+import { REPRINT_STATUS_LABELS, SUBTASK_STATUS_LABELS, TRACK_LABELS } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
-import Input from '@/shared/components/Input'
-import Modal from '@/shared/components/Modal'
 import Spinner from '@/shared/components/Spinner'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
+import { CreateReprintModal } from './CreateReprintModal'
 
 /**
  * R22.1 (ТЗ 20.07 Фаза 1) — вкладка «Подзадачи» карточки заказа.
@@ -23,49 +20,7 @@ export function OrderSubtasksTab({ order }) {
   const { hasRole } = useAuth()
   const canManage = hasRole(['admin', 'manager'])
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ qty: '', reason: '', comment: '', view: '' })
-  const [saving, setSaving] = useState(false)
   const [pendingDelete, setPendingDelete] = useState(null) // subtask | null
-
-  // R23.5: селектор вида — какой вид доделывает допечатка. Источник зависит от
-  // типа: stickerpack3D → k24_pack_designs (design_index), иначе → k24_order_items
-  // (idx мульти-вида). Оба хука вызываем всегда (правила хуков), «лишнему» — null.
-  const isPack3D = order.order_type === 'stickerpack3D'
-  const { designs } = usePackDesigns(isPack3D ? order.id : null)
-  const { items } = useOrderItems(isPack3D ? null : order.id)
-  const viewOptions = isPack3D
-    ? (designs || []).map((d) => ({
-        value: d.design_index,
-        label: `Вид #${d.design_index}${d.name ? ` · ${d.name}` : ''}`,
-      }))
-    : (items || []).map((it) => ({
-        value: it.idx,
-        label: `Размер #${it.idx} · ${Number(it.width_mm)}×${Number(it.height_mm)} мм`,
-      }))
-  const showViewSelect = viewOptions.length > 1
-
-  async function handleCreate(e) {
-    e.preventDefault()
-    const qty = Number(form.qty)
-    if (!qty || qty <= 0) { toast.error('Укажите количество к допечатке'); return }
-    if (showViewSelect && form.view === '') { toast.error('Выберите вид, к которому относится допечатка'); return }
-    setSaving(true)
-    try {
-      await createReprint(order, {
-        qty,
-        reason: form.reason || null,
-        comment: form.comment || null,
-        viewRef: showViewSelect ? Number(form.view) : null,
-      })
-      toast.success('Допечатка создана')
-      setShowCreate(false)
-      setForm({ qty: '', reason: '', comment: '', view: '' })
-    } catch (err) {
-      toast.error(translateError(err).message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   async function confirmDelete() {
     const st = pendingDelete
@@ -141,61 +96,7 @@ export function OrderSubtasksTab({ order }) {
       )}
 
       {showCreate && (
-        <Modal isOpen onClose={() => setShowCreate(false)} title="Создать допечатку" maxWidth="max-w-sm">
-          <form onSubmit={handleCreate} className="space-y-4">
-            <Input
-              id="reprint-qty"
-              label="Количество к допечатке (шт)"
-              type="number"
-              inputMode="numeric"
-              min="1"
-              value={form.qty}
-              onChange={(e) => setForm((p) => ({ ...p, qty: e.target.value }))}
-              required
-              placeholder="0"
-            />
-            {showViewSelect && (
-              <div>
-                <label htmlFor="reprint-view" className="block text-sm font-medium text-text mb-1">
-                  {isPack3D ? 'Вид стикера' : 'Вид изделия'} <span className="text-danger">*</span>
-                </label>
-                <select
-                  id="reprint-view"
-                  value={form.view}
-                  onChange={(e) => setForm((p) => ({ ...p, view: e.target.value }))}
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
-                >
-                  <option value="">— выберите вид —</option>
-                  {viewOptions.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div>
-              <label htmlFor="reprint-reason" className="block text-sm font-medium text-text mb-1">Причина</label>
-              <select
-                id="reprint-reason"
-                value={form.reason}
-                onChange={(e) => setForm((p) => ({ ...p, reason: e.target.value }))}
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-surface text-text focus:outline-none focus:ring-2 focus:ring-accent/50"
-              >
-                <option value="">Не указана</option>
-                {Object.entries(REPRINT_REASONS).map(([k, label]) => (
-                  <option key={k} value={k}>{label}</option>
-                ))}
-              </select>
-            </div>
-            <Input
-              id="reprint-comment"
-              label="Комментарий"
-              value={form.comment}
-              onChange={(e) => setForm((p) => ({ ...p, comment: e.target.value }))}
-              placeholder="Необязательно"
-            />
-            <Button type="submit" loading={saving} className="w-full">Создать</Button>
-          </form>
-        </Modal>
+        <CreateReprintModal order={order} createReprint={createReprint} onClose={() => setShowCreate(false)} />
       )}
 
       <ConfirmDialog

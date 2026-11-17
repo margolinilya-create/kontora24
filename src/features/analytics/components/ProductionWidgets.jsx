@@ -28,6 +28,8 @@ const TILES = [
   { op: 'cutMeters',   label: 'Резка',                unit: 'пм', bg: 'bg-dept-print/10',  fg: 'text-dept-print',  alwaysShow: false },
   { op: 'poured',      label: 'Залито стикеров',      unit: 'шт', bg: 'bg-dept-pouring/10', fg: 'text-dept-pouring', alwaysShow: true },
   { op: 'drying',      label: 'Брак на сушке',        unit: 'шт', bg: 'bg-danger/10',       fg: 'text-danger',       alwaysShow: false },
+  // R25.2 (ТЗ 2.4): брак, найденный на ТК — скрыт при нуле.
+  { op: 'otkDefects',  label: 'Брак на ТК',           unit: 'шт', bg: 'bg-danger/10',       fg: 'text-danger',       alwaysShow: false },
   { op: 'selection',   label: 'Выбрано штучных',      unit: 'шт', bg: 'bg-dept-pouring/10', fg: 'text-dept-pouring', alwaysShow: false },
   { op: 'selected',    label: 'Выбрано фонов',        unit: 'шт', bg: 'bg-dept-print/10',   fg: 'text-dept-print',   alwaysShow: true },
   { op: 'assembled',   label: 'Собрано 3D-паков',     unit: 'шт', bg: 'bg-dept-finish/10',  fg: 'text-dept-finish',  alwaysShow: true },

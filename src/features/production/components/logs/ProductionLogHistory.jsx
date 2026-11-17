@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { STAGE_FIELDS } from '../../lib/production-logs'
+import { STAGE_FIELDS, OTK_DEFECT_LABELS } from '../../lib/production-logs'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -89,6 +89,21 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
               <div className="text-xs text-text-muted">{config.label} — редактирование</div>
               <div className="grid grid-cols-2 gap-2">
                 {config.fields.map((f) => {
+                  // R25.2: поле-список (тип брака ТК).
+                  if (f.options) {
+                    return (
+                      <label key={f.key} className="text-xs text-text-muted block">
+                        {f.label}
+                        <select
+                          value={editDraft[f.key] ?? ''}
+                          onChange={(e) => setEditDraft((p) => ({ ...p, [f.key]: e.target.value }))}
+                          className="w-full mt-0.5 rounded-md border border-border px-2 py-1 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+                        >
+                          {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </label>
+                    )
+                  }
                   const isDecimal = !!f.step && /\./.test(f.step)
                   return (
                     <label key={f.key} className="text-xs text-text-muted block">
@@ -132,6 +147,7 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
                 {/* R20.5: поэвидовой лог по размерному виду (k24_order_items).
                     Лейбл «Размер» — чтобы не сливался с дизайн-видом выше
                     (на sticker3D multi-design оба бейджа могут стоять рядом). */}
+                {log.stage === 'otk' && log.defect_stage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-danger/10 text-danger">Брак: {(OTK_DEFECT_LABELS[log.defect_stage] || log.defect_stage).toLowerCase()}</span>}
                 {log.item_idx != null && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-2 text-text-muted">Размер #{log.item_idx}</span>}
               </div>
               <div className="flex items-center gap-3 text-xs text-text-muted mt-0.5 flex-wrap">

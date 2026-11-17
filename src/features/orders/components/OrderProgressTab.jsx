@@ -7,7 +7,11 @@ import { PackDesignsForm } from '@/features/production/components/PackDesignsFor
 import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
 import { useOrderSubtasks } from '@/features/orders/hooks/useOrderSubtasks'
 import { useOrderItems } from '@/features/orders/hooks/useOrderItems'
-import { computeIncoming, computeStageProgress, SUBTRACT_DEFECTS_STAGES, VARIANT_STAGES } from '@/features/production/lib/production-logs'
+import {
+  computeIncoming, computeStageProgress, SUBTRACT_DEFECTS_STAGES, VARIANT_STAGES,
+  applyOtkDefects, computeOtkSummary, otkDefectLogs, otkTargetQty,
+} from '@/features/production/lib/production-logs'
+import { OtkDefectsForm } from '@/features/production/components/logs/OtkDefectsForm'
 import { VariantLogForm } from '@/features/production/components/VariantLogForm'
 import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
@@ -30,9 +34,10 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 // в header'е, на CurrentStageWidget показываем заглушку.
 // R13.2 (бриф 02.06): prepress теперь имеет форму с prepared_qty — убираем из NO_INPUT.
 // R25.1: + этапы v2 без ввода (subcontract; остальные этапы ОП — SalesStageCard).
+// R25.2: otk убран — на ТК своя форма брака по типам (OtkDefectsForm).
 const NO_INPUT_STAGES = new Set([
   'new', 'design', 'sample_layout', 'color_approval', 'batch_layout',
-  'otk', 'done', 'cancelled',
+  'done', 'cancelled',
   'awaiting_payment', 'design_approval', 'subcontract', 'awaiting_pickup', 'delivery',
 ])
 
@@ -403,6 +408,22 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
     )
   }
 
+  // R25.2 (ТЗ 2.1): ТК — форма брака по типам (печать / ламинация / рез / заливка).
+  if (stage === 'otk') {
+    return (
+      <div className="space-y-4">
+        <StageJumperBlock order={order} onUpdated={onUpdated} />
+        <OtkDefectsForm
+          order={order}
+          logs={logs}
+          items={items}
+          route={route}
+          onSaved={() => { refetch(); onUpdated?.() }}
+        />
+      </div>
+    )
+  }
+
   if (NO_INPUT_STAGES.has(stage)) {
     const label = ORDER_STATUSES[stage]?.label || stage
     return (
@@ -688,8 +709,25 @@ function StageJumperBlock({ order, onUpdated }) {
 }
 
 function ProgressLinesWidget({ order, logs, items = [] }) {
-  const lines = getProgressLines(order, items, logs)
+  const route = getOrderRoute(order)
+  // R25.2 (ТЗ 2.3): брак ТК вычитается из строки своего этапа и всех строк
+  // после неё — одна функция applyOtkDefects (production-logs.js).
+  const rows = applyOtkDefects(
+    getProgressLines(order, items, logs).map((line) => ({ ...line, ...aggregateLine(logs, line) })),
+    logs,
+    route,
+  )
   const target = order.qty
+  // Строка «Годных после ТК» — когда на ТК уже есть записи брака или заказ на ТК.
+  const otkSummary = route.includes('otk') && (order.status === 'otk' || otkDefectLogs(logs).length > 0)
+    ? computeOtkSummary(logs, route, otkTargetQty(order, items))
+    : null
+  if (otkSummary && otkSummary.good != null) {
+    rows.push({
+      key: 'otk_good', stage: 'otk', label: 'Годных после ТК', target: otkSummary.target,
+      total: otkSummary.good, defects: 0, otkDefects: otkSummary.defects,
+    })
+  }
   const isOnPrint = order.status === 'print'
   const filmUsage = isOnPrint ? aggregateFilmUsage(logs, order) : null
 
@@ -697,8 +735,8 @@ function ProgressLinesWidget({ order, logs, items = [] }) {
     <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
       <h2 className="font-semibold mb-4">Прогресс по этапам</h2>
       <div className="space-y-3">
-        {lines.map((line) => {
-          const { total, defects, allowNegative } = aggregateLine(logs, line)
+        {rows.map((line) => {
+          const { total, defects, allowNegative, otkDefects } = line
           const isQty = !line.unit
           const lineTarget = line.target ?? target
           const targetForLine = isQty ? lineTarget : null
@@ -761,6 +799,9 @@ function ProgressLinesWidget({ order, logs, items = [] }) {
                 <p className="text-xs text-danger mt-1">
                   Брак превысил залитые на {Math.abs(total)} шт — нужна допечатка.
                 </p>
+              )}
+              {otkDefects > 0 && (
+                <p className="text-xs text-danger mt-1">брак ТК: {otkDefects}</p>
               )}
             </div>
           )

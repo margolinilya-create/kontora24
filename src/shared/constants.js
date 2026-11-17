@@ -927,6 +927,9 @@ export function computeLogPayout(log, order, rates, ctx = {}) {
   const out = []
   if (!log) return out
   const stage = log.stage
+  // R25.2 (ТЗ 2.5): записи брака ТК — контроль, не работа; сдельно не платятся.
+  // Явное исключение: на них не должна сработать ни одна ветка ниже.
+  if (stage === 'otk') return out
   const perPack = Number(order?.stickers_per_pack) || 1
 
   if (stage === 'pouring' || stage === 'selection_pouring') {

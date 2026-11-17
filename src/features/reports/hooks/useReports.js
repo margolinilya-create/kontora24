@@ -72,7 +72,7 @@ export function useWorkSchedule(period = '30') {
   return { data, loading, error, refetch: fetchData }
 }
 
-const ORDER_MATERIAL_EMBEDS = ['film_material', 'film_stickers_material', 'lam_material']
+const ORDER_MATERIAL_EMBEDS = ['film_material', 'film_stickers_material', 'lam_material', 'montage_material']
 
 /**
  * R25.8: дописать unit_cost в embed'ы позиций заказа (film_material и т.п.)
@@ -117,7 +117,9 @@ export function useOrdersCostReport(period = '30') {
                    film_material_id, film_stickers_material_id, lam_material_id, sticker_shape,
                    stickers_per_pack, notes, delivery_type, payment_status,
                    bopp_bag, route_version,
+                   product_name, is_subcontract, contractor_cost, needs_montage_film, montage_material_id,
                    client:k24_clients!client_id(name),
+                   montage_material:k24_materials!montage_material_id(id, name, material_code),
                    film_material:k24_materials!film_material_id(id, name, material_code),
                    film_stickers_material:k24_materials!film_stickers_material_id(id, name, material_code),
                    lam_material:k24_materials!lam_material_id(id, name, material_code)`)
@@ -125,7 +127,7 @@ export function useOrdersCostReport(period = '30') {
           .order('created_at', { ascending: false })
           .limit(500),
         supabase.from('k24_production_logs')
-          .select(`order_id, stage, defects, design_index, film_meters, resin_grams, lamination_meters,
+          .select(`order_id, stage, defects, design_index, film_meters, resin_grams, lamination_meters, montage_meters,
                    film_type, track, stickers_printed, stickers_poured,
                    stickers_good, packs_assembled, packs_packaged, qty_selected,
                    boxes_used,
@@ -173,7 +175,7 @@ export function useOrdersCostReport(period = '30') {
       ;(logsRes.data || []).forEach((l) => {
         if (!logsByOrder[l.order_id]) {
           logsByOrder[l.order_id] = {
-            film: 0, resin: 0, lam: 0,
+            film: 0, resin: 0, lam: 0, montage: 0,
             filmByType: {}, lamByType: {},
             stickers_printed: 0, stickers_poured: 0, stickers_good: 0,
             packs_assembled: 0, packs_packaged: 0, qty_selected: 0,
@@ -192,6 +194,7 @@ export function useOrdersCostReport(period = '30') {
         acc.film += filmM
         acc.resin += resinG
         acc.lam += lamM
+        acc.montage += Number(l.montage_meters) || 0
         // R14.6 hotfix: после R8 поле film_type в логах больше не пишется (берётся
         // из заказа). Fallback: для stickerpack3D track='stickers' — film_type_stickers,
         // иначе — film_type заказа.
@@ -210,7 +213,7 @@ export function useOrdersCostReport(period = '30') {
       })
 
       const rows = (ordersRes.data || []).map((o) => {
-        const lg = logsByOrder[o.id] || { film: 0, resin: 0, lam: 0, stickers_printed: 0, stickers_poured: 0, stickers_good: 0, packs_assembled: 0, packs_packaged: 0, qty_selected: 0, boxes_used: 0, drying_defects: 0, filmByType: {}, lamByType: {} }
+        const lg = logsByOrder[o.id] || { film: 0, resin: 0, lam: 0, montage: 0, stickers_printed: 0, stickers_poured: 0, stickers_good: 0, packs_assembled: 0, packs_packaged: 0, qty_selected: 0, boxes_used: 0, drying_defects: 0, filmByType: {}, lamByType: {} }
         // R18.0 (бриф 30.06): % брака = брак на сушке / залито (нас интересует
         // брак именно после заливки, который фиксируется на этапе сушки).
         // Обе величины в штуках стикеров — единицы согласованы.
@@ -241,6 +244,7 @@ export function useOrdersCostReport(period = '30') {
           actual_film: lg.film,
           actual_resin: lg.resin,
           actual_lam: lg.lam,
+          actual_montage: lg.montage || 0,
           actual_film_by_type: lg.filmByType,
           actual_lam_by_type: lg.lamByType,
           stickers_printed: lg.stickers_printed,

@@ -110,3 +110,21 @@ describe('costForOrder (R20.2: приоритет позиции склада)',
     expect(costForOrder(row, costMap).film).toBe(12 * 150)
   })
 })
+
+describe('R25.4 costForOrder — монтажная плёнка и подрядчик', () => {
+  const costMap = buildCostMap([
+    { material_code: 'glossy', type: 'lam_film', unit_cost: 100 },
+    { material_code: 'transfer', type: 'lam_film', unit_cost: 232 },
+  ])
+  it('монтажная плёнка — своя позиция, фолбэк — код transfer', () => {
+    const base = { actual_lam: 2, actual_lam_by_type: { glossy: 2 }, actual_montage: 3 }
+    expect(costForOrder(base, costMap).lam).toBe(2 * 100 + 3 * 232)
+    expect(costForOrder({ ...base, montage_material: { unit_cost: 300 } }, costMap).lam).toBe(2 * 100 + 3 * 300)
+  })
+  it('подрядчик — отдельно, не в материалах', () => {
+    const r = costForOrder({ contractor_cost: 5000 }, costMap)
+    expect(r.contractor).toBe(5000)
+    expect(r.total).toBe(0)
+    expect(costForOrder({}, costMap).contractor).toBe(0)
+  })
+})

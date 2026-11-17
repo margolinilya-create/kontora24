@@ -14,6 +14,7 @@ import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import { DryingTimer } from './DryingTimer'
 import { SamplePrintWidget } from './SamplePrintWidget'
 import { SalesStageCard } from './SalesStageCard'
+import { SubcontractStageCard } from './SubcontractStageCard'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -390,6 +391,16 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
       <div className="space-y-4">
         <StageJumperBlock order={order} onUpdated={onUpdated} />
         <SalesStageCard order={order} onUpdated={onUpdated} />
+      </div>
+    )
+  }
+
+  // R25.4 (ТЗ 4.2): карточка «Субподряд» — подрядчик + «Получено → Упаковка».
+  if (stage === 'subcontract') {
+    return (
+      <div className="space-y-4">
+        <StageJumperBlock order={order} onUpdated={onUpdated} />
+        <SubcontractStageCard order={order} onUpdated={onUpdated} />
       </div>
     )
   }

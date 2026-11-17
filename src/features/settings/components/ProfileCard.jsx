@@ -72,7 +72,7 @@ export function ProfileCard() {
               id="profile-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+              className="flex-1 min-w-0 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
             <button
               onClick={handleSaveName}
@@ -93,7 +93,7 @@ export function ProfileCard() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Минимум 6 символов"
-              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+              className="flex-1 min-w-0 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
             <button
               onClick={handleChangePassword}

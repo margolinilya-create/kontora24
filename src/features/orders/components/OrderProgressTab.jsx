@@ -26,6 +26,7 @@ import {
   FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK, getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS, getSubtaskRoute, DUAL_TRACK_STAGES, SUBTASK_STATUS_TO_STAGE, SALES_CARD_STAGES, getStatusMeta,
 } from '@/shared/constants'
 import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
+import { isCustomStageKey } from '@/shared/lib/route-registry'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 
 // R11.2: sample_layout / batch_layout — без производственных данных, advance
@@ -176,6 +177,17 @@ function getProgressLines(order, items, logs) {
       if (l.itemIdx == null && VARIANT_LINE[l.stage]) l.excludeItemLogs = true
     }
   }
+  // R25.7D (ТЗ 7.4): свои этапы маршрута — «Выполнено − брак» от тиража.
+  // Строка встаёт перед первой строкой этапа, идущего позже по маршруту.
+  for (const stage of route.filter(isCustomStageKey)) {
+    const line = {
+      key: stage, stage, track: null, qtyField: 'qty_done',
+      label: getStatusMeta(stage)?.label || stage, target: order.qty, subtractDefects: true,
+    }
+    const at = lines.findIndex((l) => route.indexOf(l.stage) > route.indexOf(stage))
+    if (at < 0) lines.push(line)
+    else lines.splice(at, 0, line)
+  }
   return lines
 }
 
@@ -208,7 +220,7 @@ function aggregateLine(logs, line) {
   if (line.excludeItemLogs) stageLogs = stageLogs.filter((l) => l.item_idx == null)
   const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[line.qtyField]) || 0), 0)
   const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
-  const total = SUBTRACT_DEFECTS_STAGES.has(line.stage) ? Math.max(0, totalRaw - defects) : totalRaw
+  const total = SUBTRACT_DEFECTS_STAGES.has(line.stage) || line.subtractDefects ? Math.max(0, totalRaw - defects) : totalRaw
   return { total, defects }
 }
 

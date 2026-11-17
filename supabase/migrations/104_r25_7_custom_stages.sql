@@ -16,7 +16,8 @@
 --        update_stage_def(key, p jsonb) — название/отдел/норма/меню/ТК/порядок/роли;
 --        archive_stage_def(key, archived bool);
 --        delete_stage_def(key) — только неиспользуемый этап (нет в снимках
---          заказов, статусах заказов/допечаток, логах, маршрутах типов).
+--          заказов, статусах заказов/допечаток, логах, маршрутах типов);
+--        delete_order_type(key) — свой тип без заказов (ТЗ 7.1).
 --   4. check_stage_completion v8 = тело v7 (099) ДОСЛОВНО + ветка своих этапов:
 --      GREATEST(0, SUM(qty_done) − SUM(defects)) против тиража.
 --   5. auto_advance_drying v4: следующий этап после «Сушки» — из
@@ -34,6 +35,7 @@
 --   DROP FUNCTION IF EXISTS public.update_stage_def(text, jsonb);
 --   DROP FUNCTION IF EXISTS public.archive_stage_def(text, boolean);
 --   DROP FUNCTION IF EXISTS public.delete_stage_def(text);
+--   DROP FUNCTION IF EXISTS public.delete_order_type(text);
 --   пересоздать check_stage_completion из 099, auto_advance_drying из 083,
 --   CHECK defect_stage из 094 (только если нет строк с custom_*);
 --   колонку qty_done оставить.
@@ -338,6 +340,42 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.delete_stage_def(TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.delete_stage_def(TEXT) TO authenticated;
+
+-- ── 3б. Удаление своего типа заказа (ТЗ 7.1) ────────────────
+-- Только свой тип и только без заказов (FK k24_orders.order_type, 103).
+CREATE OR REPLACE FUNCTION public.delete_order_type(p_key TEXT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_uid  UUID := auth.uid();
+  v_type k24_order_types%ROWTYPE;
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'Сессия не активна. Войдите заново.');
+  END IF;
+  IF NOT public.k24_user_can('order_type:manage') THEN
+    RETURN json_build_object('ok', false, 'error', 'Нет права настраивать типы заказов.');
+  END IF;
+  SELECT * INTO v_type FROM k24_order_types WHERE key = p_key FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN json_build_object('ok', false, 'error', 'Тип не найден — обновите страницу.');
+  END IF;
+  IF v_type.is_builtin THEN
+    RETURN json_build_object('ok', false, 'error', 'Встроенный тип удалить нельзя.');
+  END IF;
+  IF EXISTS (SELECT 1 FROM k24_orders WHERE order_type = p_key) THEN
+    RETURN json_build_object('ok', false, 'error', 'По типу есть заказы — его можно только отправить в архив.');
+  END IF;
+  DELETE FROM k24_order_types WHERE key = p_key;
+  RETURN json_build_object('ok', true);
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.delete_order_type(TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.delete_order_type(TEXT) TO authenticated;
 
 -- ── 4. check_stage_completion v8 ─────────────────────────────
 -- Тело v7 (099) ДОСЛОВНО + ветка своих этапов перед финальным ELSE:

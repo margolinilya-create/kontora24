@@ -24,7 +24,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createOrder } from '../hooks/useOrders'
 import {
-  ORDER_TYPES,
   ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
   needsLamination, STICKER_SHAPES,
   PRODUCT_NAME_MAX, MAX_ORDER_ITEMS, LAMINATION_FORM_EXCLUDE_CODES,
@@ -33,6 +32,8 @@ import {
 import { applyPackShapes } from '@/features/production/hooks/usePackDesigns'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
+import { useOrderTypeOptions } from '@/features/order-types/hooks/useOrderTypeOptions'
+import { getTypeDef } from '@/shared/lib/route-registry'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
@@ -82,11 +83,13 @@ const DEFAULT_VALUES = {
 }
 
 function OrderTypeSelector({ value, onChange, error, prefilled }) {
+  // R25.7C: активные типы реестра (встроенные + свои), фолбэк — ORDER_TYPES.
+  const options = useOrderTypeOptions(value)
   return (
     <div>
       <label className="block text-sm font-medium mb-2">Тип продукции <span className="text-danger">*</span><FromCalc show={prefilled} /></label>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {Object.entries(ORDER_TYPES).map(([key, { label }]) => (
+        {options.map(({ key, label }) => (
           <button
             key={key}
             type="button"
@@ -369,7 +372,9 @@ export function CreateOrderForm({
   const filmTypeStickers = watch('film_type_stickers')
   const boppBag = watch('bopp_bag')
   const standardPerPack = Number(watch('stickers_per_pack')) || 0
+  // R25.7C: свой тип-набор тоже показывает «Стикеров в паке».
   const isStickerpack = orderType === 'stickerpack' || orderType === 'stickerpack3D'
+    || (!!getTypeDef(orderType)?.is_set && !getTypeDef(orderType)?.is_builtin)
   const isStickerpack3D = orderType === 'stickerpack3D'
   const isSticker3D = orderType === 'sticker3D'
   // R19: валидные типы стикеров (форма выбрана, номер задан).

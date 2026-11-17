@@ -62,6 +62,9 @@ function makeQueryBuilder(terminalResults = []) {
   return builder
 }
 
+/** R25.7A: первый вызов — поиск типа в реестре k24_order_types. */
+const knownTypeBuilder = () => makeQueryBuilder([{ data: { key: 'sticker_cut' }, error: null }])
+
 const VALID_BODY = {
   order_type: 'sticker_cut',
   width_mm: 50,
@@ -127,6 +130,7 @@ describe('POST /api/bitrix/incoming', () => {
     }
 
     mockSupabase.from
+      .mockReturnValueOnce(knownTypeBuilder()) // order type lookup
       .mockReturnValueOnce(clientSearchBuilder) // client search
       .mockReturnValueOnce(clientInsertBuilder) // client insert
       .mockReturnValueOnce(orderInsertBuilder) // order insert
@@ -144,10 +148,12 @@ describe('POST /api/bitrix/incoming', () => {
     })
     expect(res.body.kontora_url).toMatch(/\/orders\/order-1$/)
     // Verify call order
-    expect(mockSupabase.from).toHaveBeenNthCalledWith(1, 'k24_clients')
+    expect(mockSupabase.from).toHaveBeenNthCalledWith(1, 'k24_order_types')
     expect(mockSupabase.from).toHaveBeenNthCalledWith(2, 'k24_clients')
-    expect(mockSupabase.from).toHaveBeenNthCalledWith(3, 'k24_orders')
-    expect(mockSupabase.from).toHaveBeenNthCalledWith(4, 'k24_order_status_history')
+    expect(mockSupabase.from).toHaveBeenNthCalledWith(3, 'k24_clients')
+    expect(mockSupabase.from).toHaveBeenNthCalledWith(4, 'k24_orders')
+    expect(mockSupabase.from).toHaveBeenNthCalledWith(5, 'k24_order_status_history')
+    expect(orderInsertBuilder.insert.mock.calls[0][0].order_type).toBe('sticker_cut')
     // history error was null → no impact
   })
 
@@ -160,6 +166,7 @@ describe('POST /api/bitrix/incoming', () => {
     ])
 
     mockSupabase.from
+      .mockReturnValueOnce(knownTypeBuilder())
       .mockReturnValueOnce(clientSearchBuilder)
       .mockReturnValueOnce(clientInsertBuilder)
 
@@ -173,7 +180,7 @@ describe('POST /api/bitrix/incoming', () => {
       detail: 'duplicate key value',
     })
     // Order should NOT have been touched
-    expect(mockSupabase.from).toHaveBeenCalledTimes(2)
+    expect(mockSupabase.from).toHaveBeenCalledTimes(3)
   })
 
   it('dedup: when client with same name exists, reuses id and skips insert', async () => {
@@ -189,6 +196,7 @@ describe('POST /api/bitrix/incoming', () => {
     const historyBuilder = { insert: vi.fn().mockResolvedValue({ error: null }) }
 
     mockSupabase.from
+      .mockReturnValueOnce(knownTypeBuilder())
       .mockReturnValueOnce(clientSearchBuilder)
       .mockReturnValueOnce(orderInsertBuilder)
       .mockReturnValueOnce(historyBuilder)
@@ -199,11 +207,58 @@ describe('POST /api/bitrix/incoming', () => {
 
     expect(res.statusCode).toBe(200)
     expect(res.body.order_id).toBe('order-2')
-    // Only 3 .from() calls — no second k24_clients (no insert)
-    expect(mockSupabase.from).toHaveBeenCalledTimes(3)
-    expect(mockSupabase.from).toHaveBeenNthCalledWith(2, 'k24_orders')
+    // Only 4 .from() calls (type lookup + client search + order + history) — no client insert
+    expect(mockSupabase.from).toHaveBeenCalledTimes(4)
+    expect(mockSupabase.from).toHaveBeenNthCalledWith(3, 'k24_orders')
     // Verify the order was inserted with the existing client_id
     const insertArgs = orderInsertBuilder.insert.mock.calls[0][0]
     expect(insertArgs.client_id).toBe('existing-client')
+  })
+
+  it('R25.7A: неизвестный тип → заказ без типа (NULL) + предупреждение в k24_integration_log', async () => {
+    const typeBuilder = makeQueryBuilder([{ data: null, error: null }])
+    const clientSearchBuilder = makeQueryBuilder([{ data: { id: 'existing-client' }, error: null }])
+    const orderInsertBuilder = makeQueryBuilder([{ data: { id: 'order-3', number: 8 }, error: null }])
+    const logBuilder = { insert: vi.fn().mockResolvedValue({ error: null }) }
+    const historyBuilder = { insert: vi.fn().mockResolvedValue({ error: null }) }
+
+    mockSupabase.from
+      .mockReturnValueOnce(typeBuilder)
+      .mockReturnValueOnce(clientSearchBuilder)
+      .mockReturnValueOnce(orderInsertBuilder)
+      .mockReturnValueOnce(logBuilder)
+      .mockReturnValueOnce(historyBuilder)
+
+    const req = buildReq({ body: { ...VALID_BODY, order_type: 'magnets_xxl' } })
+    const res = buildRes()
+    await handler(req, res)
+
+    expect(res.statusCode).toBe(200)
+    expect(orderInsertBuilder.insert.mock.calls[0][0].order_type).toBeNull()
+    expect(mockSupabase.from).toHaveBeenNthCalledWith(4, 'k24_integration_log')
+    const logRow = logBuilder.insert.mock.calls[0][0]
+    expect(logRow).toMatchObject({ direction: 'incoming', status: 'warning', order_id: 'order-3' })
+    expect(logRow.payload.order_type).toBe('magnets_xxl')
+  })
+
+  it('R25.7A: ошибка поиска типа не ломает создание — тип пишется как пришёл', async () => {
+    const typeBuilder = makeQueryBuilder([{ data: null, error: { code: '42P01', message: 'relation does not exist' } }])
+    const clientSearchBuilder = makeQueryBuilder([{ data: { id: 'existing-client' }, error: null }])
+    const orderInsertBuilder = makeQueryBuilder([{ data: { id: 'order-4', number: 9 }, error: null }])
+    const historyBuilder = { insert: vi.fn().mockResolvedValue({ error: null }) }
+
+    mockSupabase.from
+      .mockReturnValueOnce(typeBuilder)
+      .mockReturnValueOnce(clientSearchBuilder)
+      .mockReturnValueOnce(orderInsertBuilder)
+      .mockReturnValueOnce(historyBuilder)
+
+    const req = buildReq({ body: VALID_BODY })
+    const res = buildRes()
+    await handler(req, res)
+
+    expect(res.statusCode).toBe(200)
+    expect(orderInsertBuilder.insert.mock.calls[0][0].order_type).toBe('sticker_cut')
+    expect(mockSupabase.from).toHaveBeenCalledTimes(4)
   })
 })

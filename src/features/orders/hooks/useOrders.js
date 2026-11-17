@@ -34,7 +34,7 @@ const LIST_FIELDS_BASE = `id, number, custom_number, client_id, status, order_ty
   assigned_to, created_by, bopp_bag, is_urgent, notes, deal_name, bitrix_deal_id, mockup_path,
   stickers_per_pack, design_variants,
   route_version, delivery_type, needs_montage_film, payment_status,
-  product_name, is_subcontract`
+  product_name, is_subcontract, route_snapshot`
 
 const LIST_FIELDS_FINANCE = `, price_final, cost_total`
 
@@ -52,7 +52,8 @@ const DETAIL_FIELDS_BASE = `id, number, custom_number, client_id, order_type, st
   delivery_notes, bopp_bag, film_type_stickers, ink_deducted_at, drying_started_at,
   film_material_id, film_stickers_material_id, lam_material_id, sticker_shape,
   route_version, payment_status,
-  product_name, is_subcontract, contractor_id, contractor_notes, montage_material_id`
+  product_name, is_subcontract, contractor_id, contractor_notes, montage_material_id,
+  route_snapshot`
 
 const DETAIL_FIELDS_FINANCE = `, cost_materials, cost_labor, cost_total, markup, discount_pct,
   price_final, price_per_unit, contractor_cost, calc_snapshot`
@@ -309,7 +310,8 @@ export async function createOrder(orderData) {
 
 // R25.1: поля заказа, нужные getOrderRoute (v1 + v2) и правилам «Ждёт оплаты».
 // R25.4: + is_subcontract (маршрут v2 субподряда).
-const ROUTE_FIELDS = 'order_type, design_status, need_lam, bopp_bag, number, route_version, delivery_type, needs_montage_film, payment_status, is_subcontract'
+// R25.7A: + route_snapshot (маршрут типа на момент создания заказа).
+const ROUTE_FIELDS = 'order_type, design_status, need_lam, bopp_bag, number, route_version, delivery_type, needs_montage_film, payment_status, is_subcontract, route_snapshot'
 
 /** Ошибка: выход из «Ждёт оплаты» без отмеченной оплаты требует подтверждения. */
 export const PAYMENT_CONFIRM_REQUIRED = 'PAYMENT_CONFIRM_REQUIRED'

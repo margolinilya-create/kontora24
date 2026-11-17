@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/shared/lib/supabase'
 import { useRolePermissionsStore } from './role-permissions-store'
+import { useOrderTypesStore } from '@/features/order-types/store'
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -25,6 +26,8 @@ export const useAuthStore = create((set, get) => ({
           set({ user: session.user, profile, loading: false })
           // Загружаем динамические права (L2 RBAC) — параллельно, не блокируя UI
           useRolePermissionsStore.getState().load()
+          // R25.7A: реестр типов заказов (маршруты/подписи; пуст → константы)
+          useOrderTypesStore.getState().load()
         }
       } else {
         set({ user: null, profile: null, loading: false })
@@ -70,6 +73,9 @@ export const useAuthStore = create((set, get) => ({
           if (!useRolePermissionsStore.getState().loaded) {
             useRolePermissionsStore.getState().load()
           }
+          if (!useOrderTypesStore.getState().loaded) {
+            useOrderTypesStore.getState().load()
+          }
         } catch {
           // swallow — keep existing state
         }
@@ -109,6 +115,7 @@ export const useAuthStore = create((set, get) => ({
     // к моменту следующего рендера, и AuthGuard кикнет обратно на /login.
     set({ user: data.user, profile, loading: false })
     useRolePermissionsStore.getState().load()
+    useOrderTypesStore.getState().load()
 
     return data
   },
@@ -117,6 +124,7 @@ export const useAuthStore = create((set, get) => ({
     await supabase.auth.signOut()
     set({ user: null, profile: null })
     useRolePermissionsStore.getState().reset()
+    useOrderTypesStore.getState().reset()
   },
 
   hasRole: (roles) => {

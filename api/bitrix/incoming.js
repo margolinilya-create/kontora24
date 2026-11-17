@@ -35,6 +35,24 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields: order_type, width_mm, height_mm, qty' })
     }
 
+    // R25.7A: order_type ссылается на реестр k24_order_types (FK, миграция 103).
+    // Неизвестный тип из Bitrix не роняет создание заказа: пишем NULL (менеджер
+    // выберет тип в AdminOrderEditor) + предупреждение в k24_integration_log.
+    // Ошибка самого поиска — оставляем тип как пришёл (поведение до R25.7).
+    let resolvedType = order_type
+    let unknownType = null
+    const { data: typeRow, error: typeErr } = await supabase
+      .from('k24_order_types')
+      .select('key')
+      .eq('key', String(order_type))
+      .maybeSingle()
+    if (typeErr) {
+      console.error('[bitrix/incoming] order type lookup failed:', typeErr)
+    } else if (!typeRow) {
+      unknownType = String(order_type)
+      resolvedType = null
+    }
+
     // Find or create client. RLS/FK ошибки больше не глотаем —
     // PGRST116 (no rows) — нормальный случай, остальное — действительная проблема.
     let clientId = null
@@ -71,7 +89,7 @@ export default async function handler(req, res) {
     const { data: order, error } = await supabase
       .from('k24_orders')
       .insert({
-        order_type,
+        order_type: resolvedType,
         width_mm: Number(width_mm),
         height_mm: Number(height_mm),
         qty: Number(qty),
@@ -89,6 +107,18 @@ export default async function handler(req, res) {
       .single()
 
     if (error) throw error
+
+    if (unknownType) {
+      const { error: logErr } = await supabase.from('k24_integration_log').insert({
+        direction: 'incoming',
+        endpoint: 'bitrix/incoming',
+        status: 'warning',
+        error_message: `Неизвестный тип заказа «${unknownType}» — заказ создан без типа, выберите тип в редакторе заказа.`,
+        payload: { order_type: unknownType, bitrix_deal_id: body.bitrix_deal_id || null },
+        order_id: order.id,
+      })
+      if (logErr) console.error('[bitrix/incoming] integration log insert failed:', logErr)
+    }
 
     // Log status — фейл в history ломает аудит-цепочку, не глотаем молча.
     const { error: historyErr } = await supabase.from('k24_order_status_history').insert({

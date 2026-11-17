@@ -315,3 +315,75 @@ describe('R25.8: маскирование денег склада', () => {
     expect(leaks, `деньги склада читаются из таблиц:\n${leaks.join('\n')}`).toHaveLength(0)
   })
 })
+
+describe('R25.7A: реестр типов заказов и снимок маршрута', () => {
+  const read = (f) => readFileSync(resolve(process.cwd(), f), 'utf-8')
+  const strip = (sql) => sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n')
+  const sql102 = strip(read('supabase/migrations/102_r25_7_order_types.sql'))
+  const sql103 = strip(read('supabase/migrations/103_r25_7_route_snapshot.sql'))
+  const sql101 = strip(read('supabase/migrations/101_r25_6_calc_snapshot.sql'))
+
+  it('103: route_snapshot — нефинансовая, колоночный GRANT authenticated', () => {
+    expect(sql103).toMatch(/ADD COLUMN IF NOT EXISTS route_snapshot JSONB/)
+    expect(sql103).toMatch(/GRANT SELECT \(route_snapshot\) ON public\.k24_orders TO authenticated/)
+    expect(sql103).not.toMatch(/GRANT SELECT ON public\.k24_orders TO authenticated/)
+    // Финансовые колонки этой миграцией не раскрываются.
+    const grants = sql103.match(/GRANT SELECT \(([^)]*)\)\s+ON public\.k24_orders TO authenticated/g) || []
+    expect(grants.length).toBeGreaterThan(0)
+    for (const g of grants) {
+      expect(g).not.toMatch(/price_final|cost_|markup|discount_pct|price_per_unit|contractor_cost|calc_snapshot/)
+    }
+  })
+
+  it('103: view = тело 101 дословно + route_snapshot последней колонкой', () => {
+    const body = (sql) => sql.slice(sql.indexOf('CREATE OR REPLACE VIEW public.k24_orders_full AS'), sql.indexOf('FROM k24_orders o;'))
+    const v101 = body(sql101).trimEnd()
+    const v103 = body(sql103).trimEnd()
+    expect(v101.length).toBeGreaterThan(100)
+    expect(v103).toBe(`${v101},\n  o.route_snapshot`)
+    expect(sql103).toContain('REVOKE ALL ON public.k24_orders_full FROM PUBLIC, anon')
+    expect(sql103).toContain('GRANT SELECT ON public.k24_orders_full TO authenticated')
+  })
+
+  it('103: protect-триггер = 101 + route_snapshot (воркер не переписывает снимок)', () => {
+    const checks = (sql) => (sql.slice(sql.indexOf('FUNCTION public.k24_protect_order_columns')).match(/NEW\.(\w+) IS DISTINCT FROM OLD\.\1/g) || [])
+    const before = checks(sql101)
+    expect(before.length).toBeGreaterThan(10)
+    expect(checks(sql103)).toEqual([...before, 'NEW.route_snapshot IS DISTINCT FROM OLD.route_snapshot'])
+  })
+
+  it('102: таблицы реестра — только чтение для authenticated, запись через RPC', () => {
+    for (const t of ['k24_order_types', 'k24_stage_defs']) {
+      expect(sql102).toMatch(new RegExp(`ALTER TABLE public\\.${t}\\s+ENABLE ROW LEVEL SECURITY`))
+      expect(sql102).toMatch(new RegExp(`REVOKE ALL ON public\\.${t}\\s+FROM PUBLIC, anon, authenticated`))
+      expect(sql102).toMatch(new RegExp(`GRANT SELECT ON public\\.${t}\\s+TO authenticated`))
+      expect(sql102).not.toMatch(new RegExp(`GRANT (INSERT|UPDATE|DELETE|ALL)[^;]*ON public\\.${t}`))
+    }
+  })
+
+  it('RPC реестра: SECURITY DEFINER + search_path + отзыв у anon; запись по order_type:manage', () => {
+    const fns = [
+      [sql102, 'save_order_type(JSONB)'],
+      [sql102, 'order_type_usage()'],
+      [sql102, 'k24_validate_type_production(JSONB, JSONB, BOOLEAN)'],
+      [sql103, 'k24_build_route_snapshot(TEXT)'],
+      [sql103, 'apply_type_route_to_order(UUID)'],
+    ]
+    for (const [sql, sig] of fns) {
+      expect(sql, sig).toContain(`REVOKE ALL ON FUNCTION public.${sig} FROM PUBLIC, anon`)
+    }
+    const definers = (sql) => sql.split('CREATE OR REPLACE FUNCTION').slice(1)
+    for (const fn of [...definers(sql102), ...definers(sql103)]) {
+      if (/SECURITY DEFINER/.test(fn)) expect(fn).toMatch(/SET search_path/)
+    }
+    expect(sql102).toMatch(/save_order_type[\s\S]*k24_user_can\('order_type:manage'\)/)
+    expect(sql102).toMatch(/order_type_usage[\s\S]*k24_user_can\('order_type:manage'\)/)
+    expect(sql103).toMatch(/apply_type_route_to_order[\s\S]*v_role NOT IN \('admin', 'manager'\)[\s\S]*k24_order_audit/)
+  })
+
+  it('фронт читает реестр явными колонками (без select(*))', () => {
+    const store = read('src/features/order-types/store.js')
+    expect(store).toMatch(/from\('k24_order_types'\)\.select\(TYPE_COLUMNS\)/)
+    expect(store).toMatch(/from\('k24_stage_defs'\)\.select\(STAGE_COLUMNS\)/)
+  })
+})

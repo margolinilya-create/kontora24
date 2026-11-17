@@ -1,3 +1,7 @@
+import {
+  ROUTE_V2_HEAD, ROUTE_V2_TAIL, resolveTypeRoute, getStageDef,
+} from './lib/route-registry'
+
 // --- Time constants (ms) ---
 export const MS_PER_DAY = 86_400_000
 export const MS_PER_HOUR = 3_600_000
@@ -65,6 +69,33 @@ export const ACTIVE_ORDER_STATUSES = Object.keys(ORDER_STATUSES)
   .filter((s) => !TERMINAL_STATUSES.includes(s))
   .sort((a, b) => ORDER_STATUSES[a].order - ORDER_STATUSES[b].order)
 
+// R25.7A: цвет своего этапа по отделу каталога k24_stage_defs.department.
+const _STAGE_DEF_DEPT_COLOR = {
+  sales: _DEPT.info,
+  prepress: _DEPT.design,
+  print: _DEPT.print,
+  '3d': _DEPT.pouring,
+  osk: _DEPT.finish,
+}
+
+/**
+ * R25.7A: описание статуса { label, color, order } — встроенный из
+ * ORDER_STATUSES, свой этап (custom_<N>) — из каталога реестра (порядок —
+ * после встроенных, по sort_order). Неизвестный ключ → null.
+ */
+export function getStatusMeta(status) {
+  if (!status) return null
+  if (ORDER_STATUSES[status]) return ORDER_STATUSES[status]
+  const def = getStageDef(status)
+  if (!def) return null
+  return {
+    label: def.name || status,
+    color: _STAGE_DEF_DEPT_COLOR[def.department] || _DEPT.info,
+    order: 100 + (Number(def.sort_order) || 0),
+    custom: true,
+  }
+}
+
 // R25.1: этапы отдела продаж (менеджер), раздел «Продажи» (/sales).
 export const SALES_STAGES = [
   'new', 'awaiting_payment', 'design_approval', 'color_approval',
@@ -122,8 +153,10 @@ export const ORDER_ROUTES = {
 // --- R25.1 (ТЗ 17.11 Фаза 1): маршруты версии 2 ---
 // Маршрут = голова + производственная часть по типу + хвост. Упаковка
 // обязательна для всех типов. Субподряд — отдельная короткая ветка.
-const HEAD_V2 = ['new', 'awaiting_payment', 'design', 'design_approval', 'sample_layout', 'sample_print', 'color_approval', 'prepress']
-const TAIL_V2 = ['otk', 'awaiting_pickup', 'delivery', 'done']
+// R25.7A: голова и хвост — из route-registry (общий источник со сборкой
+// маршрута типа из реестра и SQL k24_build_route_snapshot).
+const HEAD_V2 = ROUTE_V2_HEAD
+const TAIL_V2 = ROUTE_V2_TAIL
 const PROD_FLAT_V2 = ['print', 'lamination', 'cutting', 'packaging']
 const PROD_3D_STICKER_V2 = ['print', 'cutting', 'pouring', 'drying', 'selection', 'packaging']
 const PROD_UNIVERSAL_V2 = ['print', 'lamination', 'cutting', 'selection', 'pouring', 'drying', 'assembly_3d', 'packaging']
@@ -156,6 +189,33 @@ function needsLaminationStageV2(order) {
   return order?.need_lam === true || order?.needs_montage_film === true
 }
 
+/**
+ * R25.7A: правила конкретного заказа поверх маршрута типа v2 (ТЗ 1.2 / 7.2):
+ * макет от клиента, ламинация/монтажная плёнка, способ получения. Одинаковы
+ * для снимка заказа, реестра типов и констант.
+ */
+export function applyV2Rules(stages, order) {
+  let route = stages
+  if (order?.design_status === 'provided') {
+    route = route.filter((s) => s !== 'design' && s !== 'design_approval')
+  }
+  if (!needsLaminationStageV2(order)) route = route.filter((s) => s !== 'lamination')
+  if (order?.delivery_type !== 'delivery') route = route.filter((s) => s !== 'delivery')
+  // subcontract в обычном маршруте отсутствует; packaging и awaiting_payment
+  // не пропускаются никогда.
+  return route
+}
+
+/**
+ * Маршрут типа v2 ДО правил заказа. Приоритет (R25.7A):
+ *   снимок заказа (route_snapshot) → тип из реестра k24_order_types → константы.
+ */
+function getTypeStagesV2(order) {
+  const resolved = resolveTypeRoute(order)
+  if (resolved) return resolved.stages
+  return ORDER_ROUTES_V2[order?.order_type] || ORDER_ROUTES_V2.sticker_cut
+}
+
 function getOrderRouteV2(order) {
   if (order?.is_subcontract === true) {
     let route = ROUTE_SUBCONTRACT_V2
@@ -165,15 +225,7 @@ function getOrderRouteV2(order) {
     if (order?.delivery_type !== 'delivery') route = route.filter((s) => s !== 'delivery')
     return route
   }
-  let route = ORDER_ROUTES_V2[order?.order_type] || ORDER_ROUTES_V2.sticker_cut
-  if (order?.design_status === 'provided') {
-    route = route.filter((s) => s !== 'design' && s !== 'design_approval')
-  }
-  if (!needsLaminationStageV2(order)) route = route.filter((s) => s !== 'lamination')
-  if (order?.delivery_type !== 'delivery') route = route.filter((s) => s !== 'delivery')
-  // subcontract в обычном маршруте отсутствует; packaging и awaiting_payment
-  // не пропускаются никогда.
-  return route
+  return applyV2Rules(getTypeStagesV2(order), order)
 }
 
 export const IS_3D_TYPE = (orderType) => orderType === 'sticker3D' || orderType === 'stickerpack3D'
@@ -328,14 +380,19 @@ export const REPRINT_STATUS_LABELS = {
 export function getReprintRoute(order) {
   let stages
   if (isRouteV2(order)) {
-    // R25.1: v2 — производственная часть маршрута от печати до ТК (не включая).
+    // R25.1: v2 — производственная часть маршрута до ТК (не включая).
     // Хвост v2 (ТК / Ждёт выдачи / Доставка) — этапы заказа целиком.
-    if (order?.order_type === 'stickerpack3D') {
+    // R25.7A: старт — первый этап производственной части типа (снимок заказа
+    // или реестр; у встроенных — «Печать»), иначе упаковка (тип без этапов
+    // цеха). Субподряд и заказ без снимка/реестра — по-прежнему от «Печати».
+    const resolved = order?.is_subcontract === true ? null : resolveTypeRoute(order)
+    if (!resolved && order?.order_type === 'stickerpack3D') {
       stages = REPRINT_ROUTE_3D_STICKERPACK.slice()
       if (!needsLaminationStageV2(order)) stages = stages.filter((s) => s !== 'lamination')
     } else {
       const full = getOrderRoute(order)
-      const start = full.indexOf('print')
+      const prodSet = resolved?.production ? [...resolved.production, 'packaging'] : null
+      const start = prodSet ? full.findIndex((s) => prodSet.includes(s)) : full.indexOf('print')
       const end = full.indexOf('otk')
       stages = start >= 0 ? full.slice(start, end > start ? end : undefined).filter((s) => s !== 'done') : []
     }
@@ -447,6 +504,8 @@ export const PERMISSIONS = {
     'calc:settings',
     // R25.4: справочник подрядчиков (сид — миграция 099).
     'contractor:manage',
+    // R25.7: раздел «Типы заказов» в настройках (сид — миграция 102).
+    'order_type:manage',
   ],
   materials: [
     'material:add_transaction', 'material:manage', 'material:edit_name',
@@ -500,6 +559,7 @@ export const PERMISSION_LABELS = {
   'warehouse:edit_operation': 'Уточнять операции склада (дата, поставщик, вид)',
   'user:manage': 'Управлять пользователями',
   'contractor:manage': 'Управлять подрядчиками',
+  'order_type:manage': 'Настраивать типы заказов и этапы',
 }
 
 // Legacy: hard-coded fallback. Используется до загрузки динамических прав

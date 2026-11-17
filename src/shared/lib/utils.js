@@ -1,6 +1,7 @@
 import { format, formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { ORDER_TYPES } from '@/shared/constants'
+import { getTypeDef } from '@/shared/lib/route-registry'
 
 export function formatDate(date) {
   if (!date) return '—'
@@ -91,5 +92,6 @@ export function formatOrderType(orderOrType) {
     if (name) return name
   }
   if (!type) return '—'
-  return ORDER_TYPES[type]?.label || type
+  // R25.7A: название из реестра типов (k24_order_types), фолбэк — константы.
+  return getTypeDef(type)?.name || ORDER_TYPES[type]?.label || type
 }

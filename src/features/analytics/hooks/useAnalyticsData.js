@@ -69,7 +69,7 @@ export function useAnalyticsData(period) {
         // phase 3): базовая таблица после миграции 072 не отдаёт финколонки
         // authenticated. У k24_orders НЕТ колонки deleted_at (soft-delete
         // только у логов) — фильтр по ней ронял страницу с 400 (QA 04.07 №1).
-        supabase.from('k24_orders_full').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, stickers_per_pack, sticker_shape, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
+        supabase.from('k24_orders_full').select('id, number, status, order_type, qty, price_final, cost_total, cost_labor, cost_materials, film_type, film_type_stickers, stickers_per_pack, sticker_shape, bopp_bag, route_version, deadline, created_at, updated_at, client:k24_clients(name), client_id, assignee:k24_profiles!assigned_to(display_name)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(1000),
         supabase.from('k24_order_status_history').select('id, order_id, from_status, to_status, created_at').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
         supabase.from('k24_material_transactions').select('id, material_id, delta, reason, created_at, material:k24_materials(name, type, unit)').gte('created_at', sinceIso).lte('created_at', untilIso).limit(5000),
         period !== 'all' ? supabase.from('k24_orders_full').select('id, status, price_final').gte('created_at', prevStart.toISOString()).lt('created_at', sinceIso).limit(1000) : Promise.resolve({ data: [], error: null }),

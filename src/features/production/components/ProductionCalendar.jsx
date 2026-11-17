@@ -223,7 +223,7 @@ export function ProductionCalendar() {
         </span>
         <span className="inline-flex items-center gap-1.5" title={DEPT_GROUPS.finish.fullLabel}>
           <span className="w-2 h-2 rounded-full bg-dept-finish" aria-hidden="true" />
-          <span>{DEPT_GROUPS.finish.label} — сборка, упаковка, ОТК</span>
+          <span>{DEPT_GROUPS.finish.label} — сборка, упаковка, ТК</span>
         </span>
         <span className="inline-flex items-center gap-1.5 ml-auto">
           <span className="text-[9px] font-bold text-dept-pouring">3D</span>

@@ -393,13 +393,13 @@ describe('getNextStatus', () => {
 })
 
 describe('ORDER_STATUSES', () => {
-  it('has 19 statuses (R11.0: +sample_layout/sample_print/color_approval/batch_layout/drying/selection)', () => {
-    expect(Object.keys(ORDER_STATUSES)).toHaveLength(19)
+  it('has 24 statuses (R25.1: +awaiting_payment/design_approval/subcontract/awaiting_pickup/delivery)', () => {
+    expect(Object.keys(ORDER_STATUSES)).toHaveLength(24)
   })
 
-  it('order field is sequential 0-18', () => {
+  it('order field is sequential 0-23', () => {
     const orders = Object.values(ORDER_STATUSES).map(s => s.order).sort((a, b) => a - b)
-    expect(orders).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
+    expect(orders).toEqual(Array.from({ length: 24 }, (_, i) => i))
   })
 
   it('each status has label and color', () => {

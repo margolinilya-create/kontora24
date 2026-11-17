@@ -93,6 +93,7 @@ export function useOrdersCostReport(period = '30') {
                    film_type, film_type_stickers, lam_type, need_lam,
                    film_material_id, film_stickers_material_id, lam_material_id, sticker_shape,
                    stickers_per_pack, notes, delivery_type, payment_status,
+                   bopp_bag, route_version,
                    client:k24_clients!client_id(name),
                    film_material:k24_materials!film_material_id(id, name, material_code, unit_cost),
                    film_stickers_material:k24_materials!film_stickers_material_id(id, name, material_code, unit_cost),
@@ -255,7 +256,7 @@ export function useBonusReport(period = '30') {
     try {
       const [logsRes, ratesRes] = await Promise.all([
         supabase.from('k24_production_logs')
-          .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape)')
+          .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version)')
           .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
@@ -306,7 +307,7 @@ export function useEmployeeReport(period = '30') {
           .not('ended_at', 'is', null)
           .gte('started_at', getSince(period)).lte('started_at', getUntil(period) ?? '9999-12-31T23:59:59Z'),
         supabase.from('k24_production_logs')
-          .select('worker_id, stage, order_id, design_index, created_at, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape)')
+          .select('worker_id, stage, order_id, design_index, created_at, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version)')
           .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .limit(10000),

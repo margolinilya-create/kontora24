@@ -37,7 +37,7 @@ export function useCabinetStats(period = '30') {
       const [logsRes, shiftsRes, monthlyRes, ratesRes] = await Promise.all([
         supabase
           .from('k24_production_logs')
-          .select('*, order:k24_orders!order_id(number, custom_number, order_type, qty, stickers_per_pack, sticker_shape)')
+          .select('*, order:k24_orders!order_id(number, custom_number, order_type, qty, stickers_per_pack, sticker_shape, bopp_bag, route_version)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', since)
@@ -51,7 +51,7 @@ export function useCabinetStats(period = '30') {
           .order('started_at', { ascending: false }),
         supabase
           .from('k24_production_logs')
-          .select('stage, order_id, design_index, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, defects, created_at, order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape)')
+          .select('stage, order_id, design_index, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, defects, created_at, order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', sixMonthsAgo),

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
+import { ACTIVE_ORDER_STATUSES, SALES_STAGES } from '@/shared/constants'
 
 export const useSidebarStore = create((set) => ({
   collapsed: localStorage.getItem('sidebar-collapsed') === 'true',
@@ -22,7 +23,8 @@ export const useSidebarStore = create((set) => ({
         supabase
           .from('k24_orders')
           .select('status')
-          .in('status', ['new', 'design', 'sample_layout', 'prepress', 'print', 'lamination', 'cutting', 'selection', 'pouring', 'drying', 'assembly_3d', 'packaging', 'otk']),
+          // R25.1: все активные статусы (включая этапы отдела продаж v2).
+          .in('status', ACTIVE_ORDER_STATUSES),
         supabase
           .from('k24_materials')
           .select('stock_qty, min_qty'),
@@ -35,6 +37,8 @@ export const useSidebarStore = create((set) => ({
       // «Вёрстка образца» (sample_layout) показывается в очереди «Препресс»
       // (QueuePage extraStatuses) — счётчик должен это учитывать (ТЗ Фаза 4А).
       counts.prepress = (counts.prepress || 0) + (counts.sample_layout || 0)
+      // R25.1: бейдж «Продажи» — все заказы, ждущие действий менеджера.
+      counts.sales = SALES_STAGES.reduce((sum, st) => sum + (counts[st] || 0), 0)
 
       const lowStockCount = (materialsRes.data || []).filter(
         (m) => m.min_qty > 0 && Number(m.stock_qty) <= Number(m.min_qty)

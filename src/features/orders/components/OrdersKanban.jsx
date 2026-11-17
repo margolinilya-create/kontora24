@@ -111,7 +111,7 @@ export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived }
       deptFilter.forEach((key) => {
         DEPT_GROUPS[key]?.stages.forEach((s) => allowedStages.add(s))
       })
-      cols = cols.filter((s) => allowedStages.has(s) || (s === 'new' && deptFilter.includes('design')))
+      cols = cols.filter((s) => allowedStages.has(s))
     }
     return cols
   })()

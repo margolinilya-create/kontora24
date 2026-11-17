@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageAllowed, canAdvanceFrom } from '@/shared/constants'
+import {
+  isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageAllowed, canAdvanceFrom,
+  needsNoPaymentConfirm, getAutoPassTarget, isReprintGateTransition, PAYMENT_STATUSES,
+} from '@/shared/constants'
 import { useRolePermissionsStore, canRoleDo } from '@/features/auth/role-permissions-store'
 import { useAuthStore } from '@/features/auth/store'
 import { useRoleSwitcherStore } from '@/shared/stores/role-switcher-store'
@@ -29,7 +32,8 @@ const STAGES_REQUIRING_COMPLETION = new Set([
 const LIST_FIELDS_BASE = `id, number, custom_number, client_id, status, order_type, qty, width_mm, height_mm,
   film_type, lam_type, need_lam, design_status, priority, deadline, created_at, updated_at,
   assigned_to, created_by, bopp_bag, is_urgent, notes, deal_name, bitrix_deal_id, mockup_path,
-  stickers_per_pack, design_variants`
+  stickers_per_pack, design_variants,
+  route_version, delivery_type, needs_montage_film, payment_status`
 
 const LIST_FIELDS_FINANCE = `, price_final, cost_total`
 
@@ -45,10 +49,11 @@ const DETAIL_FIELDS_BASE = `id, number, custom_number, client_id, order_type, st
   needs_individual_cut, printed_meters, resin_used, rejected_qty, printed_qty, deal_name,
   source, source_referrer, design_status, delivery_type, delivery_city, delivery_address,
   delivery_notes, bopp_bag, film_type_stickers, ink_deducted_at, drying_started_at,
-  film_material_id, film_stickers_material_id, lam_material_id, sticker_shape`
+  film_material_id, film_stickers_material_id, lam_material_id, sticker_shape,
+  route_version, payment_status`
 
 const DETAIL_FIELDS_FINANCE = `, cost_materials, cost_labor, cost_total, markup, discount_pct,
-  price_final, price_per_unit, payment_status`
+  price_final, price_per_unit`
 
 // R17.1 (бриф 5.06): названия конкретных позиций склада подтягиваем join'ами,
 // чтобы OverviewTab и OrderReportsTab показывали реальное имя плёнки/ламинации.
@@ -298,33 +303,49 @@ export async function createOrder(orderData) {
   return data
 }
 
+// R25.1: поля заказа, нужные getOrderRoute (v1 + v2) и правилам «Ждёт оплаты».
+const ROUTE_FIELDS = 'order_type, design_status, need_lam, bopp_bag, number, route_version, delivery_type, needs_montage_film, payment_status'
+
+/** Ошибка: выход из «Ждёт оплаты» без отмеченной оплаты требует подтверждения. */
+export const PAYMENT_CONFIRM_REQUIRED = 'PAYMENT_CONFIRM_REQUIRED'
+
 /**
  * Сменить статус заказа.
  *
  * @param {string} orderId
  * @param {string} fromStatus
  * @param {string} toStatus
- * @param {{ isRollback?: boolean, force?: boolean }} [options]
+ * @param {{ isRollback?: boolean, force?: boolean, kind?: string, note?: string, confirmNoPayment?: boolean }} [options]
  *   `isRollback` — переход назад по маршруту, блокировка пропускается.
  *   `force` — пропустить блокировку (только для admin/manager override).
+ *   `kind` / `note` — пометка записи истории (R25.1, миграция 093):
+ *     manual_skip / paid_at_intake / payment_received / no_payment / design_return / rollback.
+ *   `confirmNoPayment` — подтверждён запуск без оплаты (v2, выход из «Ждёт оплаты»).
+ * @returns {Promise<{ status: string }>} фактический итоговый статус (R25.1:
+ *   при автопроходе «Ждёт оплаты» он дальше, чем toStatus).
  */
 export async function updateOrderStatus(orderId, fromStatus, toStatus, options = {}) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
+  // ВСЕ поля, которые использует getOrderRoute (v1: order_type, design_status,
+  // need_lam, bopp_bag — без bopp_bag маршрут терял «Упаковку», QA 04.07 баг №4;
+  // v2: route_version, delivery_type, needs_montage_film) + payment_status для
+  // правил «Ждёт оплаты». При rollback/force читаем только если переход может
+  // упереться в гейт допечаток (он зависит от версии маршрута).
+  const needsOrder = (!options.isRollback && !options.force) || toStatus === 'done' || fromStatus === 'otk'
+  const orderForRoute = needsOrder
+    ? (await supabase.from('k24_orders').select(ROUTE_FIELDS).eq('id', orderId).single()).data
+    : null
+
+  let finalStatus = toStatus
+  let kind = options.kind || null
+  let note = options.note || null
+  let autoPass = null
+
   // Блокировка перехода в стадию, которая не входит в маршрут заказа.
-  // isRollback / force — admin escape (StatusOverride).
-  let orderForRoute = null
+  // isRollback / force — admin escape (StatusOverride / StageJumper).
   if (!options.isRollback && !options.force) {
-    // ВСЕ поля, которые использует getOrderRoute: order_type, design_status,
-    // need_lam, bopp_bag. Без bopp_bag маршрут терял «Упаковку» для не-3D
-    // заказов с БОПП-пакетом (QA 04.07, баг №4).
-    const { data: o } = await supabase
-      .from('k24_orders')
-      .select('order_type, design_status, need_lam, bopp_bag, number')
-      .eq('id', orderId)
-      .single()
-    orderForRoute = o
     if (orderForRoute && !isStageAllowed(orderForRoute, toStatus)) {
       const stageLabel = ORDER_STATUSES[toStatus]?.label || toStatus
       throw new Error(`Этап «${stageLabel}» не входит в маршрут заказа`)
@@ -351,6 +372,21 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
         throw new Error(`У роли «${role}» нет права продвигать этап «${stageLabel}»`)
       }
     }
+
+    // R25.1 (ТЗ 1.3): выход из «Ждёт оплаты» без оплаты — только осознанно.
+    if (orderForRoute && needsNoPaymentConfirm(orderForRoute, fromStatus, toStatus)) {
+      if (!options.confirmNoPayment) {
+        const err = new Error('Оплата не отмечена. Подтвердите запуск заказа в работу без оплаты.')
+        err.code = PAYMENT_CONFIRM_REQUIRED
+        throw err
+      }
+      if (!kind) { kind = 'no_payment'; note = note || 'Запущен без оплаты' }
+    }
+
+    // R25.1 (ТЗ 1.3): оплата отмечена при приёме — «Ждёт оплаты» проходится
+    // автоматически, в историю пишутся два перехода с одним временем.
+    autoPass = orderForRoute ? getAutoPassTarget(orderForRoute, fromStatus, toStatus) : null
+    if (autoPass) finalStatus = autoPass
   }
 
   // R-фидбэк 29.06: completion-check СМЯГЧЁН — продвижение вперёд без полных
@@ -394,7 +430,9 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   // допечатки. Клиентская проверка даёт понятное сообщение до обращения к БД;
   // жёсткую гарантию держит триггер fn_block_done_with_open_reprints (миграция
   // 081) — он сработает и при force/rollback/канбане.
-  if (toStatus === 'done') {
+  // R25.1 (ТЗ 1.5): для маршрута v2 гейт стоит на выходе с ТК (otk →
+  // awaiting_pickup / delivery) — допечатки проходят контроль вместе с заказом.
+  if (isReprintGateTransition(orderForRoute, fromStatus, finalStatus)) {
     const { data: openReprints } = await supabase
       .from('k24_order_subtasks')
       .select('id')
@@ -404,19 +442,41 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
       .neq('status', 'done')
       .limit(1)
     if (openReprints && openReprints.length > 0) {
-      throw new Error('Нельзя завершить заказ: есть незавершённые допечатки. Завершите их на вкладке «Подзадачи».')
+      throw new Error(finalStatus === 'done'
+        ? 'Нельзя завершить заказ: есть незавершённые допечатки. Завершите их на вкладке «Подзадачи».'
+        : 'Нельзя выпустить заказ с ТК: есть незавершённые допечатки. Завершите их на вкладке «Подзадачи».')
     }
   }
 
+  const nowIso = new Date().toISOString()
   const { error } = await supabase
     .from('k24_orders')
-    .update({ status: toStatus, updated_at: new Date().toISOString() })
+    .update({ status: finalStatus, updated_at: nowIso })
     .eq('id', orderId)
   if (error) throw error
 
-  const { error: historyError } = await supabase.from('k24_order_status_history').insert({
-    order_id: orderId, from_status: fromStatus, to_status: toStatus, changed_by: user.id,
-  })
+  // kind/note добавляем в запись только когда они заданы — обычные переходы
+  // пишутся тем же набором полей, что и до R25.1.
+  const historyRow = (from, to, extra = {}) => {
+    const row = { order_id: orderId, from_status: from, to_status: to, changed_by: user.id, ...extra }
+    if (kind) row.kind = kind
+    if (note) row.note = note
+    return row
+  }
+  let historyRows
+  if (autoPass) {
+    const methodLabel = PAYMENT_STATUSES[orderForRoute?.payment_status]?.label || orderForRoute?.payment_status
+    kind = 'paid_at_intake'
+    note = `Оплата отмечена при приёме: ${methodLabel}`
+    historyRows = [
+      historyRow(fromStatus, toStatus, { created_at: nowIso }),
+      historyRow(toStatus, finalStatus, { created_at: nowIso }),
+    ]
+  } else {
+    historyRows = [historyRow(fromStatus, finalStatus)]
+  }
+  const { error: historyError } = await supabase.from('k24_order_status_history')
+    .insert(historyRows.length === 1 ? historyRows[0] : historyRows)
   if (historyError) throw historyError
 
   // Авто-расход краски отключён 12.05 по запросу менеджера.
@@ -447,7 +507,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
         body: JSON.stringify({
           order_id: orderId,
           order_number: order.number,
-          status: toStatus,
+          status: finalStatus,
           price_final: order.price_final,
           cost_total: order.cost_total,
           bitrix_deal_id: order.bitrix_deal_id,
@@ -457,6 +517,8 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   } catch (err) {
     captureError(err, { tags: { source: 'updateOrderStatus.notifyBitrix' }, extra: { orderId } })
   }
+
+  return { status: finalStatus }
 }
 
 /**

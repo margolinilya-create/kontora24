@@ -15,33 +15,64 @@ const _DEPT = {
   danger:  'bg-danger/15 text-danger',
 }
 
+// R25.1 (ТЗ 17.11 Фаза 1): +5 этапов отдела продаж/ОДП (awaiting_payment,
+// design_approval, subcontract, awaiting_pickup, delivery), подписи «Новый
+// заказ» и «ТК». `.order` — канонический порядок ТЗ (по нему строятся колонки
+// канбана); относительный порядок прежних статусов не изменился, поэтому
+// фолбэк getNextStatus для v1 даёт прежний результат. Устаревшие batch_layout
+// и selection_pouring остаются на своих местах с меткой «(устар.)».
 export const ORDER_STATUSES = {
-  new: { label: 'Новый', color: _DEPT.info, order: 0 },
-  design: { label: 'Дизайн', color: _DEPT.design, order: 1 },
-  sample_layout: { label: 'Вёрстка образца', color: _DEPT.design, order: 2 },
-  sample_print: { label: 'Печать образца', color: _DEPT.print, order: 3 },
-  color_approval: { label: 'Утверждение цвета', color: _DEPT.info, order: 4 },
+  new: { label: 'Новый заказ', color: _DEPT.info, order: 0 },
+  awaiting_payment: { label: 'Ждёт оплаты', color: _DEPT.info, order: 1 },
+  design: { label: 'Дизайн', color: _DEPT.design, order: 2 },
+  design_approval: { label: 'Утверждение дизайна', color: _DEPT.design, order: 3 },
+  sample_layout: { label: 'Вёрстка образца', color: _DEPT.design, order: 4 },
+  sample_print: { label: 'Печать образца', color: _DEPT.print, order: 5 },
+  color_approval: { label: 'Утверждение цвета', color: _DEPT.info, order: 6 },
   // R22.4 (ТЗ 20.07 Фаза 4Б): batch_layout упразднён — метка «(устар.)»,
   // ключ оставлен для истории/off-route. В маршрутах/меню/фильтрах отсутствует.
-  batch_layout: { label: 'Вёрстка тиража (устар.)', color: _DEPT.design, order: 5 },
-  prepress: { label: 'Препресс', color: _DEPT.design, order: 6 },
-  print: { label: 'Печать', color: _DEPT.print, order: 7 },
-  lamination: { label: 'Ламинация', color: _DEPT.print, order: 8 },
-  cutting: { label: 'Резка', color: _DEPT.print, order: 9 },
+  batch_layout: { label: 'Вёрстка тиража (устар.)', color: _DEPT.design, order: 7 },
+  prepress: { label: 'Препресс', color: _DEPT.design, order: 8 },
+  subcontract: { label: 'Субподряд', color: _DEPT.info, order: 9 },
+  print: { label: 'Печать', color: _DEPT.print, order: 10 },
+  lamination: { label: 'Ламинация', color: _DEPT.print, order: 11 },
+  cutting: { label: 'Резка', color: _DEPT.print, order: 12 },
   // R22.4 (Фаза 4А): «Выборка» выше «Заливки» — порядок колонок канбана/
-  // PipelineSummary и меню. selection(10) → pouring(11) → drying(12).
-  selection: { label: 'Выборка', color: _DEPT.pouring, order: 10 },
-  pouring: { label: 'Заливка', color: _DEPT.pouring, order: 11 },
-  drying: { label: 'Сушка', color: _DEPT.pouring, order: 12 },
+  // PipelineSummary и меню. selection → pouring → drying.
+  selection: { label: 'Выборка', color: _DEPT.pouring, order: 13 },
+  pouring: { label: 'Заливка', color: _DEPT.pouring, order: 14 },
+  drying: { label: 'Сушка', color: _DEPT.pouring, order: 15 },
   // R22.4 (Фаза 4Б): selection_pouring упразднён — метка «(устар.)», ключ
   // оставлен для истории старых заказов и рендера логов.
-  selection_pouring: { label: 'Выборка / Заливка (устар.)', color: _DEPT.pouring, order: 13 },
-  assembly_3d: { label: 'Сборка 3D', color: _DEPT.finish, order: 14 },
-  packaging: { label: 'Упаковка', color: _DEPT.finish, order: 15 },
-  otk: { label: 'ОТК / Выдача', color: _DEPT.finish, order: 16 },
-  done: { label: 'Готово', color: _DEPT.finish, order: 17 },
-  cancelled: { label: 'Отменён', color: _DEPT.danger, order: 18 },
+  selection_pouring: { label: 'Выборка / Заливка (устар.)', color: _DEPT.pouring, order: 16 },
+  assembly_3d: { label: 'Сборка 3D', color: _DEPT.finish, order: 17 },
+  packaging: { label: 'Упаковка', color: _DEPT.finish, order: 18 },
+  // R25.1: ключ otk прежний, подпись «ОТК / Выдача» → «ТК» (выдача — отдельный
+  // этап awaiting_pickup в маршруте v2).
+  otk: { label: 'ТК', color: _DEPT.finish, order: 19 },
+  awaiting_pickup: { label: 'Ждёт выдачи', color: _DEPT.info, order: 20 },
+  delivery: { label: 'Доставка', color: _DEPT.info, order: 21 },
+  done: { label: 'Готово', color: _DEPT.finish, order: 22 },
+  cancelled: { label: 'Отменён', color: _DEPT.danger, order: 23 },
 }
+
+// Все активные (не завершённые) статусы в каноническом порядке, включая
+// устаревшие (batch_layout/selection_pouring) — чтобы заказ на «грязном»
+// статусе не терялся в фильтрах/счётчиках. Единый источник для списков
+// активных статусов (OrdersPage, Dashboard, планировщик, склад и т.п.).
+export const TERMINAL_STATUSES = ['done', 'cancelled']
+export const ACTIVE_ORDER_STATUSES = Object.keys(ORDER_STATUSES)
+  .filter((s) => !TERMINAL_STATUSES.includes(s))
+  .sort((a, b) => ORDER_STATUSES[a].order - ORDER_STATUSES[b].order)
+
+// R25.1: этапы отдела продаж (менеджер), раздел «Продажи» (/sales).
+export const SALES_STAGES = [
+  'new', 'awaiting_payment', 'design_approval', 'color_approval',
+  'subcontract', 'awaiting_pickup', 'delivery',
+]
+
+// R25.1: этапы без полей ввода (серверная check_stage_completion → «готово»).
+export const NO_INPUT_STAGES_V2 = ['awaiting_payment', 'design_approval', 'subcontract', 'awaiting_pickup', 'delivery']
 
 // --- Order routes by type ---
 // R11.1 (бриф 31.05): добавлен sample-workflow префикс перед основным циклом
@@ -75,6 +106,63 @@ export const ORDER_ROUTES = {
   stickerpack3D: ROUTE_3D_STICKERPACK,
   rect: ROUTE_RECT,
   big: ROUTE_BIG,
+}
+
+// --- R25.1 (ТЗ 17.11 Фаза 1): маршруты версии 2 ---
+// Маршрут = голова + производственная часть по типу + хвост. Упаковка
+// обязательна для всех типов. Субподряд — отдельная короткая ветка.
+const HEAD_V2 = ['new', 'awaiting_payment', 'design', 'design_approval', 'sample_layout', 'sample_print', 'color_approval', 'prepress']
+const TAIL_V2 = ['otk', 'awaiting_pickup', 'delivery', 'done']
+const PROD_FLAT_V2 = ['print', 'lamination', 'cutting', 'packaging']
+const PROD_3D_STICKER_V2 = ['print', 'cutting', 'pouring', 'drying', 'selection', 'packaging']
+const PROD_UNIVERSAL_V2 = ['print', 'lamination', 'cutting', 'selection', 'pouring', 'drying', 'assembly_3d', 'packaging']
+export const ROUTE_SUBCONTRACT_V2 = ['new', 'awaiting_payment', 'design', 'design_approval', 'subcontract', 'packaging', ...TAIL_V2]
+
+export const ORDER_ROUTES_V2 = {
+  sticker_cut:   [...HEAD_V2, ...PROD_FLAT_V2, ...TAIL_V2],
+  sticker_kiss:  [...HEAD_V2, ...PROD_FLAT_V2, ...TAIL_V2],
+  stickerpack:   [...HEAD_V2, ...PROD_FLAT_V2, ...TAIL_V2],
+  rect:          [...HEAD_V2, ...PROD_FLAT_V2, ...TAIL_V2],
+  big:           [...HEAD_V2, ...PROD_FLAT_V2, ...TAIL_V2],
+  sticker3D:     [...HEAD_V2, ...PROD_3D_STICKER_V2, ...TAIL_V2],
+  stickerpack3D: [...HEAD_V2, ...PROD_UNIVERSAL_V2, ...TAIL_V2],
+  // «Прочее» (тип появится в фазе 4): универсальный маршрут, ненужные этапы
+  // менеджер пропускает вручную (StageJumper, kind='manual_skip').
+  other:         [...HEAD_V2, ...PROD_UNIVERSAL_V2, ...TAIL_V2],
+}
+
+/** Версия маршрута заказа: 2 — только при явном route_version >= 2, иначе 1. */
+export function getRouteVersion(order) {
+  return Number(order?.route_version) >= 2 ? 2 : 1
+}
+
+export function isRouteV2(order) {
+  return getRouteVersion(order) === 2
+}
+
+/** v2: нужна ли ламинация — ламинация ИЛИ монтажная плёнка (ТЗ 1.2). */
+function needsLaminationStageV2(order) {
+  return order?.need_lam === true || order?.needs_montage_film === true
+}
+
+function getOrderRouteV2(order) {
+  if (order?.is_subcontract === true) {
+    let route = ROUTE_SUBCONTRACT_V2
+    if (order?.design_status === 'provided') {
+      route = route.filter((s) => s !== 'design' && s !== 'design_approval')
+    }
+    if (order?.delivery_type !== 'delivery') route = route.filter((s) => s !== 'delivery')
+    return route
+  }
+  let route = ORDER_ROUTES_V2[order?.order_type] || ORDER_ROUTES_V2.sticker_cut
+  if (order?.design_status === 'provided') {
+    route = route.filter((s) => s !== 'design' && s !== 'design_approval')
+  }
+  if (!needsLaminationStageV2(order)) route = route.filter((s) => s !== 'lamination')
+  if (order?.delivery_type !== 'delivery') route = route.filter((s) => s !== 'delivery')
+  // subcontract в обычном маршруте отсутствует; packaging и awaiting_payment
+  // не пропускаются никогда.
+  return route
 }
 
 export const IS_3D_TYPE = (orderType) => orderType === 'sticker3D' || orderType === 'stickerpack3D'
@@ -173,7 +261,11 @@ export function getNextSubtaskStatus(track, currentStatus, order = null) {
 }
 
 // Get the route for an order based on its type
+// R25.1: route_version >= 2 → маршрут v2 (getOrderRouteV2). Для v1 (1 /
+// отсутствует / null) код ниже не менялся — побайтно как до R25.1
+// (эталон: routes-v1.snapshot.test.js).
 export function getOrderRoute(order) {
+  if (isRouteV2(order)) return getOrderRouteV2(order)
   let route = ORDER_ROUTES[order?.order_type] || ROUTE_STICKER_CUT
   // Skip lamination if not needed
   if (!order?.need_lam) {
@@ -224,6 +316,20 @@ export const REPRINT_STATUS_LABELS = {
 
 export function getReprintRoute(order) {
   let stages
+  if (isRouteV2(order)) {
+    // R25.1: v2 — производственная часть маршрута от печати до ТК (не включая).
+    // Хвост v2 (ТК / Ждёт выдачи / Доставка) — этапы заказа целиком.
+    if (order?.order_type === 'stickerpack3D') {
+      stages = REPRINT_ROUTE_3D_STICKERPACK.slice()
+      if (!needsLaminationStageV2(order)) stages = stages.filter((s) => s !== 'lamination')
+    } else {
+      const full = getOrderRoute(order)
+      const start = full.indexOf('print')
+      const end = full.indexOf('otk')
+      stages = start >= 0 ? full.slice(start, end > start ? end : undefined).filter((s) => s !== 'done') : []
+    }
+    return [...stages, 'done']
+  }
   if (order?.order_type === 'stickerpack3D') {
     stages = REPRINT_ROUTE_3D_STICKERPACK.slice()
     if (!order?.need_lam) stages = stages.filter((s) => s !== 'lamination')
@@ -245,6 +351,50 @@ export function reprintViewLabel(orderType, viewRef) {
   return orderType === 'stickerpack3D' ? `Вид #${viewRef}` : `Размер #${viewRef}`
 }
 
+// --- R25.1 (ТЗ 1.3): «Ждёт оплаты» ---
+/** Оплаченным считается любой payment_status, кроме «Не оплачено» (включая бартер). */
+export function isOrderPaid(order) {
+  return !!order?.payment_status && order.payment_status !== 'not_paid'
+}
+
+/**
+ * Нужно ли подтверждение «Запустить без оплаты?» для перехода from → to.
+ * Только v2: переход ВПЕРЁД за этап awaiting_payment, когда оплата не отмечена.
+ * Переход в сам awaiting_payment подтверждения не требует.
+ */
+export function needsNoPaymentConfirm(order, fromStatus, toStatus) {
+  if (!isRouteV2(order) || isOrderPaid(order)) return false
+  const route = getOrderRoute(order)
+  const gate = route.indexOf('awaiting_payment')
+  if (gate < 0) return false
+  const from = route.indexOf(fromStatus)
+  const to = route.indexOf(toStatus)
+  if (from < 0 || to < 0) return false
+  return from <= gate && to > gate
+}
+
+/**
+ * v2: следующий этап после awaiting_payment, если при выходе из «Нового заказа»
+ * оплата уже отмечена (этап проходится автоматически). Иначе null.
+ */
+export function getAutoPassTarget(order, fromStatus, toStatus) {
+  if (!isRouteV2(order) || toStatus !== 'awaiting_payment' || fromStatus !== 'new') return null
+  if (!isOrderPaid(order)) return null
+  const route = getOrderRoute(order)
+  const idx = route.indexOf('awaiting_payment')
+  return idx >= 0 ? route[idx + 1] || null : null
+}
+
+/**
+ * Этапы, выход с которых ВПЕРЁД блокируется незавершёнными допечатками.
+ * v1 — вход в done; v2 — выход с otk (ТЗ 1.5) и любой вход в done.
+ */
+export function isReprintGateTransition(order, fromStatus, toStatus) {
+  if (toStatus === 'done') return true
+  if (!isRouteV2(order)) return false
+  return fromStatus === 'otk' && ['awaiting_pickup', 'delivery'].includes(toStatus)
+}
+
 // Whether a stage is part of the order's effective route.
 // Used for DnD validation in the kanban and for the server-side guard in updateOrderStatus.
 export function isStageAllowed(order, stage) {
@@ -261,6 +411,9 @@ export const PERMISSIONS = {
     // маршрута). Без него StatusSwitcher/канбан блокировали выход из new
     // для всех ролей, включая admin (QA 04.07, баг №3; сид — миграция 068).
     'stage:new',
+    // R25.1: этапы отдела продаж / ОДП (сид — миграция 093).
+    'stage:awaiting_payment', 'stage:design_approval', 'stage:subcontract',
+    'stage:awaiting_pickup', 'stage:delivery',
     'stage:design', 'stage:sample_layout', 'stage:sample_print',
     'stage:color_approval', 'stage:batch_layout', 'stage:prepress',
     'stage:print', 'stage:lamination', 'stage:cutting', 'stage:pouring',
@@ -270,7 +423,7 @@ export const PERMISSIONS = {
   views: [
     'view:dashboard', 'view:analytics', 'view:finance',
     'view:warehouse', 'view:reports', 'view:settings',
-    'view:planning',
+    'view:planning', 'view:sales',
   ],
   actions: [
     'order:create', 'order:edit', 'order:cancel',
@@ -283,7 +436,12 @@ export const PERMISSIONS = {
 }
 
 export const PERMISSION_LABELS = {
-  'stage:new': 'Продвигать «Новый» (приём в работу)',
+  'stage:new': 'Продвигать «Новый заказ» (приём в работу)',
+  'stage:awaiting_payment': 'Продвигать «Ждёт оплаты»',
+  'stage:design_approval': 'Продвигать «Утверждение дизайна»',
+  'stage:subcontract': 'Продвигать «Субподряд»',
+  'stage:awaiting_pickup': 'Продвигать «Ждёт выдачи»',
+  'stage:delivery': 'Продвигать «Доставка»',
   'stage:design': 'Продвигать «Дизайн»',
   'stage:sample_layout': 'Продвигать «Вёрстка образца»',
   'stage:sample_print': 'Продвигать «Печать образца»',
@@ -299,7 +457,7 @@ export const PERMISSION_LABELS = {
   'stage:selection': 'Продвигать «Выборка»',
   'stage:assembly_3d': 'Продвигать «Сборка 3D»',
   'stage:packaging': 'Продвигать «Упаковка»',
-  'stage:otk': 'Продвигать «ОТК»',
+  'stage:otk': 'Продвигать «ТК»',
   'view:dashboard': 'Видеть «Главная»',
   'view:analytics': 'Видеть «Аналитика»',
   'view:finance': 'Видеть финансы (цены, маржа)',
@@ -307,6 +465,7 @@ export const PERMISSION_LABELS = {
   'view:reports': 'Видеть «Отчёты»',
   'view:settings': 'Видеть «Настройки»',
   'view:planning': 'Видеть «Планирование» (бета)',
+  'view:sales': 'Видеть «Продажи»',
   'order:create': 'Создавать заказы',
   'order:edit': 'Редактировать заказы',
   'order:cancel': 'Отменять заказы',
@@ -717,6 +876,19 @@ export function resolvePayoutRates(override) {
 }
 
 /**
+ * R25.1 (ТЗ 1.6): сдельная оплата упаковки — только для заказа версии 1
+ * (или без известной версии — исторические логи / embed без route_version),
+ * 3D-типа или с БОПП-пакетом. Остальная упаковка v2 (обязательная для всех
+ * типов) учитывается с оплатой 0 ₽.
+ */
+export function isPackagingPaid(order) {
+  if (!order || order.route_version == null) return true
+  if (!isRouteV2(order)) return true
+  if (IS_3D_TYPE(order.order_type)) return true
+  return order.bopp_bag === true
+}
+
+/**
  * R25.0: единая сдельная оплата ОДНОГО лога — источник истины для
  * calculateWorkerPayout (кабинет / FinanceTab / аналитика / Unit Economics)
  * и отчётов «Сдельная оплата» / «Сотрудники» (useBonusReport / useEmployeeReport).
@@ -775,7 +947,7 @@ export function computeLogPayout(log, order, rates, ctx = {}) {
       out.push({ category: 'assembly', qty: packs, units, rate, amount: units * rate })
     }
   }
-  if (stage === 'packaging') {
+  if (stage === 'packaging' && isPackagingPaid(order)) {
     const packs = Number(log.packs_packaged) || 0
     if (packs !== 0) {
       const rate = rates.packaging_per_pack
@@ -870,6 +1042,12 @@ export const NOTIFY_ROLES = {
   assembly_3d: ['post_printer'],
   packaging: ['post_printer'],
   otk: ['manager'],
+  // R25.1: этапы отдела продаж сигналят менеджеру.
+  awaiting_payment: ['manager'],
+  design_approval: ['manager'],
+  subcontract: ['manager'],
+  awaiting_pickup: ['manager'],
+  delivery: ['manager'],
 }
 
 // --- Navigation ---
@@ -882,6 +1060,8 @@ const MANAGER_ROLES = ['admin', 'manager']
 export const NAV_ITEMS = [
   { path: '/', label: 'Главная', icon: 'LayoutDashboard', roles: MANAGER_ROLES, permission: 'view:dashboard' },
   { path: '/orders', label: 'Заказы', icon: 'ShoppingCart', roles: ALL_ROLES }, // доступен всем (без permission)
+  // R25.1 (ТЗ 1.7): раздел менеджера — заказы, ждущие действий отдела продаж.
+  { path: '/sales', label: 'Продажи', icon: 'Handshake', roles: MANAGER_ROLES, permission: 'view:sales' },
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'], permission: 'stage:design' },
   { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'], permission: 'stage:prepress' },
   { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'], permission: 'stage:print' },
@@ -894,7 +1074,7 @@ export const NAV_ITEMS = [
   { path: '/production/drying', label: 'Сушка', icon: 'Wind', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:drying' },
   { path: '/production/assembly3d', label: 'Сборка 3D', icon: 'Hammer', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:assembly_3d' },
   { path: '/production/packaging', label: 'Упаковка', icon: 'Package', roles: ['admin', 'manager', 'post_printer', 'printer'], helperRoles: ['printer'], permission: 'stage:packaging' },
-  { path: '/production/otk', label: 'ОТК', icon: 'Crosshair', roles: ['admin', 'manager'], permission: 'stage:otk' },
+  { path: '/production/otk', label: 'ТК', icon: 'Crosshair', roles: ['admin', 'manager'], permission: 'stage:otk' },
   { path: '/production/plan', label: 'Планирование (бета)', icon: 'CalendarRange', roles: MANAGER_ROLES, permission: 'view:planning' },
   { path: '/cabinet', label: 'Кабинет', icon: 'User', roles: ALL_ROLES }, // личный кабинет — всем
   { path: '/warehouse', label: 'Склад', icon: 'Warehouse', roles: MANAGER_ROLES, permission: 'view:warehouse' },

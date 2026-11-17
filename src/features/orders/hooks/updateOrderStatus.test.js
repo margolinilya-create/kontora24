@@ -158,7 +158,7 @@ describe('updateOrderStatus', () => {
 
     await expect(
       updateOrderStatus('order-1', 'print', 'pouring', { force: true })
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual({ status: 'pouring' })
 
     // Security phase 3: под admin (canSeeFinance) notifyBitrix читает финансы
     // через маскирующее view k24_orders_full, а UPDATE статуса идёт по базовой
@@ -178,7 +178,7 @@ describe('updateOrderStatus', () => {
 
     await expect(
       updateOrderStatus('order-1', 'cutting', 'print', { isRollback: true })
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual({ status: 'print' })
 
     // The crucial assertion: check_stage_completion was NOT called.
     expect(mockSupabase.rpc).not.toHaveBeenCalled()
@@ -251,7 +251,7 @@ describe('updateOrderStatus', () => {
 
     await expect(
       updateOrderStatus('order-1', 'cutting', 'packaging')
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual({ status: 'packaging' })
   })
 
   it('route-check запрашивает bopp_bag у k24_orders (баг №4: без него «Упаковка» терялась)', async () => {
@@ -273,6 +273,94 @@ describe('updateOrderStatus', () => {
 
     const routeSelect = selects.find((s) => s.table === 'k24_orders')
     expect(routeSelect.fields).toContain('bopp_bag')
+  })
+})
+
+// ─── R25.1 (ТЗ 17.11 Фаза 1): маршрут v2 ─────────────────────────────────
+describe('updateOrderStatus — маршрут v2', () => {
+  const V2_ORDER = {
+    order_type: 'sticker_cut', design_status: 'needs_development', need_lam: true,
+    number: 7, bopp_bag: false, route_version: 2, delivery_type: 'pickup',
+    needs_montage_film: false, payment_status: 'not_paid',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSingleQueue()
+    mockSupabase._resetState()
+    rpcResultRef.value = { data: { is_complete: true }, error: null }
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
+    mockSupabase.from.mockImplementation(mockSupabase._defaultFromImpl)
+    mockSupabase.rpc.mockImplementation(() => Promise.resolve(rpcResultRef.value))
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete globalThis.fetch
+  })
+
+  it('оплата отмечена при приёме → «Ждёт оплаты» проходится автоматически, две записи истории', async () => {
+    singleQueue.push({ data: { ...V2_ORDER, payment_status: 'cash' }, error: null }) // route
+    singleQueue.push({ data: ACTOR_ADMIN, error: null }) // actor
+    singleQueue.push({ data: { number: 7, bitrix_deal_id: null }, error: null }) // notify
+
+    await expect(updateOrderStatus('order-1', 'new', 'awaiting_payment')).resolves.toEqual({ status: 'design' })
+
+    const update = mockSupabase._recentQueriesByTable['k24_orders'].update.mock.calls[0][0]
+    expect(update.status).toBe('design')
+    const hist = mockSupabase._allInsertCalls.filter((c) => c.table === 'k24_order_status_history')
+    expect(hist).toHaveLength(1)
+    const rows = hist[0].payload
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ from_status: 'new', to_status: 'awaiting_payment', kind: 'paid_at_intake', note: 'Оплата отмечена при приёме: Нал' })
+    expect(rows[1]).toMatchObject({ from_status: 'awaiting_payment', to_status: 'design', kind: 'paid_at_intake' })
+    expect(rows[0].created_at).toBe(rows[1].created_at)
+  })
+
+  it('без оплаты выход из «Ждёт оплаты» требует подтверждения', async () => {
+    singleQueue.push({ data: V2_ORDER, error: null })
+    singleQueue.push({ data: ACTOR_ADMIN, error: null })
+
+    await expect(updateOrderStatus('order-1', 'awaiting_payment', 'design'))
+      .rejects.toMatchObject({ code: 'PAYMENT_CONFIRM_REQUIRED' })
+  })
+
+  it('подтверждённый запуск без оплаты пишет «Запущен без оплаты»', async () => {
+    singleQueue.push({ data: V2_ORDER, error: null })
+    singleQueue.push({ data: ACTOR_ADMIN, error: null })
+    singleQueue.push({ data: { number: 7, bitrix_deal_id: null }, error: null })
+
+    await expect(updateOrderStatus('order-1', 'awaiting_payment', 'design', { confirmNoPayment: true }))
+      .resolves.toEqual({ status: 'design' })
+    const hist = mockSupabase._allInsertCalls.filter((c) => c.table === 'k24_order_status_history')
+    expect(hist[0].payload).toMatchObject({ from_status: 'awaiting_payment', to_status: 'design', kind: 'no_payment', note: 'Запущен без оплаты' })
+  })
+
+  it('обычный переход v1 пишет историю без kind/note (как до R25.1)', async () => {
+    singleQueue.push({ data: { ...V2_ORDER, route_version: 1, bopp_bag: true }, error: null })
+    singleQueue.push({ data: ACTOR_ADMIN, error: null })
+    singleQueue.push({ data: { number: 7, bitrix_deal_id: null }, error: null })
+
+    await updateOrderStatus('order-1', 'design', 'sample_layout')
+    const hist = mockSupabase._allInsertCalls.filter((c) => c.table === 'k24_order_status_history')
+    expect(hist[0].payload).toEqual({ order_id: 'order-1', from_status: 'design', to_status: 'sample_layout', changed_by: 'user-1' })
+  })
+
+  it('выход с ТК блокируется незавершённой допечаткой (v2)', async () => {
+    singleQueue.push({ data: V2_ORDER, error: null })
+    singleQueue.push({ data: ACTOR_ADMIN, error: null })
+    mockSupabase.from.mockImplementation((table) => {
+      const q = mockSupabase._defaultFromImpl(table)
+      if (table === 'k24_order_subtasks') {
+        q.neq = vi.fn().mockReturnThis()
+        q.limit = vi.fn().mockResolvedValue({ data: [{ id: 'sub-1' }], error: null })
+      }
+      return q
+    })
+
+    await expect(updateOrderStatus('order-1', 'otk', 'awaiting_pickup'))
+      .rejects.toThrow(/Нельзя выпустить заказ с ТК/)
   })
 })
 

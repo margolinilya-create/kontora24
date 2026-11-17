@@ -17,13 +17,20 @@ export const BUCKETS = {
   milestone:  'milestone',  // new / color_approval / done / cancelled — не планируем
 }
 
-// Этап → бакет. Покрывает все 19 ORDER_STATUSES.
+// Этап → бакет. Покрывает все 24 ORDER_STATUSES (R25.1: +5 этапов-вех).
 // MVP-компромисс: selection_pouring (3D-пак, параллельная стадия выборки фонов +
 // заливки стикеров) считается заливкой → 3DO. ОСК-выборка фонов «догоняет» на
 // тех же часах. Если планирование начнёт сильно расходиться с фактом —
 // перевести selection_pouring на двойной расход в planner.js (3DO + ОСК).
 export const STAGE_TO_BUCKET = Object.freeze({
   new:               BUCKETS.milestone,
+  // R25.1 (ТЗ 17.11 Фаза 1): этапы отдела продаж / согласования и субподряд —
+  // вехи (ждём клиента / подрядчика, ёмкость цеха не занимают).
+  awaiting_payment:  BUCKETS.milestone,
+  design_approval:   BUCKETS.milestone,
+  subcontract:       BUCKETS.milestone,
+  awaiting_pickup:   BUCKETS.milestone,
+  delivery:          BUCKETS.milestone,
   design:            BUCKETS.design,
   sample_layout:     BUCKETS.prepress,
   sample_print:      BUCKETS.oprl_print,
@@ -62,7 +69,7 @@ export const BUCKET_LABELS = Object.freeze({
   [BUCKETS.oprl_print]: 'Печать / ламинация (ОПРЛ)',
   [BUCKETS.oprl_cut]:   'Резка (ОПРЛ)',
   [BUCKETS.bucket_3do]: 'Заливка / сушка (3DO)',
-  [BUCKETS.bucket_osk]: 'Сборка / упаковка / ОТК (ОСК)',
+  [BUCKETS.bucket_osk]: 'Сборка / упаковка / ТК (ОСК)',
   [BUCKETS.passive]:    'Сушка',
   [BUCKETS.milestone]:  'Веха',
 })

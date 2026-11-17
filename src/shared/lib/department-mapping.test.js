@@ -1,23 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEPARTMENTS,
+  DEPT_GROUPS,
   getDepartment,
   getDepartmentLabel,
   getStageLabel,
   getAllFilterStatuses,
   getStatusesForDepartment,
+  getStageDeptToken,
+  stageBadgeClasses,
 } from './department-mapping'
 
+// R25.1 (ТЗ 17.11 Фаза 1, таблица 1.1): отделы описаны одним списком
+// ORG_DEPARTMENTS; «Печать» и «Постпечатная обработка» объединены в ОПРЛ,
+// «Сборка 3D» перенесена из 3D-отдела в ОСК, в ОП добавлены этапы продаж.
+
 describe('DEPARTMENTS structure', () => {
-  it('has 7 departments in correct order', () => {
-    expect(DEPARTMENTS).toHaveLength(7)
-    expect(DEPARTMENTS[0].id).toBe('sales')
-    expect(DEPARTMENTS[1].id).toBe('prepress')
-    expect(DEPARTMENTS[2].id).toBe('print')
-    expect(DEPARTMENTS[3].id).toBe('postprint')
-    expect(DEPARTMENTS[4].id).toBe('3d')
-    expect(DEPARTMENTS[5].id).toBe('osk')
-    expect(DEPARTMENTS[6].id).toBe('delivered')
+  it('has 6 departments in correct order', () => {
+    expect(DEPARTMENTS.map((d) => d.id)).toEqual(['sales', 'prepress', 'print', '3d', 'osk', 'delivered'])
   })
 
   it('each department has required fields', () => {
@@ -46,61 +46,42 @@ describe('getDepartment', () => {
     const result = getDepartment('new')
     expect(result.departmentId).toBe('sales')
     expect(result.departmentLabel).toBe('Отдел продаж')
-    expect(result.stageLabel).toBe('Согласование')
+    expect(result.stageLabel).toBe('Новый заказ')
   })
 
-  it('returns prepress department for design', () => {
-    const result = getDepartment('design')
-    expect(result.departmentId).toBe('prepress')
-    expect(result.departmentLabel).toBe('Допечатная подготовка')
-    expect(result.stageLabel).toBe('Дизайн')
+  it('sales department holds payment, color approval, subcontract, pickup, delivery', () => {
+    for (const s of ['awaiting_payment', 'color_approval', 'subcontract', 'awaiting_pickup', 'delivery']) {
+      expect(getDepartment(s).departmentId).toBe('sales')
+    }
   })
 
-  it('returns prepress department for prepress', () => {
-    const result = getDepartment('prepress')
-    expect(result.departmentId).toBe('prepress')
-    expect(result.stageLabel).toBe('Препресс')
+  it('returns prepress department for design / design_approval / sample_layout / prepress', () => {
+    for (const s of ['design', 'design_approval', 'sample_layout', 'prepress']) {
+      expect(getDepartment(s).departmentId).toBe('prepress')
+    }
+    expect(getDepartment('design').stageLabel).toBe('Дизайн')
+    expect(getDepartment('design').departmentLabel).toBe('Допечатная подготовка')
   })
 
-  it('returns print department for print', () => {
-    const result = getDepartment('print')
-    expect(result.departmentId).toBe('print')
-    expect(result.departmentLabel).toBe('Печать')
-    expect(result.stageLabel).toBe('Печать')
-  })
-
-  it('returns postprint department for lamination and cutting', () => {
-    expect(getDepartment('lamination').departmentId).toBe('postprint')
+  it('returns print department (ОПРЛ) for sample_print, print, lamination, cutting', () => {
+    for (const s of ['sample_print', 'print', 'lamination', 'cutting']) {
+      expect(getDepartment(s).departmentId).toBe('print')
+    }
     expect(getDepartment('lamination').stageLabel).toBe('Ламинация')
-    expect(getDepartment('cutting').departmentId).toBe('postprint')
-    expect(getDepartment('cutting').stageLabel).toBe('Резка')
   })
 
-  // R22.4 (ТЗ 20.07 Фаза 4Б): selection_pouring упразднён — раздельные этапы.
-  it('returns 3d department for selection, pouring, drying, assembly_3d', () => {
-    const s = getDepartment('selection')
-    expect(s.departmentId).toBe('3d')
-    expect(s.departmentLabel).toBe('3D отдел')
-    expect(s.stageLabel).toBe('Выборка')
-
-    const p = getDepartment('pouring')
-    expect(p.departmentId).toBe('3d')
-    expect(p.stageLabel).toBe('Заливка')
-
-    const d = getDepartment('drying')
-    expect(d.departmentId).toBe('3d')
-    expect(d.stageLabel).toBe('Сушка')
-
-    const a = getDepartment('assembly_3d')
-    expect(a.departmentId).toBe('3d')
-    expect(a.stageLabel).toBe('Сборка 3D')
+  it('returns 3d department for selection, pouring, drying', () => {
+    expect(getDepartment('selection').departmentId).toBe('3d')
+    expect(getDepartment('pouring').departmentId).toBe('3d')
+    expect(getDepartment('drying').departmentId).toBe('3d')
+    expect(getDepartment('selection').departmentLabel).toBe('3D отдел')
   })
 
-  it('returns osk department for packaging and otk', () => {
+  it('returns osk department for assembly_3d, packaging and otk (ТК)', () => {
+    expect(getDepartment('assembly_3d').departmentId).toBe('osk')
     expect(getDepartment('packaging').departmentId).toBe('osk')
-    expect(getDepartment('packaging').stageLabel).toBe('Упаковка')
     expect(getDepartment('otk').departmentId).toBe('osk')
-    expect(getDepartment('otk').stageLabel).toBe('ОТК / Выдача')
+    expect(getDepartment('otk').stageLabel).toBe('ТК')
   })
 
   it('returns delivered department for done', () => {
@@ -109,125 +90,71 @@ describe('getDepartment', () => {
     expect(result.departmentLabel).toBe('Выдан')
   })
 
-  it('returns null for unknown status', () => {
+  it('returns null for unknown status and legacy keys', () => {
     expect(getDepartment('nonexistent')).toBeNull()
     expect(getDepartment('')).toBeNull()
     expect(getDepartment(undefined)).toBeNull()
+    expect(getDepartment('selection_pouring')).toBeNull()
   })
 
   it('returns color from parent department', () => {
-    const result = getDepartment('print')
-    expect(result.color).toBe('bg-orange-500/15 text-orange-400')
+    expect(getDepartment('print').color).toBe('bg-orange-500/15 text-orange-400')
+    expect(getDepartment('new').color).toBe('bg-blue-500/15 text-blue-400')
   })
 })
 
-describe('getDepartmentLabel', () => {
+describe('getDepartmentLabel / getStageLabel', () => {
   it('returns department label for known statuses', () => {
     expect(getDepartmentLabel('new')).toBe('Отдел продаж')
-    expect(getDepartmentLabel('design')).toBe('Допечатная подготовка')
     expect(getDepartmentLabel('prepress')).toBe('Допечатная подготовка')
-    expect(getDepartmentLabel('print')).toBe('Печать')
-    expect(getDepartmentLabel('lamination')).toBe('Постпечатная обработка')
-    expect(getDepartmentLabel('cutting')).toBe('Постпечатная обработка')
-    expect(getDepartmentLabel('selection')).toBe('3D отдел')
-    expect(getDepartmentLabel('pouring')).toBe('3D отдел')
+    expect(getDepartmentLabel('cutting')).toBe('Печать, резка и ламинация')
     expect(getDepartmentLabel('drying')).toBe('3D отдел')
-    expect(getDepartmentLabel('assembly_3d')).toBe('3D отдел')
-    expect(getDepartmentLabel('packaging')).toBe('ОСК')
-    expect(getDepartmentLabel('otk')).toBe('ОСК')
+    expect(getDepartmentLabel('assembly_3d')).toBe('Отдел сборки и контроля')
     expect(getDepartmentLabel('done')).toBe('Выдан')
   })
 
-  it('returns status string as fallback for unknown status', () => {
+  it('returns status string as fallback', () => {
     expect(getDepartmentLabel('unknown')).toBe('unknown')
     expect(getDepartmentLabel('cancelled')).toBe('cancelled')
-  })
-})
-
-describe('getStageLabel', () => {
-  it('returns stage label for each status', () => {
-    expect(getStageLabel('new')).toBe('Согласование')
-    expect(getStageLabel('design')).toBe('Дизайн')
-    expect(getStageLabel('prepress')).toBe('Препресс')
-    expect(getStageLabel('print')).toBe('Печать')
-    expect(getStageLabel('lamination')).toBe('Ламинация')
-    expect(getStageLabel('cutting')).toBe('Резка')
-    expect(getStageLabel('selection')).toBe('Выборка')
-    expect(getStageLabel('pouring')).toBe('Заливка')
-    expect(getStageLabel('drying')).toBe('Сушка')
-    expect(getStageLabel('assembly_3d')).toBe('Сборка 3D')
-    expect(getStageLabel('packaging')).toBe('Упаковка')
-    expect(getStageLabel('otk')).toBe('ОТК / Выдача')
-    expect(getStageLabel('done')).toBe('Выдан')
-  })
-
-  it('returns status string as fallback for unknown status', () => {
     expect(getStageLabel('cancelled')).toBe('cancelled')
+  })
+
+  it('stage labels', () => {
+    expect(getStageLabel('awaiting_payment')).toBe('Ждёт оплаты')
+    expect(getStageLabel('awaiting_pickup')).toBe('Ждёт выдачи')
+    expect(getStageLabel('done')).toBe('Выдан')
   })
 })
 
 describe('getAllFilterStatuses', () => {
-  it('returns array of unique statuses', () => {
+  it('returns unique statuses', () => {
     const statuses = getAllFilterStatuses()
-    expect(Array.isArray(statuses)).toBe(true)
-    // Should be unique
     expect(new Set(statuses).size).toBe(statuses.length)
   })
 
-  // R22.4 (ТЗ 20.07 Фаза 4Б): selection_pouring упразднён → раздельные
-  // selection/drying (13 уникальных вместо 12).
-  it('contains all expected DB statuses (13 unique)', () => {
+  it('contains all route statuses (21: all except cancelled and legacy keys)', () => {
     const statuses = getAllFilterStatuses()
-    const expected = [
-      'new', 'design', 'prepress', 'print',
-      'lamination', 'cutting',
-      'selection', 'pouring', 'drying', 'assembly_3d',
-      'packaging', 'otk', 'done',
-    ]
-    for (const s of expected) {
+    expect(statuses).toHaveLength(21)
+    for (const s of ['new', 'awaiting_payment', 'design_approval', 'subcontract', 'awaiting_pickup', 'delivery', 'otk', 'done']) {
       expect(statuses).toContain(s)
     }
-    expect(statuses).toHaveLength(13)
   })
 
   it('does not contain cancelled or deprecated statuses', () => {
     const statuses = getAllFilterStatuses()
     expect(statuses).not.toContain('cancelled')
-    expect(statuses).not.toContain('selection_pouring') // R22.4 упразднён
-    expect(statuses).not.toContain('design_done')
-    expect(statuses).not.toContain('print_done')
-    expect(statuses).not.toContain('post_processing')
-    expect(statuses).not.toContain('resin_pouring')
-    expect(statuses).not.toContain('assembly')
+    expect(statuses).not.toContain('selection_pouring')
+    expect(statuses).not.toContain('batch_layout')
   })
 })
 
 describe('getStatusesForDepartment', () => {
-  it('returns correct statuses for sales', () => {
-    expect(getStatusesForDepartment('sales')).toEqual(['new'])
-  })
-
-  it('returns correct statuses for prepress', () => {
-    expect(getStatusesForDepartment('prepress')).toEqual(['design', 'prepress'])
-  })
-
-  it('returns correct statuses for print', () => {
-    expect(getStatusesForDepartment('print')).toEqual(['print'])
-  })
-
-  it('returns correct statuses for postprint', () => {
-    expect(getStatusesForDepartment('postprint')).toEqual(['lamination', 'cutting'])
-  })
-
-  it('returns correct statuses for 3d', () => {
-    expect(getStatusesForDepartment('3d')).toEqual(['selection', 'pouring', 'drying', 'assembly_3d'])
-  })
-
-  it('returns correct statuses for osk', () => {
-    expect(getStatusesForDepartment('osk')).toEqual(['packaging', 'otk'])
-  })
-
-  it('returns correct statuses for delivered', () => {
+  it('returns statuses per department', () => {
+    expect(getStatusesForDepartment('sales')).toEqual(['new', 'awaiting_payment', 'color_approval', 'subcontract', 'awaiting_pickup', 'delivery'])
+    expect(getStatusesForDepartment('prepress')).toEqual(['design', 'design_approval', 'sample_layout', 'prepress'])
+    expect(getStatusesForDepartment('print')).toEqual(['sample_print', 'print', 'lamination', 'cutting'])
+    expect(getStatusesForDepartment('3d')).toEqual(['selection', 'pouring', 'drying'])
+    expect(getStatusesForDepartment('osk')).toEqual(['assembly_3d', 'packaging', 'otk'])
     expect(getStatusesForDepartment('delivered')).toEqual(['done'])
   })
 
@@ -235,5 +162,23 @@ describe('getStatusesForDepartment', () => {
     expect(getStatusesForDepartment('fake')).toEqual([])
     expect(getStatusesForDepartment('')).toEqual([])
     expect(getStatusesForDepartment(undefined)).toEqual([])
+  })
+})
+
+describe('DEPT_GROUPS (цвета / канбан)', () => {
+  it('строятся из того же описания отделов', () => {
+    expect(Object.keys(DEPT_GROUPS)).toEqual(['sales', 'design', 'print', 'pouring', 'finish'])
+    expect(DEPT_GROUPS.sales.label).toBe('ОП')
+    expect(DEPT_GROUPS.finish.stages).toEqual(['assembly_3d', 'packaging', 'otk', 'done'])
+    expect(DEPT_GROUPS.pouring.stages).toContain('selection_pouring') // устаревший ключ красится цветом отдела
+    expect(DEPT_GROUPS.design.stages).toContain('batch_layout')
+  })
+
+  it('токены цветов: ОП — info (синий), отмена — danger', () => {
+    expect(getStageDeptToken('new')).toBe('info')
+    expect(getStageDeptToken('color_approval')).toBe('info')
+    expect(getStageDeptToken('cancelled')).toBe('danger')
+    expect(getStageDeptToken('assembly_3d')).toBe('dept-finish')
+    expect(stageBadgeClasses('awaiting_payment')).toBe('bg-info/15 text-info')
   })
 })

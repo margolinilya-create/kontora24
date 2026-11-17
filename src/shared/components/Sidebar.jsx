@@ -39,7 +39,7 @@ const ICONS = {
 const PRODUCTION_QUEUE_PATHS = ['/production/design', '/production/prepress', '/production/print', '/production/lamination', '/production/cutting', '/production/selection', '/production/pouring', '/production/drying', '/production/assembly3d', '/production/packaging', '/production/otk', '/production/plan']
 
 const NAV_GROUPS = [
-  { id: 'manage', label: 'Управление', paths: ['/', '/orders', '/sales'] },
+  { id: 'manage', label: 'Управление', paths: ['/', '/orders', '/sales', '/calculator'] },
   { id: 'production', label: 'Производство', paths: ['/production', ...PRODUCTION_QUEUE_PATHS], headerPath: '/production' },
   { id: 'resources', label: 'Ресурсы', paths: ['/warehouse', '/analytics'] },
   { id: 'system', label: 'Система', paths: ['/cabinet', '/reports', '/settings', '/help'] },

@@ -1,6 +1,8 @@
 export default function Tabs({ items, active, onChange, className = '' }) {
   return (
-    <div role="tablist" className={`inline-flex gap-1 bg-surface-2 rounded-xl p-1 ${className}`}>
+    // R25 (смоук 17.11): на телефоне длинная полоса вкладок прокручивается внутри
+    // себя, а не растягивает страницу (настройки, калькулятор, отчёты).
+    <div role="tablist" className={`inline-flex max-w-full overflow-x-auto gap-1 bg-surface-2 rounded-xl p-1 ${className}`}>
       {items.map((item) => {
         const isActive = active === item.key
         return (
@@ -10,7 +12,7 @@ export default function Tabs({ items, active, onChange, className = '' }) {
             onClick={() => onChange(item.key)}
             aria-selected={isActive}
             tabIndex={isActive ? 0 : -1}
-            className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+            className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-sm font-medium transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
               isActive
                 ? 'bg-accent text-on-accent shadow-[0_1px_2px_rgba(20,20,20,0.08)]'
                 : 'text-text-muted hover:text-text hover:bg-surface'

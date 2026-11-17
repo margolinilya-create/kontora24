@@ -98,13 +98,31 @@ export function OrderHistoryTab({ order, history }) {
     let cancelled = false
     async function load() {
       try {
+        // k24_order_audit.changed_by ссылается на auth.users, не на k24_profiles —
+        // embed `k24_profiles!changed_by` падал PGRST200 и журнал не грузился.
+        // Имена авторов подтягиваем отдельным запросом.
         const { data, error } = await supabase
           .from('k24_order_audit')
-          .select('*, changed_by_profile:k24_profiles!changed_by(display_name)')
+          .select('*')
           .eq('order_id', order.id)
           .order('changed_at', { ascending: false })
         if (error) throw error
-        if (!cancelled) setAudit(data || [])
+        const rows = data || []
+        const ids = [...new Set(rows.map((r) => r.changed_by).filter(Boolean))]
+        let names = {}
+        if (ids.length) {
+          const { data: profiles, error: pErr } = await supabase
+            .from('k24_profiles')
+            .select('id, display_name')
+            .in('id', ids)
+          if (pErr) throw pErr
+          names = Object.fromEntries((profiles || []).map((p) => [p.id, p.display_name]))
+        }
+        const withNames = rows.map((r) => ({
+          ...r,
+          changed_by_profile: r.changed_by ? { display_name: names[r.changed_by] || null } : null,
+        }))
+        if (!cancelled) setAudit(withNames)
       } catch (err) {
         captureError(err, { tags: { source: 'OrderHistoryTab.audit' }, extra: { orderId: order.id } })
       }

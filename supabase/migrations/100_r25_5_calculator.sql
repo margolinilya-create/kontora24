@@ -1,0 +1,243 @@
+-- R25.5 (ТЗ 17.11, Фаза 5): калькулятор во вкладке.
+--
+-- Только добавления, идемпотентно (повторный прогон ничего не ломает):
+--   1. k24_materials.calc_price_group (CHECK white/holo/metal) + calc_display_name
+--      — привязка плёнки склада к ценовой группе калькулятора и «Название в
+--      расчёте» (то, что уходит клиенту в тексте копирования вместо складского
+--      имени с шириной рулона). Колоночный GRANT (после 098 табличного SELECT
+--      у authenticated нет) + обе колонки в КОНЕЦ view k24_materials_full.
+--   2. k24_settings['calculator'] — значения по умолчанию из приложения А.3
+--      (ON CONFLICT DO NOTHING — уже сохранённое не затираем).
+--   3. k24_calc_settings_history — полная копия настроек (+ снимок привязки
+--      плёнок) на каждое изменение ключа calculator. Пишет триггер на
+--      k24_settings (SECURITY DEFINER), читать — calc:settings или view:finance.
+--   4. RPC calc_save_settings(p_value, p_films) — атомарное сохранение
+--      вкладки «Калькулятор» (ставки + таблица плёнок) под правом calc:settings.
+--      Плёнки обновляются ДО ключа settings, поэтому снимок в истории уже
+--      содержит новую привязку.
+--   5. Права view:calculator (admin, manager) и calc:settings (admin).
+--
+-- Зависимости: 096 (k24_user_can, k24_materials_full). Применять ДО деплоя
+-- фронта R25.5: фронт читает calc_* колонки через k24_materials_full.
+
+BEGIN;
+
+-- ===========================================================================
+-- 1. Колонки k24_materials
+-- ===========================================================================
+ALTER TABLE public.k24_materials
+  ADD COLUMN IF NOT EXISTS calc_price_group  text,
+  ADD COLUMN IF NOT EXISTS calc_display_name text;
+
+ALTER TABLE public.k24_materials
+  DROP CONSTRAINT IF EXISTS k24_materials_calc_price_group_check;
+ALTER TABLE public.k24_materials
+  ADD CONSTRAINT k24_materials_calc_price_group_check
+  CHECK (calc_price_group IS NULL OR calc_price_group IN ('white', 'holo', 'metal'));
+
+COMMENT ON COLUMN public.k24_materials.calc_price_group IS
+  'R25.5: ценовая группа плёнки в калькуляторе (white/holo/metal). NULL — плёнка в калькуляторе не показывается.';
+COMMENT ON COLUMN public.k24_materials.calc_display_name IS
+  'R25.5: «Название в расчёте» — имя материала в тексте для клиента.';
+
+-- Нефинансовые колонки → колоночный SELECT (после 098 табличного нет; до 098
+-- GRANT безвреден, а сам 098 перевыдаёт все колонки кроме unit_cost).
+GRANT SELECT (calc_price_group, calc_display_name) ON public.k24_materials TO authenticated;
+
+-- View: определение 096 дословно + две новые колонки в конец
+-- (CREATE OR REPLACE VIEW допускает только добавление колонок в хвост).
+CREATE OR REPLACE VIEW public.k24_materials_full AS
+SELECT
+  m.id,
+  m.type,
+  m.name,
+  m.stock_qty,
+  m.unit,
+  m.min_qty,
+  CASE WHEN f.can_fin THEN m.unit_cost END AS unit_cost,
+  m.updated_at,
+  m.material_code,
+  m.capacity_per_box,
+  m.archived_at,
+  m.width_mm,
+  m.height_mm,
+  m.manufacturer,
+  m.product_line,
+  m.roll_width_m,
+  m.finish,
+  m.color,
+  m.supplier,
+  m.category_id,
+  m.wh_status_id,
+  c.name AS category_name,
+  m.calc_price_group,
+  m.calc_display_name
+FROM public.k24_materials m
+LEFT JOIN public.k24_warehouse_categories c ON c.id = m.category_id
+CROSS JOIN (SELECT public.k24_user_can('view:finance') AS can_fin OFFSET 0) f;
+
+REVOKE ALL ON public.k24_materials_full FROM PUBLIC, anon;
+GRANT SELECT ON public.k24_materials_full TO authenticated;
+
+-- ===========================================================================
+-- 2. Настройки по умолчанию (приложение А.3)
+-- ===========================================================================
+-- Ставки — ₽/см², наценки — множители, опции: % / ₽/шт / ₽.
+-- default_film_id — позиция склада, выбранная по умолчанию (одна).
+INSERT INTO public.k24_settings (key, value)
+VALUES ('calculator', jsonb_build_object(
+  'version', 1,
+  'film_prices', jsonb_build_object('white', 0.03, 'holo', 0.04, 'metal', 0.08),
+  'ink', 0.01,
+  'labor_print', 0.03,
+  'labor_pour', 0.10,
+  'lamination', 0.03,
+  'montage', 0.03,
+  'vinyl', jsonb_build_object(
+    'rent', 0.01, 'tax', 0.02,
+    'markup_sticker_max', 4.0, 'markup_sticker_min', 1.5,
+    'markup_pack_max', 3.0, 'markup_pack_min', 1.6
+  ),
+  'resin3d', jsonb_build_object(
+    'resin', 0.45, 'rent', 0.02, 'tax', 0.07,
+    'markup_sticker_max', 5.0, 'markup_sticker_min', 2.5,
+    'markup_pack_max', 3.0, 'markup_pack_min', 1.8
+  ),
+  'options', jsonb_build_object(
+    'urgent_pct', 30, 'cut_pct', 15, 'partner_pct', 25,
+    'bag_rub', 3, 'extra_view_rub', 1000, 'design_rub', 5000, 'design_edit_rub', 3000
+  ),
+  'default_film_id', NULL
+))
+ON CONFLICT (key) DO NOTHING;
+
+-- ===========================================================================
+-- 3. История настроек
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS public.k24_calc_settings_history (
+  id          bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  changed_by  uuid REFERENCES public.k24_profiles(id) ON DELETE SET NULL,
+  changed_at  timestamptz NOT NULL DEFAULT now(),
+  value       jsonb NOT NULL,
+  films       jsonb NOT NULL DEFAULT '[]'::jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_calc_settings_history_changed_at
+  ON public.k24_calc_settings_history (changed_at DESC);
+
+COMMENT ON TABLE public.k24_calc_settings_history IS
+  'R25.5: полная копия k24_settings[calculator] (+ привязка плёнок) на каждое изменение — по каким ставкам посчитан заказ.';
+
+ALTER TABLE public.k24_calc_settings_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS calc_settings_history_select ON public.k24_calc_settings_history;
+CREATE POLICY calc_settings_history_select ON public.k24_calc_settings_history
+  FOR SELECT TO authenticated
+  USING (public.k24_user_can('calc:settings') OR public.k24_user_can('view:finance'));
+-- INSERT/UPDATE/DELETE политик нет: пишет только триггер (SECURITY DEFINER).
+
+REVOKE ALL ON public.k24_calc_settings_history FROM PUBLIC, anon;
+GRANT SELECT ON public.k24_calc_settings_history TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.k24_calc_settings_history_write()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.key <> 'calculator' THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'UPDATE' AND NEW.value IS NOT DISTINCT FROM OLD.value THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO k24_calc_settings_history (changed_by, value, films)
+  VALUES (
+    auth.uid(),
+    NEW.value,
+    COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+               'id', m.id,
+               'name', m.name,
+               'group', m.calc_price_group,
+               'display_name', m.calc_display_name
+             ) ORDER BY m.name)
+        FROM k24_materials m
+       WHERE m.calc_price_group IS NOT NULL
+    ), '[]'::jsonb)
+  );
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.k24_calc_settings_history_write() FROM PUBLIC, anon;
+
+DROP TRIGGER IF EXISTS trg_calc_settings_history ON public.k24_settings;
+CREATE TRIGGER trg_calc_settings_history
+  AFTER INSERT OR UPDATE ON public.k24_settings
+  FOR EACH ROW EXECUTE FUNCTION public.k24_calc_settings_history_write();
+
+-- Начальная запись истории (дефолты А.3), если истории ещё нет.
+INSERT INTO public.k24_calc_settings_history (changed_by, value, films)
+SELECT NULL, s.value, '[]'::jsonb
+  FROM public.k24_settings s
+ WHERE s.key = 'calculator'
+   AND NOT EXISTS (SELECT 1 FROM public.k24_calc_settings_history);
+
+-- ===========================================================================
+-- 4. RPC сохранения вкладки «Калькулятор»
+-- ===========================================================================
+-- p_value — полный объект настроек (jsonb-объект).
+-- p_films — массив [{ id, group: 'white'|'holo'|'metal'|null, display_name }]
+--           только для позиций type='film'; остальные поля позиций не трогаются.
+CREATE OR REPLACE FUNCTION public.calc_save_settings(p_value jsonb, p_films jsonb DEFAULT '[]'::jsonb)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_film jsonb;
+  v_group text;
+BEGIN
+  IF NOT public.k24_user_can('calc:settings') THEN
+    RAISE EXCEPTION 'Нет права менять настройки калькулятора' USING ERRCODE = '42501';
+  END IF;
+  IF p_value IS NULL OR jsonb_typeof(p_value) <> 'object' THEN
+    RAISE EXCEPTION 'Настройки калькулятора должны быть объектом' USING ERRCODE = '22023';
+  END IF;
+
+  FOR v_film IN SELECT * FROM jsonb_array_elements(COALESCE(p_films, '[]'::jsonb)) LOOP
+    v_group := NULLIF(v_film->>'group', '');
+    IF v_group IS NOT NULL AND v_group NOT IN ('white', 'holo', 'metal') THEN
+      RAISE EXCEPTION 'Неизвестная ценовая группа: %', v_group USING ERRCODE = '22023';
+    END IF;
+    UPDATE k24_materials
+       SET calc_price_group  = v_group,
+           calc_display_name = NULLIF(btrim(v_film->>'display_name'), '')
+     WHERE id = (v_film->>'id')::uuid
+       AND type = 'film';
+  END LOOP;
+
+  INSERT INTO k24_settings (key, value, updated_at)
+  VALUES ('calculator', p_value, now())
+  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.calc_save_settings(jsonb, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.calc_save_settings(jsonb, jsonb) TO authenticated;
+
+-- ===========================================================================
+-- 5. Права
+-- ===========================================================================
+INSERT INTO public.k24_role_permissions (role, permission, allowed)
+SELECT r.role, 'view:calculator', r.role IN ('admin', 'manager')
+  FROM (VALUES ('admin'), ('manager'), ('designer'), ('printer'), ('post_printer')) AS r(role)
+ON CONFLICT (role, permission) DO NOTHING;
+
+INSERT INTO public.k24_role_permissions (role, permission, allowed)
+SELECT r.role, 'calc:settings', r.role = 'admin'
+  FROM (VALUES ('admin'), ('manager'), ('designer'), ('printer'), ('post_printer')) AS r(role)
+ON CONFLICT (role, permission) DO NOTHING;
+
+COMMIT;

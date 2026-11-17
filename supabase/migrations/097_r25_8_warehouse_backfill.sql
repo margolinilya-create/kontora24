@@ -27,6 +27,9 @@
 
 BEGIN;
 
+-- Блокировка от параллельных списаний между снимком и самопроверкой (ревью 096–098).
+LOCK TABLE public.k24_materials, public.k24_material_transactions IN SHARE ROW EXCLUSIVE MODE;
+
 -- Снимок остатков и средних цен ДО переноса.
 CREATE TEMP TABLE _r25_8_before ON COMMIT DROP AS
 SELECT id, stock_qty, unit_cost FROM public.k24_materials;

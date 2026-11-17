@@ -803,6 +803,22 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 
 **Отложено/ограничения:** CMYK для PDF недостижим через html2canvas/jsPDF (браузерный canvas всегда RGB) — вывод RGB (для проверки/печати достаточно; настоящий CMYK = серверный рендер, отдельная задача). Фирменные SVG-ассеты (`Icon-logo.svg`, `icn-nadsechka.SVG`, `icn-skvoznoy.SVG`, `Icon-glaza.SVG`) не приложены — при получении подменяются точь-в-точь. Таблица «Дата создания» = `created_at` (спек упоминал «дату генерации», но поле с таким лейблом логичнее держать датой заказа — консистентно с капсулой).
 
+## R24 — фидбэк менеджера 24.07 (5 правок, миграция 092)
+
+Пять точечных правок после R23.6/R23.7. Ветка `claude/new-edits-group-bh24ug`. Две задачи — баги, три — доработки. Корни найдены 3 Explore-агентами + чтением живой БД.
+
+| # | Что | Файлы |
+|---|-----|-------|
+| 1 | **БОПП на упаковке подзадачи-допечатки** + миграция 092. `SubtaskLogForm` на `stage='packaging'` рендерит блок «Расход упаковки» (выбор БОПП-пакета/коробки из `usePackagingMaterials`, подсказка коробок `ceil(packs/capacity)`), поля домержатся в `data` в обход числового цикла. **Миграция 092** восстановила списание БОПП/коробок в `deduct_materials_from_log` — блок был в 031, затёрт 043/055/057 (в проде списания упаковки не было вообще). Триггер висит на всех логах без фильтра subtask_id → списание включилось и для обычной упаковки заказа, и для подзадач. Дельта NEW−OLD с deleted_at; материал `COALESCE(new_mid, old_mid)` для DELETE-реверса. **⚠️ Поведение:** авто-списание БОПП снова активно на обычной упаковке — если менеджер вёл БОПП вручную через инвентаризацию, возможен двойной учёт. | [SubtaskLogForm.jsx](src/features/production/components/logs/SubtaskLogForm.jsx), [092_...sql](supabase/migrations/092_restore_packaging_deduction.sql) |
+| 2 | **«3D отдел» — бесконечная перезагрузка на «7 дней»/«30 дней».** `ThreeDPouringTab` считал `since=getSince(period)` в теле рендера и клал в deps `useEffect`; для '7'/'30' `getSince` → `subDays(new Date(),N).toISOString()` (новые мс каждый рендер) → бесконечный рефетч. Теперь effect зависит от стабильного `period`, границы считаются внутри (как остальные вкладки). | [ThreeDPouringTab.jsx](src/features/reports/components/ThreeDPouringTab.jsx) |
+| 3 | **Окно «Сушка ещё не запущена» при заказе на сушке.** `useOrderDetail` не выбирал `drying_started_at` → `DryingTimer` получал undefined → плейсхолдер. Добавлен в `DETAIL_FIELDS_BASE`. Колонка уже в GRANT authenticated + во view `k24_orders_full` (проверено) → миграция не нужна. Триггер 044 ставит колонку, авто-переход 36ч (cron 045), досрочный — StageJumper `force`. | [useOrders.js](src/features/orders/hooks/useOrders.js) |
+| 4 | **Образец: дата генерации + центрирование капсул.** Верхняя капсула теперь = дата нажатия «Образец» (`useState(()=>new Date())`), а не `created_at`; таблица «Дата создания» осталась `created_at`. Центрирование обеих капсул переведено с flex (нестабилен в html2canvas) на блок `text-align:center` + `line-height=высота капсулы`. | [SampleProof.jsx](src/features/techcard/components/SampleProof.jsx) |
+| 5 | **Прогресс-бар вида на «Сушке»** (строгий спек: менять только расчёт/значения/%/цвет/ограничение брака). Бар стартует полным от «поступило» (Σ pouring `stickers_good` по виду), убывает по мере брака (сохранённый + live-черновик). `годное = поступило − брак`; `pct = min(100, годное/тираж×100)`; зелёный `#63B32F` при `годное≥тираж`, иначе красный `#E53935`; инпут брака `max = поступило − сохранённый`. Чистый хелпер `computeDryingBar` + 6 тестов. Структуру карточек/инпут/кнопку не трогали. | [PackDesignsForm.jsx](src/features/production/components/PackDesignsForm.jsx), [production-logs.js](src/features/production/lib/production-logs.js) |
+
+**Решения:** Задача 1 — списание восстановлено для всех логов упаковки (дефолт; изначально задуманное поведение). Задача 4 — капсула = дата генерации, таблица «Дата создания» = дата заказа (отдельное поле). Задача 5 — «поступило» считается напрямую из pouring-логов (в `DUAL_TRACK_FIELDS` нет ключа `pouring` после линейного маршрута R22.4; общий хелпер `computeIncomingPerDesign` не трогали).
+
+755 unit-тестов. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects`.
+
 ## Обработка ошибок
 
 - **toast.error в action handlers:** `toast.error(translateError(err).message)` — перевод Supabase ошибок на человеческий русский

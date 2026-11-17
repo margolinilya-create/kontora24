@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { reprintStageFields, computeSubtaskStageProgress } from '../../lib/production-logs'
+import { usePackagingMaterials } from '../../hooks/usePackagingMaterials'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
@@ -18,6 +19,15 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
   const [values, setValues] = useState({})
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // R24 (фидбэк 24.07): на упаковке подзадачи — учёт БОПП/коробок как на упаковке
+  // заказа. Списание со склада делает триггер deduct_materials_from_log (миграция
+  // 092) по packaging_bag_material_id (шт = packs_packaged) и boxes_used.
+  const isPackaging = stage === 'packaging'
+  const { bags: packagingBags, boxes: packagingBoxes } = usePackagingMaterials()
+  const [bagId, setBagId] = useState('')
+  const [boxId, setBoxId] = useState('')
+  const [boxesUsed, setBoxesUsed] = useState('')
 
   const progress = computeSubtaskStageProgress(logs, stage, subtask?.qty)
 
@@ -48,6 +58,14 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
     if (stage === 'pouring') {
       data.stickers_good = Math.max(0, Number(data.stickers_poured || 0))
     }
+    // Упаковка: домержим позиции склада (UUID-строки — вне числового цикла).
+    if (isPackaging) {
+      if (bagId) data.packaging_bag_material_id = bagId
+      if (boxId) {
+        data.box_material_id = boxId
+        data.boxes_used = Number(boxesUsed) || 0
+      }
+    }
     if (notes) data.notes = notes
 
     setSaving(true)
@@ -55,6 +73,7 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
       const res = await onSubmit(stage, data)
       setValues({})
       setNotes('')
+      setBagId(''); setBoxId(''); setBoxesUsed('')
       if (res?.advanced) {
         toast.success(`Этап завершён → ${REPRINT_STATUS_LABELS[res.new_status] || res.new_status}`)
       } else {
@@ -99,6 +118,76 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
           />
         ))}
       </div>
+
+      {isPackaging && (
+        <div className="rounded-xl border border-border bg-surface-2/40 p-3 space-y-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            Расход упаковки
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="block text-xs text-text-muted mb-1">БОПП-пакет</span>
+              <select
+                value={bagId}
+                onChange={(e) => setBagId(e.target.value)}
+                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+              >
+                <option value="">— без БОПП —</option>
+                {packagingBags.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="block text-xs text-text-muted mb-1">Коробка</span>
+              <select
+                value={boxId}
+                onChange={(e) => setBoxId(e.target.value)}
+                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
+              >
+                <option value="">— без коробки —</option>
+                {packagingBoxes.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {boxId && (() => {
+            const selectedBox = packagingBoxes.find((b) => b.id === boxId)
+            const packs = Number(values.packs_packaged) || 0
+            const capacity = Number(selectedBox?.capacity_per_box) || 0
+            const suggested = capacity > 0 && packs > 0 ? Math.ceil(packs / capacity) : null
+            const showSuggestion = suggested !== null && String(suggested) !== String(boxesUsed)
+            return (
+              <div>
+                <Input
+                  id="subtask-boxes-used"
+                  label="Использовано коробок (шт)"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1"
+                  value={boxesUsed}
+                  onChange={(e) => setBoxesUsed(e.target.value)}
+                  placeholder={suggested ? String(suggested) : '1'}
+                />
+                {showSuggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setBoxesUsed(String(suggested))}
+                    className="mt-1 text-[11px] text-accent hover:underline"
+                  >
+                    Рекомендуется {suggested} шт ({packs} ÷ {capacity}) — применить
+                  </button>
+                )}
+              </div>
+            )
+          })()}
+          <p className="text-[11px] text-text-muted">
+            БОПП-пакеты списываются по количеству упакованного. Коробки — по введённому числу.
+          </p>
+        </div>
+      )}
 
       <Input
         id="subtask-notes"

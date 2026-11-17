@@ -44,7 +44,7 @@ const DETAIL_FIELDS_BASE = `id, number, custom_number, client_id, order_type, st
   film_type, stickers_per_pack, is_3d, mockup_path, is_urgent, is_partner, needs_montage_film,
   needs_individual_cut, printed_meters, resin_used, rejected_qty, printed_qty, deal_name,
   source, source_referrer, design_status, delivery_type, delivery_city, delivery_address,
-  delivery_notes, bopp_bag, film_type_stickers, ink_deducted_at,
+  delivery_notes, bopp_bag, film_type_stickers, ink_deducted_at, drying_started_at,
   film_material_id, film_stickers_material_id, lam_material_id, sticker_shape`
 
 const DETAIL_FIELDS_FINANCE = `, cost_materials, cost_labor, cost_total, markup, discount_pct,

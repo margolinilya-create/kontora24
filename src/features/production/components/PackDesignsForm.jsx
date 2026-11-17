@@ -2,7 +2,7 @@ import { memo, useState, useEffect, useRef } from 'react'
 import Button from '@/shared/components/Button'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
-import { computeIncomingPerDesign } from '../lib/production-logs'
+import { computeIncomingPerDesign, computeDryingBar } from '../lib/production-logs'
 import { STICKER_SHAPES } from '@/shared/constants'
 import { generateUuid } from '@/shared/lib/uuid'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
@@ -21,6 +21,10 @@ import { useCanDo } from '@/features/auth/hooks/useCanDo'
  * создаёт production_log. Поля ввода НЕ закрываются по достижении тиража —
  * сотрудник может довносить количество (фидбэк менеджера 14.05).
  */
+// R24 (фидбэк 24.07): цвета соответствия тиражу на баре «Сушки».
+const DRY_GREEN = '#63B32F'
+const DRY_RED = '#E53935'
+
 const MODE_LABELS = {
   // pouring: поле «Залито» пишется в stickers_poured. Поле stickers_good
   // вычисляется автоматически в OrderProgressTab.handlePackDesignSubmit
@@ -93,6 +97,16 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
     }, 0)
     const defects = dlogs.reduce((s, l) => s + (Number(l.defects) || 0), 0)
     return { value, defects }
+  }
+
+  // R24 (фидбэк 24.07): «поступило на сушку» по виду = выход заливки
+  // (stickers_good, фолбэк stickers_poured) на pouring-логах этого вида.
+  // computeIncomingPerDesign сюда не годится: в DUAL_TRACK_FIELDS нет ключа
+  // 'pouring' (новый линейный маршрут R22.4) — считаем напрямую.
+  function pouringIncoming(designIndex) {
+    return (logs || [])
+      .filter((l) => l.stage === 'pouring' && l.track === 'stickers' && l.design_index === designIndex && !l.deleted_at)
+      .reduce((s, l) => s + (Number(l.stickers_good) || Number(l.stickers_poured) || 0), 0)
   }
 
   async function handleSubmitAll() {
@@ -190,21 +204,39 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
     <div className="space-y-3">
       {designs.map((d) => {
         const { value, defects } = designStats(d.design_index)
-        const perDesignIncoming = route
+        const isDrying = stage === 'drying'
+        const perDesignIncoming = !isDrying && route
           ? computeIncomingPerDesign(logs, route, stage, d.design_index)
           : null
-        const showPerIncoming = perDesignIncoming && !perDesignIncoming.isStart && perDesignIncoming.total != null
-        const total = value + defects
-        const pct = d.qty_target > 0 ? Math.min(100, Math.round((total / d.qty_target) * 100)) : 0
-        const isComplete = total >= d.qty_target
+        // R24 (фидбэк 24.07): на сушке бар стартует полным от «поступило»
+        // (выход заливки) и убывает по мере брака. Брак = сохранённый (defects)
+        // + вводимый вживую черновик (drafts.value) → пересчёт без сохранения.
+        const dryIncoming = isDrying ? pouringIncoming(d.design_index) : 0
+        const dryDraftDefect = isDrying ? (Number(drafts[d.design_index]?.value) || 0) : 0
+        const dryBar = isDrying
+          ? computeDryingBar({ incoming: dryIncoming, defects: defects + dryDraftDefect, target: d.qty_target })
+          : null
+        const displayGood = isDrying ? dryBar.good : value + defects
+        const pct = isDrying
+          ? dryBar.pct
+          : (d.qty_target > 0 ? Math.min(100, Math.round(((value + defects) / d.qty_target) * 100)) : 0)
+        const isComplete = isDrying ? dryBar.complete : (value + defects) >= d.qty_target
+        const dryBarColor = isDrying ? (dryBar.complete ? DRY_GREEN : DRY_RED) : null
+        const showPerIncoming = isDrying
+          ? dryIncoming > 0
+          : (perDesignIncoming && !perDesignIncoming.isStart && perDesignIncoming.total != null)
+        const incomingTotal = isDrying ? dryIncoming : perDesignIncoming?.total
+        // Ограничение поля брака: не больше чем поступило (за вычетом уже
+        // сохранённого брака этого вида).
+        const dryDefectMax = isDrying ? Math.max(0, dryIncoming - defects) : null
         const isEditingName = editingNameId === d.id
 
         return (
           <div key={d.id} className={`rounded-xl border p-3 space-y-2 ${isComplete ? 'border-success/30 bg-success/5' : 'border-border'}`}>
             {showPerIncoming && (
               <p className="text-[10px] text-text-muted">
-                Поступило на этап: {perDesignIncoming.total} шт
-                {value >= perDesignIncoming.total && (
+                Поступило на этап: {incomingTotal} шт
+                {!isDrying && value >= incomingTotal && (
                   <span className="ml-2 text-warning">· достигнут лимит, можно вносить брак</span>
                 )}
               </p>
@@ -260,8 +292,11 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
                     {STICKER_SHAPES[d.shape_type]?.label || d.shape_type}
                   </span>
                 ))}
-                <span className={`text-xs ${isComplete ? 'text-success font-medium' : 'text-text-muted'}`}>
-                  {total} / {d.qty_target} ({pct}%)
+                <span
+                  className={`text-xs font-medium ${isDrying ? '' : (isComplete ? 'text-success' : 'text-text-muted')}`}
+                  style={isDrying ? { color: dryBarColor } : undefined}
+                >
+                  {displayGood} / {d.qty_target} ({pct}%)
                 </span>
               </div>
             </div>
@@ -269,8 +304,8 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
             {/* Progress */}
             <div className="h-1.5 bg-surface-dim rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-500 ease-out ${isComplete ? 'bg-success' : 'bg-accent'}`}
-                style={{ width: `${pct}%` }}
+                className={`h-full rounded-full transition-all duration-500 ease-out ${isDrying ? '' : (isComplete ? 'bg-success' : 'bg-accent')}`}
+                style={isDrying ? { width: `${pct}%`, backgroundColor: dryBarColor } : { width: `${pct}%` }}
               />
             </div>
 
@@ -283,6 +318,7 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
                   <input
                     type="number"
                     min="0"
+                    max={isDrying && dryDefectMax != null ? dryDefectMax : undefined}
                     value={drafts[d.design_index]?.value ?? ''}
                     onChange={(e) => setField(d.design_index, 'value', e.target.value)}
                     placeholder="0"

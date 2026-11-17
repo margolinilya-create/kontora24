@@ -350,6 +350,27 @@ export function computeIncomingPerDesign(logs, route, stage, designIndex) {
 }
 
 /**
+ * R24 (фидбэк 24.07) — расчёт прогресс-бара вида на этапе «Сушка».
+ *
+ * Бизнес-правило: бар стартует ПОЛНЫМ от «поступило» (выход заливки, stickers_good
+ * по виду) и уменьшается только по мере ввода брака.
+ *   годное = поступило − брак
+ *   процент = годное / тираж × 100, но НЕ больше 100 (даже если поступило > тиража)
+ *   зелёный при годное ≥ тираж, иначе красный
+ *
+ * @returns {{ good: number, pct: number, complete: boolean }}
+ */
+export function computeDryingBar({ incoming, defects, target }) {
+  const inc = Math.max(0, Number(incoming) || 0)
+  const def = Math.max(0, Number(defects) || 0)
+  const t = Math.max(0, Number(target) || 0)
+  const good = Math.max(0, inc - def)
+  const pct = t > 0 ? Math.max(0, Math.min(100, Math.round((good / t) * 100))) : 0
+  const complete = t > 0 && good >= t
+  return { good, pct, complete }
+}
+
+/**
  * R20.5 (бриф 3.07): этапы, на которых multi-variant заказ (несколько размерных
  * видов из k24_order_items) учитывается по каждому виду отдельно — строки ввода
  * и прогресс-бары per вид. По брифу: печать, резка, заливка, выборка, упаковка.

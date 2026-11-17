@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog, compute3DPouringReport, computeStageProgressPerItem, computeIncomingPerItem } from './production-logs'
+import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog, compute3DPouringReport, computeStageProgressPerItem, computeIncomingPerItem, computeDryingBar } from './production-logs'
 
 const ROUTE = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
 
@@ -595,5 +595,47 @@ describe('R20.5: computeIncomingPerItem (поэвидовой приход)', ()
     expect(computeIncomingPerItem([], ROUTE, 'pouring', 1).isStart).toBe(true)
     const logs = [{ stage: 'print', stickers_printed: 100 }] // только order-level
     expect(computeIncomingPerItem(logs, ROUTE, 'cutting', 1).isStart).toBe(true)
+  })
+})
+
+describe('computeDryingBar (R24 фидбэк 24.07)', () => {
+  it('без брака бар полный: годное = поступило, зелёный при поступило ≥ тираж', () => {
+    const r = computeDryingBar({ incoming: 120, defects: 0, target: 100 })
+    expect(r.good).toBe(120)
+    expect(r.pct).toBe(100) // кап на 100 даже когда поступило > тиража
+    expect(r.complete).toBe(true)
+  })
+
+  it('брак уменьшает годное и процент', () => {
+    const r = computeDryingBar({ incoming: 100, defects: 30, target: 100 })
+    expect(r.good).toBe(70)
+    expect(r.pct).toBe(70)
+    expect(r.complete).toBe(false) // годное < тираж → красный
+  })
+
+  it('годное ровно тираж → зелёный (граница)', () => {
+    const r = computeDryingBar({ incoming: 100, defects: 0, target: 100 })
+    expect(r.good).toBe(100)
+    expect(r.complete).toBe(true)
+  })
+
+  it('поступило меньше тиража (недолив с заливки) → красный даже без брака', () => {
+    const r = computeDryingBar({ incoming: 80, defects: 0, target: 100 })
+    expect(r.good).toBe(80)
+    expect(r.pct).toBe(80)
+    expect(r.complete).toBe(false)
+  })
+
+  it('брак больше поступившего → годное 0, процент 0', () => {
+    const r = computeDryingBar({ incoming: 50, defects: 90, target: 100 })
+    expect(r.good).toBe(0)
+    expect(r.pct).toBe(0)
+    expect(r.complete).toBe(false)
+  })
+
+  it('тираж 0 → процент 0, не complete', () => {
+    const r = computeDryingBar({ incoming: 10, defects: 0, target: 0 })
+    expect(r.pct).toBe(0)
+    expect(r.complete).toBe(false)
   })
 })

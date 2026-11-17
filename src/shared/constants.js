@@ -431,10 +431,14 @@ export const PERMISSIONS = {
     'view:dashboard', 'view:analytics', 'view:finance',
     'view:warehouse', 'view:reports', 'view:settings',
     'view:planning', 'view:sales',
+    // R25.5: раздел «Калькулятор» (сид — миграция 100).
+    'view:calculator',
   ],
   actions: [
     'order:create', 'order:edit', 'order:cancel',
     'user:manage',
+    // R25.5: вкладка «Калькулятор» в настройках (сид — миграция 100).
+    'calc:settings',
   ],
   materials: [
     'material:add_transaction', 'material:manage', 'material:edit_name',
@@ -474,6 +478,8 @@ export const PERMISSION_LABELS = {
   'view:settings': 'Видеть «Настройки»',
   'view:planning': 'Видеть «Планирование» (бета)',
   'view:sales': 'Видеть «Продажи»',
+  'view:calculator': 'Видеть «Калькулятор»',
+  'calc:settings': 'Менять настройки калькулятора',
   'order:create': 'Создавать заказы',
   'order:edit': 'Редактировать заказы',
   'order:cancel': 'Отменять заказы',
@@ -1071,6 +1077,8 @@ export const NAV_ITEMS = [
   { path: '/orders', label: 'Заказы', icon: 'ShoppingCart', roles: ALL_ROLES }, // доступен всем (без permission)
   // R25.1 (ТЗ 1.7): раздел менеджера — заказы, ждущие действий отдела продаж.
   { path: '/sales', label: 'Продажи', icon: 'Handshake', roles: MANAGER_ROLES, permission: 'view:sales' },
+  // R25.5 (ТЗ 5.1): калькулятор стоимости — после «Продаж».
+  { path: '/calculator', label: 'Калькулятор', icon: 'Calculator', roles: MANAGER_ROLES, permission: 'view:calculator' },
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'], permission: 'stage:design' },
   { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'], permission: 'stage:prepress' },
   { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'], permission: 'stage:print' },

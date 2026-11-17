@@ -94,7 +94,7 @@ export async function copyText(text) {
   document.body.appendChild(ta)
   ta.select()
   ta.setSelectionRange(0, text.length)
-  let ok = false
+  let ok
   try {
     ok = document.execCommand('copy')
   } catch {

@@ -9,6 +9,8 @@ import { RolePermissionsTable } from '../components/RolePermissionsTable'
 import { RatesSettings } from '../components/RatesSettings'
 import { WarehouseSettings } from '../components/WarehouseSettings'
 import { PlanningSettings } from '@/features/production-planner/components/PlanningSettings'
+import { CalculatorSettings } from '@/features/calculator/components/CalculatorSettings'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import Tabs from '@/shared/components/Tabs'
 
 const SETTINGS_TABS = [
@@ -18,6 +20,8 @@ const SETTINGS_TABS = [
   { key: 'rates', label: 'Ставки' },
   { key: 'warehouse', label: 'Настройки склада' },
   { key: 'planning', label: 'Производство (бета)' },
+  // R25.5 (ТЗ 5.5): видна только с правом calc:settings.
+  { key: 'calculator', label: 'Калькулятор', permission: 'calc:settings' },
   { key: 'bitrix', label: 'Bitrix24' },
   { key: 'logs', label: 'Логи' },
   { key: 'import', label: 'Импорт' },
@@ -25,6 +29,8 @@ const SETTINGS_TABS = [
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
+  const canCalcSettings = useCanDo('calc:settings')
+  const tabs = SETTINGS_TABS.filter((t) => t.permission !== 'calc:settings' || canCalcSettings)
 
   return (
     <div className="space-y-8">
@@ -33,7 +39,7 @@ export default function SettingsPage() {
         <p className="text-text-muted">Параметры производства и управление пользователями</p>
       </div>
 
-      <Tabs items={SETTINGS_TABS} active={activeTab} onChange={setActiveTab} />
+      <Tabs items={tabs} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'profile' && <ProfileCard />}
       {activeTab === 'users' && (
@@ -46,6 +52,7 @@ export default function SettingsPage() {
       {activeTab === 'rates' && <RatesSettings />}
       {activeTab === 'warehouse' && <WarehouseSettings />}
       {activeTab === 'planning' && <PlanningSettings />}
+      {activeTab === 'calculator' && canCalcSettings && <CalculatorSettings />}
       {activeTab === 'bitrix' && <BitrixSettings />}
       {activeTab === 'logs' && <IntegrationLog />}
       {activeTab === 'import' && <SheetsImport />}

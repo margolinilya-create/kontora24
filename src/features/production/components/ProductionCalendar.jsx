@@ -13,12 +13,20 @@ import { ORDER_TYPES, PRIORITIES, IS_3D_TYPE } from '@/shared/constants'
 import { stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { getDeadlineDotClass } from '@/shared/lib/deadline'
 import { formatOrderNumber } from '@/shared/lib/utils'
+import { reprintToCalendarItem } from '@/features/orders/lib/active-reprints'
 
 const LOAD_COLORS = {
   empty: 'bg-surface',
   light: 'bg-deadline-ok/10 border-deadline-ok/30',
   medium: 'bg-deadline-warn/10 border-deadline-warn/30',
   heavy: 'bg-deadline-urgent/10 border-deadline-urgent/30',
+}
+
+// R25.3: пометка «Д» — допечатка в календаре.
+function ReprintMark() {
+  return (
+    <span className="text-[9px] font-bold text-warning mr-0.5" title="Допечатка">Д</span>
+  )
 }
 
 function loadLevel(count) {
@@ -32,9 +40,9 @@ function loadLevel(count) {
  * Календарь дедлайнов на месяц с возможностью переключения месяцев
  * и bottom-sheet'ом на мобильном при тапе по дню.
  */
-export function ProductionCalendar() {
+export function ProductionCalendar({ reprints = [] } = {}) {
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
-  const [orders, setOrders] = useState([])
+  const [baseOrders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [openDay, setOpenDay] = useState(null)
@@ -69,6 +77,14 @@ export function ProductionCalendar() {
     }
     fetch()
   }, [cursor])
+
+  // R25.3 (ТЗ 3.1): активные допечатки — по сроку родителя, с пометкой «Д».
+  const orders = useMemo(() => {
+    const extra = (reprints || [])
+      .map(reprintToCalendarItem)
+      .filter((r) => r.deadline)
+    return extra.length ? [...baseOrders, ...extra] : baseOrders
+  }, [baseOrders, reprints])
 
   const days = useMemo(() => {
     const monthStart = startOfMonth(cursor)
@@ -141,8 +157,8 @@ export function ProductionCalendar() {
           <h4 className="font-semibold text-danger text-sm mb-2">Просрочено ({overdue.length})</h4>
           <div className="flex flex-wrap gap-2">
             {overdue.map((o) => (
-              <Link key={o.id} to={`/orders/${o.id}`} className="text-xs bg-danger/15 text-danger px-2 py-1 rounded-lg hover:bg-danger/25">
-                #{formatOrderNumber(o)} — {format(new Date(o.deadline), 'd MMM', { locale: ru })}
+              <Link key={o.id} to={o.href || `/orders/${o.id}`} className="text-xs bg-danger/15 text-danger px-2 py-1 rounded-lg hover:bg-danger/25">
+                {o.isReprint && <ReprintMark />}#{formatOrderNumber(o)} — {format(new Date(o.deadline), 'd MMM', { locale: ru })}
               </Link>
             ))}
           </div>
@@ -185,7 +201,7 @@ export function ProductionCalendar() {
                 {dayOrders.slice(0, 3).map((o) => (
                   <div key={o.id} className="text-[11px] truncate flex items-center gap-1">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${stageDotClass(o.status)}`} aria-hidden="true" />
-                    <span className="truncate">#{formatOrderNumber(o)}</span>
+                    <span className="truncate">{o.isReprint && <ReprintMark />}#{formatOrderNumber(o)}</span>
                     {IS_3D_TYPE(o.order_type) && (
                       <span className="text-[9px] font-bold text-dept-pouring shrink-0" title="3D">3D</span>
                     )}
@@ -229,6 +245,10 @@ export function ProductionCalendar() {
           <span className="text-[9px] font-bold text-dept-pouring">3D</span>
           <span>— заказ с 3D смолой</span>
         </span>
+        <span className="inline-flex items-center gap-1.5">
+          <ReprintMark />
+          <span>— допечатка (по сроку заказа)</span>
+        </span>
       </div>
 
       {/* Bottom sheet: список заказов на выбранный день */}
@@ -243,14 +263,14 @@ export function ProductionCalendar() {
             return (
               <Link
                 key={o.id}
-                to={`/orders/${o.id}`}
+                to={o.href || `/orders/${o.id}`}
                 onClick={() => setOpenDay(null)}
                 className="block rounded-xl border border-border p-3 hover:border-accent/40 hover:bg-surface-2 transition-colors"
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex items-center gap-2">
                     {dotCls && <span className={`w-2 h-2 rounded-full ${dotCls}`} aria-hidden="true" />}
-                    <span className="font-semibold text-sm">#{formatOrderNumber(o)}</span>
+                    <span className="font-semibold text-sm">{o.isReprint && <ReprintMark />}#{formatOrderNumber(o)}</span>
                     <span className="text-xs text-text-muted truncate">{o.client?.name || ''}</span>
                   </div>
                   {o.priority && o.priority !== 'normal' && (
@@ -260,7 +280,7 @@ export function ProductionCalendar() {
                   )}
                 </div>
                 <p className="text-xs text-text-muted">
-                  {ORDER_TYPES[o.order_type]?.label || o.order_type} · {o.qty} шт
+                  {o.isReprint ? `${o.title} · ` : ''}{ORDER_TYPES[o.order_type]?.label || o.order_type} · {o.qty} шт
                 </p>
               </Link>
             )

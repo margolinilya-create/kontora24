@@ -27,7 +27,7 @@ function formatDeadline(deadline) {
   return new Date(deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
 }
 
-const CardContent = memo(function CardContent({ order, isOverlay = false }) {
+const CardContent = memo(function CardContent({ order, isOverlay = false, reprintCount = 0 }) {
   const [expanded, setExpanded] = useState(false)
   const timeInStatus = formatTimeInStatus(order.status_changed_at || order.updated_at)
   const deadlineLevel = getDeadlineLevel(order.deadline)
@@ -75,6 +75,12 @@ const CardContent = memo(function CardContent({ order, isOverlay = false }) {
         {/* Заказчик виден всегда — нужен и работникам цеха */}
         {order.client?.name && (
           <p className="text-xs text-text-muted mt-0.5 truncate">{order.client.name}</p>
+        )}
+        {/* R25.3: чип активных допечаток заказа */}
+        {reprintCount > 0 && (
+          <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-warning/15 text-warning">
+            Допечаток: {reprintCount}
+          </span>
         )}
       </div>
 
@@ -136,7 +142,7 @@ function AttachmentThumbnail({ attachments }) {
   )
 }
 
-export const DraggableCard = memo(function DraggableCard({ order }) {
+export const DraggableCard = memo(function DraggableCard({ order, reprintCount = 0 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: order.id,
     data: { status: order.status },
@@ -172,7 +178,7 @@ export const DraggableCard = memo(function DraggableCard({ order }) {
         transition-[border-color,box-shadow] duration-200 ease-out
         ${priorityBorder ? `border-l-[3px] ${priorityBorder}` : ''}`}
     >
-      <CardContent order={order} />
+      <CardContent order={order} reprintCount={reprintCount} />
     </div>
   )
 })

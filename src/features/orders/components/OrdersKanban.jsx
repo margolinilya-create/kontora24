@@ -9,13 +9,15 @@ import { COLS } from '@/features/production/components/PipelineSummary'
 import MultiSelect from '@/shared/components/MultiSelect'
 import ErrorState from '@/shared/components/ErrorState'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
+import { ReprintKanbanCard } from './ReprintRows'
+import { groupReprintsByStatus, formatColumnCount } from '../lib/active-reprints'
 
 // COLS реиспользуем из PipelineSummary — единственный источник правды
 // (R13.0): все рабочие этапы из ORDER_STATUSES без cancelled/done/batch_layout.
 
 const DEPT_OPTIONS = Object.entries(DEPT_GROUPS).map(([key, g]) => ({ value: key, label: g.label }))
 
-const DroppableColumn = memo(function DroppableColumn({ status, orders, isActive, activeOrder, includeArchived }) {
+const DroppableColumn = memo(function DroppableColumn({ status, orders, reprints = [], reprintCountByOrder, isActive, activeOrder, includeArchived }) {
   const allowed = activeOrder ? isStageAllowed(activeOrder, status) : true
   const isSameAsCurrent = activeOrder?.status === status
   // Колонка disabled для активного заказа, если этап не входит в его маршрут
@@ -46,13 +48,13 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, isActive
         </h3>
         <span className={`text-xs font-medium min-w-[24px] text-center py-0.5 px-2 rounded-full transition-colors
           ${isOver ? 'bg-accent text-on-accent' : 'text-text-muted bg-surface-2'}`}>
-          {orders.length}
+          {formatColumnCount(orders.length, reprints.length)}
         </span>
       </div>
 
       <SortableContext items={orders.map((o) => o.id)} strategy={verticalListSortingStrategy}>
         <div className="px-2 pb-2 space-y-2 flex-1 overflow-y-auto max-h-[60vh]">
-          {orders.length === 0 ? (
+          {orders.length === 0 && reprints.length === 0 ? (
             <div className={`border border-dashed rounded-xl py-8 text-center transition-all
               ${isOver ? 'border-accent/30 bg-accent/[0.03]' : 'border-border/50'}`}>
               <p className={`text-xs ${isOver ? 'text-accent' : 'text-text-muted/60'}`}>
@@ -60,7 +62,13 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, isActive
               </p>
             </div>
           ) : (
-            orders.map((order) => <DraggableCard key={order.id} order={order} />)
+            <>
+              {orders.map((order) => (
+                <DraggableCard key={order.id} order={order} reprintCount={reprintCountByOrder?.[order.id] || 0} />
+              ))}
+              {/* R25.3: допечатки — в колонке своего этапа, без перетаскивания */}
+              {reprints.map((r) => <ReprintKanbanCard key={`r-${r.id}`} reprint={r} />)}
+            </>
           )}
         </div>
       </SortableContext>
@@ -72,7 +80,7 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, isActive
  * Канбан с DnD, цветными полосами по отделам, мульти-фильтром по отделам
  * и опциональным показом завершённых.
  */
-export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived }) {
+export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived, reprints, reprintCountByOrder }) {
   const board = useProductionBoard({ includeArchived })
   const { columns, scrollRef, scrollState, setScrollState, error, refetch, activeId, setActiveId, activeOrder, handleDragEnd, loading, paymentConfirm, confirmPaymentMove, cancelPaymentMove } = board
 
@@ -100,6 +108,8 @@ export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => { el.removeEventListener('scroll', onScroll); if (rafId) cancelAnimationFrame(rafId) }
   }, [scrollRef, setScrollState])
+
+  const reprintsByStatus = groupReprintsByStatus(reprints)
 
   if (error) return <ErrorState error={error} onRetry={refetch} />
 
@@ -163,6 +173,8 @@ export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived }
                   <DroppableColumn
                     status={status}
                     orders={columns[status] || []}
+                    reprints={reprintsByStatus[status]}
+                    reprintCountByOrder={reprintCountByOrder}
                     isActive={!!activeId}
                     activeOrder={activeOrder}
                     includeArchived={includeArchived}

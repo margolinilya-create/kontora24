@@ -19,6 +19,9 @@ import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass, getDeadlineB
 import { stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { toast } from '@/shared/stores/toast-store'
 import { formatOrderNumber } from '@/shared/lib/utils'
+import { useActiveReprints } from '../hooks/useActiveReprints'
+import { matchesReprintFilters, interleaveReprints, countActiveReprintsByOrder } from '../lib/active-reprints'
+import { ReprintMobileRow, ReprintDesktopRow, ReprintsChip } from '../components/ReprintRows'
 
 // R25.1: списки статусов строятся из констант/описания отделов — новый этап
 // не может «потеряться» в фильтрах и группах (см. тест-«сторож» routes-v2).
@@ -51,6 +54,8 @@ export default function OrdersPage() {
   const [deadlineFrom, setDeadlineFrom] = useState(null)
   const [deadlineTo, setDeadlineTo] = useState(null)
   const [collapsedGroups, setCollapsedGroups] = useState({})
+  // R25.3 (ТЗ 3.1): показывать допечатки в списке (сохраняется в сохранённых фильтрах).
+  const [showReprints, setShowReprints] = useState(true)
   const [deletingOrder, setDeletingOrder] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -66,9 +71,10 @@ export default function OrdersPage() {
     setSortBy(config.sortBy || 'deadline')
     setSortAsc(config.sortAsc ?? true)
     setSearch(config.search || '')
+    setShowReprints(config.showReprints ?? true)
   }
 
-  const currentFilter = { statusFilters, deptFilter, includeArchived, sortBy, sortAsc, search }
+  const currentFilter = { statusFilters, deptFilter, includeArchived, sortBy, sortAsc, search, showReprints }
 
   const debouncedSearch = useDebounce(search, 300)
   const [pPage, setPPage] = useState(1)
@@ -98,6 +104,20 @@ export default function OrdersPage() {
     deadlineTo,
   })
 
+  // R25.3: допечатки — общий источник для карточек, канбана и календаря.
+  // Завершённые подгружаются только в архивном режиме (как готовые заказы).
+  const { reprints } = useActiveReprints({ includeDone: includeArchived, enabled: showReprints })
+  const reprintCountByOrder = useMemo(() => countActiveReprintsByOrder(reprints), [reprints])
+  // Фильтры применяются к СОБСТВЕННОМУ этапу допечатки; срок/поиск — по родителю.
+  const visibleReprints = reprints.filter((r) => matchesReprintFilters(r, {
+    statuses: effectiveStatuses,
+    search: debouncedSearch,
+    deadlineFrom,
+    deadlineTo,
+  }))
+  // Допечатки, чей родитель не на этой странице, показываем на первой странице.
+  const includeOrphanReprints = pPage === 1
+
   async function handleConfirmDelete() {
     if (!deletingOrder) return
     setDeleting(true)
@@ -115,15 +135,31 @@ export default function OrdersPage() {
 
   // Группировка orders по статусу→группе
   const grouped = useMemo(() => {
-    const buckets = ORDER_GROUPS.map((g) => ({ ...g, orders: [] }))
+    const buckets = ORDER_GROUPS.map((g) => ({ ...g, orders: [], reprints: [] }))
     const idxByStatus = {}
     ORDER_GROUPS.forEach((g, i) => g.statuses.forEach((s) => { idxByStatus[s] = i }))
     orders.forEach((o) => {
       const idx = idxByStatus[o.status]
       if (idx !== undefined) buckets[idx].orders.push(o)
     })
-    return buckets.filter((g) => g.orders.length > 0)
-  }, [orders])
+    // R25.3: допечатка — в группе своего этапа, сразу после родителя (если он там).
+    const pageOrderIds = new Set(orders.map((o) => o.id))
+    visibleReprints.forEach((r) => {
+      const idx = idxByStatus[r.status]
+      if (idx === undefined) return
+      if (!includeOrphanReprints && !pageOrderIds.has(r.order?.id)) return
+      buckets[idx].reprints.push(r)
+    })
+    return buckets
+      .map((g) => ({ ...g, rows: interleaveReprints(g.orders, g.reprints) }))
+      .filter((g) => g.rows.length > 0)
+  }, [orders, visibleReprints, includeOrphanReprints])
+
+  const flatRows = useMemo(
+    () => interleaveReprints(orders, visibleReprints, { includeOrphans: includeOrphanReprints }),
+    [orders, visibleReprints, includeOrphanReprints],
+  )
+  const shownReprintsCount = flatRows.length - orders.length
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pPerPage))
   const pagination = {
@@ -146,10 +182,10 @@ export default function OrdersPage() {
         <div>
           <h1 className="text-2xl font-bold font-display tracking-tight">Заказы</h1>
           <p className="text-text-muted">
-            {viewMode === 'list' && (totalCount > 0 ? `${totalCount} заказов` : 'Управление заказами')}
+            {viewMode === 'list' && (totalCount > 0 ? `${totalCount} заказов${shownReprintsCount > 0 ? ` + ${shownReprintsCount} доп.` : ''}` : 'Управление заказами')}
             {viewMode === 'kanban' && 'Канбан с DnD'}
             {viewMode === 'calendar' && 'Календарь дедлайнов'}
-            {viewMode === 'flat' && (totalCount > 0 ? `${totalCount} заказов · единый список` : 'Все заказы')}
+            {viewMode === 'flat' && (totalCount > 0 ? `${totalCount} заказов${shownReprintsCount > 0 ? ` + ${shownReprintsCount} доп.` : ''} · единый список` : 'Все заказы')}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -214,6 +250,7 @@ export default function OrdersPage() {
                 />
                 Завершённые
               </label>
+              <ReprintsToggle checked={showReprints} onChange={setShowReprints} />
             </div>
           </div>
 
@@ -228,15 +265,25 @@ export default function OrdersPage() {
       )}
 
       {/* Content */}
+      {(viewMode === 'kanban' || viewMode === 'calendar') && (
+        <div className="flex">
+          <ReprintsToggle checked={showReprints} onChange={setShowReprints} />
+        </div>
+      )}
+
       {viewMode === 'kanban' && (
         <OrdersKanban
           deptFilter={deptFilter}
           onDeptFilterChange={setDeptFilter}
           includeArchived={includeArchived}
+          reprints={showReprints ? reprints : []}
+          reprintCountByOrder={reprintCountByOrder}
         />
       )}
 
-      {viewMode === 'calendar' && <ProductionCalendar />}
+      {viewMode === 'calendar' && (
+        <ProductionCalendar reprints={showReprints ? reprints.filter((r) => r.status !== 'done') : []} />
+      )}
 
       <ConfirmDialog
         isOpen={!!deletingOrder}
@@ -260,7 +307,7 @@ export default function OrdersPage() {
           </div>
         ) : error ? (
           <div className="bg-danger/10 text-danger rounded-xl p-4 text-sm" role="alert">{String(error.message || error)}</div>
-        ) : orders.length === 0 ? (
+        ) : orders.length === 0 && flatRows.length === 0 ? (
           <div className="bg-surface rounded-xl border border-border p-12 text-center">
             <h3 className="text-lg font-semibold mb-1">{search ? 'Ничего не найдено' : 'Нет заказов'}</h3>
             <p className="text-text-muted text-sm mb-4">{search ? 'Попробуйте другой запрос' : 'Создайте первый заказ'}</p>
@@ -275,7 +322,7 @@ export default function OrdersPage() {
             <section className="bg-surface rounded-2xl border border-border shadow-card overflow-hidden">
               {/* Mobile cards */}
               <ul className="sm:hidden divide-y divide-border">
-                {orders.map((o) => <MobileRow key={o.id} order={o} isAdmin={isAdmin} onDelete={setDeletingOrder} />)}
+                {flatRows.map((row) => renderMobile(row, isAdmin, setDeletingOrder, reprintCountByOrder))}
               </ul>
               {/* Desktop table */}
               <div className="hidden sm:block overflow-x-auto">
@@ -294,7 +341,7 @@ export default function OrdersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((o) => <DesktopRow key={o.id} order={o} isAdmin={isAdmin} onDelete={setDeletingOrder} />)}
+                    {flatRows.map((row) => renderDesktop(row, isAdmin, setDeletingOrder, reprintCountByOrder))}
                   </tbody>
                 </table>
               </div>
@@ -315,7 +362,9 @@ export default function OrdersPage() {
                   >
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${stageDotClass(group.dotStatus)}`} aria-hidden="true" />
                     <span className="font-semibold text-sm">{group.label}</span>
-                    <span className="text-xs text-text-muted bg-surface px-2 py-0.5 rounded-full">{group.orders.length}</span>
+                    <span className="text-xs text-text-muted bg-surface px-2 py-0.5 rounded-full">
+                      {group.orders.length}{group.reprints.length > 0 ? ` + ${group.reprints.length} доп.` : ''}
+                    </span>
                     <svg
                       className={`ml-auto w-4 h-4 text-text-muted transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
                       fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"
@@ -328,7 +377,7 @@ export default function OrdersPage() {
                     <>
                       {/* Mobile cards */}
                       <ul className="sm:hidden divide-y divide-border">
-                        {group.orders.map((o) => <MobileRow key={o.id} order={o} isAdmin={isAdmin} onDelete={setDeletingOrder} />)}
+                        {group.rows.map((row) => renderMobile(row, isAdmin, setDeletingOrder, reprintCountByOrder))}
                       </ul>
 
                       {/* Desktop table */}
@@ -347,7 +396,7 @@ export default function OrdersPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {group.orders.map((o) => <DesktopRow key={o.id} order={o} isAdmin={isAdmin} onDelete={setDeletingOrder} />)}
+                            {group.rows.map((row) => renderDesktop(row, isAdmin, setDeletingOrder, reprintCountByOrder))}
                           </tbody>
                         </table>
                       </div>
@@ -364,7 +413,38 @@ export default function OrdersPage() {
   )
 }
 
-function MobileRow({ order, isAdmin, onDelete }) {
+// R25.3: строка списка — заказ или допечатка (из interleaveReprints).
+function renderMobile(row, isAdmin, onDelete, reprintCountByOrder) {
+  if (row.kind === 'reprint') return <ReprintMobileRow key={`r-${row.reprint.id}`} reprint={row.reprint} />
+  return (
+    <MobileRow key={row.order.id} order={row.order} isAdmin={isAdmin} onDelete={onDelete}
+      reprintCount={reprintCountByOrder[row.order.id] || 0} />
+  )
+}
+
+function renderDesktop(row, isAdmin, onDelete, reprintCountByOrder) {
+  if (row.kind === 'reprint') return <ReprintDesktopRow key={`r-${row.reprint.id}`} reprint={row.reprint} extraCell={isAdmin} />
+  return (
+    <DesktopRow key={row.order.id} order={row.order} isAdmin={isAdmin} onDelete={onDelete}
+      reprintCount={reprintCountByOrder[row.order.id] || 0} />
+  )
+}
+
+function ReprintsToggle({ checked, onChange }) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer rounded-lg border border-border px-3 py-2 hover:bg-surface-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="accent-accent"
+      />
+      Подзадачи
+    </label>
+  )
+}
+
+function MobileRow({ order, isAdmin, onDelete, reprintCount = 0 }) {
   const dotCls = getDeadlineDotClass(order.deadline)
   const textCls = getDeadlineClasses(order.deadline) || 'text-text-muted'
   return (
@@ -377,6 +457,7 @@ function MobileRow({ order, isAdmin, onDelete }) {
           <div className="flex items-center gap-2 min-w-0">
             {dotCls && <span className={`w-2 h-2 rounded-full shrink-0 ${dotCls}`} aria-hidden="true" />}
             <span className="font-semibold text-text">#{formatOrderNumber(order)}</span>
+            <ReprintsChip count={reprintCount} />
             {order.priority && order.priority !== 'normal' && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${PRIORITIES[order.priority]?.color}`}>
                 {PRIORITIES[order.priority]?.label}
@@ -414,7 +495,7 @@ function MobileRow({ order, isAdmin, onDelete }) {
   )
 }
 
-function DesktopRow({ order, isAdmin, onDelete }) {
+function DesktopRow({ order, isAdmin, onDelete, reprintCount = 0 }) {
   const deadlineLevel = getDeadlineLevel(order.deadline)
   const dotCls = getDeadlineDotClass(order.deadline)
   const borderCls = getDeadlineBorderClass(order.deadline) || 'border-l-transparent'
@@ -434,6 +515,7 @@ function DesktopRow({ order, isAdmin, onDelete }) {
           >
             #{formatOrderNumber(order)}
           </Link>
+          <ReprintsChip count={reprintCount} />
           {order.priority && order.priority !== 'normal' && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${PRIORITIES[order.priority]?.color}`}>
               {PRIORITIES[order.priority]?.label}

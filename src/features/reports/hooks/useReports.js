@@ -3,8 +3,9 @@ import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfMonth, startOfDay, endOfDay, format, parseISO } from 'date-fns'
-import { calculateWorkerPayout, settingsToRates, WORKER_RATES } from '@/shared/constants'
-import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog, pouringRateForShape } from '@/shared/lib/payout-context'
+import { calculateWorkerPayout, settingsToRates, resolvePayoutRates } from '@/shared/constants'
+import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog } from '@/shared/lib/payout-context'
+import { buildBonusRows, logPayoutTotals } from '../lib/payout-report'
 
 // R13.3 (бриф 02.06): период расширен — `today` (с начала дня), `custom:from:to`
 // (YYYY-MM-DD строки), плюс legacy '7' / '30' / 'month'.
@@ -263,46 +264,14 @@ export function useBonusReport(period = '30') {
       // ratesRes.error может быть PGRST116 (no rows) — это норм, используем default rates
       if (ratesRes.error && ratesRes.error.code !== 'PGRST116') throw ratesRes.error
 
-      // Фолбэк синхронизирован с WORKER_RATES: без pouring_shapes сложные формы
-      // оплачивались бы по 1 ₽, расходясь с calculateWorkerPayout (Unit Economics).
-      const rates = ratesRes.data?.value || {
-        pouring: 1, assembly_3d: 0.5, packaging: 1.5, selection: 0.5,
-        pouring_shapes: WORKER_RATES.pouring_by_shape,
-      }
+      // R25.0: ставки и правила — единый computeLogPayout (как в кабинете).
+      // Нет строки bonus_rates → дефолты WORKER_RATES.
+      const rates = resolvePayoutRates(settingsToRates(ratesRes.data?.value))
       // R19: формы стикеров для дифф. оплаты заливки.
       const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
       const orderShape = orderShapeFromLogs(logsRes.data)
 
-      const byWorker = {}
-      ;(logsRes.data || []).forEach((l) => {
-        const name = l.worker?.display_name || 'Неизвестный'
-        if (!byWorker[name]) byWorker[name] = { name, resin: 0, assembly: 0, packaging: 0, selection: 0, total: 0 }
-
-        if (l.stickers_good) {
-          const pRate = pouringRateForShape(shapeForLog(l, shapeByDesign, orderShape), rates)
-          byWorker[name].resin += l.stickers_good; byWorker[name].total += l.stickers_good * pRate
-        }
-        if (l.packs_assembled) {
-          // Сборка 3D: packs × stickers_per_pack × ставка (фидбэк 12.05)
-          const perPack = Number(l.order?.stickers_per_pack) || 1
-          byWorker[name].assembly += l.packs_assembled
-          byWorker[name].total += l.packs_assembled * perPack * (rates.assembly_3d || 0)
-        }
-        if (l.packs_packaged) { byWorker[name].packaging += l.packs_packaged; byWorker[name].total += l.packs_packaged * (rates.packaging || 0) }
-        if (l.qty_selected) {
-          // Выборка фонов — каждый фон = N стикеров (×stickers_per_pack).
-          // R22.7 (ТЗ Фаза 8): для stickerpack3D «Выборка» (stage='selection')
-          // = выборка фонов, оплата ×stickers_per_pack (как исторический
-          // selection_pouring). sticker3D «Выборка» штучная — ×1.
-          const isBgSelection = l.stage === 'selection_pouring'
-            || (l.stage === 'selection' && l.order?.order_type === 'stickerpack3D')
-          const perPack = isBgSelection ? (Number(l.order?.stickers_per_pack) || 1) : 1
-          byWorker[name].selection += l.qty_selected
-          byWorker[name].total += l.qty_selected * perPack * (rates.selection || 0)
-        }
-      })
-
-      setData(Object.values(byWorker).sort((a, b) => b.total - a.total))
+      setData(buildBonusRows(logsRes.data, rates, (l) => shapeForLog(l, shapeByDesign, orderShape)))
     } catch (err) {
       captureError(err, { tags: { source: 'reports.useBonusReport' }, extra: { period } })
       setError(err)
@@ -347,10 +316,8 @@ export function useEmployeeReport(period = '30') {
       if (logsRes.error) throw logsRes.error
       if (ratesRes.error && ratesRes.error.code !== 'PGRST116') throw ratesRes.error
 
-      const rates = ratesRes.data?.value || {
-        pouring: 1, assembly_3d: 0.5, packaging: 1.5, selection: 0.5,
-        pouring_shapes: WORKER_RATES.pouring_by_shape,
-      }
+      // R25.0: ставки и правила — единый computeLogPayout (как в кабинете).
+      const rates = resolvePayoutRates(settingsToRates(ratesRes.data?.value))
       // R19: формы стикеров для дифф. оплаты заливки.
       const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
       const orderShape = orderShapeFromLogs(logsRes.data)
@@ -390,33 +357,14 @@ export function useEmployeeReport(period = '30') {
         const w = ensure(l.worker_id, l.worker?.display_name || 'Неизвестный')
         const day = l.created_at ? format(new Date(l.created_at), 'dd.MM.yy') : null
         const d = day ? ensureDay(w, day) : null
-        const perPack = Number(l.order?.stickers_per_pack) || 1
-        // R14.6/R22.7: выборка фонов (selection_pouring ИЛИ selection у
-        // stickerpack3D) множится на stickers_per_pack; штучная выборка
-        // sticker3D (selection) — ×1.
-        const isBgSelection = l.stage === 'selection_pouring'
-          || (l.stage === 'selection' && l.order?.order_type === 'stickerpack3D')
-        const selectionMult = isBgSelection ? perPack : 1
-        if (l.stickers_good) {
-          const pRate = pouringRateForShape(shapeForLog(l, shapeByDesign, orderShape), rates)
-          const pay = l.stickers_good * pRate
-          w.poured += l.stickers_good; w.payout += pay
-          if (d) { d.poured += l.stickers_good; d.payout += pay }
-        }
-        if (l.qty_selected) {
-          const pay = l.qty_selected * selectionMult * (rates.selection || 0)
-          w.selected += l.qty_selected; w.payout += pay
-          if (d) { d.selected += l.qty_selected; d.payout += pay }
-        }
-        if (l.packs_assembled) {
-          const pay = l.packs_assembled * perPack * (rates.assembly_3d || 0)
-          w.assembled += l.packs_assembled; w.payout += pay
-          if (d) { d.assembled += l.packs_assembled; d.payout += pay }
-        }
-        if (l.packs_packaged) {
-          const pay = l.packs_packaged * (rates.packaging || 0)
-          w.packaged += l.packs_packaged; w.payout += pay
-          if (d) { d.packaged += l.packs_packaged; d.payout += pay }
+        const t = logPayoutTotals(l, rates, shapeForLog(l, shapeByDesign, orderShape))
+        w.poured += t.poured; w.selected += t.selected
+        w.assembled += t.assembled; w.packaged += t.packaged
+        w.payout += t.payout
+        if (d) {
+          d.poured += t.poured; d.selected += t.selected
+          d.assembled += t.assembled; d.packaged += t.packaged
+          d.payout += t.payout
         }
         if (l.stickers_printed) w.printed += l.stickers_printed
         if (l.lamination_qty) w.laminated += l.lamination_qty

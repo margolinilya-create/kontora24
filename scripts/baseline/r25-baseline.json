@@ -1,0 +1,9768 @@
+{
+ "by_stage": {
+  "assembly_3d": {
+   "defects": 0,
+   "logs": 208,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 0
+  },
+  "cutting": {
+   "defects": 7032,
+   "logs": 1340,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 0
+  },
+  "drying": {
+   "defects": 5676,
+   "logs": 390,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 0
+  },
+  "lamination": {
+   "defects": 306,
+   "logs": 96,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 0
+  },
+  "packaging": {
+   "defects": 15,
+   "logs": 290,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 0
+  },
+  "pouring": {
+   "defects": 41,
+   "logs": 1296,
+   "stickers_good": 73153,
+   "stickers_poured": 73173,
+   "stickers_printed": 0
+  },
+  "prepress": {
+   "defects": 0,
+   "logs": 166,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 0
+  },
+  "print": {
+   "defects": 0,
+   "logs": 1107,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 135886
+  },
+  "sample_print": {
+   "defects": 0,
+   "logs": 2,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 0
+  },
+  "selection": {
+   "defects": 0,
+   "logs": 325,
+   "stickers_good": 0,
+   "stickers_poured": 0,
+   "stickers_printed": 0
+  },
+  "selection_pouring": {
+   "defects": 532,
+   "logs": 630,
+   "stickers_good": 49562,
+   "stickers_poured": 37599,
+   "stickers_printed": 0
+  }
+ },
+ "materials": {
+  "011be3a3-3744-459c-8abd-816f0e4cc7e8": {
+   "delta_window": 1946,
+   "stock_at_cutoff": 1946
+  },
+  "020b0db6-594f-46f3-99c8-28f1e8ee1a15": {
+   "delta_window": -2.5,
+   "stock_at_cutoff": 12.5
+  },
+  "07cade40-e08a-4e89-a4d5-091c412e93db": {
+   "delta_window": 0,
+   "stock_at_cutoff": 645
+  },
+  "0a722acc-8df6-4349-94a1-07491ac982d0": {
+   "delta_window": 102,
+   "stock_at_cutoff": 200
+  },
+  "0bcbcfce-4c97-4be5-ab98-62a92e626611": {
+   "delta_window": 5672,
+   "stock_at_cutoff": 5672
+  },
+  "0e461dfe-872a-40b1-95a5-bcf3e7d42f25": {
+   "delta_window": 12613,
+   "stock_at_cutoff": 12613
+  },
+  "111eee1b-a94d-4be4-8078-1bf7b2040df2": {
+   "delta_window": 545,
+   "stock_at_cutoff": 545
+  },
+  "124e25b1-ef43-409c-8bc7-ca32996024ac": {
+   "delta_window": 150,
+   "stock_at_cutoff": 150
+  },
+  "17ced78f-5f01-4997-b53d-0c35a4672ccd": {
+   "delta_window": 48,
+   "stock_at_cutoff": 48
+  },
+  "1ae9d281-f6e9-4945-85af-74b34ae6410c": {
+   "delta_window": 93,
+   "stock_at_cutoff": 93
+  },
+  "1b0c2ed5-9d42-4c36-8c9b-4dfd788f5b39": {
+   "delta_window": -5,
+   "stock_at_cutoff": 45
+  },
+  "1bf63087-2ed0-4e92-801e-ea30431c9a68": {
+   "delta_window": 78,
+   "stock_at_cutoff": 78
+  },
+  "1f2a3a35-b736-465a-8687-c5a2a6ef92f8": {
+   "delta_window": 20,
+   "stock_at_cutoff": 20
+  },
+  "22d5a167-ae46-4417-af1e-cf56a367a88a": {
+   "delta_window": 0,
+   "stock_at_cutoff": 0
+  },
+  "2372f86d-f4e1-42e9-aa79-9ed74bfc6032": {
+   "delta_window": 120,
+   "stock_at_cutoff": 120
+  },
+  "2dda8a92-b483-45fa-91d9-de62afb38e53": {
+   "delta_window": -300,
+   "stock_at_cutoff": 0
+  },
+  "2ef46ec8-e027-4071-9049-141c1672b9b9": {
+   "delta_window": 1562,
+   "stock_at_cutoff": 1562
+  },
+  "2f07e1e6-1e29-44d3-9347-18bca0bece51": {
+   "delta_window": -12,
+   "stock_at_cutoff": 28
+  },
+  "30e3d630-6375-427c-bc91-112c67d43259": {
+   "delta_window": 27.4,
+   "stock_at_cutoff": 27.4
+  },
+  "338dfffc-093d-4d5d-bb26-a8503457118e": {
+   "delta_window": 0,
+   "stock_at_cutoff": 0
+  },
+  "3512bdcd-e6e3-41a3-886c-bfae3bfeab28": {
+   "delta_window": -280,
+   "stock_at_cutoff": 720
+  },
+  "3557c392-4fc7-4a43-a7f4-7ae00592811c": {
+   "delta_window": -735,
+   "stock_at_cutoff": -135
+  },
+  "371d3926-0f80-4301-a1cd-ff3be0b72c85": {
+   "delta_window": -11.4,
+   "stock_at_cutoff": 13.6
+  },
+  "37823bf0-310a-46be-8034-50c2cd5ba886": {
+   "delta_window": 105,
+   "stock_at_cutoff": 105
+  },
+  "38daf528-d0f7-4a9b-b546-950c387c0889": {
+   "delta_window": 71.5,
+   "stock_at_cutoff": 71.5
+  },
+  "3cc2a8d4-a74b-4f0b-beac-2a78b3fa91aa": {
+   "delta_window": 1675.8,
+   "stock_at_cutoff": 1675.8
+  },
+  "4205eaf1-829b-45c6-9ebc-a31d27545576": {
+   "delta_window": -234,
+   "stock_at_cutoff": 86
+  },
+  "434d2335-2a98-433c-bad7-9816d6cf1f51": {
+   "delta_window": 6,
+   "stock_at_cutoff": 6
+  },
+  "49cecf05-413c-418b-ad12-99057e7a5c7d": {
+   "delta_window": 50,
+   "stock_at_cutoff": 50
+  },
+  "4a3a4da1-65bb-45e0-b6cb-d9dc17322d13": {
+   "delta_window": 130,
+   "stock_at_cutoff": 130
+  },
+  "4bc388f1-8115-42a4-ac14-f21ec983b326": {
+   "delta_window": 0,
+   "stock_at_cutoff": 20
+  },
+  "4fd76884-286b-45ac-8092-ead287d61a04": {
+   "delta_window": -21.4,
+   "stock_at_cutoff": 28.6
+  },
+  "5123a9b5-1ce7-4ec5-86f6-7fd98c6b7400": {
+   "delta_window": 0,
+   "stock_at_cutoff": 5
+  },
+  "54127a38-7933-41bf-a388-5eea5ba2c741": {
+   "delta_window": 203,
+   "stock_at_cutoff": 303
+  },
+  "5527097b-ab6c-4957-9645-907e4c5aa4e6": {
+   "delta_window": 6,
+   "stock_at_cutoff": 6
+  },
+  "5531a356-7573-40e1-8bed-0918ef13f83b": {
+   "delta_window": 2,
+   "stock_at_cutoff": 2
+  },
+  "56d1f294-d4a2-4be2-b010-f088d776d40e": {
+   "delta_window": 181,
+   "stock_at_cutoff": 181
+  },
+  "617c7074-6480-4a3d-880c-9e08dee30224": {
+   "delta_window": 1,
+   "stock_at_cutoff": 1
+  },
+  "64822b58-1f61-4b29-848c-6a144238b35f": {
+   "delta_window": 0,
+   "stock_at_cutoff": 0
+  },
+  "6605aee5-5b67-485c-84a7-f5975b5c8e49": {
+   "delta_window": 359,
+   "stock_at_cutoff": 609
+  },
+  "6b1c3fbb-1a72-4c87-820f-4f10e730b4d5": {
+   "delta_window": -844,
+   "stock_at_cutoff": 56
+  },
+  "6bb1e743-1991-4212-bd2a-dc5b6544864d": {
+   "delta_window": 1,
+   "stock_at_cutoff": 1
+  },
+  "6e261431-8239-4f12-a1e6-2e5f64c74eda": {
+   "delta_window": 3,
+   "stock_at_cutoff": 5
+  },
+  "6f480857-73d3-4a39-91fc-23f47e69a3d8": {
+   "delta_window": 2,
+   "stock_at_cutoff": 2
+  },
+  "704cdf7b-da51-44a7-b428-c97fbc50254a": {
+   "delta_window": 3,
+   "stock_at_cutoff": 3
+  },
+  "70fcaa11-1578-4a6b-9686-f386b21b6c6c": {
+   "delta_window": 0,
+   "stock_at_cutoff": 86
+  },
+  "72924081-ea29-49cc-94ea-1df93c5b0c0a": {
+   "delta_window": 7,
+   "stock_at_cutoff": 7
+  },
+  "7429a6d2-f0b7-4f9c-8c41-09c0192aae35": {
+   "delta_window": 5230,
+   "stock_at_cutoff": 5230
+  },
+  "77f4a455-d566-4a9f-9a57-087abd52e99e": {
+   "delta_window": 1,
+   "stock_at_cutoff": 1
+  },
+  "839a1925-6dd3-4e74-90d1-b5392f78baf7": {
+   "delta_window": 99.8,
+   "stock_at_cutoff": 99.8
+  },
+  "8631bdc1-9556-4872-9c01-8f8b69f734f8": {
+   "delta_window": 17349,
+   "stock_at_cutoff": 17349
+  },
+  "866ec8ea-dbdf-45ad-9ff7-5c5213e59f28": {
+   "delta_window": 170,
+   "stock_at_cutoff": 170
+  },
+  "86ede2c0-d12c-4edc-8b3d-1781148042f2": {
+   "delta_window": 0,
+   "stock_at_cutoff": 0
+  },
+  "8a447093-73fa-455e-8b3c-13f9946d69a0": {
+   "delta_window": 2063,
+   "stock_at_cutoff": 2063
+  },
+  "8ad453f6-8036-44dd-99c6-fb046c63bd30": {
+   "delta_window": 15,
+   "stock_at_cutoff": 15
+  },
+  "8f2ec0a4-b356-460e-88c0-340ba03b01c5": {
+   "delta_window": -14,
+   "stock_at_cutoff": -14
+  },
+  "934d351d-212f-4093-bffc-40411b2acc40": {
+   "delta_window": 153,
+   "stock_at_cutoff": 153
+  },
+  "9528e95f-eeee-494b-8e41-41ded0eeb946": {
+   "delta_window": 2125,
+   "stock_at_cutoff": 2125
+  },
+  "95433444-ec83-4046-bacb-3bcdd9f246f1": {
+   "delta_window": 1,
+   "stock_at_cutoff": 1
+  },
+  "95791699-f16f-4856-9dbb-ef6fc4af54fd": {
+   "delta_window": -120,
+   "stock_at_cutoff": 280
+  },
+  "967f3c49-119b-4980-a307-a74916bb034f": {
+   "delta_window": 8.8,
+   "stock_at_cutoff": 8.8
+  },
+  "9bbb4d8d-a590-4b23-91be-0bd19dceffd1": {
+   "delta_window": -62,
+   "stock_at_cutoff": 148
+  },
+  "9dc3536e-71fc-47f0-ad44-8f9c9a8ae60e": {
+   "delta_window": 0,
+   "stock_at_cutoff": 100
+  },
+  "a19172a5-22c9-4730-a461-071aba90b5ef": {
+   "delta_window": -400,
+   "stock_at_cutoff": 600
+  },
+  "a26a24fd-736a-4fbd-a234-d34b75f8dc30": {
+   "delta_window": 0,
+   "stock_at_cutoff": 50
+  },
+  "a28283a2-a484-45fd-bf04-3cbda7134c7d": {
+   "delta_window": 1487,
+   "stock_at_cutoff": 1487
+  },
+  "a334d6be-bb43-4c39-9ee8-366c798ae368": {
+   "delta_window": 19,
+   "stock_at_cutoff": 19
+  },
+  "a626d9d1-2b2e-49b3-b29f-29c5905bacca": {
+   "delta_window": 4000,
+   "stock_at_cutoff": 4000
+  },
+  "a9e96aa8-0307-473f-9252-853ee821e344": {
+   "delta_window": 0,
+   "stock_at_cutoff": 0
+  },
+  "aa6ae328-95b6-44a9-b4f0-267e65320774": {
+   "delta_window": 0.86,
+   "stock_at_cutoff": 0.86
+  },
+  "add82f69-ba38-454f-98cb-fe11eb77c206": {
+   "delta_window": 4530,
+   "stock_at_cutoff": 4530
+  },
+  "b054144f-82ec-4f70-8cb7-e3b5d745d7d7": {
+   "delta_window": 12,
+   "stock_at_cutoff": 12
+  },
+  "b38dce89-48c2-4f8b-8053-7c7469176941": {
+   "delta_window": 1,
+   "stock_at_cutoff": 1
+  },
+  "b983e3e0-b953-44b7-a28e-a482f3746dab": {
+   "delta_window": 4,
+   "stock_at_cutoff": 4
+  },
+  "bf3bfd12-c80a-4771-b68c-4a69909993a1": {
+   "delta_window": 104,
+   "stock_at_cutoff": 104
+  },
+  "c09437d4-80e0-40cc-b77d-d24f0a4bec1c": {
+   "delta_window": 0,
+   "stock_at_cutoff": 0
+  },
+  "c107b067-bd2d-4126-8f3f-1b4811897ace": {
+   "delta_window": 0,
+   "stock_at_cutoff": 0
+  },
+  "c65ec075-9f3e-4f8d-a69e-05d872d90eca": {
+   "delta_window": 39.1,
+   "stock_at_cutoff": 39.1
+  },
+  "c738d373-a95a-4872-a78c-b2f28b3acedf": {
+   "delta_window": 50,
+   "stock_at_cutoff": 50
+  },
+  "ce5193f3-455a-49e4-bc52-2ee38be50c4c": {
+   "delta_window": -86,
+   "stock_at_cutoff": 134
+  },
+  "d1462953-7f17-4b81-aa45-b6ce8e980d49": {
+   "delta_window": -33,
+   "stock_at_cutoff": -33
+  },
+  "d4c75edd-2a22-4bc1-9525-25b6b93dadde": {
+   "delta_window": 85,
+   "stock_at_cutoff": 385
+  },
+  "d5d2c9b3-2799-4011-9e88-d32d0a11b318": {
+   "delta_window": 20,
+   "stock_at_cutoff": 20
+  },
+  "d7da7b2d-c853-4faa-b774-b352f348ae1a": {
+   "delta_window": 7,
+   "stock_at_cutoff": 7
+  },
+  "d861b0a1-30f8-4315-a95f-36f606684a86": {
+   "delta_window": 100,
+   "stock_at_cutoff": 100
+  },
+  "dded0100-1fab-4899-a023-646a91e5da46": {
+   "delta_window": -9,
+   "stock_at_cutoff": 338
+  },
+  "e069fcc0-93a2-49f1-b518-09fa9663f598": {
+   "delta_window": 0,
+   "stock_at_cutoff": 1400
+  },
+  "e0d4e2f7-6388-4879-97d0-e8d803657d7c": {
+   "delta_window": 135.1,
+   "stock_at_cutoff": 135.1
+  },
+  "e2244cb9-569a-4d67-b755-30ee48ace8d4": {
+   "delta_window": -37,
+   "stock_at_cutoff": -37
+  },
+  "e3bf33f0-c1f8-4ae1-a974-78a350450e51": {
+   "delta_window": 1,
+   "stock_at_cutoff": 1
+  },
+  "e69fe0dd-ab5d-4b02-9588-35df71433610": {
+   "delta_window": 15.7,
+   "stock_at_cutoff": 15.7
+  },
+  "e93e4538-9edb-47a6-9851-52a753193e22": {
+   "delta_window": 3800,
+   "stock_at_cutoff": 3800
+  },
+  "ecb6ec67-1dfa-4a0f-9650-70c87e50cdbe": {
+   "delta_window": 5598,
+   "stock_at_cutoff": 5598
+  },
+  "f733ea31-290b-467f-a9de-d29939a6b4fa": {
+   "delta_window": 127.20000000000002,
+   "stock_at_cutoff": 127.20000000000002
+  },
+  "f8705b4c-e643-4780-b2a1-16983aac9fe7": {
+   "delta_window": 16.25,
+   "stock_at_cutoff": 16.25
+  },
+  "fb996861-bd72-4260-87ac-05b01f51387e": {
+   "delta_window": 3845,
+   "stock_at_cutoff": 3845
+  },
+  "fd258446-1b76-480e-91df-aeeac7efb1d6": {
+   "delta_window": -980,
+   "stock_at_cutoff": 20
+  },
+  "fefa7a22-a7b6-4f7a-a2d2-dbebeda7dd1d": {
+   "delta_window": 15,
+   "stock_at_cutoff": 15
+  },
+  "ffad9a36-8066-4468-86cb-575664439d88": {
+   "delta_window": -3,
+   "stock_at_cutoff": 2
+  }
+ },
+ "meta": {
+  "from": "2026-05-01T00:00:00+00:00",
+  "to": "2026-11-17T00:00:00+00:00"
+ },
+ "payout_by_worker": {
+  "302bd742-4e35-4092-bdea-bd23bf772039": 96090.5,
+  "32d0d195-da95-4e5f-beda-d923ba5cf45b": 12462,
+  "34a122a8-c024-446c-9e77-a2e39874bdf1": 790,
+  "45414df5-67f2-4b72-8ea7-1e9b5539b98b": 34715.5,
+  "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7": 102087.5,
+  "7b8a1c63-1076-4cad-ba84-7ce01366e5d4": 6357,
+  "95eac31f-7aab-4e9a-80e7-8c0c2b47d5da": 6261.5,
+  "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e": 19400
+ },
+ "payout_inputs": [
+  {
+   "amount": 19064.5,
+   "assembled_packs": 5650,
+   "assembled_stickers": 38129,
+   "logs": 79,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "assembly_3d",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 277.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 6,
+   "order_type": "sticker3D",
+   "packaged": 185,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "big",
+   "stage": "packaging",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 4024.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 22,
+   "order_type": "sticker3D",
+   "packaged": 2683,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 798,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 3,
+   "order_type": "stickerpack",
+   "packaged": 532,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 8068.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 77,
+   "order_type": "stickerpack3D",
+   "packaged": 5379,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 357,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 9,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 238,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "big",
+   "stage": "pouring",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 126,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 3,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 84,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "complex",
+   "stage": "pouring",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 4485,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 53,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 4485,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "pouring",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 9,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 6,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "big",
+   "stage": "pouring",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 1269,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 16,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 846,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "complex",
+   "stage": "pouring",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 24508,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 487,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 24508,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "pouring",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 63,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker_cut",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 126,
+   "selected_stickers": 126,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 115.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker_kiss",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 231,
+   "selected_stickers": 231,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 125.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 7,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 251,
+   "selected_stickers": 251,
+   "shape": "big",
+   "stage": "selection",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 1239.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 28,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 2479,
+   "selected_stickers": 2479,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 20350.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 97,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 5950,
+   "selected_stickers": 40701,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 106.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 71,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "complex",
+   "stage": "selection_pouring",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 11103,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 142,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 8434,
+   "selected": 686,
+   "selected_stickers": 5338,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "302bd742-4e35-4092-bdea-bd23bf772039"
+  },
+  {
+   "amount": 1705.5,
+   "assembled_packs": 603,
+   "assembled_stickers": 3411,
+   "logs": 12,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "assembly_3d",
+   "worker_id": "32d0d195-da95-4e5f-beda-d923ba5cf45b"
+  },
+  {
+   "amount": 961.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 8,
+   "order_type": "stickerpack3D",
+   "packaged": 641,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "32d0d195-da95-4e5f-beda-d923ba5cf45b"
+  },
+  {
+   "amount": 12,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker_cut",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 24,
+   "selected_stickers": 24,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "32d0d195-da95-4e5f-beda-d923ba5cf45b"
+  },
+  {
+   "amount": 17,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker_kiss",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 34,
+   "selected_stickers": 34,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "32d0d195-da95-4e5f-beda-d923ba5cf45b"
+  },
+  {
+   "amount": 400,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 800,
+   "selected_stickers": 800,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "32d0d195-da95-4e5f-beda-d923ba5cf45b"
+  },
+  {
+   "amount": 5350,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 40,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 1525,
+   "selected_stickers": 10700,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "32d0d195-da95-4e5f-beda-d923ba5cf45b"
+  },
+  {
+   "amount": 4016,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 10,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 707,
+   "selected_stickers": 8032,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "32d0d195-da95-4e5f-beda-d923ba5cf45b"
+  },
+  {
+   "amount": 270,
+   "assembled_packs": 60,
+   "assembled_stickers": 540,
+   "logs": 3,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "assembly_3d",
+   "worker_id": "34a122a8-c024-446c-9e77-a2e39874bdf1"
+  },
+  {
+   "amount": 90,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "stickerpack3D",
+   "packaged": 60,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "34a122a8-c024-446c-9e77-a2e39874bdf1"
+  },
+  {
+   "amount": 430,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 1,
+   "selected": 78,
+   "selected_stickers": 858,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "34a122a8-c024-446c-9e77-a2e39874bdf1"
+  },
+  {
+   "amount": 5242.5,
+   "assembled_packs": 1291,
+   "assembled_stickers": 10485,
+   "logs": 26,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "assembly_3d",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 49.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "sticker3D",
+   "packaged": 33,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "big",
+   "stage": "packaging",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 22.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 3,
+   "order_type": "sticker3D",
+   "packaged": 15,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "complex",
+   "stage": "packaging",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 157.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 10,
+   "order_type": "sticker3D",
+   "packaged": 105,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 5766,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 52,
+   "order_type": "stickerpack3D",
+   "packaged": 3844,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 52,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 3,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 52,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "pouring",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 180,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 120,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "big",
+   "stage": "pouring",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 598.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 10,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 399,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "complex",
+   "stage": "pouring",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 5201,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 90,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 5201,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "pouring",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 1,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 2,
+   "selected_stickers": 2,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 4187,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 23,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 1922,
+   "selected_stickers": 8374,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 13258,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 71,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 7650,
+   "selected": 1616,
+   "selected_stickers": 11216,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "45414df5-67f2-4b72-8ea7-1e9b5539b98b"
+  },
+  {
+   "amount": 13708,
+   "assembled_packs": 3408,
+   "assembled_stickers": 27416,
+   "logs": 54,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "assembly_3d",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 217.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 5,
+   "order_type": "sticker3D",
+   "packaged": 145,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "big",
+   "stage": "packaging",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 1860,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 17,
+   "order_type": "sticker3D",
+   "packaged": 1240,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 229.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "stickerpack",
+   "packaged": 153,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 6958.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 51,
+   "order_type": "stickerpack3D",
+   "packaged": 4639,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 516,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 14,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 344,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "big",
+   "stage": "pouring",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 22.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 15,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "complex",
+   "stage": "pouring",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 5553,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 60,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 5553,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "pouring",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 2080.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 15,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 1387,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "complex",
+   "stage": "pouring",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 26542,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 524,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 26542,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "pouring",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 24.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker_cut",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 49,
+   "selected_stickers": 49,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 82.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "sticker_kiss",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 165,
+   "selected_stickers": 165,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 69,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 4,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 138,
+   "selected_stickers": 138,
+   "shape": "big",
+   "stage": "selection",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 374.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 9,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 749,
+   "selected_stickers": 749,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 13065.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 92,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 3418,
+   "selected_stickers": 26131,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 54.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 3,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 109,
+   "selected_stickers": 109,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 30729.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 304,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 28581,
+   "selected": 453,
+   "selected_stickers": 4297,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "4f07440f-76b7-4d7e-8ceb-d69011e6f0b7"
+  },
+  {
+   "amount": 120,
+   "assembled_packs": 30,
+   "assembled_stickers": 240,
+   "logs": 1,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "assembly_3d",
+   "worker_id": "7b8a1c63-1076-4cad-ba84-7ce01366e5d4"
+  },
+  {
+   "amount": 3373,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 6,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 3373,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "pouring",
+   "worker_id": "7b8a1c63-1076-4cad-ba84-7ce01366e5d4"
+  },
+  {
+   "amount": 50,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker_cut",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 100,
+   "selected_stickers": 100,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "7b8a1c63-1076-4cad-ba84-7ce01366e5d4"
+  },
+  {
+   "amount": 2814,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 22,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 2439,
+   "selected": 50,
+   "selected_stickers": 750,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "7b8a1c63-1076-4cad-ba84-7ce01366e5d4"
+  },
+  {
+   "amount": 1217.5,
+   "assembled_packs": 248,
+   "assembled_stickers": 2435,
+   "logs": 6,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "assembly_3d",
+   "worker_id": "95eac31f-7aab-4e9a-80e7-8c0c2b47d5da"
+  },
+  {
+   "amount": 243,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 6,
+   "order_type": "stickerpack3D",
+   "packaged": 162,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "95eac31f-7aab-4e9a-80e7-8c0c2b47d5da"
+  },
+  {
+   "amount": 4801,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 59,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 2386,
+   "selected": 568,
+   "selected_stickers": 4830,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "95eac31f-7aab-4e9a-80e7-8c0c2b47d5da"
+  },
+  {
+   "amount": 5655,
+   "assembled_packs": 1263,
+   "assembled_stickers": 11310,
+   "logs": 27,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "assembly_3d",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 51,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker_cut",
+   "packaged": 34,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 310.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "sticker3D",
+   "packaged": 207,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 2979,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 21,
+   "order_type": "stickerpack3D",
+   "packaged": 1986,
+   "poured_good": 0,
+   "selected": 0,
+   "selected_stickers": 0,
+   "shape": "standard",
+   "stage": "packaging",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 7.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "sticker_cut",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 15,
+   "selected_stickers": 15,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 173,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 4,
+   "order_type": "sticker_kiss",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 346,
+   "selected_stickers": 346,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 285.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 8,
+   "order_type": "sticker3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 571,
+   "selected_stickers": 571,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 2150,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 1,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 430,
+   "selected_stickers": 4300,
+   "shape": "standard",
+   "stage": "selection",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 795,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 2,
+   "order_type": "sticker_cut",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 1590,
+   "selected_stickers": 1590,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  },
+  {
+   "amount": 6993.5,
+   "assembled_packs": 0,
+   "assembled_stickers": 0,
+   "logs": 14,
+   "order_type": "stickerpack3D",
+   "packaged": 0,
+   "poured_good": 0,
+   "selected": 1366,
+   "selected_stickers": 13987,
+   "shape": "standard",
+   "stage": "selection_pouring",
+   "worker_id": "f3cb1193-1418-47b3-ae5f-b0eb6d317d6e"
+  }
+ ],
+ "quirk_fields_off_stage": {
+  "packs_assembled": 0,
+  "packs_packaged": 0,
+  "qty_selected": 0,
+  "stickers_good": 0
+ },
+ "rates": {
+  "assembly": 0.5,
+  "packaging": 1.5,
+  "pouring": 1,
+  "selection": 0.5,
+  "shapes": {
+   "big": 1.5,
+   "complex": 1.5,
+   "complex_big": 2,
+   "standard": 1
+  }
+ },
+ "three_d": [
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 1,
+   "printed": 0,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 1,
+   "printed": 0,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 1,
+   "printed": 0,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 1,
+   "printed": 0,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 1,
+   "printed": 0,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 1,
+   "printed": 0,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 1,
+   "printed": 0,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 90,
+   "number": 2,
+   "printed": 112,
+   "qty": 86,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 100,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 100,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 100,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 100,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 100,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 100,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 100,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 100,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 114,
+   "number": 4,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 720,
+   "number": 7,
+   "printed": 360,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 352,
+   "number": 7,
+   "printed": 352,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 320,
+   "number": 7,
+   "printed": 350,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 360,
+   "number": 7,
+   "printed": 360,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 329,
+   "number": 7,
+   "printed": 357,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 388,
+   "number": 7,
+   "printed": 360,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 335,
+   "number": 7,
+   "printed": 360,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 329,
+   "number": 7,
+   "printed": 357,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 357,
+   "number": 7,
+   "printed": 357,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 329,
+   "number": 7,
+   "printed": 357,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 341,
+   "number": 7,
+   "printed": 352,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 357,
+   "number": 7,
+   "printed": 357,
+   "qty": 276,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 88,
+   "number": 8,
+   "printed": 88,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 88,
+   "number": 8,
+   "printed": 84,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 88,
+   "number": 8,
+   "printed": 88,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 88,
+   "number": 8,
+   "printed": 88,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 88,
+   "number": 8,
+   "printed": 88,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 88,
+   "number": 8,
+   "printed": 83,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 88,
+   "number": 8,
+   "printed": 88,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 88,
+   "number": 8,
+   "printed": 85,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 315,
+   "number": 16,
+   "printed": 325,
+   "qty": 250,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 298,
+   "number": 16,
+   "printed": 322,
+   "qty": 250,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 307,
+   "number": 16,
+   "printed": 322,
+   "qty": 250,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 602,
+   "number": 16,
+   "printed": 322,
+   "qty": 250,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 644,
+   "number": 16,
+   "printed": 322,
+   "qty": 250,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 576,
+   "number": 16,
+   "printed": 322,
+   "qty": 250,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 156,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 162,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 152,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 156,
+   "number": 17,
+   "printed": 312,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 156,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 156,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 135,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 156,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 156,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 156,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 156,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 205,
+   "number": 17,
+   "printed": 156,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 21,
+   "printed": 0,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 21,
+   "printed": 0,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 6,
+   "design_index": 1,
+   "good": 124,
+   "number": 22,
+   "printed": 65,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 2,
+   "good": 192,
+   "number": 22,
+   "printed": 65,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 14,
+   "design_index": 3,
+   "good": 135,
+   "number": 22,
+   "printed": 65,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 65,
+   "number": 22,
+   "printed": 65,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 8,
+   "design_index": 5,
+   "good": 97,
+   "number": 22,
+   "printed": 65,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 9,
+   "design_index": 6,
+   "good": 72,
+   "number": 22,
+   "printed": 65,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 7,
+   "good": 69,
+   "number": 22,
+   "printed": 65,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 23,
+   "printed": 10,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 23,
+   "printed": 10,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 23,
+   "printed": 10,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 23,
+   "printed": 5,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 23,
+   "printed": 5,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 23,
+   "printed": 10,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 23,
+   "printed": 10,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 23,
+   "printed": 9,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 0,
+   "number": 23,
+   "printed": 10,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 0,
+   "number": 23,
+   "printed": 101,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 0,
+   "number": 23,
+   "printed": 10,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 0,
+   "number": 23,
+   "printed": 10,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 18,
+   "design_index": 1,
+   "good": 142,
+   "number": 40,
+   "printed": 520,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 25,
+   "design_index": 2,
+   "good": 207,
+   "number": 40,
+   "printed": 520,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 3,
+   "good": 227,
+   "number": 40,
+   "printed": 520,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 14,
+   "design_index": 4,
+   "good": 226,
+   "number": 40,
+   "printed": 520,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 22,
+   "design_index": 5,
+   "good": 168,
+   "number": 40,
+   "printed": 520,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 24,
+   "design_index": 6,
+   "good": 256,
+   "number": 40,
+   "printed": 519,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 17,
+   "design_index": 7,
+   "good": 213,
+   "number": 40,
+   "printed": 520,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 29,
+   "design_index": 8,
+   "good": 326,
+   "number": 40,
+   "printed": 520,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 1,
+   "good": 209,
+   "number": 43,
+   "printed": 234,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 28,
+   "design_index": 2,
+   "good": 223,
+   "number": 43,
+   "printed": 253,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 38,
+   "design_index": 3,
+   "good": 214,
+   "number": 43,
+   "printed": 297,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 4,
+   "good": 243,
+   "number": 43,
+   "printed": 256,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 8,
+   "design_index": 5,
+   "good": 206,
+   "number": 43,
+   "printed": 247,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 6,
+   "good": 245,
+   "number": 43,
+   "printed": 264,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 67,
+   "design_index": 7,
+   "good": 290,
+   "number": 43,
+   "printed": 280,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 8,
+   "good": 209,
+   "number": 43,
+   "printed": 252,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 12,
+   "design_index": 9,
+   "good": 213,
+   "number": 43,
+   "printed": 242,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 44,
+   "design_index": 1,
+   "good": 1333,
+   "number": 45,
+   "printed": 650,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 927,
+   "number": 45,
+   "printed": 650,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 3,
+   "good": 689,
+   "number": 45,
+   "printed": 650,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 9,
+   "design_index": 4,
+   "good": 573,
+   "number": 45,
+   "printed": 650,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 1,
+   "design_index": 1,
+   "good": 82,
+   "number": 47,
+   "printed": 80,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 2,
+   "good": 87,
+   "number": 47,
+   "printed": 94,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 13,
+   "design_index": 3,
+   "good": 77,
+   "number": 47,
+   "printed": 90,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 34,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 36,
+   "number": 49,
+   "printed": 36,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 32,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 33,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 30,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 33,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 38,
+   "number": 49,
+   "printed": 38,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 33,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 36,
+   "number": 49,
+   "printed": 36,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 36,
+   "number": 49,
+   "printed": 36,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 33,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 33,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 32,
+   "number": 49,
+   "printed": 36,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 30,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 33,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 33,
+   "number": 49,
+   "printed": 33,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 1,
+   "good": 84,
+   "number": 51,
+   "printed": 84,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 2,
+   "good": 84,
+   "number": 51,
+   "printed": 84,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 3,
+   "good": 72,
+   "number": 51,
+   "printed": 72,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 9,
+   "design_index": 4,
+   "good": 88,
+   "number": 51,
+   "printed": 78,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 5,
+   "good": 84,
+   "number": 51,
+   "printed": 84,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 6,
+   "good": 72,
+   "number": 51,
+   "printed": 72,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 72,
+   "number": 51,
+   "printed": 72,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 8,
+   "good": 72,
+   "number": 51,
+   "printed": 72,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 9,
+   "good": 77,
+   "number": 51,
+   "printed": 75,
+   "qty": 55,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 78,
+   "number": 52,
+   "printed": 78,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 78,
+   "number": 52,
+   "printed": 78,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 78,
+   "number": 52,
+   "printed": 78,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 77,
+   "number": 52,
+   "printed": 78,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 72,
+   "number": 52,
+   "printed": 78,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 117,
+   "number": 52,
+   "printed": 117,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 78,
+   "number": 52,
+   "printed": 78,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 70,
+   "number": 52,
+   "printed": 78,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 84,
+   "number": 52,
+   "printed": 84,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 140,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 131,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 115,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 126,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 107,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 219,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 120,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 135,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 140,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 104,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 108,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 102,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 124,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 102,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 196,
+   "number": 53,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 2,
+   "number": 57,
+   "printed": 3,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 2,
+   "number": 57,
+   "printed": 3,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 2,
+   "number": 57,
+   "printed": 3,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 2,
+   "number": 57,
+   "printed": 3,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 2,
+   "number": 57,
+   "printed": 3,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 2,
+   "number": 57,
+   "printed": 6,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 2,
+   "number": 57,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 2,
+   "number": 57,
+   "printed": 3,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 2,
+   "number": 57,
+   "printed": 3,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 206,
+   "number": 59,
+   "printed": 206,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 298,
+   "number": 59,
+   "printed": 198,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 200,
+   "number": 59,
+   "printed": 200,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 220,
+   "number": 59,
+   "printed": 220,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 191,
+   "number": 59,
+   "printed": 192,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 192,
+   "number": 59,
+   "printed": 192,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 195,
+   "number": 59,
+   "printed": 195,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 200,
+   "number": 59,
+   "printed": 200,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 200,
+   "number": 59,
+   "printed": 200,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 209,
+   "number": 59,
+   "printed": 209,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 198,
+   "number": 59,
+   "printed": 198,
+   "qty": 150,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 108,
+   "number": 61,
+   "printed": 108,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 108,
+   "number": 61,
+   "printed": 108,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 105,
+   "number": 61,
+   "printed": 108,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 105,
+   "number": 61,
+   "printed": 108,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 91,
+   "number": 61,
+   "printed": 108,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 101,
+   "number": 61,
+   "printed": 108,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 108,
+   "number": 61,
+   "printed": 108,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 104,
+   "number": 61,
+   "printed": 108,
+   "qty": 65,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 64,
+   "printed": 0,
+   "qty": 200,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 64,
+   "printed": 0,
+   "qty": 200,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 64,
+   "printed": 0,
+   "qty": 200,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 64,
+   "printed": 0,
+   "qty": 200,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 392,
+   "number": 66,
+   "printed": 392,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 392,
+   "number": 66,
+   "printed": 392,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 392,
+   "number": 66,
+   "printed": 392,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 392,
+   "number": 66,
+   "printed": 392,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 392,
+   "number": 66,
+   "printed": 392,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 392,
+   "number": 66,
+   "printed": 392,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 392,
+   "number": 66,
+   "printed": 392,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 392,
+   "number": 66,
+   "printed": 392,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 1,
+   "number": 71,
+   "printed": 1,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 155,
+   "number": 73,
+   "printed": 155,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 270,
+   "number": 73,
+   "printed": 270,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 190,
+   "number": 73,
+   "printed": 190,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 158,
+   "number": 73,
+   "printed": 158,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 140,
+   "number": 73,
+   "printed": 140,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 4,
+   "number": 74,
+   "printed": 4,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 45,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 45,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 68,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 68,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 68,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 68,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 68,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 68,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 68,
+   "number": 75,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 122,
+   "design_index": 1,
+   "good": 556,
+   "number": 81,
+   "printed": 590,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 40,
+   "design_index": 2,
+   "good": 590,
+   "number": 81,
+   "printed": 590,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 18,
+   "design_index": 3,
+   "good": 578,
+   "number": 81,
+   "printed": 729,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 80,
+   "design_index": 4,
+   "good": 558,
+   "number": 81,
+   "printed": 680,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 20,
+   "design_index": 5,
+   "good": 587,
+   "number": 81,
+   "printed": 590,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 108,
+   "design_index": 6,
+   "good": 590,
+   "number": 81,
+   "printed": 730,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 97,
+   "design_index": 7,
+   "good": 734,
+   "number": 81,
+   "printed": 590,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 744,
+   "number": 81,
+   "printed": 590,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 127,
+   "design_index": 9,
+   "good": 714,
+   "number": 81,
+   "printed": 716,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 89,
+   "design_index": 10,
+   "good": 875,
+   "number": 81,
+   "printed": 730,
+   "qty": 450,
+   "status": "done"
+  },
+  {
+   "defects": 26,
+   "design_index": 1,
+   "good": 77,
+   "number": 93,
+   "printed": 77,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 13,
+   "design_index": 2,
+   "good": 77,
+   "number": 93,
+   "printed": 76,
+   "qty": 60,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 115,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 87,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 94,
+   "printed": 99,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 44,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 115,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 79,
+   "number": 94,
+   "printed": 100,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 65,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 65,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 65,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 65,
+   "number": 97,
+   "printed": 73,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 65,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 65,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 65,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 65,
+   "number": 97,
+   "printed": 64,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 65,
+   "number": 97,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 65,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 64,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 65,
+   "number": 97,
+   "printed": 65,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 65,
+   "number": 97,
+   "printed": 73,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 65,
+   "number": 97,
+   "printed": 73,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 103,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 103,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 103,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 103,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 103,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 1,
+   "good": 294,
+   "number": 104,
+   "printed": 300,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 19,
+   "design_index": 2,
+   "good": 294,
+   "number": 104,
+   "printed": 300,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 31,
+   "design_index": 3,
+   "good": 294,
+   "number": 104,
+   "printed": 299,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 50,
+   "design_index": 4,
+   "good": 294,
+   "number": 104,
+   "printed": 300,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 5,
+   "good": 294,
+   "number": 104,
+   "printed": 300,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 37,
+   "design_index": 6,
+   "good": 294,
+   "number": 104,
+   "printed": 300,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 47,
+   "design_index": 7,
+   "good": 294,
+   "number": 104,
+   "printed": 300,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 27,
+   "design_index": 8,
+   "good": 294,
+   "number": 104,
+   "printed": 300,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 9,
+   "good": 278,
+   "number": 104,
+   "printed": 300,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 71,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 71,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 71,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 71,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 71,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 71,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 71,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 71,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 86,
+   "number": 117,
+   "printed": 72,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 378,
+   "number": 122,
+   "printed": 404,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 268,
+   "number": 122,
+   "printed": 296,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 268,
+   "number": 122,
+   "printed": 297,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 268,
+   "number": 122,
+   "printed": 297,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 268,
+   "number": 122,
+   "printed": 297,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 268,
+   "number": 122,
+   "printed": 297,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 268,
+   "number": 122,
+   "printed": 270,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 268,
+   "number": 122,
+   "printed": 297,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 268,
+   "number": 122,
+   "printed": 297,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 60,
+   "number": 126,
+   "printed": 76,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 60,
+   "number": 126,
+   "printed": 76,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 50,
+   "number": 126,
+   "printed": 76,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 50,
+   "number": 126,
+   "printed": 76,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 70,
+   "number": 127,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 129,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 129,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 129,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 129,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 129,
+   "printed": 2,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 50,
+   "number": 130,
+   "printed": 70,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 50,
+   "number": 130,
+   "printed": 70,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 50,
+   "number": 130,
+   "printed": 70,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 50,
+   "number": 130,
+   "printed": 70,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 50,
+   "number": 130,
+   "printed": 70,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 50,
+   "number": 130,
+   "printed": 70,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 50,
+   "number": 130,
+   "printed": 70,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 50,
+   "number": 130,
+   "printed": 70,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 100,
+   "number": 131,
+   "printed": 160,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 100,
+   "number": 131,
+   "printed": 160,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 100,
+   "number": 131,
+   "printed": 159,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 100,
+   "number": 131,
+   "printed": 160,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 100,
+   "number": 131,
+   "printed": 160,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 100,
+   "number": 131,
+   "printed": 160,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 100,
+   "number": 131,
+   "printed": 160,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 100,
+   "number": 131,
+   "printed": 160,
+   "qty": 120,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 88,
+   "number": 133,
+   "printed": 264,
+   "qty": 88,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 88,
+   "number": 133,
+   "printed": 264,
+   "qty": 88,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 88,
+   "number": 133,
+   "printed": 264,
+   "qty": 88,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 100,
+   "number": 133,
+   "printed": 264,
+   "qty": 88,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 100,
+   "number": 133,
+   "printed": 264,
+   "qty": 88,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 100,
+   "number": 133,
+   "printed": 264,
+   "qty": 88,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 100,
+   "number": 133,
+   "printed": 264,
+   "qty": 88,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 100,
+   "number": 133,
+   "printed": 264,
+   "qty": 88,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 10,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 0,
+   "number": 136,
+   "printed": 0,
+   "qty": 49,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 390,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 390,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 269,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 390,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 390,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 384,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 390,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 291,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 297,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 388,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 387,
+   "number": 141,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 17,
+   "good": 0,
+   "number": 143,
+   "printed": 0,
+   "qty": 2,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 100,
+   "number": 144,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 100,
+   "number": 144,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 100,
+   "number": 144,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 100,
+   "number": 144,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 100,
+   "number": 144,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 100,
+   "number": 144,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 100,
+   "number": 144,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 10,
+   "good": 78,
+   "number": 146,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 59,
+   "number": 157,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 420,
+   "number": 160,
+   "printed": 0,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 440,
+   "number": 160,
+   "printed": 0,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 50,
+   "design_index": 3,
+   "good": 453,
+   "number": 160,
+   "printed": 0,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 435,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 232,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 443,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 202,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 193,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 202,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 202,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 202,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 193,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 202,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 193,
+   "number": 161,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 1,
+   "good": 60,
+   "number": 163,
+   "printed": 0,
+   "qty": 51,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 2,
+   "good": 60,
+   "number": 163,
+   "printed": 0,
+   "qty": 51,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 3,
+   "good": 60,
+   "number": 163,
+   "printed": 0,
+   "qty": 51,
+   "status": "done"
+  },
+  {
+   "defects": 6,
+   "design_index": 4,
+   "good": 60,
+   "number": 163,
+   "printed": 0,
+   "qty": 51,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 5,
+   "good": 60,
+   "number": 163,
+   "printed": 0,
+   "qty": 51,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 6,
+   "good": 60,
+   "number": 163,
+   "printed": 0,
+   "qty": 51,
+   "status": "done"
+  },
+  {
+   "defects": 1,
+   "design_index": 7,
+   "good": 60,
+   "number": 163,
+   "printed": 0,
+   "qty": 51,
+   "status": "done"
+  },
+  {
+   "defects": 9,
+   "design_index": 8,
+   "good": 60,
+   "number": 163,
+   "printed": 0,
+   "qty": 51,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 126,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 166,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 270,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 120,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 128,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 222,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 135,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 129,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 126,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 32,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 90,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 0,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 13,
+   "good": 108,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 14,
+   "good": 123,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 15,
+   "good": 123,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 16,
+   "good": 123,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 17,
+   "good": 123,
+   "number": 168,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 17,
+   "design_index": 1,
+   "good": 460,
+   "number": 170,
+   "printed": 0,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 30,
+   "design_index": 2,
+   "good": 460,
+   "number": 170,
+   "printed": 0,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 66,
+   "design_index": 3,
+   "good": 460,
+   "number": 170,
+   "printed": 0,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 98,
+   "design_index": 4,
+   "good": 460,
+   "number": 170,
+   "printed": 0,
+   "qty": 400,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 58,
+   "number": 172,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 175,
+   "printed": 0,
+   "qty": 100,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 175,
+   "printed": 0,
+   "qty": 100,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 175,
+   "printed": 0,
+   "qty": 100,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 175,
+   "printed": 0,
+   "qty": 100,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 175,
+   "printed": 0,
+   "qty": 100,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 175,
+   "printed": 0,
+   "qty": 100,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 175,
+   "printed": 0,
+   "qty": 100,
+   "status": "cancelled"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 175,
+   "printed": 0,
+   "qty": 100,
+   "status": "cancelled"
+  },
+  {
+   "defects": 25,
+   "design_index": 1,
+   "good": 1333,
+   "number": 180,
+   "printed": 0,
+   "qty": 1500,
+   "status": "done"
+  },
+  {
+   "defects": 29,
+   "design_index": 2,
+   "good": 1333,
+   "number": 180,
+   "printed": 0,
+   "qty": 1500,
+   "status": "done"
+  },
+  {
+   "defects": 40,
+   "design_index": 3,
+   "good": 1333,
+   "number": 180,
+   "printed": 0,
+   "qty": 1500,
+   "status": "done"
+  },
+  {
+   "defects": 38,
+   "design_index": 4,
+   "good": 1333,
+   "number": 180,
+   "printed": 0,
+   "qty": 1500,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 52,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 54,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 55,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 62,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 53,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 17,
+   "good": 48,
+   "number": 182,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 1,
+   "good": 60,
+   "number": 184,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 2,
+   "good": 60,
+   "number": 184,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 3,
+   "good": 60,
+   "number": 184,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 4,
+   "good": 60,
+   "number": 184,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 1,
+   "good": 95,
+   "number": 190,
+   "printed": 0,
+   "qty": 75,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 2,
+   "good": 95,
+   "number": 190,
+   "printed": 0,
+   "qty": 75,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 3,
+   "good": 95,
+   "number": 190,
+   "printed": 0,
+   "qty": 75,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 4,
+   "good": 95,
+   "number": 190,
+   "printed": 0,
+   "qty": 75,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 1011,
+   "number": 191,
+   "printed": 0,
+   "qty": 1000,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 1011,
+   "number": 191,
+   "printed": 0,
+   "qty": 1000,
+   "status": "done"
+  },
+  {
+   "defects": 28,
+   "design_index": 1,
+   "good": 550,
+   "number": 192,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 27,
+   "design_index": 2,
+   "good": 550,
+   "number": 192,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 38,
+   "design_index": 3,
+   "good": 550,
+   "number": 192,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 36,
+   "design_index": 4,
+   "good": 550,
+   "number": 192,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 1,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 2,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 1,
+   "design_index": 3,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 4,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 5,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 6,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 7,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 8,
+   "design_index": 8,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 9,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 10,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 9,
+   "design_index": 11,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 12,
+   "good": 66,
+   "number": 193,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 50,
+   "number": 194,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 50,
+   "number": 194,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 1,
+   "good": 118,
+   "number": 196,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 82,
+   "design_index": 1,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 68,
+   "design_index": 2,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 56,
+   "design_index": 3,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 47,
+   "design_index": 4,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 36,
+   "design_index": 5,
+   "good": 587,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 80,
+   "design_index": 6,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 61,
+   "design_index": 7,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 46,
+   "design_index": 8,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 93,
+   "design_index": 9,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 109,
+   "design_index": 10,
+   "good": 588,
+   "number": 197,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 3,
+   "number": 201,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 3,
+   "number": 201,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 243,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 315,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 261,
+   "number": 202,
+   "printed": 0,
+   "qty": 205,
+   "status": "done"
+  },
+  {
+   "defects": 90,
+   "design_index": 1,
+   "good": 174,
+   "number": 204,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 71,
+   "design_index": 2,
+   "good": 196,
+   "number": 204,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 3,
+   "good": 174,
+   "number": 204,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 23,
+   "design_index": 4,
+   "good": 196,
+   "number": 204,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 5,
+   "good": 174,
+   "number": 204,
+   "printed": 0,
+   "qty": 200,
+   "status": "done"
+  },
+  {
+   "defects": 18,
+   "design_index": 1,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 19,
+   "design_index": 2,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 3,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 6,
+   "design_index": 4,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 5,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 6,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 7,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 8,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 9,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 10,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 11,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 6,
+   "design_index": 12,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 13,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 9,
+   "design_index": 14,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 15,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 16,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 17,
+   "good": 60,
+   "number": 206,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 8,
+   "design_index": 1,
+   "good": 134,
+   "number": 217,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 16,
+   "design_index": 2,
+   "good": 142,
+   "number": 217,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 141,
+   "number": 217,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 4,
+   "good": 129,
+   "number": 217,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 13,
+   "design_index": 1,
+   "good": 126,
+   "number": 218,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 24,
+   "design_index": 2,
+   "good": 134,
+   "number": 218,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 18,
+   "design_index": 3,
+   "good": 132,
+   "number": 218,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 1,
+   "design_index": 4,
+   "good": 141,
+   "number": 218,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 12,
+   "design_index": 2,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 3,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 4,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 19,
+   "design_index": 5,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 6,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 0,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 76,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 76,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 76,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 76,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 17,
+   "good": 76,
+   "number": 220,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 17,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 18,
+   "good": 78,
+   "number": 223,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 17,
+   "good": 1,
+   "number": 224,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 1,
+   "good": 78,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 19,
+   "design_index": 2,
+   "good": 88,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 3,
+   "good": 77,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 4,
+   "good": 86,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 6,
+   "design_index": 5,
+   "good": 82,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 6,
+   "good": 78,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 7,
+   "good": 75,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 8,
+   "good": 78,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 9,
+   "good": 79,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 10,
+   "good": 77,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 11,
+   "good": 77,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 14,
+   "design_index": 12,
+   "good": 77,
+   "number": 226,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 0,
+   "number": 228,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 60,
+   "number": 230,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 1,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 2,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 3,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 55,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 17,
+   "good": 54,
+   "number": 234,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 17,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 18,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 19,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 20,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 21,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 22,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 23,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 24,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 25,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 26,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 27,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 28,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 29,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 30,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 31,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 32,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 33,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 34,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 35,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 36,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 37,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 38,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 39,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 40,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 41,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 42,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 43,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 44,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 45,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 46,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 47,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 48,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 49,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 50,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 51,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 52,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 53,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 54,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 55,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 56,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 57,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 58,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 59,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 60,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 61,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 62,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 63,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 64,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 65,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 66,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 67,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 68,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 69,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 70,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 71,
+   "good": 20,
+   "number": 236,
+   "printed": 0,
+   "qty": 16,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 237,
+   "printed": 0,
+   "qty": 141,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 237,
+   "printed": 0,
+   "qty": 141,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 237,
+   "printed": 0,
+   "qty": 141,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 237,
+   "printed": 0,
+   "qty": 141,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 237,
+   "printed": 0,
+   "qty": 141,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 237,
+   "printed": 0,
+   "qty": 141,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 237,
+   "printed": 0,
+   "qty": 141,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 237,
+   "printed": 0,
+   "qty": 141,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 248,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 14,
+   "design_index": 1,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 2,
+   "good": 67,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 8,
+   "design_index": 3,
+   "good": 68,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 12,
+   "design_index": 4,
+   "good": 70,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 1,
+   "design_index": 6,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 6,
+   "design_index": 7,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 8,
+   "good": 68,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 9,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 10,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 19,
+   "design_index": 11,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 12,
+   "good": 63,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 9,
+   "design_index": 13,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 14,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 15,
+   "good": 60,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 11,
+   "design_index": 16,
+   "good": 63,
+   "number": 250,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 16,
+   "design_index": 1,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 16,
+   "design_index": 2,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 16,
+   "design_index": 3,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 17,
+   "design_index": 4,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 17,
+   "design_index": 5,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 13,
+   "design_index": 6,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 7,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 12,
+   "design_index": 8,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 9,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 10,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 11,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 12,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 13,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 14,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 15,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 16,
+   "design_index": 16,
+   "good": 40,
+   "number": 251,
+   "printed": 0,
+   "qty": 30,
+   "status": "done"
+  },
+  {
+   "defects": 1,
+   "design_index": 1,
+   "good": 26,
+   "number": 253,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 2,
+   "design_index": 2,
+   "good": 27,
+   "number": 253,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 8,
+   "design_index": 3,
+   "good": 27,
+   "number": 253,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 26,
+   "number": 253,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 4,
+   "design_index": 5,
+   "good": 27,
+   "number": 253,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 5,
+   "design_index": 6,
+   "good": 26,
+   "number": 253,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 7,
+   "good": 26,
+   "number": 253,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 7,
+   "design_index": 8,
+   "good": 30,
+   "number": 253,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 256,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 256,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 256,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 256,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 256,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 256,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 256,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 256,
+   "printed": 0,
+   "qty": 20,
+   "status": "done"
+  },
+  {
+   "defects": 12,
+   "design_index": 1,
+   "good": 131,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 30,
+   "design_index": 2,
+   "good": 126,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 100,
+   "design_index": 3,
+   "good": 126,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 20,
+   "design_index": 4,
+   "good": 126,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 5,
+   "good": 127,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 25,
+   "design_index": 6,
+   "good": 130,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 22,
+   "design_index": 7,
+   "good": 126,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 24,
+   "design_index": 8,
+   "good": 64,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 10,
+   "design_index": 9,
+   "good": 134,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 13,
+   "design_index": 10,
+   "good": 132,
+   "number": 257,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 15,
+   "design_index": 1,
+   "good": 130,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 35,
+   "design_index": 2,
+   "good": 130,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 19,
+   "design_index": 3,
+   "good": 130,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 20,
+   "design_index": 4,
+   "good": 130,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 26,
+   "design_index": 5,
+   "good": 130,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 18,
+   "design_index": 7,
+   "good": 130,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 8,
+   "design_index": 8,
+   "good": 130,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 16,
+   "design_index": 9,
+   "good": 118,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 14,
+   "design_index": 10,
+   "good": 129,
+   "number": 258,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 12,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 13,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 14,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 15,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 16,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 17,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 18,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 19,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 20,
+   "good": 0,
+   "number": 259,
+   "printed": 0,
+   "qty": 100,
+   "status": "done"
+  },
+  {
+   "defects": 1,
+   "design_index": 1,
+   "good": 10,
+   "number": 266,
+   "printed": 0,
+   "qty": 1,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 9,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 10,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 11,
+   "good": 60,
+   "number": 269,
+   "printed": 0,
+   "qty": 52,
+   "status": "done"
+  },
+  {
+   "defects": 137,
+   "design_index": 1,
+   "good": 586,
+   "number": 270,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 47,
+   "design_index": 2,
+   "good": 586,
+   "number": 270,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 58,
+   "design_index": 3,
+   "good": 586,
+   "number": 270,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 60,
+   "design_index": 4,
+   "good": 586,
+   "number": 270,
+   "printed": 0,
+   "qty": 500,
+   "status": "done"
+  },
+  {
+   "defects": 20,
+   "design_index": 1,
+   "good": 60,
+   "number": 273,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 3,
+   "design_index": 2,
+   "good": 60,
+   "number": 273,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 60,
+   "number": 273,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 60,
+   "number": 273,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 60,
+   "number": 273,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 18,
+   "design_index": 6,
+   "good": 60,
+   "number": 273,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 21,
+   "design_index": 7,
+   "good": 60,
+   "number": 273,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 60,
+   "number": 273,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 274,
+   "printed": 0,
+   "qty": 350,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 277,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 277,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 277,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 4,
+   "good": 0,
+   "number": 277,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 5,
+   "good": 0,
+   "number": 277,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 6,
+   "good": 0,
+   "number": 277,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 7,
+   "good": 0,
+   "number": 277,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 8,
+   "good": 0,
+   "number": 277,
+   "printed": 0,
+   "qty": 50,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 279,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 348,
+   "number": 280,
+   "printed": 0,
+   "qty": 300,
+   "status": "done"
+  },
+  {
+   "defects": 0,
+   "design_index": 1,
+   "good": 0,
+   "number": 281,
+   "printed": 0,
+   "qty": 100,
+   "status": "pouring"
+  },
+  {
+   "defects": 0,
+   "design_index": 2,
+   "good": 0,
+   "number": 281,
+   "printed": 0,
+   "qty": 100,
+   "status": "pouring"
+  },
+  {
+   "defects": 0,
+   "design_index": 3,
+   "good": 0,
+   "number": 281,
+   "printed": 0,
+   "qty": 100,
+   "status": "pouring"
+  }
+ ]
+}

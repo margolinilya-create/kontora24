@@ -1,7 +1,7 @@
 // R19 (бриф 30.06): вкладка «Ставки» в /settings — сдельная оплата.
 // Заливка оплачивается по форме стикера (standard/complex/big/complex_big),
 // плюс выборка / сборка / упаковка. Хранится в k24_settings key='bonus_rates'.
-// Читают: calculateWorkerPayout (через settingsToRates) + инлайн-хуки отчётов.
+// Читают: computeLogPayout (через settingsToRates + resolvePayoutRates) — кабинет, отчёты, аналитика.
 
 import { useState, useEffect } from 'react'
 import { useSettings } from '@/features/settings/hooks/useSettings'

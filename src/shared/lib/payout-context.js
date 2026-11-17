@@ -54,9 +54,3 @@ export function shapeForLog(log, shapeByDesign, orderShape) {
   )
 }
 
-/** Ставка заливки для формы из bonus_rates ({ pouring, pouring_shapes }). */
-export function pouringRateForShape(shape, bonusRates) {
-  const byShape = bonusRates?.pouring_shapes
-  if (byShape && byShape[shape] != null) return Number(byShape[shape])
-  return Number(bonusRates?.pouring) || 0
-}

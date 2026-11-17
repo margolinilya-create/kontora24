@@ -700,6 +700,91 @@ const POURING_SHAPE_LABEL = {
   complex_big: 'Заливка (сложная и большая)',
 }
 
+const POURING_SHAPES = ['standard', 'complex', 'big', 'complex_big']
+
+/**
+ * R25.0: полные ставки в форме WORKER_RATES (дефолты + переопределение).
+ * pouring_by_shape мёржится поштучно, чтобы частичная карта форм не теряла
+ * дефолтные ставки остальных форм.
+ * @param {object} [override] — результат settingsToRates() или undefined
+ */
+export function resolvePayoutRates(override) {
+  return {
+    ...WORKER_RATES,
+    ...(override || {}),
+    pouring_by_shape: { ...WORKER_RATES.pouring_by_shape, ...(override?.pouring_by_shape || {}) },
+  }
+}
+
+/**
+ * R25.0: единая сдельная оплата ОДНОГО лога — источник истины для
+ * calculateWorkerPayout (кабинет / FinanceTab / аналитика / Unit Economics)
+ * и отчётов «Сдельная оплата» / «Сотрудники» (useBonusReport / useEmployeeReport).
+ *
+ * Правила (поле оплачивается только на «своём» этапе):
+ *   • pouring | selection_pouring: stickers_good (>0) × ставка формы → 'pouring_<shape>'
+ *   • selection_pouring: qty_selected × stickers_per_pack → 'selection'
+ *   • selection: qty_selected × (stickers_per_pack для stickerpack3D, иначе 1) → 'selection'
+ *   • assembly_3d: packs_assembled × stickers_per_pack → 'assembly'
+ *   • packaging: packs_packaged → 'packaging'
+ * stickers_per_pack = order.stickers_per_pack (NULL/0 → 1).
+ *
+ * До R25.0 отчёты платили по полю без проверки этапа (напр. упаковка — по любому
+ * логу с packs_packaged). В проде таких логов нет (эталон r25-baseline.json,
+ * quirk_fields_off_stage = 0), поэтому цифры мая–ноября не меняются.
+ *
+ * @param {object} log — запись k24_production_logs
+ * @param {object|null} order — заказ лога (нужны order_type, stickers_per_pack)
+ * @param {object} rates — полные ставки (resolvePayoutRates())
+ * @param {object} [ctx]
+ * @param {string} [ctx.shape] — форма стикера для заливки (дефолт 'standard')
+ * @returns {Array<{category: string, qty: number, units: number, rate: number, amount: number, shape?: string}>}
+ *   qty — исходное количество из лога (стикеры / фоны / паки), units — оплачиваемые
+ *   единицы (qty × множитель), amount = units × rate. Пустой массив — лог не оплачивается.
+ */
+export function computeLogPayout(log, order, rates, ctx = {}) {
+  const out = []
+  if (!log) return out
+  const stage = log.stage
+  const perPack = Number(order?.stickers_per_pack) || 1
+
+  if (stage === 'pouring' || stage === 'selection_pouring') {
+    const good = Number(log.stickers_good) || 0
+    if (good > 0) {
+      const shape = POURING_SHAPES.includes(ctx.shape) ? ctx.shape : 'standard'
+      const rate = rates.pouring_by_shape?.[shape] ?? rates.pouring_per_sticker
+      out.push({ category: `pouring_${shape}`, shape, qty: good, units: good, rate, amount: good * rate })
+    }
+  }
+  if (stage === 'selection_pouring' || stage === 'selection') {
+    const qty = Number(log.qty_selected) || 0
+    if (qty !== 0) {
+      // selection_pouring — выборка фонов (×spp). selection: R11 штучные стикеры
+      // sticker3D (×1); R22.7 — у stickerpack3D это выборка фонов (×spp).
+      const mult = stage === 'selection_pouring' || order?.order_type === 'stickerpack3D' ? perPack : 1
+      const units = qty * mult
+      const rate = rates.selection_per_sticker
+      out.push({ category: 'selection', qty, units, rate, amount: units * rate })
+    }
+  }
+  if (stage === 'assembly_3d') {
+    const packs = Number(log.packs_assembled) || 0
+    if (packs !== 0) {
+      const units = packs * perPack
+      const rate = rates.assembly_per_pack
+      out.push({ category: 'assembly', qty: packs, units, rate, amount: units * rate })
+    }
+  }
+  if (stage === 'packaging') {
+    const packs = Number(log.packs_packaged) || 0
+    if (packs !== 0) {
+      const rate = rates.packaging_per_pack
+      out.push({ category: 'packaging', qty: packs, units: packs, rate, amount: packs * rate })
+    }
+  }
+  return out
+}
+
 /**
  * Подсчитать заработок работника из массива production logs.
  *
@@ -711,24 +796,18 @@ const POURING_SHAPE_LABEL = {
  * @param {object} [opts.orderShape] — { [order_id]: shape } из k24_orders.sticker_shape
  * @returns {{ breakdown: object, total: number }}
  *
- * R19 (бриф 30.06): заливка оплачивается по форме стикера (standard 1.0 /
- * complex 1.5 / big 1.5 / complex_big 2.0). Форма ищется по design_index в
- * shapeByDesign, затем order-level orderShape, иначе 'standard'. breakdown
- * заливки разбит на pouring_<shape> — по одной ставке на строку.
- * Без shape-карт всё падает в 'standard' → суммы как раньше.
- *
- * Формула сборки 3D: packs_assembled × stickers_per_pack × ставка.
- * Формула выборки фонов: qty_selected × stickers_per_pack × ставка.
+ * Пологовая оплата — computeLogPayout (R25.0). R19: заливка по форме стикера
+ * (standard 1.0 / complex 1.5 / big 1.5 / complex_big 2.0); форма ищется по
+ * design_index в shapeByDesign, затем order-level orderShape, иначе 'standard'.
+ * breakdown заливки разбит на pouring_<shape>.
  */
 export function calculateWorkerPayout(logs, opts = {}) {
-  const rates = { ...WORKER_RATES, ...(opts.rates || {}) }
-  const shapeRate = { ...WORKER_RATES.pouring_by_shape, ...(opts.rates?.pouring_by_shape || {}) }
+  const rates = resolvePayoutRates(opts.rates)
   const resolveShape = (l) =>
     opts.shapeByDesign?.[`${l.order_id}:${l.design_index}`]
     || opts.orderShape?.[l.order_id]
     || 'standard'
 
-  // Заливка — по формам стикера.
   const pouringByShape = { standard: 0, complex: 0, big: 0, complex_big: 0 }
   let packaging = 0
   // Выборку и сборку считаем в «стикерах», чтобы умножить на ставку 0.5 ₽/стикер.
@@ -739,49 +818,19 @@ export function calculateWorkerPayout(logs, opts = {}) {
   let assemblyPacks = 0
 
   for (const l of logs || []) {
-    if (l.stage === 'pouring' || l.stage === 'selection_pouring') {
-      const good = Number(l.stickers_good) || 0
-      if (good > 0) {
-        const shape = resolveShape(l)
-        pouringByShape[shape] = (pouringByShape[shape] || 0) + good
-      }
-    }
-    if (l.stage === 'selection_pouring') {
-      const bgs = Number(l.qty_selected) || 0
-      selectionBgs += bgs
-      const order = opts.ordersById?.[l.order_id] || l.order || null
-      const perPack = Number(order?.stickers_per_pack) || 1
-      selectionStickers += bgs * perPack
-    }
-    if (l.stage === 'selection') {
-      // R11: выборка штучных стикеров sticker3D после сушки — qty_selected =
-      // один стикер, без умножения на stickers_per_pack.
-      // R22.7 (ТЗ 20.07 Фаза 8): для stickerpack3D (после упразднения
-      // selection_pouring «Выборка» — это выборка фонов) оплата =
-      // qty_selected × stickers_per_pack, как исторический selection_pouring.
-      const qty = Number(l.qty_selected) || 0
-      selectionBgs += qty
-      const order = opts.ordersById?.[l.order_id] || l.order || null
-      const perPack = order?.order_type === 'stickerpack3D'
-        ? (Number(order?.stickers_per_pack) || 1) : 1
-      selectionStickers += qty * perPack
-    }
-    if (l.stage === 'assembly_3d') {
-      const packs = Number(l.packs_assembled) || 0
-      assemblyPacks += packs
-      const order = opts.ordersById?.[l.order_id] || l.order || null
-      const perPack = Number(order?.stickers_per_pack) || 1
-      assemblyStickers += packs * perPack
-    }
-    if (l.stage === 'packaging') {
-      packaging += Number(l.packs_packaged) || 0
+    const order = opts.ordersById?.[l.order_id] || l.order || null
+    for (const e of computeLogPayout(l, order, rates, { shape: resolveShape(l) })) {
+      if (e.shape) pouringByShape[e.shape] += e.units
+      else if (e.category === 'selection') { selectionBgs += e.qty; selectionStickers += e.units }
+      else if (e.category === 'assembly') { assemblyPacks += e.qty; assemblyStickers += e.units }
+      else if (e.category === 'packaging') packaging += e.units
     }
   }
 
   const breakdown = {}
-  for (const shape of ['standard', 'complex', 'big', 'complex_big']) {
+  for (const shape of POURING_SHAPES) {
     const count = pouringByShape[shape] || 0
-    const rate = shapeRate[shape] ?? rates.pouring_per_sticker
+    const rate = rates.pouring_by_shape[shape] ?? rates.pouring_per_sticker
     breakdown[`pouring_${shape}`] = { count, rate, amount: count * rate, label: POURING_SHAPE_LABEL[shape], shape }
   }
   breakdown.selection = { count: selectionStickers, rate: rates.selection_per_sticker, amount: selectionStickers * rates.selection_per_sticker, label: 'Выборка фонов', bgs: selectionBgs }

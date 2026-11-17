@@ -13,13 +13,11 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { forecastMaterials } from '@/features/orders/lib/material-forecast'
+import { ACTIVE_ORDER_STATUSES } from '@/shared/constants'
 
-const ACTIVE_STATUSES = [
-  'design', 'sample_layout', 'sample_print', 'color_approval', 'prepress',
-  'print', 'lamination', 'cutting',
-  'selection_pouring', 'pouring', 'drying', 'selection',
-  'assembly_3d', 'packaging', 'otk',
-]
+// R25.1: из общего списка активных статусов. Не входят: «Новый заказ» и
+// «Ждёт оплаты» (заказ ещё не запущен) и «Субподряд» (цех не расходует материалы).
+const ACTIVE_STATUSES = ACTIVE_ORDER_STATUSES.filter((s) => !['new', 'awaiting_payment', 'subcontract'].includes(s))
 
 export function usePlannedConsumption(materials) {
   const [plan, setPlan] = useState(new Map())

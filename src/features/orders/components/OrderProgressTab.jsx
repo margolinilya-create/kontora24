@@ -13,13 +13,14 @@ import { StageJumper } from './StageJumper'
 import { ThreeDPouringExportButton } from './ThreeDPouringExportButton'
 import { DryingTimer } from './DryingTimer'
 import { SamplePrintWidget } from './SamplePrintWidget'
+import { SalesStageCard } from './SalesStageCard'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import {
   ORDER_STATUSES, FILM_TYPES, calculateActualMaterialsCost, getOrderRoute, IS_3D_STICKERPACK,
   getNextSubtaskStatus, TRACK_LABELS, SUBTASK_STATUS_LABELS, getSubtaskRoute,
-  DUAL_TRACK_STAGES, SUBTASK_STATUS_TO_STAGE,
+  DUAL_TRACK_STAGES, SUBTASK_STATUS_TO_STAGE, SALES_CARD_STAGES,
 } from '@/shared/constants'
 import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -28,9 +29,11 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 // через StatusSwitcher. color_approval имеет свой контрол ColorApprovalControls
 // в header'е, на CurrentStageWidget показываем заглушку.
 // R13.2 (бриф 02.06): prepress теперь имеет форму с prepared_qty — убираем из NO_INPUT.
+// R25.1: + этапы v2 без ввода (subcontract; остальные этапы ОП — SalesStageCard).
 const NO_INPUT_STAGES = new Set([
   'new', 'design', 'sample_layout', 'color_approval', 'batch_layout',
   'otk', 'done', 'cancelled',
+  'awaiting_payment', 'design_approval', 'subcontract', 'awaiting_pickup', 'delivery',
 ])
 
 // R20.5: маппинг per-вид линий прогресса (multi-variant заказы) — поле и
@@ -379,6 +382,16 @@ function CurrentStageWidget({ order, logs, refetch, onUpdated, items = [] }) {
       data.stickers_good = Math.max(0, Number(value || 0) - Number(defects || 0))
     }
     await handleSubmit(effectiveStage, data)
+  }
+
+  // R25.1 (ТЗ 1.3–1.5): этапы отдела продаж v2 — карточка действий менеджера.
+  if (SALES_CARD_STAGES.includes(stage)) {
+    return (
+      <div className="space-y-4">
+        <StageJumperBlock order={order} onUpdated={onUpdated} />
+        <SalesStageCard order={order} onUpdated={onUpdated} />
+      </div>
+    )
   }
 
   if (stage === 'sample_print') {

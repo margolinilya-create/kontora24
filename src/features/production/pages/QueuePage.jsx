@@ -15,6 +15,14 @@ import { OnboardingTip } from '@/shared/components/OnboardingTip'
 // вместе с selection_pouring. stickerpack3D теперь идёт линейно и показывается
 // обычной карточкой заказа. Допечатки (track='reprint') видны через useReprintQueue.
 const QUEUE_CONFIG = {
+  // R25.1 (ТЗ 1.7): очереди раздела «Продажи» (этапы отдела продаж).
+  new: { title: 'Новые', subtitle: 'Новые заказы', status: 'new' },
+  awaiting_payment: { title: 'Ждут оплаты', subtitle: 'Заказы, ожидающие оплаты', status: 'awaiting_payment' },
+  design_approval: { title: 'Утверждение дизайна', subtitle: 'Макет на согласовании у заказчика', status: 'design_approval' },
+  color_approval: { title: 'Утверждение цвета', subtitle: 'Образец на согласовании у заказчика', status: 'color_approval' },
+  subcontract: { title: 'Субподряд', subtitle: 'Заказы у подрядчика', status: 'subcontract' },
+  awaiting_pickup: { title: 'Ждут выдачи', subtitle: 'Готовые заказы к выдаче', status: 'awaiting_pickup' },
+  delivery: { title: 'Доставка', subtitle: 'Заказы в доставке', status: 'delivery' },
   design: { title: 'Дизайн', subtitle: 'Разработка макетов', status: 'design' },
   // R14.2 (бриф 03.06): на вкладке препресс показываем и «Вёрстка образца»
   // (sample_layout) — это та же подготовка к печати.
@@ -28,7 +36,7 @@ const QUEUE_CONFIG = {
   drying: { title: 'Сушка', subtitle: 'Сушка 36 часов', status: 'drying' },
   assembly_3d: { title: 'Сборка 3D', subtitle: 'Сборка 3D стикерпаков', status: 'assembly_3d' },
   packaging: { title: 'Упаковка', subtitle: 'Упаковка готовой продукции', status: 'packaging' },
-  otk: { title: 'ОТК / Выдача', subtitle: 'Контроль качества и выдача заказа', status: 'otk' },
+  otk: { title: 'ТК', subtitle: 'Технический контроль качества', status: 'otk' },
 }
 
 const SORT_OPTIONS = [

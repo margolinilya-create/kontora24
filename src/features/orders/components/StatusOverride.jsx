@@ -34,7 +34,7 @@ export function StatusOverride({ order, onUpdated }) {
     setBusy(true)
     setOpen(false)
     try {
-      await updateOrderStatus(order.id, order.status, toStatus, { isRollback: true })
+      await updateOrderStatus(order.id, order.status, toStatus, { isRollback: true, kind: 'rollback' })
       toast.success(`Заказ возвращён на «${ORDER_STATUSES[toStatus]?.label}»`)
       onUpdated?.()
     } catch (err) {

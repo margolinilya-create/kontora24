@@ -3,11 +3,12 @@ import { DndContext, DragOverlay, useDroppable, closestCorners, PointerSensor, T
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { DraggableCard, DragOverlayCard } from '@/features/production/components/DraggableCard'
 import { useProductionBoard } from '@/features/production/hooks/useProductionBoard'
-import { ORDER_STATUSES, isStageAllowed } from '@/shared/constants'
+import { ORDER_STATUSES, isStageAllowed, NO_PAYMENT_CONFIRM_MESSAGE } from '@/shared/constants'
 import { stageBorderClass, stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { COLS } from '@/features/production/components/PipelineSummary'
 import MultiSelect from '@/shared/components/MultiSelect'
 import ErrorState from '@/shared/components/ErrorState'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
 // COLS реиспользуем из PipelineSummary — единственный источник правды
 // (R13.0): все рабочие этапы из ORDER_STATUSES без cancelled/done/batch_layout.
@@ -73,7 +74,7 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, isActive
  */
 export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived }) {
   const board = useProductionBoard({ includeArchived })
-  const { columns, scrollRef, scrollState, setScrollState, error, refetch, activeId, setActiveId, activeOrder, handleDragEnd, loading } = board
+  const { columns, scrollRef, scrollState, setScrollState, error, refetch, activeId, setActiveId, activeOrder, handleDragEnd, loading, paymentConfirm, confirmPaymentMove, cancelPaymentMove } = board
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
@@ -176,6 +177,17 @@ export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived }
           </DragOverlay>
         </DndContext>
       )}
+
+      {/* R25.1 (ТЗ 1.3): перенос за «Ждёт оплаты» без оплаты */}
+      <ConfirmDialog
+        isOpen={!!paymentConfirm}
+        onClose={cancelPaymentMove}
+        onConfirm={confirmPaymentMove}
+        title="Запуск без оплаты"
+        message={NO_PAYMENT_CONFIRM_MESSAGE}
+        confirmText="Запустить"
+        variant="primary"
+      />
     </div>
   )
 }

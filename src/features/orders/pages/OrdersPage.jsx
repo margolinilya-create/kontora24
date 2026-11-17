@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useOrders, deleteOrder } from '../hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { StatusBadge } from '../components/StatusBadge'
-import { ORDER_TYPES, PRIORITIES } from '@/shared/constants'
+import { ORDER_TYPES, PRIORITIES, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { Pagination } from '@/shared/components/Pagination'
 import { OrdersKanban } from '../components/OrdersKanban'
@@ -16,28 +16,25 @@ import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
-import { stageDotClass } from '@/shared/lib/department-mapping'
+import { stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { toast } from '@/shared/stores/toast-store'
 import { formatOrderNumber } from '@/shared/lib/utils'
 
-// R13.0 (бриф 02.06): добавлены R11-этапы (sample_layout/sample_print/color_approval/drying/selection),
-// batch_layout удалён как дубль prepress.
-const ACTIVE_STATUSES = [
-  'new', 'design', 'sample_layout', 'sample_print', 'color_approval', 'prepress',
-  'print', 'lamination', 'cutting',
-  'selection_pouring', 'pouring', 'drying', 'selection',
-  'assembly_3d', 'packaging', 'otk',
-]
+// R25.1: списки статусов строятся из констант/описания отделов — новый этап
+// не может «потеряться» в фильтрах и группах (см. тест-«сторож» routes-v2).
+const ACTIVE_STATUSES = ACTIVE_ORDER_STATUSES
 const ARCHIVED_STATUSES = ['done', 'cancelled']
 
-// Группы по отделам — таблица заказов разбивается на эти секции
+// Группы по отделам — таблица заказов разбивается на эти секции.
+const GROUP_LABELS = { sales: 'Продажи', design: 'Дизайн', print: 'Печать', pouring: 'Заливка', finish: 'Финиш' }
 const ORDER_GROUPS = [
-  { id: 'new',      label: 'Новые',         statuses: ['new'],                                                        dotStatus: 'new' },
-  { id: 'design',   label: 'Дизайн',        statuses: ['design', 'sample_layout', 'color_approval', 'prepress'],      dotStatus: 'design' },
-  { id: 'print',    label: 'Печать',        statuses: ['print', 'sample_print', 'lamination', 'cutting'],             dotStatus: 'print' },
-  { id: 'pouring',  label: 'Заливка',       statuses: ['pouring', 'selection_pouring', 'drying', 'selection'],        dotStatus: 'pouring' },
-  { id: 'finish',   label: 'Финиш',         statuses: ['assembly_3d', 'packaging', 'otk'],                            dotStatus: 'packaging' },
-  { id: 'archive',  label: 'Завершённые',   statuses: ['done', 'cancelled'],                                          dotStatus: 'done' },
+  ...Object.entries(DEPT_GROUPS).map(([id, g]) => ({
+    id,
+    label: GROUP_LABELS[id] || g.label,
+    statuses: g.stages.filter((s) => s !== 'done'),
+    dotStatus: g.stages[0],
+  })),
+  { id: 'archive', label: 'Завершённые', statuses: ['done', 'cancelled'], dotStatus: 'done' },
 ]
 
 export default function OrdersPage() {

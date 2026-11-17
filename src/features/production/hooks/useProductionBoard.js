@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useOrders, updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { COLS } from '../components/PipelineSummary'
-import { ORDER_STATUSES, getOrderRoute, PRIORITIES, isStageAllowed } from '@/shared/constants'
+import { ORDER_STATUSES, getOrderRoute, PRIORITIES, isStageAllowed, needsNoPaymentConfirm } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
@@ -103,6 +103,10 @@ export function useProductionBoard({ includeArchived = false } = {}) {
     prevCountRef.current = total
   }, [total])
 
+  // R25.1 (ТЗ 1.3): перетаскивание за «Ждёт оплаты» без оплаты — через
+  // подтверждение «Запустить без оплаты?». Ждущий подтверждения перенос.
+  const [paymentConfirm, setPaymentConfirm] = useState(null)
+
   async function handleDragEnd(event) {
     setActiveId(null)
     const { active, over } = event
@@ -123,6 +127,25 @@ export function useProductionBoard({ includeArchived = false } = {}) {
       return
     }
 
+    if (needsNoPaymentConfirm(order, order.status, targetStatus)) {
+      setPaymentConfirm({ order, targetStatus })
+      return
+    }
+    await performMove(order, targetStatus)
+  }
+
+  function cancelPaymentMove() {
+    setPaymentConfirm(null)
+  }
+
+  async function confirmPaymentMove() {
+    const pending = paymentConfirm
+    setPaymentConfirm(null)
+    if (pending) await performMove(pending.order, pending.targetStatus, { confirmNoPayment: true })
+  }
+
+  async function performMove(order, targetStatus, moveOpts = {}) {
+    const orderId = order.id
     setPendingMove({ orderId, targetStatus })
 
     try {
@@ -137,19 +160,21 @@ export function useProductionBoard({ includeArchived = false } = {}) {
         // При падении на шаге N откатываем заказ обратно на исходный статус
         // (через isRollback, чтобы обойти guard завершения этапа), чтобы не
         // оставить заказ в промежуточном состоянии.
+        // R25.1: шаг может уйти дальше запрошенного (автопроход «Ждёт оплаты»)
+        // — берём фактический статус из ответа updateOrderStatus.
         let currentStatus = order.status
         const originalStatus = order.status
-        for (let i = fromIdx; i < toIdx; i++) {
-          const nextStep = route[i + 1]
+        while (route.indexOf(currentStatus) > -1 && route.indexOf(currentStatus) < toIdx) {
+          const nextStep = route[route.indexOf(currentStatus) + 1]
           try {
-            await updateOrderStatus(orderId, currentStatus, nextStep)
-            currentStatus = nextStep
+            const res = await updateOrderStatus(orderId, currentStatus, nextStep, moveOpts)
+            currentStatus = res?.status || nextStep
           } catch (stepErr) {
             toast.error(`Не удалось обновить «${ORDER_STATUSES[currentStatus]?.label || currentStatus}» → «${ORDER_STATUSES[nextStep]?.label || nextStep}»: ${translateError(stepErr).message}`)
             // Откат: вернуть заказ на исходную стадию, если он успел сдвинуться.
             if (currentStatus !== originalStatus) {
               try {
-                await updateOrderStatus(orderId, currentStatus, originalStatus, { isRollback: true })
+                await updateOrderStatus(orderId, currentStatus, originalStatus, { isRollback: true, kind: 'rollback' })
                 toast.error(`Заказ откачен на «${ORDER_STATUSES[originalStatus]?.label || originalStatus}»`)
               } catch (rollbackErr) {
                 captureError(rollbackErr, { tags: { source: 'useProductionBoard.rollback' }, extra: { orderId, currentStatus, originalStatus } })
@@ -184,5 +209,6 @@ export function useProductionBoard({ includeArchived = false } = {}) {
     total,
     todayDone,
     handleDragEnd,
+    paymentConfirm, confirmPaymentMove, cancelPaymentMove,
   }
 }

@@ -8,6 +8,7 @@ import { formatDateTime } from '@/shared/lib/utils'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { stageDotClass } from '@/shared/lib/department-mapping'
 
 const DEPT_DOT = {
   design:  'bg-dept-design',
@@ -18,29 +19,10 @@ const DEPT_DOT = {
   danger:  'bg-danger',
 }
 
+// R25.1: цвет точки — из единого описания отделов (department-mapping),
+// новые этапы ОП красятся синим автоматически.
 function dotColor(status) {
-  switch (status) {
-    case 'new':
-    case 'color_approval': return DEPT_DOT.info
-    case 'design':
-    case 'sample_layout':
-    case 'batch_layout':
-    case 'prepress': return DEPT_DOT.design
-    case 'sample_print':
-    case 'print':
-    case 'lamination':
-    case 'cutting': return DEPT_DOT.print
-    case 'selection_pouring':
-    case 'pouring':
-    case 'drying':
-    case 'selection': return DEPT_DOT.pouring
-    case 'assembly_3d':
-    case 'packaging':
-    case 'otk':
-    case 'done': return DEPT_DOT.finish
-    case 'cancelled': return DEPT_DOT.danger
-    default: return DEPT_DOT.info
-  }
+  return stageDotClass(status)
 }
 
 // Цвет точки для статуса подзадачи (printing/laminating/cutting/...).

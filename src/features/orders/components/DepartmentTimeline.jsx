@@ -12,21 +12,17 @@ export function DepartmentTimeline({ order }) {
     return d.stages.some(s => routeSet.has(s.status))
   })
 
-  // Determine each department's state
-  const currentOrder = ORDER_STATUSES[order.status]?.order ?? 0
+  // Determine each department's state.
+  // R25.1: по позиции в маршруте заказа, а не по ORDER_STATUSES.order — в v2
+  // отдел продаж стоит и в голове, и в хвосте маршрута (диапазон по .order
+  // накрывал бы весь маршрут).
+  const currentIdx = orderRoute.indexOf(order.status)
 
   function getDeptState(dept) {
-    // Get the range of status orders in this department
-    const statusOrders = dept.stages
-      .map(s => ORDER_STATUSES[s.status]?.order ?? -1)
-      .filter(o => o >= 0)
-
-    if (statusOrders.length === 0) return 'pending'
-    const minOrder = Math.min(...statusOrders)
-    const maxOrder = Math.max(...statusOrders)
-
-    if (currentOrder > maxOrder) return 'completed'
-    if (currentOrder >= minOrder && currentOrder <= maxOrder) return 'active'
+    const idxs = dept.stages.map(s => orderRoute.indexOf(s.status)).filter(i => i >= 0)
+    if (idxs.length === 0 || currentIdx < 0) return 'pending'
+    if (dept.stages.some(s => s.status === order.status)) return 'active'
+    if (Math.max(...idxs) < currentIdx) return 'completed'
     return 'pending'
   }
 

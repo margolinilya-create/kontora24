@@ -7,14 +7,11 @@ import { useEffect, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { usePlanStore } from '../store/plan-store'
+import { ACTIVE_ORDER_STATUSES } from '@/shared/constants'
 
 // R13.0 (бриф 02.06): batch_layout удалён из активных маршрутов.
-const ACTIVE_STATUSES = [
-  'new', 'design', 'sample_layout', 'sample_print', 'color_approval',
-  'prepress', 'print', 'lamination', 'cutting',
-  'selection_pouring', 'pouring', 'drying', 'selection', 'assembly_3d',
-  'packaging', 'otk',
-]
+// R25.1: все активные статусы из констант (этапы ОП v2 — вехи в buckets.js).
+const ACTIVE_STATUSES = ACTIVE_ORDER_STATUSES
 
 const PLANNING_SETTING_KEYS = [
   'planning:norms',
@@ -38,7 +35,7 @@ async function loadInitial(store) {
       // заказ прилетит без price_final до refetch — приемлемая деградация.
       supabase
         .from('k24_orders_full')
-        .select('id, number, custom_number, order_type, status, width_mm, height_mm, qty, design_variants, stickers_per_pack, need_lam, design_status, film_type, bopp_bag, priority, is_urgent, deadline, client_id, price_final, created_at, client:k24_clients!client_id(name)')
+        .select('id, number, custom_number, order_type, status, width_mm, height_mm, qty, design_variants, stickers_per_pack, need_lam, design_status, film_type, bopp_bag, route_version, delivery_type, needs_montage_film, priority, is_urgent, deadline, client_id, price_final, created_at, client:k24_clients!client_id(name)')
         .in('status', ACTIVE_STATUSES)
         .order('deadline', { ascending: true, nullsFirst: false }),
       supabase

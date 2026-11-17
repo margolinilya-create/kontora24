@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy, Suspense
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY } from '@/shared/constants'
+import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
 import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
@@ -49,12 +49,8 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, onUpdated }) {
 // Production statuses ordered for "in work" filter (module-level constant
 // keeps useMemo deps stable).
 // R13.0 (бриф 02.06): добавлены R11-этапы для корректного подсчёта «в работе».
-const WORK_STATUSES = [
-  'design', 'sample_layout', 'sample_print', 'color_approval', 'prepress',
-  'print', 'lamination', 'cutting',
-  'selection_pouring', 'pouring', 'drying', 'selection',
-  'assembly_3d', 'packaging', 'otk',
-]
+// R25.1: все активные статусы кроме «Новый заказ» (включая этапы ОП v2).
+const WORK_STATUSES = ACTIVE_ORDER_STATUSES.filter((s) => s !== 'new')
 
 function StatCard({ label, value }) {
   return (

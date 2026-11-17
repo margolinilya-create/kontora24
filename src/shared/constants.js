@@ -71,6 +71,13 @@ export const SALES_STAGES = [
   'subcontract', 'awaiting_pickup', 'delivery',
 ]
 
+// R25.1: этапы маршрута v2 со своей карточкой действий на вкладке «Прогресс»
+// (SalesStageCard, ТЗ 1.3–1.5).
+export const SALES_CARD_STAGES = ['awaiting_payment', 'design_approval', 'awaiting_pickup', 'delivery']
+
+// R25.1 (ТЗ 1.3): текст подтверждения запуска без оплаты (карточка, канбан, кнопка).
+export const NO_PAYMENT_CONFIRM_MESSAGE = 'Оплата не отмечена. Запустить заказ в работу без оплаты?'
+
 // R25.1: этапы без полей ввода (серверная check_stage_completion → «готово»).
 export const NO_INPUT_STAGES_V2 = ['awaiting_payment', 'design_approval', 'subcontract', 'awaiting_pickup', 'delivery']
 

@@ -6,9 +6,11 @@ import { ExtraStickersModal } from './ExtraStickersModal'
 
 // R11.3: кнопка видна только после стадии print (бриф 31.05).
 // Cancelled / done — тоже скрываем.
+// R25.1: + этапы хвоста v2 (awaiting_pickup / delivery) — заказ уже после печати.
 const POST_PRINT_STAGES = new Set([
   'print', 'lamination', 'cutting', 'pouring', 'selection_pouring',
   'drying', 'selection', 'assembly_3d', 'packaging', 'otk',
+  'awaiting_pickup', 'delivery',
 ])
 
 /**

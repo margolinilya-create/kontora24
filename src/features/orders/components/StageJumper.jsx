@@ -39,9 +39,19 @@ export function StageJumper({ order, onUpdated }) {
     if (!optEntry) return
     setSaving(true)
     try {
+      // R25.1 (ТЗ 1.2): пропуск этапов пишется в историю с пометкой
+      // «пропущен вручную» (kind='manual_skip'), откат — kind='rollback'.
+      const targetIdx = route.indexOf(target)
+      const skipped = optEntry.direction === 'forward' ? route.slice(currentIdx + 1, targetIdx) : []
+      const meta = optEntry.direction === 'back'
+        ? { kind: 'rollback' }
+        : skipped.length > 0
+          ? { kind: 'manual_skip', note: `Пропущен вручную: ${skipped.map((s) => ORDER_STATUSES[s]?.label || s).join(', ')}` }
+          : {}
       await updateOrderStatus(order.id, order.status, target, {
         isRollback: optEntry.direction === 'back',
         force: optEntry.direction === 'forward',
+        ...meta,
       })
       toast.success(optEntry.direction === 'back' ? 'Заказ возвращён' : 'Заказ продвинут')
       setTarget('')

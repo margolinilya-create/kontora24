@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import MultiSelect from '@/shared/components/MultiSelect'
 import Button from '@/shared/components/Button'
-import { ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, MATERIAL_COSTS } from '@/shared/constants'
+import { ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, MATERIAL_COSTS, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
 import { periodRange } from '@/shared/lib/period'
 import { ExportDataModal } from './ExportDataModal'
 import { captureError } from '@/shared/lib/sentry'
@@ -17,12 +17,9 @@ const PERIODS = [
 ]
 
 // R13.0 (бриф 02.06): добавлены R11-этапы (sample_layout/sample_print/color_approval/drying/selection).
-const STAGE_OPTIONS = [
-  'design', 'sample_layout', 'sample_print', 'color_approval', 'prepress',
-  'print', 'lamination', 'cutting',
-  'pouring', 'selection_pouring', 'drying', 'selection',
-  'assembly_3d', 'packaging', 'otk',
-].map((s) => ({ value: s, label: ORDER_STATUSES[s]?.label || s }))
+// R25.1: все активные этапы кроме «Новый заказ», в каноническом порядке.
+const STAGE_OPTIONS = ACTIVE_ORDER_STATUSES.filter((s) => s !== 'new' && s !== 'batch_layout')
+  .map((s) => ({ value: s, label: ORDER_STATUSES[s]?.label || s }))
 
 const ORDER_TYPE_OPTIONS = Object.entries(ORDER_TYPES).map(([value, { label }]) => ({ value, label }))
 

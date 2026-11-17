@@ -24,7 +24,7 @@ const NORM_FIELDS = [
   { key: 'selection_stickers_per_8h', label: 'Выборка штучных стикеров (шт / 8 ч)', step: '50' },
   { key: 'assembly_packs_per_8h', label: 'Сборка 3D (паков / 8 ч)', step: '10' },
   { key: 'packaging_packs_per_8h', label: 'Упаковка (паков / 8 ч)', step: '10' },
-  { key: 'otk_minutes', label: 'ОТК (мин на заказ)', step: '1' },
+  { key: 'otk_minutes', label: 'ТК (мин на заказ)', step: '1' },
   { key: 'drying_hours', label: 'Сушка (часов, пассив)', step: '1' },
 ]
 
@@ -36,7 +36,7 @@ const CAPACITY_FIELDS = [
   { key: 'printers', label: 'Печатники / печатные машины', tip: 'Бакет oprl_print (печать + ламинация + sample_print)' },
   { key: 'cutters', label: 'Режущие плоттеры', tip: 'Бакет oprl_cut (резка)' },
   { key: 'post_3do', label: '3DO (заливка / сушка)', tip: 'Заливщики + поток заливки/сушки' },
-  { key: 'post_osk', label: 'ОСК (сборка / упаковка / ОТК)', tip: 'Постпечатники: выборка фонов, сборка 3D, упаковка, ОТК/выдача' },
+  { key: 'post_osk', label: 'ОСК (сборка / упаковка / ТК)', tip: 'Постпечатники: выборка фонов, сборка 3D, упаковка, ТК' },
   { key: 'hours_per_day', label: 'Часов в рабочем дне', tip: 'Длина рабочей смены' },
 ]
 

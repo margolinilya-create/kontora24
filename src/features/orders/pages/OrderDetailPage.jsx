@@ -11,6 +11,7 @@ import { StatusSwitcher } from '../components/StatusSwitcher'
 import { StatusOverride } from '../components/StatusOverride'
 import { ColorApprovalControls } from '../components/ColorApprovalControls'
 import { OrderStepper } from '../components/OrderStepper'
+import { RouteUpgradeButton } from '../components/RouteUpgradeButton'
 import { OrderComments } from '../components/OrderComments'
 import { OrderProgressTab } from '../components/OrderProgressTab'
 import { OrderSubtasksTab } from '../components/OrderSubtasksTab'
@@ -488,6 +489,7 @@ export default function OrderDetailPage() {
 
       {/* Stepper */}
       <OrderStepper order={order} history={history} subtasks={subtasks} extras={extras} onUpdated={refetch} />
+      <RouteUpgradeButton order={order} onUpdated={refetch} />
 
       {/* Source files link — компактная высота, инлайн-редактирование */}
       <SourceFilesRow order={order} onUpdated={refetch} onCopy={copySourceLink} />

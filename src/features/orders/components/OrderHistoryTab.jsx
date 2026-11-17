@@ -24,6 +24,17 @@ const FIELD_LABELS = {
   source: 'Источник', payment_status: 'Оплата',
   delivery_type: 'Отгрузка', delivery_city: 'Город', delivery_address: 'Адрес',
   delivery_notes: 'Комментарий к доставке', notes: 'Комментарий', assigned_to: 'Исполнитель',
+  route_version: 'Версия маршрута',
+}
+
+// R25.1 (миграция 093): пометки переходов статуса.
+const HISTORY_KIND_LABELS = {
+  manual_skip: 'пропущен вручную',
+  paid_at_intake: 'оплата отмечена при приёме',
+  payment_received: 'оплата получена',
+  no_payment: 'запущен без оплаты',
+  design_return: 'возврат в дизайн',
+  rollback: 'откат',
 }
 
 const FIELD_ENUM_LOOKUP = {
@@ -83,6 +94,8 @@ export function OrderHistoryTab({ order, history }) {
         actor: h.changed_by_profile?.display_name || 'Система',
         from: h.from_status,
         to: h.to_status,
+        kind: h.kind || null,
+        note: h.note || null,
       })
     }
     for (const l of logs || []) {
@@ -133,6 +146,10 @@ export function OrderHistoryTab({ order, history }) {
                     <><span className="text-text-muted">{ORDER_STATUSES[it.from]?.label || it.from}</span>{' → '}</>
                   )}
                   <span className="font-medium">{ORDER_STATUSES[it.to]?.label || it.to}</span>
+                  {it.kind && HISTORY_KIND_LABELS[it.kind] && (
+                    <span className="text-xs text-text-muted ml-1.5">({HISTORY_KIND_LABELS[it.kind]})</span>
+                  )}
+                  {it.note && <span className="block text-xs text-text-muted break-words">{it.note}</span>}
                 </p>
               ) : it.type === 'log' ? (
                 <p className="break-words">

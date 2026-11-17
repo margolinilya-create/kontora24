@@ -61,6 +61,15 @@ export default async function handler(req, res) {
     // Map Kontora status to Bitrix stage
     const STAGE_MAP = {
       new: 'NEW',
+      // R25.1 (ТЗ 17.11 Фаза 1): этапы маршрута v2.
+      awaiting_payment: 'PREPAYMENT_INVOICE',
+      design_approval: 'PREPARATION',
+      sample_layout: 'PREPARATION',
+      sample_print: 'PREPARATION',
+      color_approval: 'PREPARATION',
+      subcontract: 'EXECUTING',
+      awaiting_pickup: 'FINAL_INVOICE',
+      delivery: 'FINAL_INVOICE',
       design: 'PREPARATION',
       prepress: 'PREPARATION',
       print: 'EXECUTING',

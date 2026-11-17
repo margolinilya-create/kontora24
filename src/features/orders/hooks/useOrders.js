@@ -55,7 +55,7 @@ const DETAIL_FIELDS_BASE = `id, number, custom_number, client_id, order_type, st
   product_name, is_subcontract, contractor_id, contractor_notes, montage_material_id`
 
 const DETAIL_FIELDS_FINANCE = `, cost_materials, cost_labor, cost_total, markup, discount_pct,
-  price_final, price_per_unit, contractor_cost`
+  price_final, price_per_unit, contractor_cost, calc_snapshot`
 
 // R17.1 (бриф 5.06): названия конкретных позиций склада подтягиваем join'ами,
 // чтобы OverviewTab и OrderReportsTab показывали реальное имя плёнки/ламинации.

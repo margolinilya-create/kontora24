@@ -159,7 +159,8 @@ describe('Security phase 3: маскирование финансов k24_orders
 
   it('фронт НЕ читает финансовые колонки напрямую из k24_orders (только через view)', () => {
     const { execSync } = require('child_process')
-    const finRe = /price_final|cost_total|cost_labor|cost_materials|markup|discount_pct|price_per_unit/
+    // R25.6: + calc_snapshot (снимок расчёта калькулятора — финансовый, миграция 101).
+    const finRe = /price_final|cost_total|cost_labor|cost_materials|markup|discount_pct|price_per_unit|calc_snapshot/
     // Ревью 05.07: старый построчный grep не видел многострочные select'ы
     // (типичный стиль кодовой базы — .select(...) следующей строкой после
     // .from('k24_orders')). Теперь смотрим окно после каждого вызова + все
@@ -188,6 +189,72 @@ describe('Security phase 3: маскирование финансов k24_orders
       }
     }
     expect(leaks, `финансы читаются напрямую из таблицы:\n${leaks.join('\n')}`).toHaveLength(0)
+  })
+})
+
+describe('R25.6: снимок расчёта калькулятора (calc_snapshot)', () => {
+  const read = (f) => readFileSync(resolve(process.cwd(), f), 'utf-8')
+  const sql = read('supabase/migrations/101_r25_6_calc_snapshot.sql')
+  // Без комментариев: проверяем только исполняемый SQL.
+  const code = sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n')
+
+  it('101: колонка финансовая — без колоночного GRANT для authenticated', () => {
+    expect(code).toMatch(/ADD COLUMN IF NOT EXISTS calc_snapshot JSONB/)
+    const grants = code.match(/GRANT SELECT \(([^)]*)\)\s+ON public\.k24_orders TO authenticated/g) || []
+    for (const g of grants) expect(g).not.toContain('calc_snapshot')
+    expect(code).not.toMatch(/GRANT SELECT ON public\.k24_orders TO authenticated/)
+    expect(code).toMatch(/REVOKE SELECT \(calc_snapshot\) ON public\.k24_orders FROM authenticated/)
+  })
+
+  it('101: view k24_orders_full маскирует calc_snapshot и все прежние финколонки', () => {
+    for (const col of ['price_final', 'price_per_unit', 'cost_total', 'contractor_cost', 'calc_snapshot']) {
+      const re = new RegExp(`CASE WHEN EXISTS[^\\n]*view:finance[^\\n]*THEN o\\.${col} END AS ${col}`)
+      expect(code, `нет маски для ${col}`).toMatch(re)
+    }
+    // calc_snapshot — последняя колонка view (CREATE OR REPLACE VIEW: только добавление в конец).
+    expect(code).toMatch(/o\.montage_material_id,\s*\n\s*CASE WHEN EXISTS[^\n]*THEN o\.calc_snapshot END AS calc_snapshot\s*\nFROM k24_orders o;/)
+    expect(code).toContain('REVOKE ALL ON public.k24_orders_full FROM PUBLIC, anon')
+    expect(code).toContain('GRANT SELECT ON public.k24_orders_full TO authenticated')
+  })
+
+  it('101: protect-триггер не даёт воркеру менять calc_snapshot (и сохраняет поля 099)', () => {
+    expect(code).toMatch(/NEW\.calc_snapshot IS DISTINCT FROM OLD\.calc_snapshot/)
+    for (const col of ['price_final', 'price_per_unit', 'contractor_cost', 'is_subcontract', 'route_version', 'sticker_shape']) {
+      expect(code).toContain(`NEW.${col} IS DISTINCT FROM OLD.${col}`)
+    }
+  })
+
+  it('фронт читает calc_snapshot только из k24_orders_full и только с view:finance', () => {
+    const { execSync } = require('child_process')
+    const files = execSync(
+      'grep -rl "calc_snapshot" src/ --include="*.js" --include="*.jsx" || true',
+      { encoding: 'utf-8' },
+    ).split('\n').filter(Boolean).filter((f) => !/\.test\.jsx?$/.test(f))
+    const leaks = []
+    for (const f of files) {
+      const src = read(f)
+      // Любой select-список с calc_snapshot должен идти через k24_orders_full
+      // и подключаться только финансовой веткой (константа *FINANCE*).
+      const selRe = /calc_snapshot/g
+      let m
+      while ((m = selRe.exec(src))) {
+        const before = src.slice(Math.max(0, m.index - 600), m.index)
+        if (/from\('k24_orders'\)\s*\.select\([^)]*$/.test(before)) {
+          leaks.push(`${f}: calc_snapshot в select из k24_orders`)
+        }
+      }
+      const embedRe = /k24_orders!\w+\(([^)]*)\)/g
+      while ((m = embedRe.exec(src))) {
+        if (/calc_snapshot/.test(m[1])) leaks.push(`${f}: embed k24_orders!(…) с calc_snapshot`)
+      }
+    }
+    expect(leaks, leaks.join('\n')).toHaveLength(0)
+    // Детальный запрос заказа: calc_snapshot только в финансовом наборе полей.
+    const orders = read('src/features/orders/hooks/useOrders.js')
+    const base = orders.match(/const DETAIL_FIELDS_BASE = `([^`]*)`/)?.[1] || ''
+    const fin = orders.match(/const DETAIL_FIELDS_FINANCE = `([^`]*)`/)?.[1] || ''
+    expect(base).not.toContain('calc_snapshot')
+    expect(fin).toContain('calc_snapshot')
   })
 })
 

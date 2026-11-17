@@ -7,7 +7,8 @@ import { calculateWorkerPayout, settingsToRates, resolvePayoutRates } from '@/sh
 import { buildQualityRows } from '../lib/quality-report'
 import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog } from '@/shared/lib/payout-context'
 import { buildBonusRows, logPayoutTotals } from '../lib/payout-report'
-import { summarizeExtraMaterials } from '../lib/materials-cost'
+import { summarizeExtraMaterials, aggregateMaterialUsage } from '../lib/materials-cost'
+import { fetchAllRows, fetchAllRowsByIds } from '@/shared/lib/fetch-all'
 
 /**
  * R25.7B (ТЗ 7.5): расход доп. материалов по заказам (RPC order_extra_materials,
@@ -126,9 +127,18 @@ export function useOrdersCostReport(period = '30') {
       // Расширенный набор полей для Unit Economics / P&L / Расходы по заказам
       // (R8.5 серии 25.05). Подтягиваем клиента, ламинацию, плёнку, оплату,
       // дедлайны, доставку — всё нужно для итоговых таблиц.
-      const [ordersRes, logsRes, ratesRes] = await Promise.all([
+      // Методика (код-ревью 17.11): заказы — по дате приёма (created_at) в
+      // периоде; расход материалов, труд и доп. материалы — по ВСЕМ записям
+      // цеха этих заказов, независимо от даты записи. Раньше логи тоже
+      // резались по периоду: у заказа, принятого в конце периода, терялась
+      // печать/заливка следующего месяца, а логи чужих заказов пропадали.
+      // Всё грузится порциями (PostgREST отдаёт ≤ 1000 строк; limit(500)
+      // заказов и limit(10000) логов молча обрезали данные).
+      const since = getSince(period)
+      const until = getUntil(period) ?? '9999-12-31T23:59:59Z'
+      const [orders, ratesRes] = await Promise.all([
         // Финансы — через маскирующее view k24_orders_full (security phase 3).
-        supabase.from('k24_orders_full')
+        fetchAllRows(() => supabase.from('k24_orders_full')
           .select(`id, number, custom_number, order_type, qty, price_final,
                    cost_materials, cost_labor, cost_total, status,
                    created_at, deadline, width_mm, height_mm,
@@ -142,23 +152,24 @@ export function useOrdersCostReport(period = '30') {
                    film_material:k24_materials!film_material_id(id, name, material_code),
                    film_stickers_material:k24_materials!film_stickers_material_id(id, name, material_code),
                    lam_material:k24_materials!lam_material_id(id, name, material_code)`)
-          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
+          .gte('created_at', since).lte('created_at', until)
           .order('created_at', { ascending: false })
-          .limit(500),
-        supabase.from('k24_production_logs')
-          .select(`order_id, stage, defects, design_index, film_meters, resin_grams, lamination_meters, montage_meters,
+          .order('id', { ascending: false })),
+        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').maybeSingle(),
+      ])
+      if (ratesRes.error) throw ratesRes.error
+      const ordersRes = { data: orders }
+      const logsRes = {
+        data: await fetchAllRowsByIds(orders.map((o) => o.id), (ids) => supabase.from('k24_production_logs')
+          .select(`id, order_id, stage, defects, design_index, film_meters, resin_grams, lamination_meters, montage_meters,
                    film_type, track, stickers_printed, stickers_poured,
                    stickers_good, packs_assembled, packs_packaged, qty_selected, qty_cut, lamination_qty, qty_done,
                    boxes_used,
                    order:k24_orders!order_id(lam_type, film_type, film_type_stickers, order_type)`)
           .is('deleted_at', null)
-          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
-          .limit(10000),
-        supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
-      ])
-      if (ordersRes.error) throw ordersRes.error
-      if (logsRes.error) throw logsRes.error
-      // ratesRes.error PGRST116 (нет строки) — ок, дефолтные ставки
+          .in('order_id', ids)
+          .order('created_at').order('id')),
+      }
 
       // R25.8: средняя цена позиций — из маскирующего view k24_materials_full
       // (после миграции 098 прямое чтение k24_materials.unit_cost отозвано).
@@ -168,17 +179,17 @@ export function useOrdersCostReport(period = '30') {
       const orderIds = (ordersRes.data || []).map((o) => o.id)
       const itemsByOrder = {}
       if (orderIds.length > 0) {
-        const { data: itemsData, error: itemsErr } = await supabase
+        const itemsData = await fetchAllRowsByIds(orderIds, (ids) => supabase
           .from('k24_order_items')
           .select('order_id, idx, width_mm, height_mm, qty')
-          .in('order_id', orderIds)
-          .order('idx', { ascending: true })
-        if (itemsErr) throw itemsErr
-        for (const it of itemsData || []) (itemsByOrder[it.order_id] ||= []).push(it)
+          .in('order_id', ids)
+          .order('order_id').order('idx', { ascending: true }))
+        for (const it of itemsData) (itemsByOrder[it.order_id] ||= []).push(it)
       }
 
-      // R25.7B: доп. материалы с отметкой «Учитывать в расходах» — за тот же период.
-      const extraByOrder = await fetchExtraMaterialsByOrder(orderIds, getSince(period), getUntil(period))
+      // R25.7B: доп. материалы с отметкой «Учитывать в расходах» — все списания
+      // заказов когорты (та же методика, что и для логов: без среза по дате).
+      const extraByOrder = await fetchExtraMaterialsByOrder(orderIds, null, null)
 
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
       const payoutRates = settingsToRates(ratesRes.data?.value)
@@ -197,45 +208,27 @@ export function useOrdersCostReport(period = '30') {
       ;(logsRes.data || []).forEach((l) => {
         if (!logsByOrder[l.order_id]) {
           logsByOrder[l.order_id] = {
-            film: 0, resin: 0, lam: 0, montage: 0,
-            filmByType: {}, lamByType: {},
             stickers_printed: 0, stickers_poured: 0, stickers_good: 0,
             packs_assembled: 0, packs_packaged: 0, qty_selected: 0,
-            boxes_used: 0, drying_defects: 0,
-            payouts: 0,
+            drying_defects: 0,
           }
         }
         ;(rawLogsByOrder[l.order_id] ||= []).push(l)
         const acc = logsByOrder[l.order_id]
         // R18.0: брак сушки — числитель для % брака заливки в Unit Economics.
         if (l.stage === 'drying') acc.drying_defects += Number(l.defects) || 0
-        const filmM = Number(l.film_meters) || 0
-        const resinG = Number(l.resin_grams) || 0
-        const lamM = Number(l.lamination_meters) || 0
-
-        acc.film += filmM
-        acc.resin += resinG
-        acc.lam += lamM
-        acc.montage += Number(l.montage_meters) || 0
-        // R14.6 hotfix: после R8 поле film_type в логах больше не пишется (берётся
-        // из заказа). Fallback: для stickerpack3D track='stickers' — film_type_stickers,
-        // иначе — film_type заказа.
-        const isPackStickerTrack = l.order?.order_type === 'stickerpack3D' && l.track === 'stickers'
-        const ft = l.film_type || (isPackStickerTrack ? l.order?.film_type_stickers : l.order?.film_type)
-        if (ft && filmM > 0) acc.filmByType[ft] = (acc.filmByType[ft] || 0) + filmM
-        const logLamType = l.order?.lam_type
-        if (logLamType && lamM > 0) acc.lamByType[logLamType] = (acc.lamByType[logLamType] || 0) + lamM
         acc.stickers_printed += Number(l.stickers_printed) || 0
         acc.stickers_poured += Number(l.stickers_poured) || 0
         acc.stickers_good += Number(l.stickers_good) || 0
         acc.packs_assembled += Number(l.packs_assembled) || 0
         acc.packs_packaged += Number(l.packs_packaged) || 0
         acc.qty_selected += Number(l.qty_selected) || 0
-        acc.boxes_used += Number(l.boxes_used) || 0
       })
 
       const rows = (ordersRes.data || []).map((o) => {
-        const lg = logsByOrder[o.id] || { film: 0, resin: 0, lam: 0, montage: 0, stickers_printed: 0, stickers_poured: 0, stickers_good: 0, packs_assembled: 0, packs_packaged: 0, qty_selected: 0, boxes_used: 0, drying_defects: 0, filmByType: {}, lamByType: {} }
+        const lg = logsByOrder[o.id] || { stickers_printed: 0, stickers_poured: 0, stickers_good: 0, packs_assembled: 0, packs_packaged: 0, qty_selected: 0, drying_defects: 0 }
+        // Расход материалов — единая функция (та же в аналитике и «Финансах» заказа).
+        const usage = aggregateMaterialUsage(rawLogsByOrder[o.id] || [], o)
         // R18.0 (бриф 30.06): % брака = брак на сушке / залито (нас интересует
         // брак именно после заливки, который фиксируется на этапе сушки).
         // Обе величины в штуках стикеров — единицы согласованы.
@@ -263,19 +256,13 @@ export function useOrdersCostReport(period = '30') {
           ...o,
           client_name: o.client?.name || null,
           items: itemsByOrder[o.id] || [],
-          actual_film: lg.film,
-          actual_resin: lg.resin,
-          actual_lam: lg.lam,
-          actual_montage: lg.montage || 0,
-          actual_film_by_type: lg.filmByType,
-          actual_lam_by_type: lg.lamByType,
+          ...usage,
           stickers_printed: lg.stickers_printed,
           stickers_poured: lg.stickers_poured,
           stickers_good: lg.stickers_good,
           packs_assembled: lg.packs_assembled,
           packs_packaged: lg.packs_packaged,
           qty_selected: lg.qty_selected,
-          boxes_used: lg.boxes_used,
           drying_defects: dryingDefects,
           reject_pct: rejectPct, surplus, surplus_pct: surplusPct,
           labor_cost: laborCost,
@@ -310,10 +297,13 @@ export function useBonusReport(period = '30') {
     setError(null)
     try {
       const [logsRes, ratesRes] = await Promise.all([
-        supabase.from('k24_production_logs')
-          .select('worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, qty_done, defects, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot)')
+        // Порциями: limit(10000) PostgREST молча резал до 1000 строк.
+        fetchAllRows(() => supabase.from('k24_production_logs')
+          .select('id, worker_id, stage, order_id, design_index, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, qty_done, defects, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot)')
           .is('deleted_at', null)
-          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
+          .order('created_at').order('id'))
+          .then((data) => ({ data, error: null })),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (logsRes.error) throw logsRes.error
@@ -357,15 +347,18 @@ export function useEmployeeReport(period = '30') {
     setError(null)
     try {
       const [shiftsRes, logsRes, ratesRes] = await Promise.all([
-        supabase.from('k24_shift_entries')
-          .select('worker_id, duration_minutes, started_at, ended_at, worker:k24_profiles!worker_id(display_name)')
+        fetchAllRows(() => supabase.from('k24_shift_entries')
+          .select('id, worker_id, duration_minutes, started_at, ended_at, worker:k24_profiles!worker_id(display_name)')
           .not('ended_at', 'is', null)
-          .gte('started_at', getSince(period)).lte('started_at', getUntil(period) ?? '9999-12-31T23:59:59Z'),
-        supabase.from('k24_production_logs')
-          .select('worker_id, stage, order_id, design_index, created_at, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, qty_done, defects, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot)')
+          .gte('started_at', getSince(period)).lte('started_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
+          .order('started_at').order('id'))
+          .then((data) => ({ data, error: null })),
+        fetchAllRows(() => supabase.from('k24_production_logs')
+          .select('id, worker_id, stage, order_id, design_index, created_at, stickers_good, packs_assembled, packs_packaged, qty_selected, stickers_printed, lamination_qty, qty_cut, qty_done, defects, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot)')
           .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
-          .limit(10000),
+          .order('created_at').order('id'))
+          .then((data) => ({ data, error: null })),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
       if (shiftsRes.error) throw shiftsRes.error
@@ -452,19 +445,23 @@ export function useQualityReport(period = '30') {
     setLoading(true)
     setError(null)
     try {
-      const [ordersRes, logsRes] = await Promise.all([
-        supabase.from('k24_orders').select('id, number, custom_number, qty, order_type')
-          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').order('number').limit(500),
-        supabase.from('k24_production_logs')
-          .select('order_id, stage, defects, defect_stage, stickers_printed, stickers_poured, stickers_good')
+      // Раньше: limit(500) заказов по возрастанию номера — при >500 заказах
+      // в периоде пропадали самые НОВЫЕ; limit(10000) логов резался до 1000.
+      // Теперь всё порциями, новые заказы первыми. Методика (заказы и логи —
+      // каждый по своей дате в периоде) не менялась — эталон R25.0.
+      const [orders, logs] = await Promise.all([
+        fetchAllRows(() => supabase.from('k24_orders').select('id, number, custom_number, qty, order_type')
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
+          .order('number', { ascending: false }).order('id', { ascending: false })),
+        fetchAllRows(() => supabase.from('k24_production_logs')
+          .select('id, order_id, stage, defects, defect_stage, stickers_printed, stickers_poured, stickers_good')
           .is('deleted_at', null)
-          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
+          .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
+          .order('created_at').order('id')),
       ])
-      if (ordersRes.error) throw ordersRes.error
-      if (logsRes.error) throw logsRes.error
 
       // R25.2: + брак по этапам и «в т.ч. найдено на ТК» (quality-report.js).
-      const rows = buildQualityRows(ordersRes.data, logsRes.data)
+      const rows = buildQualityRows(orders, logs)
       setData(rows)
     } catch (err) {
       captureError(err, { tags: { source: 'reports.useQualityReport' }, extra: { period } })

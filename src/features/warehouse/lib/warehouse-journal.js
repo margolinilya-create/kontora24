@@ -24,6 +24,18 @@ export const OPERATION_KINDS = {
 
 export const OPERATION_KIND_KEYS = Object.keys(OPERATION_KINDS)
 
+/**
+ * Виды операций, которые являются РАСХОДОМ материала (графики/аналитика
+ * расхода). Инвентаризация, начальный остаток и корректировки — не расход:
+ * минус по инвентаризации — это недостача/пересчёт, а не потребление.
+ */
+export const CONSUMPTION_KINDS = ['order_consumption', 'manual_consumption']
+
+/** Операция — расход материала (по виду и знаку). */
+export function isConsumptionOperation(tx) {
+  return CONSUMPTION_KINDS.includes(tx?.kind) && Number(tx?.delta) < 0
+}
+
 export function operationKindLabel(kind) {
   return OPERATION_KINDS[kind]?.label || kind || '—'
 }
@@ -264,12 +276,15 @@ export const DEFAULT_JOURNAL_FILTERS = {
   sort: 'date_desc',
 }
 
+// Каждая сортировка заканчивается уникальным `id`: журнал листается
+// порциями (.range), и без полного порядка строки с равными ключами
+// (одинаковое кол-во/дата) могли дублироваться или теряться между страницами.
 export const JOURNAL_SORTS = {
   date_desc: [['op_date', false], ['created_at', false], ['id', false]],
   date_asc: [['op_date', true], ['created_at', true], ['id', true]],
-  material_asc: [['material_name', true], ['op_date', false], ['created_at', false]],
-  qty_desc: [['delta', false], ['op_date', false]],
-  qty_asc: [['delta', true], ['op_date', false]],
+  material_asc: [['material_name', true], ['op_date', false], ['created_at', false], ['id', false]],
+  qty_desc: [['delta', false], ['op_date', false], ['created_at', false], ['id', false]],
+  qty_asc: [['delta', true], ['op_date', false], ['created_at', false], ['id', false]],
 }
 
 const LIST_KEYS = ['categories', 'kinds']

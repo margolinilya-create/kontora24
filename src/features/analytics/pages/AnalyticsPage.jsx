@@ -4,6 +4,8 @@ import { StatCard } from '../components/StatCard'
 import { ResourcesTab } from '../components/ResourcesTab'
 import { ProductionWidgets } from '../components/ProductionWidgets'
 import { formatPrice } from '@/shared/lib/utils'
+import { localIsoDate } from '@/shared/lib/period'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Tabs from '@/shared/components/Tabs'
@@ -15,8 +17,9 @@ import ErrorState from '@/shared/components/ErrorState'
 const FinanceTab = lazy(() => import('../components/FinanceTab').then((m) => ({ default: m.FinanceTab })))
 const ProductionTab = lazy(() => import('../components/ProductionTab').then((m) => ({ default: m.ProductionTab })))
 
-const TABS = [
-  { key: 'finance', label: 'Финансы' },
+// «Финансы» (выручка/маржа по типам, топ клиентов) — только с view:finance.
+const TABS_ALL = [
+  { key: 'finance', label: 'Финансы', requiresFinance: true },
   { key: 'production', label: 'Производство' },
   { key: 'resources', label: 'Ресурсы' },
 ]
@@ -25,9 +28,8 @@ function getThemeColor(varName) {
   return getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
 }
 
-function isoToday() {
-  return new Date().toISOString().slice(0, 10)
-}
+// Локальная дата (не UTC): ночью по Москве toISOString давал «вчера».
+const isoToday = () => localIsoDate()
 
 export default function AnalyticsPage() {
   // R15.2 (бриф 04.06 #9): отдельный ключ периода + custom-диапазон.
@@ -39,7 +41,14 @@ export default function AnalyticsPage() {
   const period = periodKey === 'custom' && customFrom && customTo
     ? `custom:${customFrom}:${customTo}`
     : periodKey
-  const [activeTab, setActiveTab] = useState('finance')
+  // Финансы (выручка, себестоимость, маржа, сдельная оплата) — только с
+  // правом view:finance (код-ревью 17.11: раньше были видны всем с
+  // view:analytics; цены маскировались view, но себестоимость/маржа и
+  // оплата труда считались из логов и показывались).
+  const canFinance = useCanDo('view:finance')
+  const TABS = TABS_ALL.filter((t) => canFinance || !t.requiresFinance)
+  const [activeTabRaw, setActiveTab] = useState('finance')
+  const activeTab = TABS.some((t) => t.key === activeTabRaw) ? activeTabRaw : TABS[0].key
   const [chartColors, setChartColors] = useState({ grid: '#e5e7eb', tooltipBorder: '#e5e7eb', tooltipBg: '#ffffff' })
 
   useEffect(() => {
@@ -138,16 +147,18 @@ export default function AnalyticsPage() {
                 doc.text(`Период: ${PERIODS.find((p) => p.key === periodKey)?.label || period}`, 15, 28)
                 let y = 38
                 const rows = [
-                  ['Выручка', formatPrice(analytics.revenue)],
-                  ['Себестоимость', formatPrice(analytics.totalCost)],
-                  ['Маржа', formatPrice(analytics.revenue - analytics.totalCost)],
+                  ...(canFinance ? [
+                    ['Выручка', formatPrice(analytics.revenue)],
+                    ['Себестоимость', formatPrice(analytics.totalCost)],
+                    ['Маржа', formatPrice(analytics.revenue - analytics.totalCost)],
+                  ] : []),
                   ['Заказов', String(analytics.orders.length)],
-                  ['Средний чек', formatPrice(analytics.avgCheck)],
+                  ...(canFinance ? [['Средний чек', formatPrice(analytics.avgCheck)]] : []),
                   ['Конверсия', `${analytics.conversionRate}%`],
                 ]
                 rows.forEach(([l, v]) => { doc.text(l + ':', 15, y); doc.text(v, 80, y); y += 6 })
                 y += 5
-                if (analytics.typeData.length > 0) {
+                if (canFinance && analytics.typeData.length > 0) {
                   doc.setFont('helvetica', 'bold'); doc.text('Маржинальность по типам', 15, y); y += 7
                   doc.setFont('helvetica', 'normal'); doc.setFontSize(9)
                   analytics.typeData.forEach((r) => {
@@ -200,12 +211,18 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatCard label="Выручка" value={formatPrice(analytics.revenue)} sub={analytics.revenueDelta !== null ? `${analytics.revenueDelta > 0 ? '+' : ''}${analytics.revenueDelta}% к прошлому` : null} />
-        <StatCard label="Себестоимость" value={formatPrice(analytics.totalCost)} sub="из логов + WORKER_RATES" />
-        <StatCard label="Маржа" value={formatPrice(analytics.revenue - analytics.totalCost)} accent />
+      <div className={`grid grid-cols-2 sm:grid-cols-3 gap-4 ${canFinance ? 'lg:grid-cols-6' : ''}`}>
+        {canFinance && (
+          <>
+            <StatCard label="Выручка" value={formatPrice(analytics.revenue)} sub={analytics.revenueDelta !== null ? `${analytics.revenueDelta > 0 ? '+' : ''}${analytics.revenueDelta}% к прошлому` : null} />
+            <StatCard label="Себестоимость" value={formatPrice(analytics.totalCost)} sub="материалы по средней цене склада + сдельная" />
+            <StatCard label="Маржа" value={formatPrice(analytics.revenue - analytics.totalCost)} accent />
+          </>
+        )}
         <StatCard label="Заказов" value={analytics.orders.length} sub={analytics.prevOrders?.length > 0 ? `было ${analytics.prevOrders.length}` : null} />
-        <StatCard label="Сдельная (пост-печать)" value={formatPrice(analytics.totalPayout)} sub={analytics.payrollData?.length > 0 ? `${analytics.payrollData.length} работн.` : null} />
+        {canFinance && (
+          <StatCard label="Сдельная (пост-печать)" value={formatPrice(analytics.totalPayout)} sub={analytics.payrollData?.length > 0 ? `${analytics.payrollData.length} работн.` : null} />
+        )}
         <StatCard label="Конверсия" value={`${analytics.conversionRate}${analytics.conversionRate === '—' ? '' : '%'}`} sub={`${analytics.cancelledCount} отмен`} />
       </div>
 
@@ -213,7 +230,7 @@ export default function AnalyticsPage() {
 
       <Tabs items={TABS} active={activeTab} onChange={setActiveTab} />
 
-      {activeTab === 'finance' && (
+      {activeTab === 'finance' && canFinance && (
         <Suspense fallback={<Spinner />}>
           <FinanceTab
             typeData={analytics.typeData}

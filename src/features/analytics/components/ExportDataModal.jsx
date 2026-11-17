@@ -2,11 +2,15 @@ import { useState } from 'react'
 import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
 import { supabase } from '@/shared/lib/supabase'
-import { FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES, ORDER_SOURCES, PAYMENT_STATUSES, calculateActualMaterialsCost, getStatusMeta } from '@/shared/constants'
+import { FILM_TYPES, getStatusMeta } from '@/shared/constants'
 import { downloadXlsx } from '@/shared/lib/export-xlsx'
+import { fetchAllRowsByIds } from '@/shared/lib/fetch-all'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
-import { formatOrderType } from '@/shared/lib/utils'
+import { captureError } from '@/shared/lib/sentry'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
+import { buildOrdersFullAoa } from '../lib/orders-export'
+import { localIsoDate } from '@/shared/lib/period'
 
 const EXPORTS = [
   { id: 'orders_full', label: 'Полная таблица заказов (с фактическим расходом материалов)' },
@@ -16,6 +20,7 @@ const EXPORTS = [
 export function ExportDataModal({ isOpen, onClose }) {
   const [selected, setSelected] = useState(['orders_full'])
   const [loading, setLoading] = useState(false)
+  const canFinance = useCanDo('view:finance')
 
   function toggle(id) {
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
@@ -29,7 +34,7 @@ export function ExportDataModal({ isOpen, onClose }) {
     setLoading(true)
     try {
       if (selected.includes('orders_full')) {
-        await exportOrdersFull()
+        await exportOrdersFull({ canFinance })
       }
       if (selected.includes('materials_log')) {
         await exportMaterialsLog()
@@ -37,6 +42,7 @@ export function ExportDataModal({ isOpen, onClose }) {
       toast.success('Готово')
       onClose()
     } catch (err) {
+      captureError(err, { tags: { source: 'analytics.ExportDataModal' } })
       toast.error(translateError(err).message || err.message)
     } finally {
       setLoading(false)
@@ -79,97 +85,62 @@ export function ExportDataModal({ isOpen, onClose }) {
 }
 
 const EXPORT_LIMIT = 5000
+const MATERIALS_LOG_LIMIT = 2000
 
-async function exportOrdersFull() {
-  const [{ data: orders, error, count }, { data: logs, error: logsErr }] = await Promise.all([
-    // Через маскирующее view: select('*') на базовой таблице после миграции
-    // 072 упал бы 42501 (финколонки отозваны). На view '*' легален (грант
-    // цельный, финансы NULL для не-менеджера). Экспорт — admin/manager.
-    supabase
+const ORDERS_FULL_SELECT = '*, client:k24_clients(name, phone), creator:k24_profiles!created_by(display_name), assignee:k24_profiles!assigned_to(display_name)'
+
+async function exportOrdersFull({ canFinance }) {
+  // Через маскирующее view: select('*') на базовой таблице после миграции
+  // 072 упал бы 42501 (финколонки отозваны). На view '*' легален (грант
+  // цельный, финансы NULL для не-менеджера). Финансовые колонки в файл
+  // попадают только с правом view:finance (buildOrdersFullAoa).
+  // Порциями по 1000: PostgREST отдаёт ≤ 1000 строк — limit(5000) молча
+  // резался до тысячи.
+  const list = []
+  let total = null
+  for (let from = 0; from < EXPORT_LIMIT; from += 1000) {
+    const { data, error, count } = await supabase
       .from('k24_orders_full')
-      .select('*, client:k24_clients(name, phone), creator:k24_profiles!created_by(display_name), assignee:k24_profiles!assigned_to(display_name)', { count: 'exact' })
+      .select(ORDERS_FULL_SELECT, from === 0 ? { count: 'exact' } : undefined)
       .order('created_at', { ascending: false })
-      .limit(EXPORT_LIMIT),
-    supabase
-      .from('k24_production_logs')
-      .select('order_id, stage, film_type, film_meters, lamination_meters, resin_grams')
-      .is('deleted_at', null)
-      .limit(EXPORT_LIMIT * 5),
-  ])
-  if (error) throw error
-  if (logsErr) throw logsErr
-  if (count && count > EXPORT_LIMIT) {
-    toast.error(`Выгружено только ${EXPORT_LIMIT} последних заказов из ${count}. Используйте фильтры для выгрузки старых заказов.`)
+      .order('id', { ascending: false })
+      .range(from, Math.min(from + 999, EXPORT_LIMIT - 1))
+    if (error) throw error
+    if (from === 0) total = count
+    list.push(...(data || []))
+    if (!data || data.length < 1000) break
+  }
+  if (total && total > EXPORT_LIMIT) {
+    toast.error(`Выгружено только ${EXPORT_LIMIT} последних заказов из ${total}. Используйте фильтры для выгрузки старых заказов.`)
   }
 
-  // Группируем логи по order_id для быстрого поиска
-  const logsByOrder = {}
-  for (const l of logs || []) {
-    if (!logsByOrder[l.order_id]) logsByOrder[l.order_id] = []
-    logsByOrder[l.order_id].push(l)
-  }
+  // Логи — только по выгружаемым заказам, все порциями.
+  const logs = await fetchAllRowsByIds(list.map((o) => o.id), (ids) => supabase
+    .from('k24_production_logs')
+    .select('id, order_id, stage, film_type, film_meters, lamination_meters, resin_grams')
+    .is('deleted_at', null)
+    .in('order_id', ids)
+    .order('created_at').order('id'))
 
-  const headers = [
-    '№', 'Клиент', 'Тел.', 'Тип', 'Размер', 'Тираж', 'Плёнка', 'Ламинация',
-    'Стикеров в паке', 'Видов', 'Срочность', 'Статус', 'Дата приёма',
-    'Дедлайн', 'Менеджер', 'Исполнитель', 'Источник', 'Оплата', 'Отгрузка',
-    'Город', 'Адрес', 'Цена', 'Себестоимость', 'Маржа', 'Bitrix ID', 'Комментарий',
-    // Фактический расход материалов из production logs
-    'Факт. плёнка (м)', 'Факт. ламинация (м)', 'Факт. смола (г)', 'Себестоимость материалов (₽)',
-  ]
-
-  const rows = (orders || []).map((o) => {
-    const orderLogs = logsByOrder[o.id] || []
-    const filmMeters = orderLogs.reduce((s, l) => s + (Number(l.film_meters) || 0), 0)
-    const lamMeters = orderLogs.reduce((s, l) => s + (Number(l.lamination_meters) || 0), 0)
-    const resinGrams = orderLogs.reduce((s, l) => s + (Number(l.resin_grams) || 0), 0)
-    const actual = calculateActualMaterialsCost(orderLogs, o.film_type)
-    const margin = (Number(o.price_final) || 0) - (Number(o.cost_total) || 0)
-    return [
-      o.number,
-      o.client?.name || '',
-      o.client?.phone || '',
-      formatOrderType(o),
-      o.width_mm && o.height_mm ? `${o.width_mm}x${o.height_mm}` : '',
-      o.qty || '',
-      FILM_TYPES[o.film_type]?.label || o.film_type || '',
-      LAMINATION_TYPES[o.lam_type]?.label || (o.need_lam ? 'Да' : 'Нет'),
-      o.stickers_per_pack || '',
-      o.design_variants || 1,
-      PRIORITIES[o.priority]?.label || '',
-      getStatusMeta(o.status)?.label || o.status,
-      o.created_at ? new Date(o.created_at).toLocaleDateString('ru-RU') : '',
-      o.deadline ? new Date(o.deadline).toLocaleDateString('ru-RU') : '',
-      o.creator?.display_name || '',
-      o.assignee?.display_name || '',
-      ORDER_SOURCES[o.source]?.label || '',
-      PAYMENT_STATUSES[o.payment_status]?.label || '',
-      DELIVERY_TYPES[o.delivery_type]?.label || '',
-      o.delivery_city || '',
-      o.delivery_address || '',
-      Number(o.price_final) || 0,
-      Number(o.cost_total) || 0,
-      margin,
-      o.bitrix_deal_id || '',
-      o.notes || '',
-      filmMeters > 0 ? Number(filmMeters.toFixed(2)) : '',
-      lamMeters > 0 ? Number(lamMeters.toFixed(2)) : '',
-      resinGrams > 0 ? Number(resinGrams.toFixed(0)) : '',
-      actual.total > 0 ? Number(actual.total.toFixed(2)) : '',
-    ]
-  })
-
-  await downloadXlsx(`orders-${new Date().toISOString().slice(0, 10)}`, 'Заказы', [headers, ...rows])
+  const aoa = buildOrdersFullAoa(list, logs, { canFinance })
+  await downloadXlsx(`orders-${localIsoDate()}`, 'Заказы', aoa)
 }
 
 async function exportMaterialsLog() {
-  const { data, error } = await supabase
-    .from('k24_production_logs')
-    .select('created_at, stage, film_type, film_meters, lamination_meters, resin_grams, defects, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(number)')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(2000)
-  if (error) throw error
+  // Последние 2000 записей — двумя порциями (limit(2000) резался до 1000).
+  const data = []
+  for (let from = 0; from < MATERIALS_LOG_LIMIT; from += 1000) {
+    const { data: page, error } = await supabase
+      .from('k24_production_logs')
+      .select('id, created_at, stage, film_type, film_meters, lamination_meters, resin_grams, defects, worker:k24_profiles!worker_id(display_name), order:k24_orders!order_id(number)')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, Math.min(from + 999, MATERIALS_LOG_LIMIT - 1))
+    if (error) throw error
+    data.push(...(page || []))
+    if (!page || page.length < 1000) break
+  }
 
   const headers = ['Дата', 'Заказ', 'Этап', 'Тип плёнки', 'Плёнка (м)', 'Ламинация (м)', 'Смола (г)', 'Брак', 'Сотрудник']
   const rows = (data || [])
@@ -186,5 +157,5 @@ async function exportMaterialsLog() {
       l.worker?.display_name || '',
     ])
 
-  await downloadXlsx(`materials-log-${new Date().toISOString().slice(0, 10)}`, 'Расход материалов', [headers, ...rows])
+  await downloadXlsx(`materials-log-${localIsoDate()}`, 'Расход материалов', [headers, ...rows])
 }

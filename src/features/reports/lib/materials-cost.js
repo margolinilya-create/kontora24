@@ -3,29 +3,112 @@
 // от приходов) вместо жёстких прайс-листов MATERIAL_COSTS.
 
 /**
+ * Приоритет позиции при дубле material_code (несколько позиций склада с одним
+ * кодом — например, Duckson и Orajet обе 'G'). Раньше побеждала последняя в
+ * выдаче БД, т.е. цена плёнки «прыгала» между загрузками. Теперь выбор
+ * детерминирован: (1) не архивная, (2) по имени (localeCompare 'ru'),
+ * (3) по id. Позиции без unit_cost > 0 в карту не попадают вовсе.
+ * Отрицательное значение — a приоритетнее b.
+ */
+export function compareCodeCandidates(a, b) {
+  const archA = a.archived_at ? 1 : 0
+  const archB = b.archived_at ? 1 : 0
+  if (archA !== archB) return archA - archB
+  const byName = String(a.name || '').localeCompare(String(b.name || ''), 'ru')
+  if (byName !== 0) return byName
+  return String(a.id || '').localeCompare(String(b.id || ''))
+}
+
+/**
  * Построить карту { material_code → unit_cost } из массива материалов.
  * Для БОПП и коробок (где material_code пустой) — отдельная map по type
  * с усреднением (фактическая ставка зависит от размера, в отчётах берём
  * среднюю по группе).
+ *
+ * Дубли material_code разрешаются compareCodeCandidates (см. выше) —
+ * результат не зависит от порядка строк. unit_cost читается из
+ * k24_materials_full (NULL без view:finance → карта пустая).
  */
 export function buildCostMap(materials) {
   const byCode = {}        // {G: 245, M: 230, matte: 130, resin: 2.35, transfer: 232, ...}
   const avgByType = {}     // {packaging_bag: 0.7, box: 35} — среднее unit_cost по группе
   const sumByType = {}
   const cntByType = {}
+  const winner = {}        // code → выбранная позиция
   for (const m of materials || []) {
     if (m.material_code && Number(m.unit_cost) > 0) {
-      byCode[m.material_code] = Number(m.unit_cost)
+      const cur = winner[m.material_code]
+      if (!cur || compareCodeCandidates(m, cur) < 0) winner[m.material_code] = m
     }
     if (m.type && Number(m.unit_cost) > 0) {
       sumByType[m.type] = (sumByType[m.type] || 0) + Number(m.unit_cost)
       cntByType[m.type] = (cntByType[m.type] || 0) + 1
     }
   }
+  for (const [code, m] of Object.entries(winner)) byCode[code] = Number(m.unit_cost)
   for (const t of Object.keys(sumByType)) {
     avgByType[t] = sumByType[t] / cntByType[t]
   }
   return { byCode, avgByType }
+}
+
+/**
+ * Фактический расход материалов заказа из его production logs — в форме,
+ * которую ждёт costForOrder (actual_film / actual_film_by_type / actual_lam /
+ * actual_lam_by_type / actual_montage / actual_resin / boxes_used).
+ * Единый источник для отчётов (useOrdersCostReport), аналитики и вкладки
+ * «Финансы» заказа — все считают себестоимость по WAC одинаково.
+ *
+ * Код плёнки лога: l.film_type, иначе (R14.6: после R8 в логи не пишется)
+ * из заказа — для stickerpack3D track='stickers' film_type_stickers, иначе
+ * film_type. Поля заказа — из embed'а лога (l.order), недостающие — из аргумента.
+ *
+ * @param {Array} logs — логи ОДНОГО заказа
+ * @param {object} [order] — { film_type, film_type_stickers, lam_type, order_type }
+ */
+export function aggregateMaterialUsage(logs, order = null) {
+  const out = {
+    actual_film: 0, actual_film_by_type: {}, actual_lam: 0, actual_lam_by_type: {},
+    actual_montage: 0, actual_resin: 0, boxes_used: 0,
+  }
+  for (const l of logs || []) {
+    // Поле-за-полем: embed лога может нести не все колонки (в аналитике —
+    // только order_type и поля оплаты), недостающее берём из заказа.
+    const pick = (k) => l.order?.[k] ?? order?.[k]
+    const o = {
+      order_type: pick('order_type'), film_type: pick('film_type'),
+      film_type_stickers: pick('film_type_stickers'), lam_type: pick('lam_type'),
+    }
+    const filmM = Number(l.film_meters) || 0
+    const lamM = Number(l.lamination_meters) || 0
+    out.actual_film += filmM
+    out.actual_lam += lamM
+    out.actual_montage += Number(l.montage_meters) || 0
+    out.actual_resin += Number(l.resin_grams) || 0
+    out.boxes_used += Number(l.boxes_used) || 0
+    const isPackStickerTrack = o.order_type === 'stickerpack3D' && l.track === 'stickers'
+    const ft = l.film_type || (isPackStickerTrack ? o.film_type_stickers : o.film_type)
+    if (ft && filmM > 0) out.actual_film_by_type[ft] = (out.actual_film_by_type[ft] || 0) + filmM
+    if (o.lam_type && lamM > 0) out.actual_lam_by_type[o.lam_type] = (out.actual_lam_by_type[o.lam_type] || 0) + lamM
+  }
+  return out
+}
+
+/**
+ * Дописать unit_cost в embed'ы позиций заказа (film_material и т.п.) из
+ * списка k24_materials_full (unit_cost NULL без view:finance). Чистая
+ * функция: возвращает новый объект заказа.
+ * @param {object} order — с *_material_id и/или embed'ами
+ * @param {Object<string, object>} materialsById — { id: { id, name, material_code, unit_cost } }
+ */
+export function withMaterialUnitCosts(order, materialsById) {
+  const out = { ...order }
+  for (const k of ['film_material', 'film_stickers_material', 'lam_material', 'montage_material']) {
+    const id = order?.[k]?.id || order?.[`${k}_id`]
+    const m = id ? materialsById?.[id] : null
+    if (m) out[k] = { ...(order?.[k] || {}), id, name: order?.[k]?.name ?? m.name, material_code: order?.[k]?.material_code ?? m.material_code, unit_cost: m.unit_cost ?? null }
+  }
+  return out
 }
 
 /**

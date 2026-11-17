@@ -1,6 +1,18 @@
 import { MS_PER_DAY } from '@/shared/constants'
 
 /**
+ * Сегодняшняя (или переданная) дата в ЛОКАЛЬНОМ поясе как 'YYYY-MM-DD'.
+ * Для дефолтов `<input type="date">` и имён файлов. `toISOString().slice(0,10)`
+ * даёт дату по UTC — ночью по Москве (00:00–03:00) это «вчера».
+ */
+export function localIsoDate(d = new Date()) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/**
  * Преобразовать выбор периода (для аналитики/дашборда) в ISO-диапазон.
  * Если customFrom > customTo — меняем местами (вместо тихого пустого результата).
  *

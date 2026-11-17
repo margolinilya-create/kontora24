@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
+import { fetchAllRows } from '@/shared/lib/fetch-all'
+import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
 
 /**
  * R25.8: позиции склада читаются через view k24_materials_full — средняя цена
@@ -38,10 +41,12 @@ export function useMaterials(opts = {}) {
   const [materials, setMaterials] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [reservationsError, setReservationsError] = useState(null)
 
   const fetchMaterials = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setReservationsError(null)
     let data, reservations
     try {
       let materialsQuery = supabase
@@ -53,14 +58,24 @@ export function useMaterials(opts = {}) {
       }
       const results = await Promise.all([
         materialsQuery,
-        supabase
+        // Порциями (PostgREST режет ответ до 1000 строк). Ошибку резервов
+        // не глотаем молча (код-ревью 17.11): остатки показываем, но «Доступно»
+        // без учёта резерва помечаем и сообщаем пользователю.
+        fetchAllRows(() => supabase
           .from('k24_material_transactions')
-          .select('material_id, delta')
-          .eq('reservation_status', 'reserved'),
+          .select('id, material_id, delta')
+          .eq('reservation_status', 'reserved')
+          .order('id'))
+          .then((rows) => ({ data: rows, error: null }), (err) => ({ data: null, error: err })),
       ])
       data = results[0].data
       reservations = results[1].data
       if (results[0].error) throw results[0].error
+      if (results[1].error) {
+        captureError(results[1].error, { tags: { source: 'warehouse.useMaterials.reservations' } })
+        setReservationsError(results[1].error)
+        toast.error(`Не удалось загрузить резервы — «Доступно» показано без учёта резерва. ${translateError(results[1].error).message}`)
+      }
     } catch (err) {
       setError(err)
       setLoading(false)
@@ -88,7 +103,7 @@ export function useMaterials(opts = {}) {
   useEffect(() => { fetchMaterials() }, [fetchMaterials])
   useRefetchOnFocus(fetchMaterials)
 
-  return { materials, loading, error, refetch: fetchMaterials }
+  return { materials, loading, error, reservationsError, refetch: fetchMaterials }
 }
 
 /**

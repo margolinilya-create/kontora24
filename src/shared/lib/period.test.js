@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { periodRange } from './period'
+import { periodRange, localIsoDate } from './period'
+
+describe('localIsoDate', () => {
+  it('берёт локальные год/месяц/день (не UTC)', () => {
+    // 17.11.2026 00:30 по локальному времени — toISOString в поясе UTC+3
+    // дал бы 16.11 («вчера»).
+    expect(localIsoDate(new Date(2026, 10, 17, 0, 30))).toBe('2026-11-17')
+    expect(localIsoDate(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
+  })
+})
 
 describe('periodRange', () => {
   beforeEach(() => {

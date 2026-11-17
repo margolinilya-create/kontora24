@@ -3,6 +3,7 @@ import { useOrdersCostReport, useEmployeeReport, useQualityReport } from '../hoo
 import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
 import { ThreeDPouringTab } from '../components/ThreeDPouringTab'
 import { buildCostMap, costForOrder } from '../lib/materials-cost'
+import { buildPnl, buildPnlAoa } from '../lib/pnl'
 import { buildEmployeeReportAoa, parseDayKey } from '../lib/employee-report'
 import Input from '@/shared/components/Input'
 import { FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PAYMENT_STATUSES } from '@/shared/constants'
@@ -16,6 +17,7 @@ import Modal from '@/shared/components/Modal'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
+import { localIsoDate } from '@/shared/lib/period'
 
 // 5 вкладок по брифу 25.05 (R8.5):
 // 1) Unit Economics — сводка по заказам с финансами и материалами
@@ -48,9 +50,8 @@ const PERIOD_TABS = [
   { key: 'custom', label: 'Свой' },
 ]
 
-function isoToday() {
-  return new Date().toISOString().slice(0, 10)
-}
+// Локальная дата (не UTC): ночью по Москве toISOString давал «вчера».
+const isoToday = () => localIsoDate()
 
 export default function ReportsPage() {
   const canSeeFinance = useCanDo('view:finance')
@@ -211,6 +212,7 @@ function UnitEconomicsTab({ period }) {
 
   return (
     <ReportFrame title="Unit Economics" onXlsx={handleExport}>
+      <MethodNote>{COHORT_NOTE}</MethodNote>
       <table className="w-full text-xs">
         <thead className="text-text-muted">
           <tr className="border-b border-border">
@@ -520,6 +522,7 @@ function ExpensesTab({ period }) {
 
   return (
     <ReportFrame title="Расходы по заказам — фактическое списание" onXlsx={handleExport}>
+      <MethodNote>{COHORT_NOTE}</MethodNote>
       <table className="w-full text-xs">
         <thead className="text-text-muted">
           <tr className="border-b border-border">
@@ -574,47 +577,31 @@ function PnLTab({ period }) {
   if (error) return <ReportError text="Не удалось загрузить P&L" error={error} onRetry={refetch} />
   if (data.length === 0) return <Empty text="Нет заказов за период" />
 
-  const rows = data.map((o) => {
-    const mat = costForOrder(o, costMap)
-    // R20.3 (бриф 3.07): труд — фактический сдельный расчёт (labor_cost из хука),
-    // единый принцип с Unit Economics; ручное cost_labor больше не используется.
-    // R25.4 (ТЗ 4.2): стоимость подрядчика входит в себестоимость отдельной строкой.
-    const matLabor = mat.total + (Number(o.labor_cost) || 0) + mat.contractor
-    const profit = (Number(o.price_final) || 0) - matLabor
-    const marginPct = o.price_final > 0 ? Math.round((profit / o.price_final) * 100) : 0
-    return { ...o, mat_total: mat.total, contractor: mat.contractor, total_cost_with_mat_labor: matLabor, real_profit: profit, real_margin: marginPct }
-  })
-
-  const totals = rows.reduce((acc, o) => {
-    acc.revenue += Number(o.price_final) || 0
-    acc.cost += o.total_cost_with_mat_labor
-    acc.profit += o.real_profit
-    return acc
-  }, { revenue: 0, cost: 0, profit: 0 })
+  // Экран и xlsx — один источник (buildPnl): отменённые исключены, итоги =
+  // суммы тех же колонок.
+  const { rows, totals } = buildPnl(data, costMap)
 
   function handleExport() {
-    const header = ['№ заказа', 'Клиент', 'Сумма заказа', 'Тип оплаты', 'Себестоимость', 'Оплата труда', 'Подрядчик', 'Маржа ₽', 'Маржа %']
-    const aoa = [header, ...rows.map((o) => [
-      formatOrderNumber(o), o.client_name || '—',
-      o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
-      Math.round(o.mat_total), Math.round(o.labor_cost || 0), Math.round(o.contractor),
-      Math.round(o.real_profit), `${o.real_margin}%`,
-    ])]
-    aoa.push([])
-    aoa.push(['ИТОГО', '', totals.revenue, '', Math.round(totals.cost), '', '', Math.round(totals.profit),
-      totals.revenue > 0 ? `${Math.round((totals.profit / totals.revenue) * 100)}%` : '0%'])
+    const aoa = buildPnlAoa({ rows, totals }, {
+      orderNumber: (o) => formatOrderNumber(o),
+      paymentLabel: (o) => PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status || '',
+    })
     downloadXlsx(`pnl-${period}`, 'P&L', aoa).catch((err) => toast.error(translateError(err).message))
   }
 
   return (
     <ReportFrame title="P&L (прибыль и убытки)" onXlsx={handleExport}>
+      <MethodNote>
+        Заказы, принятые в периоде (по дате приёма). Расход материалов и труд — по всем записям цеха этих заказов.
+        Отменённые заказы не учитываются{totals.cancelledExcluded > 0 ? ` (${totals.cancelledExcluded})` : ''}.
+      </MethodNote>
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <SummaryCard label="Выручка" value={formatPrice(totals.revenue)} />
-        <SummaryCard label="Себестоимость" value={formatPrice(totals.cost)} muted />
+        <SummaryCard label="Затраты" value={formatPrice(totals.cost)} sub="материалы + труд + подрядчик" muted />
         <SummaryCard label="Маржа"
           value={formatPrice(totals.profit)}
-          sub={totals.revenue > 0 ? `${Math.round((totals.profit / totals.revenue) * 100)}%` : '0%'}
+          sub={`${totals.margin_pct}%`}
           accent={totals.profit > 0}
           danger={totals.profit < 0}
         />
@@ -623,7 +610,7 @@ function PnLTab({ period }) {
         <thead className="text-text-muted">
           <tr className="border-b border-border">
             <Th>№</Th><Th>Клиент</Th><Th right>Сумма</Th><Th>Оплата</Th>
-            <Th right>Себест.</Th><Th right>Труд</Th><Th right>Подрядчик</Th><Th right>Маржа ₽</Th><Th right>Маржа %</Th>
+            <Th right>Себест. мат.</Th><Th right>Труд</Th><Th right>Подрядчик</Th><Th right>Затраты</Th><Th right>Маржа ₽</Th><Th right>Маржа %</Th>
           </tr>
         </thead>
         <tbody>
@@ -631,13 +618,14 @@ function PnLTab({ period }) {
             <tr key={o.id} className="border-b border-border last:border-0">
               <Td bold>{formatOrderNumber(o)}</Td>
               <Td>{o.client_name || '—'}</Td>
-              <Td right>{formatPrice(o.price_final)}</Td>
+              <Td right>{formatPrice(o.revenue)}</Td>
               <Td muted>{PAYMENT_STATUSES[o.payment_status]?.label || '—'}</Td>
               <Td right muted>{formatPrice(o.mat_total)}</Td>
-              <Td right muted>{formatPrice(o.labor_cost)}</Td>
+              <Td right muted>{formatPrice(o.labor)}</Td>
               <Td right muted>{formatPrice(o.contractor)}</Td>
-              <Td right success={o.real_profit > 0} danger={o.real_profit < 0}>{formatPrice(o.real_profit)}</Td>
-              <Td right>{o.real_margin}%</Td>
+              <Td right>{formatPrice(o.cost)}</Td>
+              <Td right success={o.profit > 0} danger={o.profit < 0}>{formatPrice(o.profit)}</Td>
+              <Td right>{o.margin_pct}%</Td>
             </tr>
           ))}
         </tbody>
@@ -649,6 +637,13 @@ function PnLTab({ period }) {
 // ============================================================================
 // Shared
 // ============================================================================
+// Подпись методики над таблицей: по какой дате фильтруется отчёт.
+function MethodNote({ children }) {
+  return <p className="text-xs text-text-muted mb-3">{children}</p>
+}
+
+const COHORT_NOTE = 'Заказы, принятые в периоде (по дате приёма). Расход материалов и труд — по всем записям цеха этих заказов, включая записи вне периода.'
+
 function ReportFrame({ title, onXlsx, children }) {
   return (
     <div className="bg-surface rounded-2xl border border-border shadow-card p-5">

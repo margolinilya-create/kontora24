@@ -118,6 +118,9 @@ export default async function handler(req, res) {
     if (email) authUpdates.email = email
     if (password) authUpdates.password = password
     if (display_name) authUpdates.user_metadata = { display_name }
+    // «Активен» = реальный запрет входа: деактивированная учётка банится в
+    // Supabase Auth (вход и обновление токена отклоняются), активация снимает бан.
+    if (approved !== undefined) authUpdates.ban_duration = approved ? 'none' : '876000h'
 
     if (Object.keys(authUpdates).length > 0) {
       const { error: authError } = await supabase.auth.admin.updateUserById(userId, authUpdates)

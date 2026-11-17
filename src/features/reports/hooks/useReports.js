@@ -71,6 +71,29 @@ export function useWorkSchedule(period = '30') {
   return { data, loading, error, refetch: fetchData }
 }
 
+const ORDER_MATERIAL_EMBEDS = ['film_material', 'film_stickers_material', 'lam_material']
+
+/**
+ * R25.8: дописать unit_cost в embed'ы позиций заказа (film_material и т.п.)
+ * из view k24_materials_full. Мутирует объекты embed'ов на месте.
+ */
+async function attachMaterialUnitCosts(orders) {
+  const ids = new Set()
+  for (const o of orders) for (const k of ORDER_MATERIAL_EMBEDS) if (o[k]?.id) ids.add(o[k].id)
+  if (ids.size === 0) return
+  const { data, error } = await supabase
+    .from('k24_materials_full')
+    .select('id, unit_cost')
+    .in('id', [...ids])
+  if (error) throw error
+  const costById = Object.fromEntries((data || []).map((m) => [m.id, m.unit_cost]))
+  for (const o of orders) {
+    for (const k of ORDER_MATERIAL_EMBEDS) {
+      if (o[k]?.id) o[k] = { ...o[k], unit_cost: costById[o[k].id] ?? null }
+    }
+  }
+}
+
 export function useOrdersCostReport(period = '30') {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
@@ -93,9 +116,9 @@ export function useOrdersCostReport(period = '30') {
                    film_material_id, film_stickers_material_id, lam_material_id, sticker_shape,
                    stickers_per_pack, notes, delivery_type, payment_status,
                    client:k24_clients!client_id(name),
-                   film_material:k24_materials!film_material_id(id, name, material_code, unit_cost),
-                   film_stickers_material:k24_materials!film_stickers_material_id(id, name, material_code, unit_cost),
-                   lam_material:k24_materials!lam_material_id(id, name, material_code, unit_cost)`)
+                   film_material:k24_materials!film_material_id(id, name, material_code),
+                   film_stickers_material:k24_materials!film_stickers_material_id(id, name, material_code),
+                   lam_material:k24_materials!lam_material_id(id, name, material_code)`)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z')
           .order('created_at', { ascending: false })
           .limit(500),
@@ -113,6 +136,10 @@ export function useOrdersCostReport(period = '30') {
       if (ordersRes.error) throw ordersRes.error
       if (logsRes.error) throw logsRes.error
       // ratesRes.error PGRST116 (нет строки) — ок, дефолтные ставки
+
+      // R25.8: средняя цена позиций — из маскирующего view k24_materials_full
+      // (после миграции 098 прямое чтение k24_materials.unit_cost отозвано).
+      await attachMaterialUnitCosts(ordersRes.data || [])
 
       // R20.4 (бриф 3.07): виды изделий для подстрок 107.1 / 107.2 / … в Unit Economics.
       const orderIds = (ordersRes.data || []).map((o) => o.id)

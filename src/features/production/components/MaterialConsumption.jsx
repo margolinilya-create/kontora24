@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { MATERIAL_TYPES } from '@/shared/constants'
@@ -11,9 +10,9 @@ import { formatOrderNumber } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import Modal from '@/shared/components/Modal'
+import { addMaterialTransaction } from '@/features/warehouse/hooks/useMaterials'
 
 export function MaterialConsumption({ order }) {
-  const { profile } = useAuth()
   // R22.0 (ТЗ 20.07 Фаза 6.4): preflight-гейт вместо «нет прав» из RPC после
   // заполнения формы. До загрузки стора прав кнопку не блокируем (permsLoaded).
   const canAddTx = useCanDo('material:add_transaction')
@@ -30,9 +29,9 @@ export function MaterialConsumption({ order }) {
     setLoadError(null)
     try {
       const [matRes, txRes] = await Promise.all([
-        supabase.from('k24_materials').select('*').order('name'),
+        supabase.from('k24_materials').select('id, name, unit, type, stock_qty').is('archived_at', null).order('name'),
         supabase.from('k24_material_transactions')
-          .select('*, material:k24_materials(name, unit, type)')
+          .select('id, material_id, order_id, delta, reason, created_at, material:k24_materials(name, unit, type)')
           .eq('order_id', order.id)
           .lt('delta', 0)
           .order('created_at', { ascending: false }),
@@ -60,20 +59,14 @@ export function MaterialConsumption({ order }) {
     try {
       const qty = Number(formData.qty)
 
-      const { error } = await supabase.from('k24_material_transactions').insert({
-        material_id: formData.materialId,
-        order_id: order.id,
+      // R25.8: операция + остаток атомарно, вид операции передаётся явно.
+      await addMaterialTransaction({
+        materialId: formData.materialId,
+        orderId: order.id,
         delta: -Math.abs(qty),
+        kind: 'manual_consumption',
         reason: `Заказ #${formatOrderNumber(order)}`,
-        created_by: profile.id,
       })
-      if (error) throw error
-
-      const { error: rpcError } = await supabase.rpc('update_stock', {
-        p_material_id: formData.materialId,
-        p_delta: -Math.abs(qty),
-      })
-      if (rpcError) throw rpcError
 
       toast.success('Расход записан')
       setShowForm(false)

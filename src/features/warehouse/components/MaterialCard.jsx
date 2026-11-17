@@ -9,6 +9,8 @@ export function MaterialCard({ material, onAddStock, onUpdated, plannedInfo }) {
   const isLow = material.min_qty > 0 && Number(material.stock_qty) <= Number(material.min_qty)
   const typeInfo = MATERIAL_TYPES[material.type]
   const canEditName = useCanDo('material:edit_name')
+  // R25.8 (ТЗ 8.8): средняя цена — только с правом «Видеть финансы».
+  const canSeeFinance = useCanDo('view:finance')
   const isArchived = !!material.archived_at
 
   return (
@@ -63,11 +65,13 @@ export function MaterialCard({ material, onAddStock, onUpdated, plannedInfo }) {
 
       <div className="flex items-center justify-between text-xs text-text-muted mt-2">
         <span>Мин: {formatNumber(material.min_qty, 1)} {material.unit}</span>
-        <span>
-          Себест.: {Number(material.unit_cost) > 0
-            ? `${formatPrice(material.unit_cost)}/${material.unit}`
-            : '—'}
-        </span>
+        {canSeeFinance && (
+          <span>
+            Себест.: {Number(material.unit_cost) > 0
+              ? `${formatPrice(material.unit_cost)}/${material.unit}`
+              : '—'}
+          </span>
+        )}
       </div>
 
       {!isArchived && (

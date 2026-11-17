@@ -9,6 +9,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 
 // R13.1 (бриф 02.06): менеджер может править любое поле позиции склада.
 // Список допустимых единиц вынесен в общую константу — используется тут
@@ -17,6 +18,7 @@ export const UNIT_OPTIONS = ['м', 'm', 'm2', 'ml', 'g', 'kg', 'шт', 'руло
 
 export function MaterialEditModal({ material, onClose, onUpdated }) {
   const { categories } = useWarehouseCategories()
+  const canSeeFinance = useCanDo('view:finance') // R25.8: средняя цена
   const [form, setForm] = useState({
     name: material.name || '',
     // R23.1 (ТЗ 23.07 Фаза 7): категория — основное поле; type сохраняем и
@@ -65,7 +67,9 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
         category_id: form.categoryId || null,
         unit: form.unit,
         min_qty: form.minQty,
-        unit_cost: Math.max(0, Number(form.unitCost) || 0),
+        // R25.8: средняя цена пишется только при праве «Видеть финансы» —
+        // без него поле скрыто и приходит NULL из view (не затираем его нулём).
+        ...(canSeeFinance ? { unit_cost: Math.max(0, Number(form.unitCost) || 0) } : {}),
         supplier: form.supplier || null,
         // Структурные поля пишем только для плёнки/ламинации; для прочих —
         // очищаем (на случай смены типа), чтобы не тянулись чужие значения.
@@ -147,7 +151,7 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
           step="any"
         />
 
-        <div>
+        {canSeeFinance && <div>
           <Input
             label={`Себестоимость (₽/${form.unit})`}
             id="medit-cost"
@@ -160,7 +164,7 @@ export function MaterialEditModal({ material, onClose, onUpdated }) {
           <p className="mt-1 text-xs text-text-muted">
             При следующем приходе с указанной стоимостью пересчитается автоматически (средневзвешенно).
           </p>
-        </div>
+        </div>}
 
         <Button type="submit" loading={loading} className="w-full">
           Сохранить

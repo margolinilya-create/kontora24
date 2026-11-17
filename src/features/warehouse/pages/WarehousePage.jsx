@@ -1,11 +1,13 @@
 import { useState, useMemo, lazy, Suspense } from 'react'
-import { useMaterials } from '../hooks/useMaterials'
+import { useSearchParams } from 'react-router-dom'
+import { useMaterials, MATERIAL_COLS, normalizeMaterialRow } from '../hooks/useMaterials'
 import { usePlannedConsumption } from '../hooks/usePlannedConsumption'
 import { MaterialCard } from '../components/MaterialCard'
 import { StockModal } from '../components/StockModal'
 import { MaterialForm } from '../components/MaterialForm'
 import { MaterialsTable } from '../components/MaterialsTable'
-import { TransactionsHistory } from '../components/TransactionsHistory'
+import { OperationsJournal } from '../components/OperationsJournal'
+import { ReceiptsTab } from '../components/ReceiptsTab'
 import { InventoryTab } from '../components/InventoryTab'
 import { ArchivedMaterialsTab } from '../components/ArchivedMaterialsTab'
 import { WarehouseFilterBar } from '../components/WarehouseFilterBar'
@@ -17,6 +19,11 @@ import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
 import ErrorState from '@/shared/components/ErrorState'
+import { supabase } from '@/shared/lib/supabase'
+import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
+
+const TAB_KEYS = ['stock', 'table', 'inventory', 'journal', 'receipts', 'analytics', 'archived']
 
 // Lazy: Recharts весит ~395 KB. Грузим только при открытии вкладки «Аналитика».
 const ConsumptionChart = lazy(() => import('../components/ConsumptionChart').then((m) => ({ default: m.ConsumptionChart })))
@@ -30,7 +37,21 @@ export default function WarehousePage() {
   const canCreateMaterial = useCanDo('material:manage') // создание новых позиций — для admin/manager (UI guard)
   const [selectedMaterial, setSelectedMaterial] = useState(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [tab, setTab] = useState('stock') // 'stock' | 'table' | 'inventory' | 'history' | 'analytics'
+  // R25.8: вкладка живёт в адресе (?tab=journal&…) — фильтры журнала тоже,
+  // поэтому ссылкой можно поделиться, а «Открыть в журнале» ведёт сюда же.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawTab = searchParams.get('tab')
+  const tab = rawTab === 'history' ? 'journal' : TAB_KEYS.includes(rawTab) ? rawTab : 'stock'
+  const setTab = (next) => setSearchParams(next === 'stock' ? {} : { tab: next })
+
+  /** Открыть карточку позиции по id (в т.ч. архивной — из журнала). */
+  async function openMaterialById(id) {
+    const local = materials.find((m) => m.id === id)
+    if (local) { setSelectedMaterial(local); return }
+    const { data, error: err } = await supabase.from('k24_materials_full').select(MATERIAL_COLS).eq('id', id).single()
+    if (err) { toast.error(translateError(err).message); return }
+    setSelectedMaterial(normalizeMaterialRow(data))
+  }
 
   // Общий стейт фильтра — переиспользуется на табах stock и table.
   const [filter, setFilter] = useState({ search: '', category: 'all', status: 'all' })
@@ -76,7 +97,8 @@ export default function WarehousePage() {
           { key: 'stock', label: 'Состояние склада' },
           { key: 'table', label: 'Список' },
           { key: 'inventory', label: 'Инвентаризация' },
-          { key: 'history', label: 'История операций' },
+          { key: 'journal', label: 'Журнал операций' },
+          { key: 'receipts', label: 'Поступления' },
           { key: 'analytics', label: 'Расход и прогноз' },
           { key: 'archived', label: 'Архив' },
         ]
@@ -107,8 +129,10 @@ export default function WarehousePage() {
         />
       ) : tab === 'inventory' ? (
         <InventoryTab materials={materials} onSaved={refetch} />
-      ) : tab === 'history' ? (
-        <TransactionsHistory />
+      ) : tab === 'journal' ? (
+        <OperationsJournal categories={categories} onOpenMaterial={openMaterialById} />
+      ) : tab === 'receipts' ? (
+        <ReceiptsTab categories={categories} />
       ) : tab === 'archived' ? (
         <ArchivedMaterialsTab />
       ) : (

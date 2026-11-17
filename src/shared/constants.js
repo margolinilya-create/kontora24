@@ -279,6 +279,7 @@ export const PERMISSIONS = {
   materials: [
     'material:add_transaction', 'material:manage', 'material:edit_name',
     'material:archive', 'material:delete',
+    'warehouse:edit_operation',
   ],
 }
 
@@ -315,6 +316,7 @@ export const PERMISSION_LABELS = {
   'material:edit_name': 'Редактировать названия материалов',
   'material:archive': 'Архивировать/редактировать позиции склада',
   'material:delete': 'Полное удаление позиций склада',
+  'warehouse:edit_operation': 'Уточнять операции склада (дата, поставщик, вид)',
   'user:manage': 'Управлять пользователями',
 }
 

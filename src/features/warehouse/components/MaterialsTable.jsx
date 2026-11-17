@@ -15,6 +15,7 @@ import { useCanDo } from '@/features/auth/hooks/useCanDo'
  */
 export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdated, showArchived, onToggleArchived, planMap }) {
   const canEditName = useCanDo('material:edit_name')
+  const canSeeFinance = useCanDo('view:finance') // R25.8: средняя цена
   const { categories } = useWarehouseCategories()
   const { category = 'all', status = 'all', search = '' } = filter || {}
 
@@ -57,7 +58,7 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
                   <th className="px-4 py-2 font-medium">Категория</th>
                   <th className="px-4 py-2 font-medium text-right">Остаток</th>
                   <th className="px-4 py-2 font-medium text-right">Минимум</th>
-                  <th className="px-4 py-2 font-medium text-right">Себест.</th>
+                  {canSeeFinance && <th className="px-4 py-2 font-medium text-right">Себест.</th>}
                   <th className="px-4 py-2 font-medium">Статус</th>
                   <th className="px-4 py-2 font-medium w-24"></th>
                 </tr>
@@ -94,9 +95,11 @@ export function MaterialsTable({ materials, onSelect, filter, onFilter, onUpdate
                       <td className="px-4 py-2.5 text-right tabular-nums text-text-muted">
                         {Number(m.min_qty) > 0 ? `${Number(m.min_qty).toFixed(1)} ${unit}` : '—'}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-text-muted">
-                        {Number(m.unit_cost) > 0 ? `${formatPrice(m.unit_cost)}/${unit}` : '—'}
-                      </td>
+                      {canSeeFinance && (
+                        <td className="px-4 py-2.5 text-right tabular-nums text-text-muted">
+                          {Number(m.unit_cost) > 0 ? `${formatPrice(m.unit_cost)}/${unit}` : '—'}
+                        </td>
+                      )}
                       <td className="px-4 py-2.5">
                         {isArchived ? (
                           <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-text-muted/15 text-text-muted">Архив</span>

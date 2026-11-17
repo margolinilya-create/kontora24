@@ -9,6 +9,7 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Spinner from '@/shared/components/Spinner'
 import ErrorState from '@/shared/components/ErrorState'
+import { MATERIAL_COLS } from '../hooks/useMaterials'
 
 /**
  * R18.6 (бриф 30.06): отдельная вкладка «Архив» на складе.
@@ -28,8 +29,8 @@ export function ArchivedMaterialsTab() {
     setError(null)
     try {
       const { data, error: err } = await supabase
-        .from('k24_materials')
-        .select('*')
+        .from('k24_materials_full') // R25.8: unit_cost маскируется по view:finance
+        .select(MATERIAL_COLS)
         .not('archived_at', 'is', null)
         .order('archived_at', { ascending: false })
       if (err) throw err

@@ -98,7 +98,7 @@ export default function DashboardPage() {
         // Через view: select('*') на таблице после миграции 072 → 42501.
         // Дашборд — admin/manager (воркеры редиректятся в /cabinet).
         supabase.from('k24_orders_full').select('*, client:k24_clients(name)').order('created_at', { ascending: false }).limit(50),
-        supabase.from('k24_materials').select('*'),
+        supabase.from('k24_materials').select('id, name, unit, stock_qty, min_qty').is('archived_at', null),
         supabase.from('k24_order_status_history').select('*, changed_by_profile:k24_profiles!changed_by(display_name), order:k24_orders!order_id(number)').order('created_at', { ascending: false }).limit(15),
       ])
       if (ordersRes.error) throw ordersRes.error

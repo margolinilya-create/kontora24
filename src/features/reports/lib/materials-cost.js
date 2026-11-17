@@ -36,7 +36,10 @@ export function buildCostMap(materials) {
  *   и (R20.2) джойны film_material / film_stickers_material / lam_material с unit_cost.
  *   R17.0: bopp_bags_used убрано — поле не пишется в k24_production_logs.
  * @param {object} costMap — результат buildCostMap.
- * @returns {{ film: number, lam: number, resin: number, box: number, total: number }}
+ * @returns {{ film: number, lam: number, resin: number, box: number, total: number, contractor: number }}
+ *   R25.4: lam включает монтажную плёнку (actual_montage × позиция заказа или
+ *   код 'transfer'); contractor — стоимость работ подрядчика (contractor_cost),
+ *   НЕ входит в total (total — материалы). Себестоимость = total + труд + contractor.
  *
  * R20.2 (бриф 3.07): приоритет — себестоимость КОНКРЕТНО выбранной позиции
  * склада (film_material_id / lam_material_id, R16.1). Фолбэк по material_code —
@@ -82,7 +85,12 @@ export function costForOrder(row, costMap) {
     }
   }
 
+  // R25.4 (ТЗ 4.3): монтажная плёнка — своя позиция склада (фолбэк — код transfer).
+  const montageUnit = Number(row.montage_material?.unit_cost) || costMap.byCode.transfer || 0
+  lam += (Number(row.actual_montage) || 0) * montageUnit
+
   const resin = (Number(row.actual_resin) || 0) * (costMap.byCode.resin || 0)
   const box = (Number(row.boxes_used) || 0) * (costMap.avgByType.box || 0)
-  return { film, lam, resin, box, total: film + lam + resin + box }
+  const contractor = Number(row.contractor_cost) || 0
+  return { film, lam, resin, box, total: film + lam + resin + box, contractor }
 }

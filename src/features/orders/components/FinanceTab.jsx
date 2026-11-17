@@ -48,7 +48,9 @@ export function FinanceTab({ order }) {
   const labor = autoLabor > 0 ? autoLabor : manualLabor
   const manualMaterials = Number(order.cost_materials) || 0
   const materials = actual.total > 0 ? actual.total : manualMaterials
-  const cost = materials + labor
+  // R25.4 (ТЗ 4.2): работа подрядчика — отдельная строка себестоимости.
+  const contractor = Number(order.contractor_cost) || 0
+  const cost = materials + labor + contractor
   const margin = total - cost
   const marginPct = total > 0 ? (margin / total) * 100 : 0
   const safeQty = order.qty > 0 ? order.qty : 1
@@ -75,6 +77,7 @@ export function FinanceTab({ order }) {
           <p className="text-xs text-text-muted mt-0.5">
             Материалы {formatPrice(materials)} + труд {formatPrice(labor)}
             {autoLabor > 0 && <span className="ml-1 text-success">(авто)</span>}
+            {contractor > 0 && <> + подрядчик {formatPrice(contractor)}</>}
           </p>
         </div>
         <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
@@ -148,6 +151,9 @@ export function FinanceTab({ order }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <InfoField label="Материалы" value={formatPrice(materials)} />
           <InfoField label="Труд" value={formatPrice(labor)} />
+          {(order.is_subcontract || contractor > 0) && (
+            <InfoField label="Подрядчик" value={formatPrice(contractor)} />
+          )}
           <InfoField label="Цена / шт" value={formatPrice(pricePerUnit)} />
           <InfoField label="Себестоимость / шт" value={formatPrice(costPerUnit)} />
           <InfoField label="Наценка" value={order.markup ? `x${order.markup}` : '—'} />

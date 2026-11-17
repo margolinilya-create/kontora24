@@ -1,5 +1,6 @@
 import { format, formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { ORDER_TYPES } from '@/shared/constants'
 
 export function formatDate(date) {
   if (!date) return '—'
@@ -72,4 +73,23 @@ export function orderFileSlug(order) {
   const custom = order?.custom_number?.trim?.()
   const raw = custom || `ORD-${String(order?.number ?? 0).padStart(4, '0')}`
   return raw.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/**
+ * R25.4 (ТЗ 4.1): подпись типа продукции заказа. Для «Прочее» (order_type
+ * 'other') — название продукции (product_name), если задано. Принимает заказ
+ * целиком; строка трактуется как order_type (совместимость со старыми
+ * вызовами formatOrderType(type) из тех-карты и группировок по типу).
+ */
+export function formatOrderType(orderOrType) {
+  const order = typeof orderOrType === 'string' || orderOrType == null
+    ? { order_type: orderOrType }
+    : orderOrType
+  const type = order.order_type
+  if (type === 'other') {
+    const name = order.product_name?.trim?.()
+    if (name) return name
+  }
+  if (!type) return '—'
+  return ORDER_TYPES[type]?.label || type
 }

@@ -9,6 +9,8 @@ import {
   ORDER_TYPES,
   ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
   needsLamination, STICKER_SHAPES,
+  PRODUCT_NAME_MAX, MAX_ORDER_ITEMS, LAMINATION_FORM_EXCLUDE_CODES,
+  isIndividualCutHidden, individualCutForOrderType, orderTypeForIndividualCut,
 } from '@/shared/constants'
 import { applyPackShapes } from '@/features/production/hooks/usePackDesigns'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -24,6 +26,9 @@ import { captureError } from '@/shared/lib/sentry'
 import { MaterialForecast } from '../components/MaterialForecast'
 import { FilmSelect } from '../components/FilmSelect'
 import { LaminationSelect } from '../components/LaminationSelect'
+import { MontageFilmSelect } from '../components/MontageFilmSelect'
+import { ContractorSelect } from '@/features/contractors/components/ContractorSelect'
+import { buildVariantRows, variantsTotalQty, resizeVariants } from '../lib/order-variants'
 import { replaceOrderItems } from '../hooks/useOrderItems'
 import { forecastMaterials } from '../lib/material-forecast'
 import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
@@ -130,6 +135,27 @@ const schema = z.object({
   delivery_city: z.string().optional(),
   delivery_address: z.string().optional(),
   delivery_notes: z.string().optional(),
+
+  // R25.4 (ТЗ Фаза 4)
+  product_name: z.string().optional(),
+  needs_individual_cut: z.boolean().default(false),
+  needs_montage_film: z.boolean().default(false),
+  montage_material_id: z.string().optional().nullable(),
+  is_subcontract: z.boolean().default(false),
+  contractor_id: z.string().optional().nullable(),
+  contractor_notes: z.string().optional(),
+  contractor_cost: z.union([z.literal(''), z.coerce.number().min(0, 'Стоимость не может быть отрицательной')]).optional(),
+}).superRefine((v, ctx) => {
+  // «Прочее» требует название продукции (ТЗ 4.1).
+  if (v.order_type === 'other') {
+    const name = (v.product_name || '').trim()
+    if (!name) ctx.addIssue({ code: 'custom', path: ['product_name'], message: 'Укажите название продукции' })
+    else if (name.length > PRODUCT_NAME_MAX) ctx.addIssue({ code: 'custom', path: ['product_name'], message: `Название — до ${PRODUCT_NAME_MAX} символов` })
+  }
+  // Субподряд: подрядчик обязателен (ТЗ 4.2).
+  if (v.is_subcontract && !v.contractor_id) {
+    ctx.addIssue({ code: 'custom', path: ['contractor_id'], message: 'Выберите подрядчика' })
+  }
 })
 
 export default function CreateOrderPage() {
@@ -144,25 +170,19 @@ export default function CreateOrderPage() {
   const [previewFile, setPreviewFile] = useState(null)
   const [previewBlobUrl, setPreviewBlobUrl] = useState(null)
   const [previewDragOver, setPreviewDragOver] = useState(false)
-  // Multi-variant (R8.3): счётчик видов + массив доп.видов (idx>=2).
-  // Первый вид (idx=1) — основные width_mm/height_mm/qty из формы.
+  // Multi-variant (R8.3 → R25.4 ТЗ 4.6): до 9 видов. У каждого вида — размер
+  // (пусто = общий размер заказа) и тираж. Тираж заказа = сумма видов.
   const [itemsCount, setItemsCount] = useState(1)
-  const [extraItems, setExtraItems] = useState([])
+  const [variants, setVariants] = useState([])
 
   function updateItemsCount(n) {
-    const next = Math.max(1, Math.min(6, Number(n) || 1))
+    const next = Math.max(1, Math.min(MAX_ORDER_ITEMS, Number(n) || 1))
     setItemsCount(next)
-    // Подгоняем массив доп.видов: либо обрезаем, либо добиваем пустыми.
-    setExtraItems((prev) => {
-      const targetLen = next - 1
-      const result = prev.slice(0, targetLen)
-      while (result.length < targetLen) result.push({ width_mm: '', height_mm: '', qty: '' })
-      return result
-    })
+    setVariants((prev) => resizeVariants(prev, next, getValues('qty')))
   }
 
-  function updateExtraItem(idx, field, value) {
-    setExtraItems((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
+  function updateVariant(idx, field, value) {
+    setVariants((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
   }
 
   // R19: типы (формы) стикеров в 3D-паке — {shape, number}. Итого стикеров в
@@ -229,7 +249,7 @@ export default function CreateOrderPage() {
   useEffect(() => () => { if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl) }, [previewBlobUrl])
 
   const formRef = useRef(null)
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       order_type: '', qty: 1, width_mm: 100, height_mm: 100,
@@ -239,6 +259,9 @@ export default function CreateOrderPage() {
       is_partner: false, payment_status: 'not_paid',
       design_status: 'provided', delivery_type: 'pickup',
       client_name: '',
+      product_name: '', needs_individual_cut: false,
+      needs_montage_film: false, montage_material_id: null,
+      is_subcontract: false, contractor_id: null, contractor_notes: '', contractor_cost: '',
     },
   })
 
@@ -276,20 +299,35 @@ export default function CreateOrderPage() {
     [stickerTypes],
   )
   const isMockupImage = mockupPath && IMAGE_RX.test(mockupPath)
+  const isOther = orderType === 'other'
+  const isSubcontract = !!watch('is_subcontract')
+  const needsMontageFilm = !!watch('needs_montage_film')
+  const montageMaterialId = watch('montage_material_id') || null
+  const needsIndividualCut = !!watch('needs_individual_cut')
+  const individualCutHidden = isIndividualCutHidden(orderType)
+
+  // R25.4: виды с разрешённым размером (пусто → общий) и суммарный тираж.
+  const variantRows = useMemo(
+    () => (itemsCount > 1 ? buildVariantRows(variants, widthMm, heightMm) : null),
+    [itemsCount, variants, widthMm, heightMm],
+  )
+  const variantsTotal = variantRows ? variantsTotalQty(variantRows) : 0
+  // Тираж заказа при видах > 1 равен сумме и руками не меняется (ТЗ 4.6).
+  useEffect(() => {
+    if (itemsCount > 1) setValue('qty', variantsTotal, { shouldValidate: variantsTotal > 0 })
+  }, [itemsCount, variantsTotal, setValue])
+  const forecastItems = useMemo(
+    () => (variantRows ? variantRows.map((r) => ({ widthMm: r.width_mm, heightMm: r.height_mm, qty: r.qty })) : undefined),
+    [variantRows],
+  )
 
   // R11.4: считаем прогноз расхода и складские остатки для warning'ов.
   const { materials } = useMaterials()
   const forecastRows = useMemo(() => forecastMaterials({
     orderType, widthMm, heightMm, qty, filmType, lamType, boppBag,
-    items: itemsCount > 1 ? [
-      { widthMm, heightMm, qty },
-      ...extraItems.map((it) => ({
-        widthMm: Number(it.width_mm) || 0,
-        heightMm: Number(it.height_mm) || 0,
-        qty: Math.max(0, Math.floor(Number(it.qty) || 0)),
-      })),
-    ] : undefined,
-  }), [orderType, widthMm, heightMm, qty, filmType, lamType, boppBag, itemsCount, extraItems])
+    items: forecastItems,
+    needsMontageFilm, montageMaterialId, isSubcontract,
+  }), [orderType, widthMm, heightMm, qty, filmType, lamType, boppBag, forecastItems, needsMontageFilm, montageMaterialId, isSubcontract])
 
   const stockByCode = useMemo(() => {
     const map = {}
@@ -329,6 +367,10 @@ export default function CreateOrderPage() {
       setValue('bopp_bag', true)
       // R23.3 (Фаза 8.4): одна плёнка — film_type_stickers больше не заполняем.
     }
+    // R25.4 (ТЗ 4.5): поштучная резка связана с типом винилового стикера,
+    // у стикерпаков скрыта (сбрасываем).
+    const cut = individualCutForOrderType(orderType)
+    if (cut !== null) setValue('needs_individual_cut', cut)
   }, [orderType, setValue])
 
   function applyPreset(key) {
@@ -347,16 +389,13 @@ export default function CreateOrderPage() {
 
   function preSubmit(values) {
     // R14.7 (code-review 03.06): multi-variant — блокируем submit если выбрано
-    // >1 видов, но extraItems не дозаполнен (qty=0 / w=0 / h=0 в строках).
+    // >1 видов, но виды не дозаполнены (qty=0 / нет размера).
     // Раньше отфильтрованные строки молча терялись, заказ создавался с одним
     // видом и подзадачи variants не генерировались. Менеджер узнавал поздно.
     if (itemsCount > 1) {
-      const validExtras = extraItems.filter(
-        (it) => Number(it.width_mm) > 0 && Number(it.height_mm) > 0 && Number(it.qty) > 0
-      )
-      if (validExtras.length < itemsCount - 1) {
-        const missing = itemsCount - 1 - validExtras.length
-        toast.error(`Заполните все ${itemsCount} видов изделий — не хватает ${missing} (ширина, длина, тираж > 0).`)
+      const invalid = (variantRows || []).filter((r) => !(r.width_mm > 0 && r.height_mm > 0 && r.qty > 0))
+      if (invalid.length > 0) {
+        toast.error(`Заполните все ${itemsCount} видов изделий — у ${invalid.length} не указан тираж или размер.`)
         return
       }
     }
@@ -382,7 +421,8 @@ export default function CreateOrderPage() {
     // material_code) — маржа завышалась у ~трети заказов. Требуем выбор
     // позиции с ценой; для 3D-пака ещё и плёнку стикеров (её код/цена
     // отличаются от фонов).
-    if (!values.film_material_id) {
+    // R25.4: на субподряде плёнку цеха не выбираем — изделие делает подрядчик.
+    if (!values.is_subcontract && !values.film_material_id) {
       toast.error('Выберите плёнку со склада (конкретную позицию) — без неё себестоимость считается неверно')
       return
     }
@@ -415,16 +455,31 @@ export default function CreateOrderPage() {
         clientId = client?.id || null
       }
       stage = 'createOrder'
+      const sub = !!values.is_subcontract
+      // На субподряде ламинация/монтаж цеха не выполняются.
+      const lamOn = needLam && !sub
+      const montageOn = !!values.needs_montage_film && !sub
       const order = await createOrder({
         order_type: values.order_type,
-        qty: values.qty,
+        qty: itemsCount > 1 ? variantsTotal : values.qty,
         width_mm: values.width_mm,
         height_mm: values.height_mm,
-        need_lam: needLam,
-        lam_type: needLam ? values.lam_type : null,
-        lam_material_id: needLam ? (values.lam_material_id || null) : null,
+        need_lam: lamOn,
+        lam_type: lamOn ? values.lam_type : null,
+        lam_material_id: lamOn ? (values.lam_material_id || null) : null,
         film_type: values.film_type,
         film_material_id: values.film_material_id || null,
+        // R25.4 (ТЗ Фаза 4)
+        product_name: values.order_type === 'other' ? (values.product_name || '').trim() : null,
+        needs_individual_cut: isIndividualCutHidden(values.order_type) ? false : !!values.needs_individual_cut,
+        needs_montage_film: montageOn,
+        montage_material_id: montageOn ? (values.montage_material_id || null) : null,
+        is_subcontract: sub,
+        contractor_id: sub ? (values.contractor_id || null) : null,
+        contractor_notes: sub ? ((values.contractor_notes || '').trim() || null) : null,
+        ...(canSeeFinance && sub && values.contractor_cost !== '' && values.contractor_cost != null
+          ? { contractor_cost: Number(values.contractor_cost) }
+          : {}),
         // R23.3 (Фаза 8.4): одна плёнка на заказ — плёнка стикеров больше не
         // хранится (колонки остаются nullable для исторических заказов).
         film_type_stickers: null,
@@ -457,18 +512,11 @@ export default function CreateOrderPage() {
 
       // Multi-variant: если выбрано больше одного вида — перезаписываем items.
       // Триггер уже создал дефолтный idx=1; replaceOrderItems заменит на полный
-      // массив (idx=1 = основные width/height/qty, далее extraItems с idx=2..N).
-      if (itemsCount > 1 && extraItems.length > 0) {
-        const itemsToInsert = [
-          { width_mm: values.width_mm, height_mm: values.height_mm, qty: values.qty },
-          ...extraItems
-            .filter((it) => Number(it.width_mm) > 0 && Number(it.height_mm) > 0 && Number(it.qty) > 0)
-            .map((it) => ({
-              width_mm: Number(it.width_mm),
-              height_mm: Number(it.height_mm),
-              qty: Math.max(1, Math.floor(Number(it.qty))),
-            })),
-        ]
+      // массив видов (R25.4: размер вида — свой или общий, тираж — свой).
+      if (itemsCount > 1 && variantRows) {
+        const itemsToInsert = variantRows
+          .filter((r) => r.width_mm > 0 && r.height_mm > 0 && r.qty > 0)
+          .map((r) => ({ width_mm: r.width_mm, height_mm: r.height_mm, qty: r.qty }))
         if (itemsToInsert.length > 1) {
           try {
             await replaceOrderItems(order.id, itemsToInsert)
@@ -595,6 +643,81 @@ export default function CreateOrderPage() {
               error={errors.order_type}
             />
 
+            {/* R25.4 (ТЗ 4.1): «Прочее» — обязательное название продукции */}
+            {isOther && (
+              <div>
+                <label htmlFor="product_name" className="block text-sm font-medium mb-1">
+                  Название продукции <span className="text-danger">*</span>
+                </label>
+                <Input
+                  id="product_name"
+                  type="text"
+                  maxLength={PRODUCT_NAME_MAX}
+                  placeholder="Например, Магниты"
+                  aria-invalid={!!errors.product_name}
+                  className={errors.product_name ? 'border-danger ring-1 ring-danger/30' : ''}
+                  {...register('product_name')}
+                />
+                <FieldError error={errors.product_name} />
+              </div>
+            )}
+
+            {/* R25.4 (ТЗ 4.5 / 4.2): поштучная резка + субподряд */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {!individualCutHidden && (
+                <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
+                  <input
+                    type="checkbox"
+                    checked={needsIndividualCut}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setValue('needs_individual_cut', checked, { shouldDirty: true })
+                      // Виниловый стикер: галочка переключает «вырубной» ↔ «на подложке».
+                      const linked = orderTypeForIndividualCut(orderType, checked)
+                      if (linked !== orderType) setValue('order_type', linked, { shouldValidate: true })
+                    }}
+                    className="w-5 h-5 rounded border-border text-accent focus:ring-accent"
+                  />
+                  <span className="text-sm">Поштучная резка</span>
+                </label>
+              )}
+              <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
+                <input type="checkbox" {...register('is_subcontract')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
+                <span className="text-sm">Субподряд</span>
+              </label>
+            </div>
+
+            {isSubcontract && (
+              <div className="space-y-3 p-3 rounded-xl border border-border bg-surface-dim">
+                <p className="text-xs text-text-muted">
+                  Этапы цеха не выполняются: после утверждения дизайна заказ уходит подрядчику, затем — на упаковку.
+                </p>
+                <div>
+                  <label htmlFor="contractor_id" className="block text-sm font-medium mb-1">
+                    Подрядчик <span className="text-danger">*</span>
+                  </label>
+                  <ContractorSelect
+                    id="contractor_id"
+                    value={watch('contractor_id')}
+                    onChange={(val) => setValue('contractor_id', val, { shouldValidate: true })}
+                    invalid={!!errors.contractor_id}
+                  />
+                  <FieldError error={errors.contractor_id} />
+                </div>
+                <div>
+                  <label htmlFor="contractor_notes" className="block text-sm font-medium mb-1">Что заказано у подрядчика</label>
+                  <Input id="contractor_notes" type="text" placeholder="Например, 500 магнитов 50×50" {...register('contractor_notes')} />
+                </div>
+                {canSeeFinance && (
+                  <div>
+                    <label htmlFor="contractor_cost" className="block text-sm font-medium mb-1">Стоимость работ подрядчика, ₽</label>
+                    <Input id="contractor_cost" type="number" step="0.01" min="0" inputMode="decimal" {...register('contractor_cost')} />
+                    <FieldError error={errors.contractor_cost} />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Размер */}
             <div>
               <label className="block text-sm font-medium mb-2">Размер, мм <span className="text-danger">*</span></label>
@@ -618,9 +741,9 @@ export default function CreateOrderPage() {
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Тираж, шт <span className="text-danger">*</span>
-                  {itemsCount > 1 && <span className="text-text-muted text-xs ml-1">(вида 1)</span>}
+                  {itemsCount > 1 && <span className="text-text-muted text-xs ml-1">(сумма видов)</span>}
                 </label>
-                <Input type="number" inputMode="numeric" aria-invalid={!!errors.qty} className={errors.qty ? 'border-danger ring-1 ring-danger/30' : ''} {...register('qty')} />
+                <Input type="number" inputMode="numeric" readOnly={itemsCount > 1} aria-invalid={!!errors.qty} className={`${errors.qty ? 'border-danger ring-1 ring-danger/30' : ''} ${itemsCount > 1 ? 'bg-surface-dim' : ''}`} {...register('qty')} />
                 <FieldError error={errors.qty} />
               </div>
               <div>
@@ -641,37 +764,39 @@ export default function CreateOrderPage() {
                 onChange={(e) => updateItemsCount(e.target.value)}
                 className={SELECT_CLASS}
               >
-                {[1, 2, 3, 4, 5, 6].map((n) => (
+                {Array.from({ length: MAX_ORDER_ITEMS }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
               {itemsCount > 1 && (
                 <p className="text-xs text-text-muted mt-1">
-                  Каждый вид со своим размером и тиражом. Расход и тех-карта учитывают все виды.
+                  Каждый вид со своим тиражом; размер — общий, если не указан свой. Расход и тех-карта учитывают все виды.
                 </p>
               )}
             </div>
 
-            {/* Дополнительные виды изделий */}
+            {/* Виды изделий (R25.4 ТЗ 4.6): размер по умолчанию общий, тираж — свой */}
             {itemsCount > 1 && (
               <div className="space-y-2 p-3 rounded-xl border border-border bg-surface-dim">
-                <p className="text-sm font-medium">Доп. виды изделий</p>
-                {extraItems.map((it, i) => (
+                <p className="text-sm font-medium">Виды изделий</p>
+                {variants.map((it, i) => (
                   <div key={i} className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-xs text-text-muted mb-0.5">Вид {i + 2} · Ширина, мм</label>
+                      <label className="block text-xs text-text-muted mb-0.5">Вид {i + 1} · Ширина, мм</label>
                       <Input
                         type="number" inputMode="numeric" min="1"
+                        placeholder={String(Number(widthMm) || '')}
                         value={it.width_mm}
-                        onChange={(e) => updateExtraItem(i, 'width_mm', e.target.value)}
+                        onChange={(e) => updateVariant(i, 'width_mm', e.target.value)}
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-text-muted mb-0.5">Длина, мм</label>
                       <Input
                         type="number" inputMode="numeric" min="1"
+                        placeholder={String(Number(heightMm) || '')}
                         value={it.height_mm}
-                        onChange={(e) => updateExtraItem(i, 'height_mm', e.target.value)}
+                        onChange={(e) => updateVariant(i, 'height_mm', e.target.value)}
                       />
                     </div>
                     <div>
@@ -679,11 +804,12 @@ export default function CreateOrderPage() {
                       <Input
                         type="number" inputMode="numeric" min="1"
                         value={it.qty}
-                        onChange={(e) => updateExtraItem(i, 'qty', e.target.value)}
+                        onChange={(e) => updateVariant(i, 'qty', e.target.value)}
                       />
                     </div>
                   </div>
                 ))}
+                <p className="text-sm font-medium pt-1">Итого: {variantsTotal} шт</p>
               </div>
             )}
 
@@ -764,6 +890,7 @@ export default function CreateOrderPage() {
             {/* Плёнка + Ламинация/перенос на монтаж.
                 R23.3 (ТЗ 23.07 Фаза 8.4): для stickerpack3D тоже ОДНА плёнка
                 (раньше были отдельные «Плёнка фонов» + «Плёнка стикеров»). */}
+            {!isSubcontract && (
             <div className="grid grid-cols-2 gap-3">
               <FilmSelect
                 label="Плёнка *"
@@ -783,8 +910,27 @@ export default function CreateOrderPage() {
                   setValue('lam_type', code || '', { shouldDirty: true })
                 }}
                 expected={lamType ? expectedByCode[lamType] : undefined}
+                excludeCodes={LAMINATION_FORM_EXCLUDE_CODES}
               />
             </div>
+            )}
+
+            {/* R25.4 (ТЗ 4.3): монтажная плёнка — отдельно от ламинации */}
+            {!isSubcontract && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
+                  <input type="checkbox" {...register('needs_montage_film')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
+                  <span className="text-sm">Монтажная плёнка</span>
+                </label>
+                {needsMontageFilm && (
+                  <MontageFilmSelect
+                    value={montageMaterialId}
+                    onChange={({ materialId }) => setValue('montage_material_id', materialId, { shouldDirty: true })}
+                    expected={forecastRows.find((r) => r.key === 'montage')?.expected}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Заказчик + Срочность */}
             <div className="grid grid-cols-2 gap-3">
@@ -935,18 +1081,10 @@ export default function CreateOrderPage() {
             filmTypeStickers={filmTypeStickers}
             lamType={lamType}
             boppBag={boppBag}
-            items={
-              itemsCount > 1
-                ? [
-                    { widthMm, heightMm, qty },
-                    ...extraItems.map((it) => ({
-                      widthMm: Number(it.width_mm) || 0,
-                      heightMm: Number(it.height_mm) || 0,
-                      qty: Math.max(0, Math.floor(Number(it.qty) || 0)),
-                    })),
-                  ]
-                : undefined
-            }
+            items={forecastItems}
+            needsMontageFilm={needsMontageFilm}
+            montageMaterialId={montageMaterialId}
+            isSubcontract={isSubcontract}
           />
 
           <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-3">

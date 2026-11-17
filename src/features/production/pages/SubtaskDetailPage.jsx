@@ -8,9 +8,9 @@ import { computeSubtaskOverallProgress, getReprintRollbackTargets } from '../lib
 import { ReprintRollbackDialog } from '../components/ReprintRollbackDialog'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import {
-  REPRINT_STATUS_LABELS, REPRINT_REASONS, ORDER_TYPES, FILM_TYPES, reprintViewLabel,
+  REPRINT_STATUS_LABELS, REPRINT_REASONS, FILM_TYPES, reprintViewLabel,
 } from '@/shared/constants'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { DryingTimer } from '@/features/orders/components/DryingTimer'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -141,7 +141,7 @@ export default function SubtaskDetailPage() {
         </div>
 
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
-          <div><dt className="text-text-muted text-xs">Изделие</dt><dd>{ORDER_TYPES[order.order_type]?.label || order.order_type}</dd></div>
+          <div><dt className="text-text-muted text-xs">Изделие</dt><dd>{formatOrderType(order)}</dd></div>
           <div><dt className="text-text-muted text-xs">Размер</dt><dd>{order.width_mm}×{order.height_mm} мм</dd></div>
           <div><dt className="text-text-muted text-xs">Материал</dt><dd>{filmName || '—'}</dd></div>
           <div><dt className="text-text-muted text-xs">Тираж допечатки</dt><dd>{subtask.qty} шт</dd></div>

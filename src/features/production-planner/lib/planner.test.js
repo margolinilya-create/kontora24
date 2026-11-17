@@ -113,6 +113,12 @@ describe('getStageDurationHours', () => {
     expect(getStageDurationHours('design', order2, items, { ...norms, design_multiply_kinds: true })).toBe(72)
   })
 
+  it('R25.4: правка макета = design_edit_days (1 день = 8 ч)', () => {
+    const edit = makeOrder({ design_status: 'needs_edit' })
+    expect(getStageDurationHours('design', edit, items, norms)).toBe(8)
+    expect(getStageDurationHours('design', edit, items, { ...norms, design_edit_days: 2 })).toBe(16)
+  })
+
   it('sample_layout = verstka_minutes / 60', () => {
     expect(getStageDurationHours('sample_layout', order, items, norms)).toBeCloseTo(10 / 60, 5)
   })

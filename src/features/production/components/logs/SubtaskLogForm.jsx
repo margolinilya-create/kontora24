@@ -15,7 +15,7 @@ import { FILM_TYPES, REPRINT_STATUS_LABELS } from '@/shared/constants'
  * данные не теряются. onSubmit(stage, data) → useReprintSubtask.addLogAndAdvance.
  */
 export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
-  const fields = reprintStageFields(stage)
+  const fields = reprintStageFields(stage, order)
   const [values, setValues] = useState({})
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)

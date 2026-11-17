@@ -11,6 +11,7 @@ import { DEFAULT_NORMS, DEFAULT_CAPACITY } from '../lib/norms'
 
 const NORM_FIELDS = [
   { key: 'design_days', label: 'Дизайн (рабочих дней)', step: '0.5' },
+  { key: 'design_edit_days', label: 'Правка макета (рабочих дней)', step: '0.5' },
   { key: 'design_multiply_kinds', label: 'Дизайн × кол-во видов', type: 'checkbox' },
   { key: 'verstka_minutes', label: 'Вёрстка образца (мин)', step: '1' },
   { key: 'sample_print_minutes', label: 'Печать образца (мин)', step: '1' },

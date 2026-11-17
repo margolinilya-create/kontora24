@@ -1,5 +1,4 @@
-import { ORDER_TYPES } from '@/shared/constants'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { Link } from 'react-router-dom'
 
 export function BatchView({ orders }) {
@@ -39,7 +38,7 @@ export function BatchView({ orders }) {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="font-semibold">
-                {ORDER_TYPES[group.type]?.label} — {group.width}x{group.height} мм
+                {formatOrderType(group.type)} — {group.width}x{group.height} мм
               </h3>
               <p className="text-sm text-text-muted">
                 {group.orders.length} заказов · {group.totalQty} шт · {group.totalArea.toFixed(2)} м2

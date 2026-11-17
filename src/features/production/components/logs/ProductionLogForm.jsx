@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { STAGE_FIELDS, validateLogEntry } from '../../lib/production-logs'
+import { STAGE_FIELDS, validateLogEntry, stageFieldsForOrder } from '../../lib/production-logs'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
@@ -57,9 +57,11 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
     : []
   // Single-track форма поддерживает omitFields.single — например, sticker3D
   // multi-variant pouring: основные поля вводятся поэвидово, остаётся только смола.
+  // R25.4: поля с предикатом when(order) — например, «Монтажная плёнка» на ламинации.
+  const orderFields = stageFieldsForOrder(stage, order)
   const singleFields = (!useTracks && Array.isArray(omitFields?.single) && omitFields.single.length)
-    ? config.fields.filter((f) => !omitFields.single.includes(f.key))
-    : (config.fields || [])
+    ? orderFields.filter((f) => !omitFields.single.includes(f.key))
+    : orderFields
 
   const [saving, setSaving] = useState(false)
   // Состояние формы — { [trackKey || 'single']: { fieldKey: value }, notes, resin }

@@ -9,6 +9,7 @@ import { BUCKETS } from './buckets'
 // §6.2 ТЗ + R11. Формат тот же, что в миграции 048.
 export const DEFAULT_NORMS = Object.freeze({
   design_days:                     3,     // §6.2 — фиксированно 3 раб. дня
+  design_edit_days:                1,     // R25.4 (ТЗ 4.4) — правка макета
   design_multiply_kinds:           false, // §13 №2 — открытый вопрос ТЗ
   verstka_minutes:                 10,    // sample_layout (§6.2: verstka=10мин)
   sample_print_minutes:            10,    // samplePrint

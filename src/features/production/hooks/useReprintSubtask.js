@@ -22,7 +22,7 @@ export async function rollbackReprintSubtask({ subtaskId, targetStatus, expected
   return data
 }
 
-const ORDER_COLS = 'id, number, custom_number, status, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, need_lam, design_status, stickers_per_pack, design_variants, sticker_shape, deadline, priority, client_id, client:k24_clients(name), film_material:k24_materials!film_material_id(id, name), film_stickers_material:k24_materials!film_stickers_material_id(id, name), lam_material:k24_materials!lam_material_id(id, name)'
+const ORDER_COLS = 'id, number, custom_number, status, order_type, product_name, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, need_lam, needs_montage_film, design_status, stickers_per_pack, design_variants, sticker_shape, deadline, priority, client_id, client:k24_clients(name), film_material:k24_materials!film_material_id(id, name), film_stickers_material:k24_materials!film_stickers_material_id(id, name), lam_material:k24_materials!lam_material_id(id, name)'
 
 /**
  * R22.1 (ТЗ 20.07 Фаза 1) — одна подзадача-допечатка для страницы

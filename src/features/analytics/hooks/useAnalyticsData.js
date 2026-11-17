@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import {
-  ORDER_TYPES, ORDER_STATUSES,
+  ORDER_STATUSES,
   calculateActualMaterialsCost, calculateWorkerPayout, settingsToRates,
 } from '@/shared/constants'
 import { fetchShapeByDesign } from '@/shared/lib/payout-context'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { subDays, subMonths, subWeeks, startOfWeek, startOfDay, endOfDay, format, differenceInHours, getISOWeek } from 'date-fns'
+import { formatOrderType } from '@/shared/lib/utils'
 
 export const PERIODS = [
   { key: 'today', label: 'Сегодня' },
@@ -162,7 +163,7 @@ export function useAnalyticsData(period) {
       byType[o.order_type].count += 1
     })
     return Object.entries(byType).map(([type, d]) => ({
-      name: ORDER_TYPES[type]?.label || type, ...d, margin: d.revenue - d.cost,
+      name: formatOrderType(type), ...d, margin: d.revenue - d.cost,
     }))
   }, [doneOrders])
 

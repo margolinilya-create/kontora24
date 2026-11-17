@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import {
-  ORDER_STATUSES, ORDER_TYPES, getOrderRoute,
+  ORDER_STATUSES, getOrderRoute,
   IS_3D_STICKERPACK, SUBTASK_STATUS_TO_STAGE, SUBTASK_STATUS_LABELS,
   TRACK_LABELS, getSubtaskRoute,
 } from '@/shared/constants'
-import { formatDateTime } from '@/shared/lib/utils'
+import { formatDateTime, formatOrderType } from '@/shared/lib/utils'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -174,7 +174,7 @@ export function OrderStepper({ order, history, subtasks, extras, onUpdated }) {
 
   if (isOffRoute) {
     const currentLabel = ORDER_STATUSES[order.status]?.label || order.status
-    const orderTypeLabel = ORDER_TYPES[order.order_type]?.label || order.order_type
+    const orderTypeLabel = formatOrderType(order)
     const recoveryLabel = recoveryTarget ? (ORDER_STATUSES[recoveryTarget]?.label || recoveryTarget) : null
     return (
       <div className="bg-warning/10 border border-warning/40 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">

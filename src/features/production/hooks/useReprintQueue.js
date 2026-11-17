@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { computeSubtaskOverallProgress } from '../lib/production-logs'
 
-const ORDER_COLS = 'id, number, custom_number, order_type, qty, width_mm, height_mm, deadline, priority, created_at, client:k24_clients(name)'
+const ORDER_COLS = 'id, number, custom_number, order_type, product_name, qty, width_mm, height_mm, deadline, priority, created_at, client:k24_clients(name)'
 
 /**
  * R22.1 (ТЗ 20.07 Фаза 1) — допечатки в очереди конкретного этапа.

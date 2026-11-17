@@ -12,9 +12,13 @@ import {
   ORDER_STATUSES, ORDER_TYPES,
   DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES,
   PRIORITIES, SIZE_PRESETS, STICKER_SHAPES,
+  PRODUCT_NAME_MAX, LAMINATION_FORM_EXCLUDE_CODES, canToggleSubcontract,
+  isIndividualCutHidden, individualCutForOrderType, orderTypeForIndividualCut,
 } from '@/shared/constants'
 import { FilmSelect } from './FilmSelect'
 import { LaminationSelect } from './LaminationSelect'
+import { MontageFilmSelect } from './MontageFilmSelect'
+import { ContractorSelect } from '@/features/contractors/components/ContractorSelect'
 
 // R22.4 (ТЗ 20.07 Фаза 4Б): упразднённые этапы — недоступны для назначения.
 const DEPRECATED_STATUSES = ['batch_layout', 'selection_pouring']
@@ -66,7 +70,14 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       bopp_bag: !!order.bopp_bag,
       is_urgent: !!order.is_urgent,
       needs_montage_film: !!order.needs_montage_film,
+      montage_material_id: order.montage_material_id || null,
       needs_individual_cut: !!order.needs_individual_cut,
+      // R25.4 (ТЗ Фаза 4)
+      product_name: order.product_name || '',
+      is_subcontract: !!order.is_subcontract,
+      contractor_id: order.contractor_id || null,
+      contractor_notes: order.contractor_notes || '',
+      contractor_cost: order.contractor_cost ?? '',
       deal_name: order.deal_name || '',
       bitrix_deal_id: order.bitrix_deal_id || '',
       is_partner: !!order.is_partner,
@@ -132,7 +143,33 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
     update('height_mm', preset.height)
   }
 
+  // R25.4: смена типа связывает «Поштучную резку» (виниловый стикер / пак).
+  function changeOrderType(value) {
+    setForm((prev) => {
+      const cut = individualCutForOrderType(value)
+      return { ...prev, order_type: value, ...(cut !== null ? { needs_individual_cut: cut } : {}) }
+    })
+  }
+
+  function changeIndividualCut(checked) {
+    setForm((prev) => ({
+      ...prev,
+      needs_individual_cut: checked,
+      order_type: orderTypeForIndividualCut(prev.order_type, checked),
+    }))
+  }
+
   async function handleSave() {
+    // R25.4 (ТЗ 4.1 / 4.2): «Прочее» требует название, субподряд — подрядчика.
+    if (form.order_type === 'other') {
+      const name = (form.product_name || '').trim()
+      if (!name) { toast.error('Укажите название продукции'); return }
+      if (name.length > PRODUCT_NAME_MAX) { toast.error(`Название — до ${PRODUCT_NAME_MAX} символов`); return }
+    }
+    if (form.is_subcontract && !form.contractor_id) {
+      toast.error('Выберите подрядчика')
+      return
+    }
     setSaving(true)
     try {
       const updates = {
@@ -162,7 +199,12 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         bopp_bag: form.bopp_bag,
         is_urgent: form.is_urgent,
         needs_montage_film: form.needs_montage_film,
-        needs_individual_cut: form.needs_individual_cut,
+        montage_material_id: form.needs_montage_film ? (form.montage_material_id || null) : null,
+        needs_individual_cut: isIndividualCutHidden(form.order_type) ? false : form.needs_individual_cut,
+        product_name: form.order_type === 'other' ? (form.product_name || '').trim() : null,
+        is_subcontract: !!form.is_subcontract,
+        contractor_id: form.is_subcontract ? (form.contractor_id || null) : null,
+        contractor_notes: form.is_subcontract ? ((form.contractor_notes || '').trim() || null) : null,
         deal_name: form.deal_name || null,
         bitrix_deal_id: form.bitrix_deal_id || null,
         is_partner: form.is_partner,
@@ -195,6 +237,8 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         updates.price_per_unit = form.price_per_unit !== '' ? Number(form.price_per_unit) : null
         updates.markup = form.markup !== '' ? Number(form.markup) : null
         updates.discount_pct = form.discount_pct !== '' ? Number(form.discount_pct) : null
+        // R25.4: стоимость подрядчика — финансовая; без субподряда обнуляем.
+        updates.contractor_cost = form.is_subcontract && form.contractor_cost !== '' ? Number(form.contractor_cost) : null
       }
 
       const patch = await updateOrder(order.id, updates)
@@ -211,6 +255,9 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   const isStickerpack = form.order_type === 'stickerpack' || form.order_type === 'stickerpack3D'
   const isStickerpack3D = form.order_type === 'stickerpack3D'
   const isSticker3D = form.order_type === 'sticker3D'
+  // R25.4 (ТЗ 4.2): переключать субподряд можно только до цеха (и только v2).
+  const subcontractToggleable = canToggleSubcontract(order)
+  const subcontractVisible = Number(order?.route_version) >= 2 || !!form.is_subcontract
 
   // 3D-стикерпак → BOPP обязателен
   useEffect(() => {
@@ -324,13 +371,23 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         <h3 className={SECTION_TITLE}>Продукт</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Field label="Тип заказа">
-            <select value={form.order_type || ''} onChange={(e) => update('order_type', e.target.value)} className={SELECT_CLASS}>
+            <select value={form.order_type || ''} onChange={(e) => changeOrderType(e.target.value)} className={SELECT_CLASS}>
               <option value="">—</option>
               {Object.entries(ORDER_TYPES).map(([k, { label }]) => (
                 <option key={k} value={k}>{label}</option>
               ))}
             </select>
           </Field>
+          {form.order_type === 'other' && (
+            <Field label="Название продукции *">
+              <Input
+                value={form.product_name || ''}
+                maxLength={PRODUCT_NAME_MAX}
+                onChange={(e) => update('product_name', e.target.value)}
+                placeholder="Например, Магниты"
+              />
+            </Field>
+          )}
           <Field label="Плёнка">
             <FilmSelect
               value={form.film_material_id || form.film_type || 'G'}
@@ -403,7 +460,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               </select>
             </Field>
           )}
-          <Field label="Ламинация / перенос на монтаж" className={isStickerpack ? '' : 'sm:col-span-2 lg:col-span-1'}>
+          <Field label="Ламинация" className={isStickerpack ? '' : 'sm:col-span-2 lg:col-span-1'}>
             <div className="flex items-center gap-2 min-h-[44px]">
               <label className={CHECKBOX_BOX + ' flex-shrink-0'}>
                 <input type="checkbox" checked={!!form.need_lam} onChange={(e) => update('need_lam', e.target.checked)} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
@@ -419,6 +476,24 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
                       update('lam_type', code || 'glossy')
                     }}
                     includeOutOfStock
+                    excludeCodes={LAMINATION_FORM_EXCLUDE_CODES}
+                  />
+                </div>
+              )}
+            </div>
+          </Field>
+          {/* R25.4 (ТЗ 4.3): монтажная плёнка — отдельно от ламинации */}
+          <Field label="Монтажная плёнка">
+            <div className="flex items-center gap-2 min-h-[44px]">
+              <label className={CHECKBOX_BOX + ' flex-shrink-0'}>
+                <input type="checkbox" checked={!!form.needs_montage_film} onChange={(e) => update('needs_montage_film', e.target.checked)} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
+                <span className="text-sm">Да</span>
+              </label>
+              {form.needs_montage_film && (
+                <div className="flex-1 min-w-0">
+                  <MontageFilmSelect
+                    value={form.montage_material_id}
+                    onChange={({ materialId }) => update('montage_material_id', materialId)}
                   />
                 </div>
               )}
@@ -443,17 +518,61 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               <input type="checkbox" checked={!!form.is_urgent} onChange={(e) => update('is_urgent', e.target.checked)} className="w-5 h-5 rounded border-border text-danger focus:ring-danger accent-danger" />
               <span className="text-sm">Срочный заказ</span>
             </label>
-            <label className={CHECKBOX_BOX}>
-              <input type="checkbox" checked={!!form.needs_montage_film} onChange={(e) => update('needs_montage_film', e.target.checked)} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
-              <span className="text-sm">Монтажная плёнка</span>
-            </label>
-            <label className={CHECKBOX_BOX}>
-              <input type="checkbox" checked={!!form.needs_individual_cut} onChange={(e) => update('needs_individual_cut', e.target.checked)} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
-              <span className="text-sm">Индивидуальная резка</span>
-            </label>
+            {!isIndividualCutHidden(form.order_type) && (
+              <label className={CHECKBOX_BOX}>
+                <input type="checkbox" checked={!!form.needs_individual_cut} onChange={(e) => changeIndividualCut(e.target.checked)} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
+                <span className="text-sm">Поштучная резка</span>
+              </label>
+            )}
           </div>
         </div>
       </section>
+
+      {/* === Субподряд (R25.4 ТЗ 4.2) === */}
+      {subcontractVisible && (
+        <>
+          <hr className="border-border" />
+          <section className="space-y-4">
+            <h3 className={SECTION_TITLE}>Субподряд</h3>
+            <label
+              className={CHECKBOX_BOX + (subcontractToggleable ? '' : ' opacity-70 cursor-not-allowed')}
+              title={subcontractToggleable ? undefined : 'Заказ уже в производстве'}
+            >
+              <input
+                type="checkbox"
+                checked={!!form.is_subcontract}
+                disabled={!subcontractToggleable}
+                onChange={(e) => update('is_subcontract', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-accent focus:ring-accent"
+              />
+              <span className="text-sm">
+                Субподряд
+                {!subcontractToggleable && <span className="text-text-muted ml-1">(заказ уже в производстве)</span>}
+              </span>
+            </label>
+            {form.is_subcontract && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Field label="Подрядчик *">
+                  <ContractorSelect
+                    id="admin_contractor_id"
+                    value={form.contractor_id}
+                    onChange={(val) => update('contractor_id', val)}
+                    invalid={!form.contractor_id}
+                  />
+                </Field>
+                <Field label="Что заказано у подрядчика" className={canSeeFinance ? '' : 'lg:col-span-2'}>
+                  <Input value={form.contractor_notes || ''} onChange={(e) => update('contractor_notes', e.target.value)} />
+                </Field>
+                {canSeeFinance && (
+                  <Field label="Стоимость работ подрядчика, ₽">
+                    <Input type="number" step="0.01" min="0" value={form.contractor_cost ?? ''} onChange={(e) => update('contractor_cost', e.target.value)} />
+                  </Field>
+                )}
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       <hr className="border-border" />
 

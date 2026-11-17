@@ -10,8 +10,15 @@ const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-
  * value = material.id; onChange отдаёт { materialId, code } для записи в
  * lam_material_id (R16.1) и legacy lam_type. Спец-опция «Без ламинации» —
  * value=null/'', сбрасывает оба.
+ *
+ * R25.4 (ТЗ 4.3): onlyCodes / excludeCodes — фильтр позиций по material_code.
+ * Форма заказа исключает 'transfer' (монтажная плёнка — отдельный выбор
+ * MontageFilmSelect). Текущее значение показывается всегда (старые заказы).
  */
-export function LaminationSelect({ value, onChange, includeOutOfStock = false, id, expected, label = 'Ламинация / перенос на монтаж' }) {
+export function LaminationSelect({
+  value, onChange, includeOutOfStock = false, id, expected, label = 'Ламинация',
+  onlyCodes = null, excludeCodes = null, emptyLabel = 'Без ламинации',
+}) {
   const { materials } = useMaterials()
 
   const { options, currentMaterial } = useMemo(() => {
@@ -42,7 +49,13 @@ export function LaminationSelect({ value, onChange, includeOutOfStock = false, i
       }
     }
 
-    let result = enriched.filter((o) => o.inStock || includeOutOfStock || (current && current.id === o.id))
+    const codeAllowed = (o) => {
+      if (onlyCodes && !onlyCodes.includes(o.code)) return false
+      if (excludeCodes && o.code && excludeCodes.includes(o.code)) return false
+      return true
+    }
+    const isCurrent = (o) => current && current.id === o.id
+    let result = enriched.filter((o) => isCurrent(o) || (codeAllowed(o) && (o.inStock || includeOutOfStock)))
     result.sort((a, b) => {
       if (a.inStock !== b.inStock) return a.inStock ? -1 : 1
       if (!!a.code !== !!b.code) return a.code ? -1 : 1
@@ -51,7 +64,7 @@ export function LaminationSelect({ value, onChange, includeOutOfStock = false, i
       return a.name.localeCompare(b.name)
     })
     return { options: result, currentMaterial: current || null }
-  }, [materials, value, includeOutOfStock])
+  }, [materials, value, includeOutOfStock, onlyCodes, excludeCodes])
 
   const shortage = (expected != null && currentMaterial)
     ? Math.max(0, expected - currentMaterial.stock)
@@ -76,7 +89,7 @@ export function LaminationSelect({ value, onChange, includeOutOfStock = false, i
         onChange={handleChange}
         className={SELECT_CLASS}
       >
-        <option value="">Без ламинации</option>
+        <option value="">{emptyLabel}</option>
         {options.map((o) => {
           const codeLabel = o.code && LAMINATION_TYPES[o.code]?.label
           const suffix = codeLabel ? ` · ${codeLabel}` : ''

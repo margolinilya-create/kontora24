@@ -5,8 +5,8 @@ import { ThreeDPouringTab } from '../components/ThreeDPouringTab'
 import { buildCostMap, costForOrder } from '../lib/materials-cost'
 import { buildEmployeeReportAoa, parseDayKey } from '../lib/employee-report'
 import Input from '@/shared/components/Input'
-import { ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PAYMENT_STATUSES } from '@/shared/constants'
-import { formatPrice, formatOrderNumber, formatDate } from '@/shared/lib/utils'
+import { FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PAYMENT_STATUSES } from '@/shared/constants'
+import { formatPrice, formatOrderNumber, formatDate, formatOrderType } from '@/shared/lib/utils'
 import { downloadXlsx } from '@/shared/lib/export-xlsx'
 import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
@@ -141,6 +141,7 @@ function UnitEconomicsTab({ period }) {
     // R18.0: труд — фактический сдельный расчёт (o.labor_cost из useReports),
     // а не ручное поле cost_labor. Затраты на производство = материалы + труд.
     const labor = Number(o.labor_cost) || 0
+    // R25.4 (ТЗ 4.2): работа подрядчика — отдельная строка себестоимости.
     return {
       ...o,
       mat_film: mat.film,
@@ -148,7 +149,8 @@ function UnitEconomicsTab({ period }) {
       mat_resin: mat.resin,
       mat_total: mat.total,
       labor,
-      prod_cost: mat.total + labor,
+      contractor: mat.contractor,
+      prod_cost: mat.total + labor + mat.contractor,
     }
   })
 
@@ -181,14 +183,14 @@ function UnitEconomicsTab({ period }) {
       'Отгрузка', '% брака', 'Излишки, шт', 'Излишки, %', 'Сумма заказа', 'Тип оплаты',
       'Себестоимость плёнки для печати, ₽', 'Себестоимость плёнки для ламинации, ₽',
       'Себестоимость смолы, ₽', 'Себестоимость материалов, ₽', 'Стоимость труда, ₽',
-      'Затраты на производство, ₽',
+      'Подрядчик, ₽', 'Затраты на производство, ₽',
     ]
     const aoa = [header, ...displayRows.map((o) => {
       // Деньги и «Излишки, шт» — только в первой подстроке заказа (R20.4).
       const first = o._first
       return [
         o.id, o._num, formatDate(o.created_at), o.deadline || '—',
-        o.client_name || '—', ORDER_TYPES[o.order_type]?.label || o.order_type,
+        o.client_name || '—', formatOrderType(o),
         o.order_type === 'sticker3D' || o.order_type === 'stickerpack3D' ? 'Да' : 'Нет',
         `${o.width_mm}×${o.height_mm}`, o.qty, o.stickers_per_pack || '—',
         o.film_material?.name || FILM_TYPES[o.film_type]?.label || o.film_type || '—',
@@ -199,6 +201,7 @@ function UnitEconomicsTab({ period }) {
         first ? (o.price_final || 0) : '', PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
         first ? Math.round(o.mat_film) : '', first ? Math.round(o.mat_lam) : '', first ? Math.round(o.mat_resin) : '',
         first ? Math.round(o.mat_total) : '', first ? Math.round(o.labor) : '',
+        first ? Math.round(o.contractor) : '',
         first ? Math.round(o.prod_cost) : '',
       ]
     })]
@@ -216,7 +219,7 @@ function UnitEconomicsTab({ period }) {
             <Th right>Брак%</Th><Th right>Излиш.шт</Th><Th right>Излиш.%</Th>
             <Th right>Сумма</Th>
             <Th right>Плёнка печать ₽</Th><Th right>Плёнка лам. ₽</Th><Th right>Смола ₽</Th>
-            <Th right>Себест. мат.</Th><Th right>Труд ₽</Th><Th right>Затраты произв. ₽</Th>
+            <Th right>Себест. мат.</Th><Th right>Труд ₽</Th><Th right>Подрядчик ₽</Th><Th right>Затраты произв. ₽</Th>
           </tr>
         </thead>
         <tbody>
@@ -227,7 +230,7 @@ function UnitEconomicsTab({ period }) {
                 <Td bold>{o._num}</Td>
                 <Td>{formatDate(o.created_at)}</Td>
                 <Td>{o.client_name || '—'}</Td>
-                <Td>{ORDER_TYPES[o.order_type]?.label}</Td>
+                <Td>{formatOrderType(o)}</Td>
                 <Td right>{o.width_mm}×{o.height_mm}</Td>
                 <Td right>{o.qty}</Td>
                 <Td>{o.film_material?.name || FILM_TYPES[o.film_type]?.label || '—'}</Td>
@@ -241,6 +244,7 @@ function UnitEconomicsTab({ period }) {
                 <Td right muted>{first ? Math.round(o.mat_resin) : ''}</Td>
                 <Td right>{first ? formatPrice(Math.round(o.mat_total)) : ''}</Td>
                 <Td right muted>{first ? formatPrice(Math.round(o.labor)) : ''}</Td>
+                <Td right muted>{first ? formatPrice(Math.round(o.contractor)) : ''}</Td>
                 <Td right>{first ? formatPrice(Math.round(o.prod_cost)) : ''}</Td>
               </tr>
             )
@@ -478,7 +482,11 @@ function ExpensesTab({ period }) {
   if (error) return <ReportError text="Не удалось загрузить расходы" error={error} onRetry={refetch} />
   if (data.length === 0) return <Empty text="Нет заказов за период" />
 
-  const rows = data.map((o) => ({ ...o, cost: costForOrder(o, costMap) }))
+  // R25.4: затраты = материалы + труд + подрядчик (cost.contractor).
+  const rows = data.map((o) => {
+    const cost = costForOrder(o, costMap)
+    return { ...o, cost, prod_cost: cost.total + (Number(o.labor_cost) || 0) + cost.contractor }
+  })
 
   function handleExport() {
     // R20.3 (бриф 3.07): «Стоимость труда» и «Затраты на производство» —
@@ -489,17 +497,18 @@ function ExpensesTab({ period }) {
       'Ламинация, м', 'Себест. лам., ₽',
       'Коробки, шт', 'Себест. коробок, ₽',
       'Смола, г', 'Себест. смолы, ₽',
-      'Итого материалов, ₽', 'Стоимость труда, ₽', 'Затраты на производство, ₽',
+      'Итого материалов, ₽', 'Стоимость труда, ₽', 'Подрядчик, ₽', 'Затраты на производство, ₽',
     ]
     const aoa = [header, ...rows.map((o) => [
       formatOrderNumber(o), o.client_name || '—', o.qty,
       o.surplus, `${o.surplus_pct}%`,
       Number(o.actual_film || 0).toFixed(1), Math.round(o.cost.film),
-      Number(o.actual_lam || 0).toFixed(1), Math.round(o.cost.lam),
+      (Number(o.actual_lam || 0) + Number(o.actual_montage || 0)).toFixed(1), Math.round(o.cost.lam),
       o.boxes_used || 0, Math.round(o.cost.box),
       Math.round(o.actual_resin), Math.round(o.cost.resin),
       Math.round(o.cost.total), Math.round(o.labor_cost || 0),
-      Math.round(o.cost.total + (Number(o.labor_cost) || 0)),
+      Math.round(o.cost.contractor),
+      Math.round(o.prod_cost),
     ])]
     downloadXlsx(`расходы-по-заказам-${period}`, 'Расходы', aoa)
       .catch((err) => toast.error(translateError(err).message))
@@ -516,7 +525,7 @@ function ExpensesTab({ period }) {
             <Th right>Лам.</Th><Th right>₽</Th>
             <Th right>Кор.</Th><Th right>₽</Th>
             <Th right>Смола</Th><Th right>₽</Th>
-            <Th right>Мат. ₽</Th><Th right>Труд ₽</Th><Th right>Затраты ₽</Th>
+            <Th right>Мат. ₽</Th><Th right>Труд ₽</Th><Th right>Подряд. ₽</Th><Th right>Затраты ₽</Th>
           </tr>
         </thead>
         <tbody>
@@ -529,7 +538,7 @@ function ExpensesTab({ period }) {
               <Td right muted>{o.surplus_pct}%</Td>
               <Td right>{Number(o.actual_film || 0).toFixed(1)}м</Td>
               <Td right muted>{Math.round(o.cost.film)}</Td>
-              <Td right>{Number(o.actual_lam || 0).toFixed(1)}м</Td>
+              <Td right>{(Number(o.actual_lam || 0) + Number(o.actual_montage || 0)).toFixed(1)}м</Td>
               <Td right muted>{Math.round(o.cost.lam)}</Td>
               <Td right>{o.boxes_used || 0}</Td>
               <Td right muted>{Math.round(o.cost.box)}</Td>
@@ -537,7 +546,8 @@ function ExpensesTab({ period }) {
               <Td right muted>{Math.round(o.cost.resin)}</Td>
               <Td right>{formatPrice(o.cost.total)}</Td>
               <Td right muted>{formatPrice(o.labor_cost)}</Td>
-              <Td right bold>{formatPrice(o.cost.total + (Number(o.labor_cost) || 0))}</Td>
+              <Td right muted>{formatPrice(o.cost.contractor)}</Td>
+              <Td right bold>{formatPrice(o.prod_cost)}</Td>
             </tr>
           ))}
         </tbody>
@@ -562,10 +572,11 @@ function PnLTab({ period }) {
     const mat = costForOrder(o, costMap)
     // R20.3 (бриф 3.07): труд — фактический сдельный расчёт (labor_cost из хука),
     // единый принцип с Unit Economics; ручное cost_labor больше не используется.
-    const matLabor = mat.total + (Number(o.labor_cost) || 0)
+    // R25.4 (ТЗ 4.2): стоимость подрядчика входит в себестоимость отдельной строкой.
+    const matLabor = mat.total + (Number(o.labor_cost) || 0) + mat.contractor
     const profit = (Number(o.price_final) || 0) - matLabor
     const marginPct = o.price_final > 0 ? Math.round((profit / o.price_final) * 100) : 0
-    return { ...o, mat_total: mat.total, total_cost_with_mat_labor: matLabor, real_profit: profit, real_margin: marginPct }
+    return { ...o, mat_total: mat.total, contractor: mat.contractor, total_cost_with_mat_labor: matLabor, real_profit: profit, real_margin: marginPct }
   })
 
   const totals = rows.reduce((acc, o) => {
@@ -576,15 +587,15 @@ function PnLTab({ period }) {
   }, { revenue: 0, cost: 0, profit: 0 })
 
   function handleExport() {
-    const header = ['№ заказа', 'Клиент', 'Сумма заказа', 'Тип оплаты', 'Себестоимость', 'Оплата труда', 'Маржа ₽', 'Маржа %']
+    const header = ['№ заказа', 'Клиент', 'Сумма заказа', 'Тип оплаты', 'Себестоимость', 'Оплата труда', 'Подрядчик', 'Маржа ₽', 'Маржа %']
     const aoa = [header, ...rows.map((o) => [
       formatOrderNumber(o), o.client_name || '—',
       o.price_final || 0, PAYMENT_STATUSES[o.payment_status]?.label || o.payment_status,
-      Math.round(o.mat_total), Math.round(o.labor_cost || 0),
+      Math.round(o.mat_total), Math.round(o.labor_cost || 0), Math.round(o.contractor),
       Math.round(o.real_profit), `${o.real_margin}%`,
     ])]
     aoa.push([])
-    aoa.push(['ИТОГО', '', totals.revenue, '', Math.round(totals.cost), '', Math.round(totals.profit),
+    aoa.push(['ИТОГО', '', totals.revenue, '', Math.round(totals.cost), '', '', Math.round(totals.profit),
       totals.revenue > 0 ? `${Math.round((totals.profit / totals.revenue) * 100)}%` : '0%'])
     downloadXlsx(`pnl-${period}`, 'P&L', aoa).catch((err) => toast.error(translateError(err).message))
   }
@@ -606,7 +617,7 @@ function PnLTab({ period }) {
         <thead className="text-text-muted">
           <tr className="border-b border-border">
             <Th>№</Th><Th>Клиент</Th><Th right>Сумма</Th><Th>Оплата</Th>
-            <Th right>Себест.</Th><Th right>Труд</Th><Th right>Маржа ₽</Th><Th right>Маржа %</Th>
+            <Th right>Себест.</Th><Th right>Труд</Th><Th right>Подрядчик</Th><Th right>Маржа ₽</Th><Th right>Маржа %</Th>
           </tr>
         </thead>
         <tbody>
@@ -618,6 +629,7 @@ function PnLTab({ period }) {
               <Td muted>{PAYMENT_STATUSES[o.payment_status]?.label || '—'}</Td>
               <Td right muted>{formatPrice(o.mat_total)}</Td>
               <Td right muted>{formatPrice(o.labor_cost)}</Td>
+              <Td right muted>{formatPrice(o.contractor)}</Td>
               <Td right success={o.real_profit > 0} danger={o.real_profit < 0}>{formatPrice(o.real_profit)}</Td>
               <Td right>{o.real_margin}%</Td>
             </tr>

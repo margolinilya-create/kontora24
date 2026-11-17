@@ -3,8 +3,8 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useShiftTracker } from '@/features/production/hooks/useShiftTracker'
 import { useCabinetStats } from '../hooks/useCabinetStats'
 import { STAGE_FIELDS, fieldValueLabel } from '@/features/production/lib/production-logs'
-import { ROLES, ORDER_TYPES } from '@/shared/constants'
-import { formatDateTime } from '@/shared/lib/utils'
+import { ROLES } from '@/shared/constants'
+import { formatDateTime, formatOrderType } from '@/shared/lib/utils'
 import { Link } from 'react-router-dom'
 import Button from '@/shared/components/Button'
 import Spinner from '@/shared/components/Spinner'
@@ -247,7 +247,7 @@ export default function CabinetPage() {
                             #{formatOrderNumber({ number: o.orderNumber, custom_number: o.customNumber })}
                           </Link>
                         </td>
-                        <td className="py-2 text-text-muted">{ORDER_TYPES[o.orderType]?.label || o.orderType}</td>
+                        <td className="py-2 text-text-muted">{formatOrderType(o.orderType)}</td>
                         <td className="py-2 text-right">{o.totalEntries}</td>
                       </tr>
                     ))}

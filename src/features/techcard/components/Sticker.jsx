@@ -1,6 +1,7 @@
 import { forwardRef, useLayoutEffect, useRef, useState, useImperativeHandle } from 'react'
 import kontoraLogo from '@/assets/kontora-logo.png'
-import { formatOrderNumberShort } from '@/shared/lib/utils'
+import { formatOrderNumberShort, formatOrderType } from '@/shared/lib/utils'
+import { laminationSummary } from '@/features/orders/lib/order-labels'
 
 // 120×75 мм. 1 мм = 2.833 px при 72dpi → 340×213 px.
 const MM = 2.833
@@ -117,6 +118,12 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
         { label: 'Срок сдачи', value: deadline },
         { label: 'Заказчик', value: clientName },
         { label: 'Тираж', value: `${order.qty || 0}` },
+        // R25.4 (ТЗ 4.1 / 4.3): изделие («Прочее» → название) и ламинация с
+        // монтажной плёнкой — цеху на боксе. Строка ламинации только если она есть.
+        { label: 'Изделие', value: formatOrderType(order), small: true },
+        ...((order.need_lam || order.needs_montage_film)
+          ? [{ label: 'Ламинация', value: laminationSummary(order), small: true }]
+          : []),
       ]
 
   return (
@@ -201,7 +208,7 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
               }}>
                 {row.label}
               </div>
-              <div style={{ fontSize: '10pt' }}>{row.value}</div>
+              <div style={{ fontSize: row.small ? '8pt' : '10pt' }}>{row.value}</div>
             </div>
           ))}
         </div>

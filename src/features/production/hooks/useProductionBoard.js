@@ -3,7 +3,7 @@ import { useOrders, updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getKanbanColumns } from '../lib/kanban-columns'
 import { useOrderTypesStore } from '@/features/order-types/store'
-import { getOrderRoute, PRIORITIES, isStageAllowed, needsNoPaymentConfirm, getStatusMeta } from '@/shared/constants'
+import { getOrderRoute, PRIORITIES, isStageAllowed, needsNoPaymentConfirm, getStatusMeta, getActiveOrderStatuses } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
@@ -29,9 +29,18 @@ export function useProductionBoard({ includeArchived = false } = {}) {
   const scrollRef = useRef(null)
   const [scrollState, setScrollState] = useState({ start: true, end: false })
 
-  const { orders: allFetchedOrders, loading, error, refetch } = useOrders()
-  // R25.7D: колонки = встроенные + свои этапы каталога (пересчёт после загрузки реестра).
   const stageDefs = useOrderTypesStore((s) => s.stages)
+  // Ревью 17.11: грузим только активные статусы (+ архивные по флагу). Без
+  // фильтра запрос тянул и done/cancelled и срезался на 1000 строк PostgREST —
+  // старые активные заказы пропадали с доски.
+  const boardStatuses = useMemo(
+    () => (includeArchived ? [...getActiveOrderStatuses(), ...ARCHIVED_STATUSES] : getActiveOrderStatuses()),
+    // stageDefs: свои этапы каталога догружаются после логина.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [includeArchived, stageDefs],
+  )
+  const { orders: allFetchedOrders, loading, error, refetch } = useOrders({ statuses: boardStatuses })
+  // R25.7D: колонки = встроенные + свои этапы каталога (пересчёт после загрузки реестра).
   const COLS = useMemo(() => getKanbanColumns(stageDefs.filter((d) => !d.archived_at)), [stageDefs])
 
   const fetchTodayDone = useCallback(async () => {

@@ -10,11 +10,13 @@ import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
 import Input from '@/shared/components/Input'
 import Button from '@/shared/components/Button'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 
 const EMPTY_FILM = { manufacturer: '', product_line: '', roll_width_m: '', finish: null, color: '' }
 
 export function MaterialForm({ onClose, onCreated }) {
   const { categories } = useWarehouseCategories()
+  const canSeeFinance = useCanDo('view:finance') // R25.8: цена — только с финансами
   const [form, setForm] = useState({
     // R23.1 (ТЗ 23.07 Фаза 7): основное поле — «Категория» (БД). `type`
     // выводится из категории (для FilmFields/единиц/списания).
@@ -45,7 +47,7 @@ export function MaterialForm({ onClose, onCreated }) {
     try {
       await createMaterial({
         type: form.type, name, unit: form.unit, categoryId: form.categoryId,
-        stockQty: form.stockQty, minQty: form.minQty, unitCost: form.unitCost,
+        stockQty: form.stockQty, minQty: form.minQty, unitCost: canSeeFinance ? form.unitCost : 0,
         supplier: form.supplier || null,
         ...(isFilm ? {
           manufacturer: form.manufacturer || null,
@@ -142,6 +144,7 @@ export function MaterialForm({ onClose, onCreated }) {
           />
         </div>
 
+        {canSeeFinance && <>
         <Input
           label="Себестоимость 1 ед. (₽)"
           id="mat-cost"
@@ -154,6 +157,7 @@ export function MaterialForm({ onClose, onCreated }) {
         <p className="text-xs text-text-muted -mt-2">
           Стартовое значение. При следующих приходах с указанной стоимостью пересчитается автоматически.
         </p>
+        </>}
 
         <Button type="submit" loading={loading} className="w-full">
           Добавить материал

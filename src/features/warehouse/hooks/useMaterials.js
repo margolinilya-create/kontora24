@@ -4,6 +4,31 @@ import { captureError } from '@/shared/lib/sentry'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 
 /**
+ * R25.8: позиции склада читаются через view k24_materials_full — средняя цена
+ * (unit_cost) приходит NULL без права view:finance. После миграции 098 прямой
+ * SELECT k24_materials.unit_cost у authenticated отозван, поэтому select('*')
+ * по таблице запрещён: только явные колонки или это view.
+ */
+export const MATERIAL_COLS = [
+  'id', 'type', 'name', 'stock_qty', 'unit', 'min_qty', 'unit_cost', 'updated_at', 'material_code',
+  'capacity_per_box', 'archived_at', 'width_mm', 'height_mm', 'manufacturer', 'product_line',
+  'roll_width_m', 'finish', 'color', 'supplier', 'category_id', 'wh_status_id', 'category_name',
+].join(', ')
+
+/** Колонки таблицы k24_materials без денег — для returning после insert/update. */
+export const MATERIAL_TABLE_COLS = [
+  'id', 'type', 'name', 'stock_qty', 'unit', 'min_qty', 'updated_at', 'material_code',
+  'capacity_per_box', 'archived_at', 'width_mm', 'height_mm', 'manufacturer', 'product_line',
+  'roll_width_m', 'finish', 'color', 'supplier', 'category_id', 'wh_status_id',
+].join(', ')
+
+/** Строка view → форма, к которой привыкли компоненты (category.name). */
+export function normalizeMaterialRow(m) {
+  if (!m) return m
+  return { ...m, category: m.category_name ? { name: m.category_name } : null }
+}
+
+/**
  * @param {{ includeArchived?: boolean }} [opts]
  *   includeArchived — если true, возвращает архивные позиции вместе с активными
  *   (для UI «показать архив»). По умолчанию активные.
@@ -20,8 +45,8 @@ export function useMaterials(opts = {}) {
     let data, reservations
     try {
       let materialsQuery = supabase
-        .from('k24_materials')
-        .select('*, category:k24_warehouse_categories(name)')
+        .from('k24_materials_full')
+        .select(MATERIAL_COLS)
         .order('type', { ascending: true })
       if (!includeArchived) {
         materialsQuery = materialsQuery.is('archived_at', null)
@@ -48,7 +73,7 @@ export function useMaterials(opts = {}) {
       reservedByMaterial[r.material_id] = (reservedByMaterial[r.material_id] || 0) + Math.abs(Number(r.delta))
     })
 
-    const materialsWithReservations = (data || []).map(m => ({
+    const materialsWithReservations = (data || []).map(normalizeMaterialRow).map(m => ({
       ...m,
       reserved: reservedByMaterial[m.id] || 0,
       available: Math.max(0, Number(m.stock_qty) - (reservedByMaterial[m.id] || 0)),
@@ -98,7 +123,7 @@ export async function deleteMaterial(id) {
   if (!id) throw new Error('deleteMaterial: нужен id')
   const { count: txCount, error: countError } = await supabase
     .from('k24_material_transactions')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('material_id', id)
   if (countError) throw countError
   if ((txCount || 0) > 0) {
@@ -114,99 +139,65 @@ export async function deleteMaterial(id) {
   if (error) throw error
 }
 
-export function useMaterialTransactions(materialId) {
-  const [transactions, setTransactions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    if (!materialId) return
-    async function fetch() {
-      setLoading(true)
-      setError(null)
-      try {
-        const { data, error: err } = await supabase
-          .from('k24_material_transactions')
-          .select('*, material:k24_materials(name), created_by_profile:k24_profiles!created_by(display_name)')
-          .eq('material_id', materialId)
-          .order('created_at', { ascending: false })
-          .limit(50)
-        if (err) throw err
-        setTransactions(data || [])
-      } catch (err) {
-        captureError(err, { tags: { source: 'useMaterialTransactions.fetch' }, extra: { materialId } })
-        setError(err)
-        setTransactions([])
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetch()
-  }, [materialId])
-
-  return { transactions, loading, error }
-}
-
-export async function addMaterialTransaction({ materialId, delta, reason, orderId, totalCost }) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
-
-  // totalCost: только на приходе. Триггер recalc_material_wac (migration 036)
-  // обновит k24_materials.unit_cost через weighted-average и заполнит NEW.unit_cost.
-  const totalCostValue = delta > 0 && totalCost !== undefined && totalCost !== null && totalCost !== ''
+/**
+ * R25.8: операция склада через RPC warehouse_add_operation (миграция 096) —
+ * запись операции и изменение остатка в одной транзакции. Каждое место записи
+ * передаёт вид операции явно.
+ *
+ * @param {object} p
+ * @param {string} p.materialId
+ * @param {number} p.delta — знак: + приход/начальный остаток, − расход
+ * @param {'purchase'|'manual_consumption'|'opening'} p.kind
+ * @param {string} [p.reason] — комментарий (для расхода обязателен)
+ * @param {string} [p.orderId]
+ * @param {number|string} [p.totalCost] — сумма по накладной, только у прихода
+ * @param {string} [p.opDate] — 'YYYY-MM-DD', не позже сегодня (по умолчанию сегодня)
+ * @param {string} [p.supplier]
+ * @param {string} [p.docNumber]
+ * @returns {Promise<string>} id операции
+ */
+export async function addMaterialTransaction({
+  materialId, delta, kind, reason, orderId, totalCost, opDate, supplier, docNumber,
+}) {
+  if (!kind) throw new Error('addMaterialTransaction: нужен вид операции (kind)')
+  const totalCostValue = kind === 'purchase' && totalCost !== undefined && totalCost !== null && totalCost !== ''
     ? Number(totalCost)
     : null
-
-  const { data: txn, error } = await supabase.from('k24_material_transactions').insert({
-    material_id: materialId,
-    delta,
-    reason,
-    order_id: orderId || null,
-    created_by: user.id,
-    total_cost: totalCostValue,
-  }).select('id').single()
-  if (error) throw error
-
-  // Atomic stock update via RPC — rollback transaction record on failure
-  const { error: rpcError } = await supabase.rpc('update_stock', {
+  const { data, error } = await supabase.rpc('warehouse_add_operation', {
     p_material_id: materialId,
-    p_delta: delta,
+    p_delta: Number(delta),
+    p_kind: kind,
+    p_reason: reason || null,
+    p_order_id: orderId || null,
+    p_total_cost: totalCostValue,
+    p_op_date: opDate || null,
+    p_supplier: supplier || null,
+    p_doc_number: docNumber || null,
   })
-  if (rpcError) {
-    // Rollback: delete the orphan transaction record
-    await supabase.from('k24_material_transactions').delete().eq('id', txn.id)
-    throw rpcError
-  }
+  if (error) throw error
+  return data
 }
 
 /**
- * Массовая инвентаризация: для каждого материала устанавливаем фактический остаток.
- * Для каждой записи создаётся material_transaction с дельтой (factual - current)
- * и reason='Инвентаризация'. Если delta=0 — пропускаем (не пишем нулевую транзакцию).
+ * Массовая инвентаризация одной транзакцией (RPC warehouse_inventory):
+ * delta = факт − текущий остаток (берётся на сервере под блокировкой),
+ * нулевые расхождения пропускаются, вид операции — «Инвентаризация».
  *
- * @param {Array<{ materialId: string, currentQty: number, factualQty: number }>} items
+ * @param {Array<{ materialId: string, factualQty: number }>} items
  * @returns {Promise<{ updated: number, skipped: number }>}
  */
 export async function bulkInventory(items) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
-
-  let updated = 0, skipped = 0
+  const payload = []
+  let skipped = 0
   for (const item of items) {
     const fact = Number(item.factualQty)
-    const current = Number(item.currentQty) || 0
-    if (isNaN(fact) || fact < 0) { skipped++; continue }
-    const delta = fact - current
-    if (Math.abs(delta) < 0.0001) { skipped++; continue }
-
-    await addMaterialTransaction({
-      materialId: item.materialId,
-      delta,
-      reason: 'Инвентаризация',
-    })
-    updated++
+    if (item.factualQty === '' || item.factualQty == null || isNaN(fact) || fact < 0) { skipped++; continue }
+    payload.push({ material_id: item.materialId, fact })
   }
-  return { updated, skipped }
+  if (payload.length === 0) return { updated: 0, skipped }
+  const { data, error } = await supabase.rpc('warehouse_inventory', { p_items: payload })
+  if (error) throw error
+  return { updated: Number(data?.updated) || 0, skipped: skipped + (Number(data?.skipped) || 0) }
 }
 
 /**
@@ -221,7 +212,7 @@ export async function updateMaterial(id, fields) {
     .from('k24_materials')
     .update(fields)
     .eq('id', id)
-    .select()
+    .select(MATERIAL_TABLE_COLS)
     .single()
   if (error) throw error
   return data
@@ -239,7 +230,9 @@ export async function createMaterial({
       name,
       unit,
       category_id: categoryId ?? null,
-      stock_qty: stockQty || 0,
+      // R25.8: остаток не пишем напрямую — его создаёт операция «Начальный
+      // остаток» ниже, чтобы история объясняла каждый метр.
+      stock_qty: 0,
       min_qty: minQty || 0,
       unit_cost: unitCost || 0,
       supplier: supplier ?? null,
@@ -249,9 +242,27 @@ export async function createMaterial({
       finish: finish ?? null,
       color: color ?? null,
     })
-    .select()
+    .select(MATERIAL_TABLE_COLS)
     .single()
 
   if (error) throw error
+
+  const initial = Number(stockQty) || 0
+  if (initial !== 0) {
+    try {
+      await addMaterialTransaction({
+        materialId: data.id,
+        delta: initial,
+        kind: 'opening',
+        reason: 'Начальный остаток',
+      })
+    } catch (err) {
+      captureError(err, { tags: { source: 'createMaterial.opening' }, extra: { materialId: data.id } })
+      const e = new Error('Позиция создана, но начальный остаток не записан — внесите его приходом')
+      e.cause = err
+      throw e
+    }
+    return { ...data, stock_qty: initial }
+  }
   return data
 }

@@ -9,7 +9,7 @@ import { translateError } from '@/shared/lib/error-translator'
 
 const EXPORTS = [
   { id: 'orders_full', label: 'Полная таблица заказов (с фактическим расходом материалов)' },
-  { id: 'materials_log', label: 'Журнал расхода материалов (по логам)' },
+  { id: 'materials_log', label: 'Расход материалов по записям цеха' },
 ]
 
 export function ExportDataModal({ isOpen, onClose }) {

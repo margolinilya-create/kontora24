@@ -9,6 +9,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import { formatOrderNumber } from '@/shared/lib/utils'
 import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
+import { addMaterialTransaction } from '@/features/warehouse/hooks/useMaterials'
 
 export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
   const { profile } = useAuth()
@@ -24,7 +25,7 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
   useEffect(() => {
     if (!isOpen) return
     // Load available materials
-    supabase.from('k24_materials').select('*').order('name').then(({ data }) => {
+    supabase.from('k24_materials').select('id, name, unit, type, stock_qty').is('archived_at', null).order('name').then(({ data }) => {
       setMaterials(data || [])
     })
     setStep('confirm')
@@ -61,19 +62,14 @@ export function CompleteTaskModal({ order, isOpen, onClose, onCompleted }) {
       for (const item of consumption) {
         const qty = Number(item.qty)
         if (!item.materialId || !qty || qty <= 0) continue
-        const { error: txError } = await supabase.from('k24_material_transactions').insert({
-          material_id: item.materialId,
-          order_id: order.id,
+        // R25.8: операция + остаток атомарно, вид операции передаётся явно.
+        await addMaterialTransaction({
+          materialId: item.materialId,
+          orderId: order.id,
           delta: -qty,
+          kind: 'manual_consumption',
           reason: `Заказ #${formatOrderNumber(order)}`,
-          created_by: profile.id,
         })
-        if (txError) throw txError
-        const { error: stockError } = await supabase.rpc('update_stock', {
-          p_material_id: item.materialId,
-          p_delta: -qty,
-        })
-        if (stockError) throw stockError
       }
 
       // 3. Change status

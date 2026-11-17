@@ -190,3 +190,61 @@ describe('Security phase 3: маскирование финансов k24_orders
     expect(leaks, `финансы читаются напрямую из таблицы:\n${leaks.join('\n')}`).toHaveLength(0)
   })
 })
+
+describe('R25.8: маскирование денег склада', () => {
+  const read = (f) => readFileSync(resolve(process.cwd(), f), 'utf-8')
+
+  it('view k24_material_movements и k24_materials_full маскируют деньги по view:finance', () => {
+    const sql = read('supabase/migrations/096_r25_8_warehouse_journal.sql')
+    expect(sql).toMatch(/k24_user_can\('view:finance'\) AS can_fin/)
+    expect(sql).toMatch(/CASE WHEN f\.can_fin THEN t\.total_cost END AS total_cost/)
+    expect(sql).toMatch(/CASE WHEN f\.can_fin THEN t\.unit_cost\s+END AS unit_cost/)
+    expect(sql).toMatch(/CASE WHEN f\.can_fin THEN m\.unit_cost END AS unit_cost/)
+    for (const v of ['k24_material_movements', 'k24_materials_full']) {
+      expect(sql).toContain(`REVOKE ALL ON public.${v} FROM PUBLIC, anon`)
+      expect(sql).toContain(`GRANT SELECT ON public.${v} TO authenticated`)
+    }
+    // Сводка читает total_cost таблицы → маскирует сумму явно.
+    expect(sql).toMatch(/CASE WHEN v_fin THEN a\.a_sum END/)
+  })
+
+  it('098 отзывает табличный SELECT и возвращает колоночный без денежных колонок', () => {
+    const sql = read('supabase/migrations/098_r25_8_warehouse_money_revoke.sql')
+    expect(sql).toContain('REVOKE SELECT ON public.k24_material_transactions FROM authenticated')
+    expect(sql).toContain('REVOKE SELECT ON public.k24_materials FROM authenticated')
+    expect(sql).toMatch(/NOT IN \('total_cost', 'unit_cost'\)/)
+    expect(sql).toMatch(/NOT IN \('unit_cost'\)/)
+  })
+
+  it('фронт не читает деньги склада из таблиц напрямую и не делает select(*) по ним', () => {
+    // После 098 такие запросы падают 42501 — тест ловит регресс до прода.
+    const { execSync } = require('child_process')
+    const files = execSync(
+      'grep -rlE "k24_materials|k24_material_transactions" src/ --include="*.js" --include="*.jsx" || true',
+      { encoding: 'utf-8' },
+    ).split('\n').filter(Boolean)
+    const leaks = []
+    for (const f of files) {
+      const src = read(f)
+      const fromRe = /from\('(k24_materials|k24_material_transactions)'\)([^;]{0,400})/g
+      let m
+      while ((m = fromRe.exec(src))) {
+        const sel = m[2].match(/^[\s\S]*?\.select\(([^)]*)\)/)
+        // insert/update/delete без select — пропускаем; select() без колонок = '*'.
+        if (!sel) continue
+        if (/\.(insert|update|delete)\(/.test(m[2].slice(0, m[2].indexOf('.select(')))) {
+          if (sel[1].trim() === '') leaks.push(`${f}: from('${m[1]}')…select() без колонок`)
+          continue
+        }
+        if (/unit_cost|total_cost|'\*'/.test(sel[1]) || sel[1].trim() === '') {
+          leaks.push(`${f}: from('${m[1]}').select(${sel[1].trim().slice(0, 60)})`)
+        }
+      }
+      const embedRe = /k24_materials(?:!\w+)?\(([^)]*)\)/g
+      while ((m = embedRe.exec(src))) {
+        if (/unit_cost|\*/.test(m[1])) leaks.push(`${f}: embed k24_materials(${m[1].trim().slice(0, 60)})`)
+      }
+    }
+    expect(leaks, `деньги склада читаются из таблиц:\n${leaks.join('\n')}`).toHaveLength(0)
+  })
+})

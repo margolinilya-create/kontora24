@@ -217,9 +217,9 @@ src/
                           #   StickerActions, PrintPreviewModal
       utils.js
     warehouse/
-      pages/WarehousePage.jsx   # tabs: Виджеты / Список / Инвентаризация / История / Расход
+      pages/WarehousePage.jsx   # tabs: Виджеты / Список / Инвентаризация / Журнал операций / Поступления / Расход (R25.8)
       components/         # MaterialCard, MaterialForm, StockModal, ConsumptionChart,
-                          #   MaterialsTable, TransactionsHistory,
+                          #   MaterialsTable, OperationsJournal, ReceiptsTab,
                           #   InventoryTab (массовый ввод фактических остатков с группировкой
                           #     по UI-категориям, save → bulk-транзакции)
       hooks/useMaterials.js  # + bulkInventory(items) — массовая инвентаризация
@@ -818,6 +818,16 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 **Решения:** Задача 1 — списание восстановлено для всех логов упаковки (дефолт; изначально задуманное поведение). Задача 4 — капсула = дата генерации, таблица «Дата создания» = дата заказа (отдельное поле). Задача 5 — «поступило» считается напрямую из pouring-логов (в `DUAL_TRACK_FIELDS` нет ключа `pouring` после линейного маршрута R22.4; общий хелпер `computeIncomingPerDesign` не трогали).
 
 755 unit-тестов. Прод-деплой через `npx vercel deploy --yes --prod --scope margolinilya-creates-projects`.
+
+## R25.8 — Склад: журнал операций, поступления, Excel (ТЗ Фаза 8, миграции 096–098)
+
+- **Операции склада** (`k24_material_transactions`) получили `kind` (purchase/opening/order_consumption/manual_consumption/inventory/correction), `op_date` (дата поступления / дата внесения по Москве), `supplier`, `doc_number`, `is_auto`, `needs_review`, `updated_by/at`. BEFORE INSERT-триггер `trg_material_tx_defaults` — страховка по классификатору `k24_classify_material_tx` (JS-зеркало `classifyMaterialOperation` в [warehouse-journal.js](src/features/warehouse/lib/warehouse-journal.js)).
+- **Запись — только через RPC**: `warehouse_add_operation` (приход/расход/начальный остаток, операция + остаток атомарно), `warehouse_inventory` (массовая инвентаризация одной транзакцией). Фронт вызывает `addMaterialTransaction({ kind, … })` — `kind` обязателен (тест). `createMaterial` пишет операцию «Начальный остаток». `deduct_materials_from_log` / `delete_order_cascade` передают `kind/is_auto/op_date`.
+- **Чтение** — view `k24_material_movements` (позиция/категория/заказ/автор + «остаток после» оконной функцией назад от `stock_qty`, деньги NULL без `view:finance`) через RPC `warehouse_movements(p_filters jsonb)` (одни фильтры для списка, итогов `warehouse_movements_totals` и Excel), сводка — `warehouse_turnover(from, to, category_ids)`. Позиции — view `k24_materials_full` (`unit_cost` маскирован). Оба view owner-run (как `k24_orders_full`), не security_invoker: после 098 invoker-view падал бы 42501.
+- **«Уточнить»** — `update_material_operation` (право `warehouse:edit_operation`, admin+manager): дата/вид/поставщик/№ док./комментарий только у ручных операций, количество и сумма не меняются, аудит в `k24_material_transaction_audit`.
+- **UI**: вкладки `/warehouse?tab=journal` («Журнал операций», фильтры в URL, догрузка по 100, итоги по всему фильтру) и `?tab=receipts` («Поступления»: журнал по категориям + оборотная ведомость). Карточка позиции — новая форма прихода/расхода и полная история. Excel — `downloadXlsxBook` + `fetchAllChunked` (порции по 1000, предел 50 000) в [export-xlsx.js](src/shared/lib/export-xlsx.js); без `view:finance` денежных колонок нет.
+- **Деньги склада** (суммы, цены, средняя цена) видны только с `view:finance` — на экранах, в Excel и (после 098) на сервере.
+- **Порядок применения**: 096 → 097 (перенос: классификация, «Начальный остаток» на разницу без суммы, NOT NULL; самопроверка остатков/WAC) → деплой фронта → **098 только после деплоя** (REVOKE `total_cost/unit_cost` и `k24_materials.unit_cost` у authenticated). Процесс для новых колонок этих таблиц: колоночный GRANT + для `k24_materials` — колонка в конец `k24_materials_full`. Никаких `select('*')` по `k24_materials` / `k24_material_transactions` (security-тест).
 
 ## Обработка ошибок
 

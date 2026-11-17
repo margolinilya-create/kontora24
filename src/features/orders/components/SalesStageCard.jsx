@@ -25,6 +25,8 @@ import ConfirmDialog from '@/shared/components/ConfirmDialog'
 export function SalesStageCard({ order, onUpdated }) {
   const { profile } = useAuth()
   const canEdit = useCanDo('order:edit')
+  // Оплата — финансовая информация: плашку «не оплачен» видит тот, кто видит финансы.
+  const canSeeFinance = useCanDo('view:finance')
   const dynamicPerms = useRolePermissionsStore((s) => s.permissions)
   const dynamicLoaded = useRolePermissionsStore((s) => s.loaded)
   const [busy, setBusy] = useState(false)
@@ -109,7 +111,7 @@ export function SalesStageCard({ order, onUpdated }) {
     <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-4">
       <h2 className="font-semibold">{ORDER_STATUSES[stage]?.label || stage}</h2>
 
-      {stage === 'awaiting_payment' && (
+      {stage === 'awaiting_payment' && canAdvance && (
         <>
           <label className="block">
             <span className="text-sm text-text-muted">Способ оплаты</span>
@@ -149,7 +151,7 @@ export function SalesStageCard({ order, onUpdated }) {
 
       {(stage === 'awaiting_pickup' || stage === 'delivery') && (
         <div className="space-y-3">
-          {!paid && (
+          {!paid && canSeeFinance && (
             <div className="rounded-xl bg-danger/10 text-danger text-sm font-medium px-3 py-2">Заказ не оплачен</div>
           )}
           {stage === 'awaiting_pickup' && canEdit ? (

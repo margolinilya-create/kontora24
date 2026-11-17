@@ -73,6 +73,11 @@ describe('mapCalcToOrder — таблица 6.2', () => {
     expect(off).toMatchObject({ lam_material_id: null, lam_type: '' })
   })
 
+  it('ламинация без кода позиции → lam_type glossy (ревью R25: need_lam не теряется)', () => {
+    const { values } = mapCalcToOrder(calc({ options: { lamination: true } }), { lam: { id: 'lam-2' } })
+    expect(values).toMatchObject({ lam_material_id: 'lam-2', lam_type: 'glossy' })
+  })
+
   it('монтажная плёнка → needs_montage_film, позиция по умолчанию', () => {
     const { values } = mapCalcToOrder(calc({ options: { montage: true } }))
     expect(values).toMatchObject({ needs_montage_film: true, montage_material_id: null })

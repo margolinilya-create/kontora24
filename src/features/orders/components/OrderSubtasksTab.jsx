@@ -5,7 +5,7 @@ import { SubtaskCard } from '@/features/production/components/SubtaskCard'
 import { ReprintRollbackDialog } from '@/features/production/components/ReprintRollbackDialog'
 import { getReprintRollbackTargets } from '@/features/production/lib/production-logs'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
-import { REPRINT_STATUS_LABELS, SUBTASK_STATUS_LABELS, TRACK_LABELS } from '@/shared/constants'
+import { REPRINT_STATUS_LABELS, SUBTASK_STATUS_LABELS, TRACK_LABELS, canCreateReprint, canRollbackReprintForOrder } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
@@ -22,9 +22,10 @@ export function OrderSubtasksTab({ order }) {
   const { reprints, legacy, loading, createReprint, deleteReprint, rollbackReprint } = useReprintSubtasks(order.id)
   const { hasRole } = useAuth()
   const canManage = hasRole(['admin', 'manager'])
-  // R25.3: «Вернуть на этап…» — право subtask:rollback; для готового/отменённого
-  // заказа не показываем (RPC всё равно откажет).
-  const canRollback = useCanDo('subtask:rollback') && !['done', 'cancelled'].includes(order.status)
+  // R25.3: «Вернуть на этап…» — право subtask:rollback. Ревью R25 (п.15): не
+  // показываем, когда родитель на ТК или дальше (RPC запрещает откат после ТК).
+  const canRollback = useCanDo('subtask:rollback') && canRollbackReprintForOrder(order)
+  const createAllowed = canCreateReprint(order)
   const [rollbackTarget, setRollbackTarget] = useState(null) // subtask | null
   const [showCreate, setShowCreate] = useState(false)
   const [pendingDelete, setPendingDelete] = useState(null) // subtask | null
@@ -55,8 +56,19 @@ export function OrderSubtasksTab({ order }) {
             Допечатка проходит полный маршрут от печати. Заказ нельзя завершить, пока есть незавершённые допечатки.
           </p>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => setShowCreate(true)}>+ Создать допечатку</Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={!createAllowed.ok}
+          title={createAllowed.ok ? undefined : createAllowed.reason}
+          onClick={() => setShowCreate(true)}
+        >
+          + Создать допечатку
+        </Button>
       </div>
+      {!createAllowed.ok && (
+        <p className="text-xs text-text-muted -mt-3">{createAllowed.reason}</p>
+      )}
 
       {producedExtra > 0 && (
         <div className="bg-surface rounded-xl border border-border p-4 text-sm">
@@ -103,7 +115,7 @@ export function OrderSubtasksTab({ order }) {
         </details>
       )}
 
-      {showCreate && (
+      {showCreate && createAllowed.ok && (
         <CreateReprintModal order={order} createReprint={createReprint} onClose={() => setShowCreate(false)} />
       )}
 

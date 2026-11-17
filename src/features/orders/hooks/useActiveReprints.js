@@ -8,7 +8,7 @@ import { computeSubtaskOverallProgress, REPRINT_STAGE_QTY_FIELD } from '@/featur
 const LOG_COLS = ['id', 'subtask_id', 'stage', 'defects', 'deleted_at',
   ...new Set(Object.values(REPRINT_STAGE_QTY_FIELD)), 'qty_done'].join(', ') // R25.7D: + «Выполнено» своих этапов
 
-const ORDER_COLS = 'id, number, custom_number, order_type, status, qty, width_mm, height_mm, deadline, priority, stickers_per_pack, client:k24_clients(name)'
+const ORDER_COLS = 'id, number, custom_number, order_type, product_name, route_version, is_subcontract, status, qty, width_mm, height_mm, deadline, priority, stickers_per_pack, client:k24_clients(name)'
 
 /**
  * R25.3 (ТЗ Фаза 3.1) — допечатки для страницы «Заказы» (карточки, канбан,

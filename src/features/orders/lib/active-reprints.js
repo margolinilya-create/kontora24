@@ -100,6 +100,52 @@ export function interleaveReprints(orders, reprints, { includeOrphans = true } =
   return out
 }
 
+/**
+ * Ревью R25 (п.18): попадает ли сам заказ-родитель в выборку страницы
+ * (те же фильтры, что серверный запрос useOrders: статус, срок, поиск по
+ * номеру / произвольному номеру / заказчику). Если да — родитель стоит на
+ * какой-то странице, и допечатка показывается только рядом с ним; иначе
+ * она «сирота» и выводится на первой странице.
+ */
+export function parentMatchesOrderFilters(order, f = {}) {
+  if (!order) return false
+  const { statuses, search, deadlineFrom, deadlineTo } = f
+  if (Array.isArray(statuses) && statuses.length > 0 && !statuses.includes(order.status)) return false
+  const deadline = order.deadline || null
+  if (deadlineFrom && (!deadline || deadline < deadlineFrom)) return false
+  if (deadlineTo && (!deadline || deadline > deadlineTo)) return false
+  const q = (search || '').trim().toLowerCase()
+  if (q) {
+    const num = parseInt(q, 10)
+    const numberHit = !isNaN(num) && Number(order.number) === num
+    const hay = [order.custom_number || '', order.client?.name || ''].map((s) => String(s).toLowerCase())
+    if (!numberHit && !hay.some((h) => h.includes(q))) return false
+  }
+  return true
+}
+
+/**
+ * Ревью R25 (п.18): допечатки текущей страницы списка без дублей.
+ * Раньше на первой странице выводились все допечатки, чей родитель не на
+ * ней, — и та же допечатка повторялась на странице родителя. Теперь:
+ *   • рядом с родителем, если он на этой странице;
+ *   • на первой странице — только если родитель не попадает в выборку
+ *     вовсе.
+ *
+ * @param {Array} reprints — уже отфильтрованные matchesReprintFilters
+ * @param {Array} pageOrders — заказы текущей страницы
+ * @param {{ isFirstPage: boolean, filters: object }} opts
+ */
+export function selectPageReprints(reprints, pageOrders, { isFirstPage = true, filters = {} } = {}) {
+  const pageIds = new Set((pageOrders || []).map((o) => o.id))
+  return (reprints || []).filter((r) => {
+    const oid = r.order?.id || r.order_id
+    if (pageIds.has(oid)) return true
+    if (!isFirstPage) return false
+    return !parentMatchesOrderFilters(r.order, filters)
+  })
+}
+
 /** Карта orderId → число активных допечаток (для чипа «Допечаток: N»). */
 export function countActiveReprintsByOrder(reprints) {
   const map = {}

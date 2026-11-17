@@ -20,7 +20,7 @@ import { stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { toast } from '@/shared/stores/toast-store'
 import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { useActiveReprints } from '../hooks/useActiveReprints'
-import { matchesReprintFilters, interleaveReprints, countActiveReprintsByOrder } from '../lib/active-reprints'
+import { matchesReprintFilters, interleaveReprints, countActiveReprintsByOrder, selectPageReprints } from '../lib/active-reprints'
 import { ReprintMobileRow, ReprintDesktopRow, ReprintsChip } from '../components/ReprintRows'
 
 // R25.1: списки статусов строятся из констант/описания отделов — новый этап
@@ -108,14 +108,11 @@ export default function OrdersPage() {
   const { reprints } = useActiveReprints({ includeDone: includeArchived, enabled: showReprints })
   const reprintCountByOrder = useMemo(() => countActiveReprintsByOrder(reprints), [reprints])
   // Фильтры применяются к СОБСТВЕННОМУ этапу допечатки; срок/поиск — по родителю.
-  const visibleReprints = reprints.filter((r) => matchesReprintFilters(r, {
-    statuses: effectiveStatuses,
-    search: debouncedSearch,
-    deadlineFrom,
-    deadlineTo,
-  }))
-  // Допечатки, чей родитель не на этой странице, показываем на первой странице.
-  const includeOrphanReprints = pPage === 1
+  const reprintFilters = { statuses: effectiveStatuses, search: debouncedSearch, deadlineFrom, deadlineTo }
+  const filteredReprints = reprints.filter((r) => matchesReprintFilters(r, reprintFilters))
+  // Ревью R25 (п.18): допечатка — рядом с родителем на его странице; «сирота»
+  // (родитель не попадает в выборку вовсе) — на первой странице. Без дублей.
+  const visibleReprints = selectPageReprints(filteredReprints, orders, { isFirstPage: pPage === 1, filters: reprintFilters })
 
   async function handleConfirmDelete() {
     if (!deletingOrder) return
@@ -142,21 +139,19 @@ export default function OrdersPage() {
       if (idx !== undefined) buckets[idx].orders.push(o)
     })
     // R25.3: допечатка — в группе своего этапа, сразу после родителя (если он там).
-    const pageOrderIds = new Set(orders.map((o) => o.id))
     visibleReprints.forEach((r) => {
       const idx = idxByStatus[r.status]
       if (idx === undefined) return
-      if (!includeOrphanReprints && !pageOrderIds.has(r.order?.id)) return
       buckets[idx].reprints.push(r)
     })
     return buckets
       .map((g) => ({ ...g, rows: interleaveReprints(g.orders, g.reprints) }))
       .filter((g) => g.rows.length > 0)
-  }, [orders, visibleReprints, includeOrphanReprints])
+  }, [orders, visibleReprints])
 
   const flatRows = useMemo(
-    () => interleaveReprints(orders, visibleReprints, { includeOrphans: includeOrphanReprints }),
-    [orders, visibleReprints, includeOrphanReprints],
+    () => interleaveReprints(orders, visibleReprints),
+    [orders, visibleReprints],
   )
   const shownReprintsCount = flatRows.length - orders.length
 

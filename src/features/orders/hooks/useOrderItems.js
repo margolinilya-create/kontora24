@@ -82,8 +82,9 @@ export async function replaceOrderItems(orderId, items) {
 
   // 3) Multi-variant subtasks (R8.4c). Только если действительно >1 видов.
   if (rows.length > 1) {
-    const { data: order } = await supabase
+    const { data: order, error: ordErr } = await supabase
       .from('k24_orders').select('status').eq('id', orderId).single()
+    if (ordErr) throw ordErr
     const startStatus = order?.status || 'new'
     const subtaskRows = rows.map((r) => ({
       order_id: orderId,
@@ -94,14 +95,37 @@ export async function replaceOrderItems(orderId, items) {
     // PostgREST upsert через .upsert() невозможен на partial unique index,
     // но INSERT не упадёт если индекс не нарушен. Сначала чистим существующие
     // variant-подзадачи для этого заказа (replace-семантика).
-    await supabase.from('k24_order_subtasks')
+    const { error: delStErr } = await supabase.from('k24_order_subtasks')
       .delete().eq('order_id', orderId).eq('track', 'variant')
+    if (delStErr) throw delStErr
     const { error: stErr } = await supabase.from('k24_order_subtasks').insert(subtaskRows)
     if (stErr) throw stErr
   } else {
     // items.length === 1 — гарантируем что variant-подзадач нет (мог быть
     // случай: было 3 вида, теперь 1, лишние треки удаляем).
-    await supabase.from('k24_order_subtasks')
+    const { error: delStErr } = await supabase.from('k24_order_subtasks')
       .delete().eq('order_id', orderId).eq('track', 'variant')
+    if (delStErr) throw delStErr
   }
+}
+
+/**
+ * Ревью R25 (п.6): заказ с одним видом — синхронизировать idx=1 с основными
+ * полями заказа (размер/тираж правятся в AdminOrderEditor). Ошибку не глотаем.
+ */
+export async function syncSingleOrderItem(orderId, { width_mm, height_mm, qty }) {
+  const { data, error } = await supabase
+    .from('k24_order_items')
+    .update({ width_mm, height_mm, qty })
+    .eq('order_id', orderId)
+    .eq('idx', 1)
+    .select('id')
+  if (error) throw error
+  if (data && data.length > 0) return
+  // Строки нет (старый заказ) или RLS не дала обновить — вставка либо
+  // создаст строку, либо вернёт понятную ошибку прав.
+  const { error: insErr } = await supabase
+    .from('k24_order_items')
+    .insert({ order_id: orderId, idx: 1, width_mm, height_mm, qty })
+  if (insErr) throw insErr
 }

@@ -8,6 +8,7 @@ import {
   isPackagingPaid, computeLogPayout, calculateWorkerPayout, resolvePayoutRates,
   ORDER_STATUSES, ACTIVE_ORDER_STATUSES, SALES_STAGES, PERMISSIONS, PERMISSION_LABELS,
   NAV_ITEMS, NOTIFY_ROLES, canAdvanceFrom, ROUTE_SUBCONTRACT_V2,
+  canToggleSubcontract, canCreateReprint, canRollbackReprintForOrder,
 } from './constants'
 import { DEPARTMENTS, DEPT_GROUPS, ORG_DEPARTMENTS, getDepartment, getStageDeptToken } from './lib/department-mapping'
 import { STAGE_TO_BUCKET, BUCKETS } from '@/features/production-planner/lib/buckets'
@@ -184,6 +185,34 @@ describe('R25.1: гейт допечаток (1.5)', () => {
     expect(isReprintGateTransition(o, 'awaiting_pickup', 'done')).toBe(true)
     expect(isReprintGateTransition(o, 'otk', 'packaging')).toBe(false)
     expect(isReprintGateTransition(o, 'packaging', 'otk')).toBe(false)
+  })
+  it('ревью R25: v2 — прыжок мимо ТК вперёд тоже гейт, хвост после ТК — нет', () => {
+    const o = v2({ order_type: 'sticker_cut', delivery_type: 'delivery' })
+    expect(isReprintGateTransition(o, 'packaging', 'awaiting_pickup')).toBe(true)
+    expect(isReprintGateTransition(o, 'print', 'delivery')).toBe(true)
+    expect(isReprintGateTransition(o, 'awaiting_pickup', 'delivery')).toBe(false)
+    expect(isReprintGateTransition(o, 'awaiting_pickup', 'otk')).toBe(false)
+    expect(isReprintGateTransition(o, 'print', 'cutting')).toBe(false)
+  })
+})
+
+describe('ревью R25: субподряд и допечатки', () => {
+  it('canToggleSubcontract: без route_version — v1, переключать нельзя', () => {
+    expect(canToggleSubcontract({ status: 'new' })).toBe(false)
+    expect(canToggleSubcontract({ status: 'new', route_version: null })).toBe(false)
+    expect(canToggleSubcontract({ status: 'new', route_version: 2 })).toBe(true)
+    expect(canToggleSubcontract({ status: 'print', route_version: 2 })).toBe(false)
+  })
+  it('canCreateReprint: субподряд v2 — запрет', () => {
+    expect(canCreateReprint(v2({ order_type: 'sticker_cut', is_subcontract: true })).ok).toBe(false)
+    expect(canCreateReprint(v2({ order_type: 'sticker_cut' })).ok).toBe(true)
+    expect(canCreateReprint({ order_type: 'sticker_cut' }).ok).toBe(true)
+  })
+  it('canRollbackReprintForOrder: до ТК — да, на ТК и после — нет', () => {
+    expect(canRollbackReprintForOrder({ status: 'packaging' })).toBe(true)
+    for (const st of ['otk', 'awaiting_pickup', 'delivery', 'done', 'cancelled']) {
+      expect(canRollbackReprintForOrder({ status: st })).toBe(false)
+    }
   })
 })
 

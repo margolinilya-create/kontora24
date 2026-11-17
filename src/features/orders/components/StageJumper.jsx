@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
+import { updateOrderStatus, PAYMENT_CONFIRM_REQUIRED } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
-import { getOrderRoute, getStatusMeta } from '@/shared/constants'
+import { getOrderRoute, getStatusMeta, needsNoPaymentConfirm, NO_PAYMENT_CONFIRM_MESSAGE } from '@/shared/constants'
 import Button from '@/shared/components/Button'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 
 /**
  * Stage jumper для admin/manager — продвинуть заказ на другой этап маршрута
@@ -19,6 +20,9 @@ export function StageJumper({ order, onUpdated }) {
   const { hasRole } = useAuth()
   const [target, setTarget] = useState('')
   const [saving, setSaving] = useState(false)
+  // Ревью R25 (12b): прыжок вперёд мимо «Ждёт оплаты» без оплаты — то же
+  // подтверждение «Запустить без оплаты?», что у обычной кнопки.
+  const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false)
 
   if (!hasRole(['admin', 'manager'])) return null
 
@@ -33,10 +37,14 @@ export function StageJumper({ order, onUpdated }) {
 
   if (options.length === 0) return null
 
-  async function handleJump() {
+  async function handleJump({ confirmNoPayment = false } = {}) {
     if (!target) return
     const optEntry = options.find((o) => o.status === target)
     if (!optEntry) return
+    if (optEntry.direction === 'forward' && !confirmNoPayment && needsNoPaymentConfirm(order, order.status, target)) {
+      setPaymentConfirmOpen(true)
+      return
+    }
     setSaving(true)
     try {
       // R25.1 (ТЗ 1.2): пропуск этапов пишется в историю с пометкой
@@ -51,13 +59,18 @@ export function StageJumper({ order, onUpdated }) {
       await updateOrderStatus(order.id, order.status, target, {
         isRollback: optEntry.direction === 'back',
         force: optEntry.direction === 'forward',
+        confirmNoPayment,
         ...meta,
       })
       toast.success(optEntry.direction === 'back' ? 'Заказ возвращён' : 'Заказ продвинут')
       setTarget('')
       onUpdated?.()
     } catch (err) {
-      toast.error(translateError(err).message || err.message)
+      if (err?.code === PAYMENT_CONFIRM_REQUIRED) {
+        setPaymentConfirmOpen(true)
+      } else {
+        toast.error(translateError(err).message || err.message)
+      }
     } finally {
       setSaving(false)
     }
@@ -82,10 +95,19 @@ export function StageJumper({ order, onUpdated }) {
             ))}
           </select>
         </label>
-        <Button size="sm" disabled={!target} loading={saving} onClick={handleJump}>
+        <Button size="sm" disabled={!target} loading={saving} onClick={() => handleJump()}>
           Перейти
         </Button>
       </div>
+      <ConfirmDialog
+        isOpen={paymentConfirmOpen}
+        onClose={() => setPaymentConfirmOpen(false)}
+        onConfirm={() => { setPaymentConfirmOpen(false); handleJump({ confirmNoPayment: true }) }}
+        title="Запуск без оплаты"
+        message={NO_PAYMENT_CONFIRM_MESSAGE}
+        confirmText="Запустить"
+        variant="primary"
+      />
     </div>
   )
 }

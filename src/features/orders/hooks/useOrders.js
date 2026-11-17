@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import {
   isDualTrack, getNextStatus, DUAL_TRACK_STAGES, isStageAllowed, canAdvanceFrom, needsNoPaymentConfirm, getAutoPassTarget, isReprintGateTransition, PAYMENT_STATUSES, getStatusMeta,
+  getOrderRoute,
 } from '@/shared/constants'
+import { isCustomStageKey } from '@/shared/lib/route-registry'
 import { useRolePermissionsStore, canRoleDo } from '@/features/auth/role-permissions-store'
 import { useAuthStore } from '@/features/auth/store'
 import { useRoleSwitcherStore } from '@/shared/stores/role-switcher-store'
@@ -22,6 +24,35 @@ const STAGES_REQUIRING_COMPLETION = new Set([
   'sample_print', 'print', 'lamination', 'cutting', 'pouring',
   'selection_pouring', 'selection', 'assembly_3d', 'packaging',
 ])
+
+/**
+ * Требует ли этап проверки завершения перед продвижением. Ревью R25: свои
+ * этапы custom_N тоже (check_stage_completion поддерживает их с миграции 104).
+ */
+export function stageRequiresCompletion(stage) {
+  return STAGES_REQUIRING_COMPLETION.has(stage) || isCustomStageKey(stage)
+}
+
+/**
+ * Ревью R25 (12c): записи истории при переходе. При автопроходе «Ждёт оплаты»
+ * первая запись (→ awaiting_payment) сохраняет kind/note вызывающего, вторая
+ * помечается paid_at_intake. Чистая функция — тестируется отдельно.
+ */
+export function buildStatusHistoryRows({ orderId, userId, fromStatus, toStatus, finalStatus, kind, note, autoPass, paidNote, nowIso }) {
+  const row = (from, to, k, n, extra = {}) => {
+    const r = { order_id: orderId, from_status: from, to_status: to, changed_by: userId, ...extra }
+    if (k) r.kind = k
+    if (n) r.note = n
+    return r
+  }
+  if (autoPass) {
+    return [
+      row(fromStatus, toStatus, kind, note, { created_at: nowIso }),
+      row(toStatus, finalStatus, 'paid_at_intake', paidNote, { created_at: nowIso }),
+    ]
+  }
+  return [row(fromStatus, finalStatus, kind, note)]
+}
 
 // Финансовые поля k24_orders — видны только admin/manager (view:finance).
 // Аудит 18.05: воркеры получали price_final/cost_total через прямой SELECT
@@ -93,8 +124,15 @@ export function useOrders(filters = {}) {
   // Serialize statuses array to a primitive so the deps array stays stable.
   const statusesKey = filters.statuses?.join(',') ?? ''
 
+  // Ревью R25: спиннер — только при первой загрузке и смене фильтров. Повторные
+  // refetch (realtime, фокус вкладки, после DnD) тихие: иначе канбан ремоунтит
+  // DnD-контекст и список «мигает» (паттерн loadedIdRef из useOrderDetail).
+  const filtersKey = [filters.status, statusesKey, filters.orderType, filters.search, filters.sortBy,
+    filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo, canSeeFinance].join('|')
+  const loadedKeyRef = useRef(null)
+
   const fetchOrders = useCallback(async () => {
-    setLoading(true)
+    if (loadedKeyRef.current !== filtersKey) setLoading(true)
     setError(null)
     try {
       // Только поля, необходимые для списков/канбана/календаря/дашборда.
@@ -129,11 +167,14 @@ export function useOrders(filters = {}) {
         // R13.0 (бриф 02.06): поиск расширен на custom_number и client.name.
         // client.name матчим через предварительный запрос к k24_clients →
         // массив client_id → подмешиваем в or().
-        const { data: clientMatches } = await supabase
+        const { data: clientMatches, error: clientErr } = await supabase
           .from('k24_clients')
           .select('id')
           .ilike('name', `%${s}%`)
           .limit(50)
+        // Работник без доступа к k24_clients получает пустой список — не ошибку;
+        // реальную ошибку не глотаем.
+        if (clientErr) throw clientErr
         const clientIds = (clientMatches || []).map((c) => c.id)
 
         const orParts = []
@@ -161,13 +202,14 @@ export function useOrders(filters = {}) {
       if (err) throw err
       setOrders(data || [])
       setTotalCount(count || 0)
+      loadedKeyRef.current = filtersKey
     } catch (err) {
       setError(err)
     } finally {
       setLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- statusesKey is the serialized form of filters.statuses
-  }, [filters.status, statusesKey, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo, canSeeFinance])
+  }, [filters.status, statusesKey, filters.orderType, filters.search, filters.sortBy, filters.sortAsc, filters.from, filters.to, filters.deadlineFrom, filters.deadlineTo, canSeeFinance, filtersKey])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
   useRefetchOnFocus(fetchOrders)
@@ -337,22 +379,32 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   // ВСЕ поля, которые использует getOrderRoute (v1: order_type, design_status,
   // need_lam, bopp_bag — без bopp_bag маршрут терял «Упаковку», QA 04.07 баг №4;
   // v2: route_version, delivery_type, needs_montage_film) + payment_status для
-  // правил «Ждёт оплаты». При rollback/force читаем только если переход может
-  // упереться в гейт допечаток (он зависит от версии маршрута).
-  const needsOrder = (!options.isRollback && !options.force) || toStatus === 'done' || fromStatus === 'otk'
-  const orderForRoute = needsOrder
-    ? (await supabase.from('k24_orders').select(ROUTE_FIELDS).eq('id', orderId).single()).data
-    : null
+  // правил «Ждёт оплаты». Ревью R25: читаем всегда — гейт допечаток (п.13) и
+  // подтверждение «без оплаты» (п.12b) нужны и при force; ошибку чтения не
+  // глотаем (п.10), иначе проверки молча пропускались.
+  const { data: orderForRoute, error: routeErr } = await supabase
+    .from('k24_orders').select(ROUTE_FIELDS).eq('id', orderId).single()
+  if (routeErr) throw routeErr
+  if (!orderForRoute) throw new Error('Заказ не найден')
 
   let finalStatus = toStatus
   let kind = options.kind || null
   let note = options.note || null
   let autoPass = null
 
+  // Переход назад по маршруту без явной пометки — в историю как откат
+  // (канбан двигает назад обычным вызовом).
+  if (!kind) {
+    const route = getOrderRoute(orderForRoute)
+    const fromIdx = route.indexOf(fromStatus)
+    const toIdx = route.indexOf(toStatus)
+    if (fromIdx >= 0 && toIdx >= 0 && toIdx < fromIdx) kind = 'rollback'
+  }
+
   // Блокировка перехода в стадию, которая не входит в маршрут заказа.
   // isRollback / force — admin escape (StatusOverride / StageJumper).
   if (!options.isRollback && !options.force) {
-    if (orderForRoute && !isStageAllowed(orderForRoute, toStatus)) {
+    if (!isStageAllowed(orderForRoute, toStatus)) {
       const stageLabel = getStatusMeta(toStatus)?.label || toStatus
       throw new Error(`Этап «${stageLabel}» не входит в маршрут заказа`)
     }
@@ -378,20 +430,31 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
         throw new Error(`У роли «${role}» нет права продвигать этап «${stageLabel}»`)
       }
     }
+  }
 
-    // R25.1 (ТЗ 1.3): выход из «Ждёт оплаты» без оплаты — только осознанно.
-    if (orderForRoute && needsNoPaymentConfirm(orderForRoute, fromStatus, toStatus)) {
-      if (!options.confirmNoPayment) {
-        const err = new Error('Оплата не отмечена. Подтвердите запуск заказа в работу без оплаты.')
-        err.code = PAYMENT_CONFIRM_REQUIRED
-        throw err
-      }
-      if (!kind) { kind = 'no_payment'; note = note || 'Запущен без оплаты' }
+  // R25.1 (ТЗ 1.3): выход из «Ждёт оплаты» без оплаты — только осознанно.
+  // Ревью R25 (12b): и при прыжке вперёд с force (StageJumper) — тот же
+  // запрос подтверждения и пометка no_payment. Откат не затрагивается.
+  if (!options.isRollback && needsNoPaymentConfirm(orderForRoute, fromStatus, toStatus)) {
+    if (!options.confirmNoPayment) {
+      const err = new Error('Оплата не отмечена. Подтвердите запуск заказа в работу без оплаты.')
+      err.code = PAYMENT_CONFIRM_REQUIRED
+      throw err
     }
+    if (!kind) {
+      kind = 'no_payment'
+      note = note || 'Запущен без оплаты'
+    } else if (kind === 'manual_skip') {
+      // Прыжок вперёд мимо оплаты: фиксируем запуск без оплаты в истории.
+      kind = 'no_payment'
+      note = note ? `Запущен без оплаты. ${note}` : 'Запущен без оплаты'
+    }
+  }
 
+  if (!options.isRollback && !options.force) {
     // R25.1 (ТЗ 1.3): оплата отмечена при приёме — «Ждёт оплаты» проходится
     // автоматически, в историю пишутся два перехода с одним временем.
-    autoPass = orderForRoute ? getAutoPassTarget(orderForRoute, fromStatus, toStatus) : null
+    autoPass = getAutoPassTarget(orderForRoute, fromStatus, toStatus)
     if (autoPass) finalStatus = autoPass
   }
 
@@ -399,14 +462,8 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   // данных больше НЕ блокируется, а показывает предупреждение (toast.info),
   // как validateLogEntry в R15.1. Заказ двигается так же свободно, как
   // подзадачи. isRollback / force по-прежнему пропускают проверку молча.
-  if (!options.isRollback && !options.force && fromStatus && STAGES_REQUIRING_COMPLETION.has(fromStatus)) {
-    const order = orderForRoute || (await supabase
-      .from('k24_orders')
-      .select('order_type')
-      .eq('id', orderId)
-      .single()).data
-
-    const isPack3D = order?.order_type === 'stickerpack3D'
+  if (!options.isRollback && !options.force && fromStatus && stageRequiresCompletion(fromStatus)) {
+    const isPack3D = orderForRoute.order_type === 'stickerpack3D'
     const tracks = isPack3D && DUAL_TRACK_STAGES.includes(fromStatus) ? ['backgrounds', 'stickers'] : [null]
 
     const incompleteTracks = []
@@ -438,8 +495,9 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   // 081) — он сработает и при force/rollback/канбане.
   // R25.1 (ТЗ 1.5): для маршрута v2 гейт стоит на выходе с ТК (otk →
   // awaiting_pickup / delivery) — допечатки проходят контроль вместе с заказом.
+  // Ревью R25 (п.13): и при прыжке мимо ТК вперёд (force, канбан).
   if (isReprintGateTransition(orderForRoute, fromStatus, finalStatus)) {
-    const { data: openReprints } = await supabase
+    const { data: openReprints, error: reprintsErr } = await supabase
       .from('k24_order_subtasks')
       .select('id')
       .eq('order_id', orderId)
@@ -447,6 +505,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
       .eq('is_legacy', false)
       .neq('status', 'done')
       .limit(1)
+    if (reprintsErr) throw reprintsErr
     if (openReprints && openReprints.length > 0) {
       throw new Error(finalStatus === 'done'
         ? 'Нельзя завершить заказ: есть незавершённые допечатки. Завершите их на вкладке «Подзадачи».'
@@ -454,33 +513,26 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
     }
   }
 
+  // Ревью R25 (п.2): optimistic-lock — обновляем, только если статус всё ещё
+  // fromStatus. Иначе чужое продвижение молча перезаписывалось бы, а история
+  // писала бы несуществующий переход.
   const nowIso = new Date().toISOString()
-  const { error } = await supabase
+  let updateQuery = supabase
     .from('k24_orders')
     .update({ status: finalStatus, updated_at: nowIso })
     .eq('id', orderId)
+  updateQuery = fromStatus == null ? updateQuery.is('status', null) : updateQuery.eq('status', fromStatus)
+  const { data: updatedRows, error } = await updateQuery.select('id')
   if (error) throw error
+  if (!updatedRows || updatedRows.length === 0) {
+    throw new Error('Статус заказа изменился, обновите страницу')
+  }
 
-  // kind/note добавляем в запись только когда они заданы — обычные переходы
-  // пишутся тем же набором полей, что и до R25.1.
-  const historyRow = (from, to, extra = {}) => {
-    const row = { order_id: orderId, from_status: from, to_status: to, changed_by: user.id, ...extra }
-    if (kind) row.kind = kind
-    if (note) row.note = note
-    return row
-  }
-  let historyRows
-  if (autoPass) {
-    const methodLabel = PAYMENT_STATUSES[orderForRoute?.payment_status]?.label || orderForRoute?.payment_status
-    kind = 'paid_at_intake'
-    note = `Оплата отмечена при приёме: ${methodLabel}`
-    historyRows = [
-      historyRow(fromStatus, toStatus, { created_at: nowIso }),
-      historyRow(toStatus, finalStatus, { created_at: nowIso }),
-    ]
-  } else {
-    historyRows = [historyRow(fromStatus, finalStatus)]
-  }
+  const methodLabel = PAYMENT_STATUSES[orderForRoute.payment_status]?.label || orderForRoute.payment_status
+  const historyRows = buildStatusHistoryRows({
+    orderId, userId: user.id, fromStatus, toStatus, finalStatus, kind, note,
+    autoPass, paidNote: `Оплата отмечена при приёме: ${methodLabel}`, nowIso,
+  })
   const { error: historyError } = await supabase.from('k24_order_status_history')
     .insert(historyRows.length === 1 ? historyRows[0] : historyRows)
   if (historyError) throw historyError

@@ -4,6 +4,9 @@ import { usePackDesigns } from '@/features/production/hooks/usePackDesigns'
 import { useOrderItems } from '../hooks/useOrderItems'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { SubtaskCard } from '@/features/production/components/SubtaskCard'
+import { ReprintRollbackDialog } from '@/features/production/components/ReprintRollbackDialog'
+import { getReprintRollbackTargets } from '@/features/production/lib/production-logs'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { REPRINT_REASONS, REPRINT_STATUS_LABELS, SUBTASK_STATUS_LABELS, TRACK_LABELS } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -19,9 +22,13 @@ import ConfirmDialog from '@/shared/components/ConfirmDialog'
  * подзадачи. Старая система (bg/stickers/extra_stickers) — read-only архив.
  */
 export function OrderSubtasksTab({ order }) {
-  const { reprints, legacy, loading, createReprint, deleteReprint } = useReprintSubtasks(order.id)
+  const { reprints, legacy, loading, createReprint, deleteReprint, rollbackReprint } = useReprintSubtasks(order.id)
   const { hasRole } = useAuth()
   const canManage = hasRole(['admin', 'manager'])
+  // R25.3: «Вернуть на этап…» — право subtask:rollback; для готового/отменённого
+  // заказа не показываем (RPC всё равно откажет).
+  const canRollback = useCanDo('subtask:rollback') && !['done', 'cancelled'].includes(order.status)
+  const [rollbackTarget, setRollbackTarget] = useState(null) // subtask | null
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ qty: '', reason: '', comment: '', view: '' })
   const [saving, setSaving] = useState(false)
@@ -118,6 +125,7 @@ export function OrderSubtasksTab({ order }) {
               overall={r.overall}
               uiStatus={r.uiStatus}
               onDelete={canManage && r.status !== 'done' ? () => setPendingDelete(r) : undefined}
+              onRollback={canRollback && getReprintRollbackTargets(r).length > 0 ? () => setRollbackTarget(r) : undefined}
             />
           ))}
         </div>
@@ -197,6 +205,12 @@ export function OrderSubtasksTab({ order }) {
           </form>
         </Modal>
       )}
+
+      <ReprintRollbackDialog
+        subtask={rollbackTarget}
+        onConfirm={(target, comment) => rollbackReprint(rollbackTarget, target, comment)}
+        onClose={() => setRollbackTarget(null)}
+      />
 
       <ConfirmDialog
         isOpen={!!pendingDelete}

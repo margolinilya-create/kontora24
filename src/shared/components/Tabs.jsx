@@ -17,9 +17,26 @@ export default function Tabs({ items, active, onChange, className = '' }) {
             }`}
           >
             {item.label}
+            <TabBadge badge={item.badge} active={isActive} />
           </button>
         )
       })}
     </div>
+  )
+}
+
+// R25.3 (ТЗ 3.3): необязательный кружок-счётчик у пункта: item.badge = { count, tone: 'accent'|'muted' }.
+export function TabBadge({ badge, active = false }) {
+  if (!badge || !badge.count) return null
+  const tone = badge.tone === 'accent'
+    ? (active ? 'bg-on-accent text-accent' : 'bg-accent text-on-accent')
+    : (active ? 'bg-on-accent/30 text-on-accent' : 'bg-surface-dim text-text-muted')
+  return (
+    <span
+      className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold tabular-nums align-middle ${tone}`}
+      aria-label={`${badge.count}`}
+    >
+      {badge.count}
+    </span>
   )
 }

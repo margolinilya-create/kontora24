@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, PRIORITIES } from '@/shared/constants'
+import { REPRINT_STATUS_LABELS, ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, PRIORITIES } from '@/shared/constants'
 import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { supabase } from '@/shared/lib/supabase'
@@ -41,6 +41,35 @@ const FIELD_ENUM_LOOKUP = {
   order_type: ORDER_TYPES, film_type: FILM_TYPES, lam_type: LAMINATION_TYPES,
   design_status: DESIGN_STATUSES, source: ORDER_SOURCES, payment_status: PAYMENT_STATUSES,
   delivery_type: DELIVERY_TYPES, priority: PRIORITIES,
+}
+
+// R25.3: события допечаток в k24_order_audit (095: reprint_rollback — new_value
+// JSON {title, from, to, comment}; 090: reprint_deleted — old_value = название).
+function parseJson(v) {
+  try { return v ? JSON.parse(v) : null } catch { return null }
+}
+
+function ReprintAuditLine({ field, oldValue, newValue }) {
+  if (field === 'reprint_deleted') {
+    return (
+      <p className="break-words">
+        <span className="text-text-muted">Удалена допечатка:</span>{' '}
+        <span className="font-medium">{oldValue || '—'}</span>
+      </p>
+    )
+  }
+  const d = parseJson(newValue) || {}
+  const from = d.from || oldValue
+  return (
+    <p className="break-words">
+      <span className="text-text-muted">Допечатка возвращена на этап:</span>{' '}
+      <span className="font-medium">{d.title || 'Допечатка'}</span>
+      <span className="text-text-muted text-xs ml-1.5">
+        {REPRINT_STATUS_LABELS[from] || from || '—'} → {REPRINT_STATUS_LABELS[d.to] || d.to || '—'}
+      </span>
+      {d.comment && <span className="block text-xs text-text-muted break-words">{d.comment}</span>}
+    </p>
+  )
 }
 
 function formatAuditValue(field, value) {
@@ -162,6 +191,8 @@ export function OrderHistoryTab({ order, history }) {
                   )}
                   <LogSummary log={it.log} stage={it.stage} />
                 </p>
+              ) : (it.field === 'reprint_rollback' || it.field === 'reprint_deleted') ? (
+                <ReprintAuditLine field={it.field} oldValue={it.oldValue} newValue={it.newValue} />
               ) : (
                 <p className="break-words">
                   <span className="text-text-muted">Изменено поле:</span>{' '}

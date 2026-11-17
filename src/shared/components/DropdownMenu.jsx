@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { TabBadge } from './Tabs'
 
 /**
  * Универсальный компонент-выпадайка для выбора одного значения из списка.
@@ -41,7 +42,7 @@ export default function DropdownMenu({ items, active, onChange, className = '', 
         aria-expanded={open}
         className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-accent/50 min-h-[40px]"
       >
-        <span>{label}</span>
+        <span>{label}<TabBadge badge={activeItem?.badge} /></span>
         <span className={`text-xs text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">▾</span>
       </button>
       {open && (
@@ -63,6 +64,7 @@ export default function DropdownMenu({ items, active, onChange, className = '', 
                   }`}
                 >
                   {item.label}
+                  <TabBadge badge={item.badge} />
                 </button>
               </li>
             )

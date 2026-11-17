@@ -434,6 +434,8 @@ export const PERMISSIONS = {
   ],
   actions: [
     'order:create', 'order:edit', 'order:cancel',
+    // R25.3: откат допечатки на пройденный этап (сид — миграция 095).
+    'subtask:rollback',
     'user:manage',
   ],
   materials: [
@@ -477,6 +479,7 @@ export const PERMISSION_LABELS = {
   'order:create': 'Создавать заказы',
   'order:edit': 'Редактировать заказы',
   'order:cancel': 'Отменять заказы',
+  'subtask:rollback': 'Откатывать подзадачи (допечатки)',
   'material:add_transaction': 'Вносить приход/расход на складе',
   'material:manage': 'Создавать/удалять позиции склада',
   'material:edit_name': 'Редактировать названия материалов',

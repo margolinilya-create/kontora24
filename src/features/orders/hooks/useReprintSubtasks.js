@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { getReprintRoute } from '@/shared/constants'
 import { computeSubtaskOverallProgress, reprintUiStatus } from '@/features/production/lib/production-logs'
+import { rollbackReprintSubtask } from '@/features/production/hooks/useReprintSubtask'
 
 /**
  * R22.1 (ТЗ 20.07 Фаза 1) — подзадачи-допечатки заказа.
@@ -118,6 +119,15 @@ export function useReprintSubtasks(orderId) {
     return data
   }, [fetchData])
 
+  // R25.3: откат допечатки на пройденный этап (право subtask:rollback).
+  const rollbackReprint = useCallback(async (subtask, targetStatus, comment) => {
+    const res = await rollbackReprintSubtask({
+      subtaskId: subtask.id, targetStatus, expectedStatus: subtask.status, comment,
+    })
+    await fetchData()
+    return res
+  }, [fetchData])
+
   const reprints = rows
     .filter((s) => s.track === 'reprint')
     .map((s) => {
@@ -126,5 +136,5 @@ export function useReprintSubtasks(orderId) {
     })
   const legacy = rows.filter((s) => s.track !== 'reprint')
 
-  return { reprints, legacy, loading, error, refetch: fetchData, createReprint, renameReprint, pauseReprint, deleteReprint }
+  return { reprints, legacy, loading, error, refetch: fetchData, createReprint, renameReprint, pauseReprint, deleteReprint, rollbackReprint }
 }

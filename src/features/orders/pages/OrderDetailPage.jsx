@@ -15,6 +15,8 @@ import { RouteUpgradeButton } from '../components/RouteUpgradeButton'
 import { OrderComments } from '../components/OrderComments'
 import { OrderProgressTab } from '../components/OrderProgressTab'
 import { OrderSubtasksTab } from '../components/OrderSubtasksTab'
+import { useOrderReprintStatuses } from '../hooks/useActiveReprints'
+import { reprintTabBadge } from '../lib/active-reprints'
 import { OrderReportsTab } from '../components/OrderReportsTab'
 import { OrderHistoryTab } from '../components/OrderHistoryTab'
 import { FinanceTab } from '../components/FinanceTab'
@@ -378,6 +380,8 @@ export default function OrderDetailPage() {
   const { id } = useParams()
   const { order, history, loading, refetch, setOrder } = useOrderDetail(id)
   const { subtasks, extras } = useOrderSubtasks(id)
+  // R25.3 (ТЗ 3.3): счётчик на вкладке «Подзадачи», реалтайм.
+  const reprintStatuses = useOrderReprintStatuses(id)
   useAuth() // keep mount for legacy stores
   const isFinance = useCanDo('view:finance')
   const canEdit = useCanDo('order:edit')
@@ -423,7 +427,7 @@ export default function OrderDetailPage() {
   const tabs = [
     { key: 'overview', label: 'Обзор' },
     { key: 'progress', label: 'Прогресс' },
-    { key: 'subtasks', label: 'Подзадачи' },
+    { key: 'subtasks', label: 'Подзадачи', badge: reprintTabBadge(reprintStatuses) },
     { key: 'reports', label: 'Расход материалов' },
     { key: 'history', label: 'История' },
     ...(isFinance ? [{ key: 'finance', label: 'Финансы' }] : []),

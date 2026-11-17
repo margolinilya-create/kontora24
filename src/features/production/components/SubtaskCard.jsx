@@ -15,7 +15,7 @@ const UI_STATUS_TONE = {
  * «Подзадачи» и в производственных очередях. Кликабельна → страница подзадачи.
  * Отмечена лейблом «Допечатка».
  */
-export function SubtaskCard({ subtask, order, overall, uiStatus, onDelete }) {
+export function SubtaskCard({ subtask, order, overall, uiStatus, onDelete, onRollback }) {
   const num = fmtNum(order)
   const pct = overall?.percentage ?? 0
   const viewLabel = reprintViewLabel(order?.order_type, subtask.view_ref)
@@ -42,6 +42,17 @@ export function SubtaskCard({ subtask, order, overall, uiStatus, onDelete }) {
             <span className={`text-[11px] px-1.5 py-0.5 rounded ${UI_STATUS_TONE[uiStatus] || ''}`}>
               {REPRINT_UI_STATUS_LABELS[uiStatus] || uiStatus}
             </span>
+          )}
+          {onRollback && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRollback() }}
+              className="text-xs text-text-muted hover:text-text px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors"
+              title="Вернуть на этап…"
+              aria-label="Вернуть допечатку на этап"
+            >
+              ↶
+            </button>
           )}
           {onDelete && (
             <button

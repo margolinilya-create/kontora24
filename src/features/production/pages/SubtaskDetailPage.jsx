@@ -4,7 +4,9 @@ import { useReprintSubtask } from '../hooks/useReprintSubtask'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { SubtaskRouteChain } from '../components/SubtaskRouteChain'
 import { SubtaskLogForm } from '../components/logs/SubtaskLogForm'
-import { computeSubtaskOverallProgress } from '../lib/production-logs'
+import { computeSubtaskOverallProgress, getReprintRollbackTargets } from '../lib/production-logs'
+import { ReprintRollbackDialog } from '../components/ReprintRollbackDialog'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import {
   REPRINT_STATUS_LABELS, REPRINT_REASONS, ORDER_TYPES, FILM_TYPES, reprintViewLabel,
 } from '@/shared/constants'
@@ -22,7 +24,9 @@ export default function SubtaskDetailPage() {
   const navigate = useNavigate()
   const { hasRole } = useAuth()
   const canManage = hasRole(['admin', 'manager'])
-  const { subtask, order, logs, loading, error, refetch, addLogAndAdvance, forceAdvance, deleteSubtask } = useReprintSubtask(subtaskId)
+  const canRollbackPerm = useCanDo('subtask:rollback')
+  const { subtask, order, logs, loading, error, refetch, addLogAndAdvance, forceAdvance, deleteSubtask, rollback } = useReprintSubtask(subtaskId)
+  const [rollbackOpen, setRollbackOpen] = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
   const [pendingForce, setPendingForce] = useState(false)
   const [pendingDelete, setPendingDelete] = useState(false)
@@ -44,6 +48,11 @@ export default function SubtaskDetailPage() {
   const overall = computeSubtaskOverallProgress(subtask, logs)
   const filmName = order.film_material?.name || FILM_TYPES[order.film_type]?.label || order.film_type
   const viewLabel = reprintViewLabel(order.order_type, subtask.view_ref)
+  // R25.3: «Вернуть на этап…» — право subtask:rollback, есть пройденные этапы,
+  // родитель не готов и не отменён (сервер проверяет то же самое).
+  const canRollback = canRollbackPerm
+    && getReprintRollbackTargets(subtask).length > 0
+    && !['done', 'cancelled'].includes(order.status)
 
   async function handleSubmit(stage, data) {
     const res = await addLogAndAdvance(stage, data)
@@ -106,6 +115,17 @@ export default function SubtaskDetailPage() {
             }`}>
               {REPRINT_STATUS_LABELS[subtask.status] || subtask.status}
             </span>
+            {canRollback && (
+              <button
+                type="button"
+                onClick={() => setRollbackOpen(true)}
+                disabled={busy}
+                className="text-xs text-text-muted hover:text-text px-2 py-1 rounded hover:bg-surface-2 transition-colors disabled:opacity-50"
+                title="Вернуть допечатку на пройденный этап"
+              >
+                Вернуть на этап…
+              </button>
+            )}
             {canManage && !isDone && (
               <button
                 type="button"
@@ -198,6 +218,11 @@ export default function SubtaskDetailPage() {
         </div>
       )}
 
+      <ReprintRollbackDialog
+        subtask={rollbackOpen ? subtask : null}
+        onConfirm={rollback}
+        onClose={() => setRollbackOpen(false)}
+      />
       <ConfirmDialog
         isOpen={pendingForce}
         onClose={() => setPendingForce(false)}

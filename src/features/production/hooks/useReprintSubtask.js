@@ -4,7 +4,25 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { captureError } from '@/shared/lib/sentry'
 import { computeSubtaskStageProgress } from '../lib/production-logs'
 
-const ORDER_COLS = 'id, number, custom_number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, need_lam, design_status, stickers_per_pack, design_variants, sticker_shape, deadline, priority, client_id, client:k24_clients(name), film_material:k24_materials!film_material_id(id, name), film_stickers_material:k24_materials!film_stickers_material_id(id, name), lam_material:k24_materials!lam_material_id(id, name)'
+/**
+ * R25.3 (ТЗ 3.2) — откат допечатки на пройденный этап. RPC
+ * rollback_reprint_subtask (миграция 095): право subtask:rollback,
+ * optimistic-lock по текущему этапу, отказ для готового/отменённого заказа.
+ * Логи учёта не удаляются; завершённая допечатка открывается заново.
+ */
+export async function rollbackReprintSubtask({ subtaskId, targetStatus, expectedStatus, comment }) {
+  const { data, error } = await supabase.rpc('rollback_reprint_subtask', {
+    p_subtask_id: subtaskId,
+    p_target_status: targetStatus,
+    p_expected_status: expectedStatus,
+    p_comment: comment?.trim() || null,
+  })
+  if (error) throw error
+  if (data?.ok === false) throw new Error(data.error || 'Не удалось вернуть допечатку на этап')
+  return data
+}
+
+const ORDER_COLS = 'id, number, custom_number, status, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, need_lam, design_status, stickers_per_pack, design_variants, sticker_shape, deadline, priority, client_id, client:k24_clients(name), film_material:k24_materials!film_material_id(id, name), film_stickers_material:k24_materials!film_stickers_material_id(id, name), lam_material:k24_materials!lam_material_id(id, name)'
 
 /**
  * R22.1 (ТЗ 20.07 Фаза 1) — одна подзадача-допечатка для страницы
@@ -127,5 +145,15 @@ export function useReprintSubtask(subtaskId) {
     return data
   }, [subtask])
 
-  return { subtask, order, logs, loading, error, refetch: fetchData, addLogAndAdvance, forceAdvance, deleteSubtask }
+  // R25.3: откат на пройденный этап (право subtask:rollback).
+  const rollback = useCallback(async (targetStatus, comment) => {
+    if (!subtask) throw new Error('Допечатка не загружена')
+    const res = await rollbackReprintSubtask({
+      subtaskId: subtask.id, targetStatus, expectedStatus: subtask.status, comment,
+    })
+    await fetchData()
+    return res
+  }, [subtask, fetchData])
+
+  return { subtask, order, logs, loading, error, refetch: fetchData, addLogAndAdvance, forceAdvance, deleteSubtask, rollback }
 }

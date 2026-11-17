@@ -507,6 +507,20 @@ export function computeSubtaskOverallProgress(subtask, subtaskLogs) {
 }
 
 /**
+ * R25.3 (ТЗ Фаза 3.2) — этапы, на которые можно вернуть допечатку: только
+ * этапы снимка маршрута subtask.route строго ДО текущего (без 'done').
+ * Зеркало серверной проверки rollback_reprint_subtask (миграция 095).
+ * @param {object} subtask — { status, route: string[] }
+ * @returns {string[]}
+ */
+export function getReprintRollbackTargets(subtask) {
+  const route = Array.isArray(subtask?.route) ? subtask.route : []
+  const curIdx = route.indexOf(subtask?.status)
+  if (curIdx <= 0) return []
+  return route.slice(0, curIdx).filter((s) => s !== 'done')
+}
+
+/**
  * UI-статус допечатки: Завершено / Приостановлено / В работе / В очереди.
  */
 export function reprintUiStatus(subtask, subtaskLogs) {

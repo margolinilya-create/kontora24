@@ -6,6 +6,7 @@
 // (запоминается для пользователя в localStorage — per-viewer удобство).
 
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import Tabs from '@/shared/components/Tabs'
@@ -28,6 +29,7 @@ import {
 import { OptionToggle } from '../components/OptionToggle'
 import { PriceTiersTable } from '../components/PriceTiersTable'
 import { CopyButton } from '../components/CopyButton'
+import { CreateOrderModal } from '../components/CreateOrderModal'
 
 const PRODUCT_TABS = [
   { key: 'sticker', label: 'Стикер' },
@@ -78,17 +80,23 @@ function toInt(v) {
 export default function CalculatorPage() {
   const { profile } = useAuth()
   const canFinance = useCanDo('view:finance')
+  const canCreateOrder = useCanDo('order:create')
   const { settings, films, laminations, loading, error, refetch } = useCalculatorSettings()
+  // R25.6: «Открыть в калькуляторе» из вкладки «Финансы» заказа передаёт
+  // восстановленный расчёт через state роутера (restoreCalcState).
+  const location = useLocation()
+  const [restored] = useState(() => location.state?.calcRestore || null)
 
-  const [product, setProduct] = useState('sticker')
-  const [width, setWidth] = useState('100')
-  const [height, setHeight] = useState('100')
-  const [filmId, setFilmId] = useState(null)
-  const [lamId, setLamId] = useState(null)
-  const [qtyText, setQtyText] = useState('500')
-  const [views, setViews] = useState([500])
-  const [viewTexts, setViewTexts] = useState(['500'])
-  const [options, setOptions] = useState(EMPTY_OPTIONS)
+  const [product, setProduct] = useState(restored?.product || 'sticker')
+  const [width, setWidth] = useState(restored?.width || '100')
+  const [height, setHeight] = useState(restored?.height || '100')
+  const [filmId, setFilmId] = useState(restored?.filmId || null)
+  const [lamId, setLamId] = useState(restored?.lamId || null)
+  const [qtyText, setQtyText] = useState(restored ? String(sumViews(restored.views)) : '500')
+  const [views, setViews] = useState(restored?.views || [500])
+  const [viewTexts, setViewTexts] = useState(restored ? restored.views.map(String) : ['500'])
+  const [options, setOptions] = useState(restored ? { ...EMPTY_OPTIONS, ...restored.options } : EMPTY_OPTIONS)
+  const [createOpen, setCreateOpen] = useState(false)
   const [hideCost, setHideCost] = useState(() => readHideCost(profile?.id))
 
   useEffect(() => { setHideCost(readHideCost(profile?.id)) }, [profile?.id])
@@ -432,6 +440,11 @@ export default function CalculatorPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
                 <CopyButton getText={() => buildShortText(result)}>Скопировать</CopyButton>
                 <CopyButton getText={() => buildDetailedText(result, labels)}>Скопировать подробно</CopyButton>
+                {canCreateOrder && (
+                  <Button type="button" className="sm:col-span-2" onClick={() => setCreateOpen(true)}>
+                    Создать заказ
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -454,6 +467,17 @@ export default function CalculatorPage() {
           </div>
           <CopyButton variant="primary" getText={() => buildShortText(result)}>Скопировать</CopyButton>
         </div>
+      )}
+
+      {/* R25.6: попап «Создать заказ» — расчёт фиксируется на момент открытия */}
+      {createOpen && ready && (
+        <CreateOrderModal
+          result={result}
+          film={film}
+          lam={options.lamination ? lam : null}
+          labels={labels}
+          onClose={() => setCreateOpen(false)}
+        />
       )}
     </div>
   )

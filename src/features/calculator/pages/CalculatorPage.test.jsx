@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { DEFAULT_CALC_SETTINGS } from '../lib/calc'
 
 let canFinance = true
+let canCreate = true
 vi.mock('@/features/auth/hooks/useAuth', () => ({ useAuth: () => ({ profile: { id: 'u1', role: 'manager' } }) }))
-vi.mock('@/features/auth/hooks/useCanDo', () => ({ useCanDo: (p) => (p === 'view:finance' ? canFinance : true) }))
+vi.mock('@/features/auth/hooks/useCanDo', () => ({ useCanDo: (p) => (p === 'view:finance' ? canFinance : p === 'order:create' ? canCreate : true) }))
+// Попап с формой заказа проверяется отдельно (CreateOrderModal.test.jsx).
+vi.mock('../components/CreateOrderModal', () => ({
+  CreateOrderModal: ({ result, film, lam }) => (
+    <div role="dialog" data-testid="create-order-modal">
+      {result.orderType}|{result.qty}|{result.totalRounded}|{film?.id}|{lam?.id || 'none'}
+    </div>
+  ),
+}))
 vi.mock('../hooks/useCalculatorSettings', () => ({
   useCalculatorSettings: () => ({
     settings: DEFAULT_CALC_SETTINGS,
@@ -22,8 +32,12 @@ vi.mock('../hooks/useCalculatorSettings', () => ({
 
 const { default: CalculatorPage } = await import('./CalculatorPage')
 
+function render(ui, { state } = {}) {
+  return rtlRender(<MemoryRouter initialEntries={[{ pathname: '/calculator', state }]}>{ui}</MemoryRouter>)
+}
+
 describe('CalculatorPage', () => {
-  beforeEach(() => { canFinance = true; localStorage.clear() })
+  beforeEach(() => { canFinance = true; canCreate = true; localStorage.clear() })
 
   it('по умолчанию считает контрольный расчёт 1 (100×100, 500 шт)', () => {
     render(<CalculatorPage />)
@@ -62,5 +76,29 @@ describe('CalculatorPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Больше видов' }))
     expect(screen.getByLabelText('Вид 1, шт').value).toBe('250')
     expect(screen.getAllByText('11 651 ₽').length).toBeGreaterThan(0)
+  })
+
+  it('«Создать заказ» открывает попап с текущим расчётом (право order:create)', () => {
+    render(<CalculatorPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Создать заказ' }))
+    expect(screen.getByTestId('create-order-modal').textContent).toBe('sticker_kiss|500|10651|f1|none')
+  })
+
+  it('без order:create кнопки «Создать заказ» нет', () => {
+    canCreate = false
+    render(<CalculatorPage />)
+    expect(screen.queryByRole('button', { name: 'Создать заказ' })).toBeNull()
+  })
+
+  it('«Открыть в калькуляторе»: расчёт восстанавливается из state роутера', () => {
+    const calcRestore = {
+      product: 'sticker', width: '100', height: '100', filmId: 'f1', lamId: null,
+      views: [100, 200, 200], options: { designEdit: true, montage: true },
+    }
+    render(<CalculatorPage />, { state: { calcRestore } })
+    expect(screen.getByLabelText('Вид 3, шт').value).toBe('200')
+    expect(screen.getByLabelText('Тираж, шт').value).toBe('500')
+    // Контрольный расчёт А.4 №5 (3 вида + правка + монтаж) — 17 151 ₽.
+    expect(screen.getAllByText('17 151 ₽').length).toBeGreaterThan(0)
   })
 })

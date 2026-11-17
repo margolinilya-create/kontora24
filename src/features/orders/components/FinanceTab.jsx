@@ -9,6 +9,7 @@ import { fetchShapeByDesign } from '@/shared/lib/payout-context'
 import { formatPrice } from '@/shared/lib/utils'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { InfoField } from './InfoField'
+import { CalcSnapshotCard } from './CalcSnapshotCard'
 
 /**
  * Финансы заказа: 3 крупных плитки (Итого / Себестоимость / Маржинальность),
@@ -92,6 +93,9 @@ export function FinanceTab({ order }) {
           )}
         </div>
       </div>
+
+      {/* R25.6: снимок расчёта калькулятора (если заказ создан из калькулятора) */}
+      <CalcSnapshotCard order={order} />
 
       {/* Actual materials breakdown */}
       {actual.total > 0 && (

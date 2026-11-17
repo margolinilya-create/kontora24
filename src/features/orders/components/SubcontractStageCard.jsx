@@ -5,7 +5,7 @@ import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { updateOrderStatus } from '../hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
-import { ORDER_STATUSES, canAdvanceFrom, getNextStatus } from '@/shared/constants'
+import { canAdvanceFrom, getNextStatus, getStatusMeta } from '@/shared/constants'
 import { formatPrice } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 
@@ -25,7 +25,7 @@ export function SubcontractStageCard({ order, onUpdated }) {
   const perms = dynamicLoaded ? dynamicPerms : null
   const canAdvance = canAdvanceFrom(profile.role, 'subcontract', perms)
   const next = getNextStatus(profile.role, 'subcontract', order, perms)
-  const nextLabel = next ? ORDER_STATUSES[next]?.label || next : null
+  const nextLabel = next ? getStatusMeta(next)?.label || next : null
   const c = order.contractor
 
   async function handleReceived() {

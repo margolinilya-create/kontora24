@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ORDER_STATUSES } from '@/shared/constants'
+import { getStatusMeta } from '@/shared/constants'
 import { laminationSummary, designEditNote } from '../lib/order-labels'
 import { formatPrice, formatDate, formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
@@ -31,7 +31,7 @@ export function OrderPdfExport({ order }) {
       // Status
       doc.setFontSize(10)
       doc.setFont('helvetica', 'bold')
-      doc.text(`Статус: ${ORDER_STATUSES[order.status]?.label || order.status}`, 15, y)
+      doc.text(`Статус: ${getStatusMeta(order.status)?.label || order.status}`, 15, y)
       doc.text(`Дата: ${formatDate(order.created_at)}`, W - 15, y, { align: 'right' })
       y += 10
 

@@ -6,7 +6,7 @@ import { computeSubtaskOverallProgress, REPRINT_STAGE_QTY_FIELD } from '@/featur
 // Только нефинансовые колонки (миграция 072: колоночный GRANT для authenticated).
 // Колонки логов для прогресса — из той же карты, что и computeSubtaskStageProgress.
 const LOG_COLS = ['id', 'subtask_id', 'stage', 'defects', 'deleted_at',
-  ...new Set(Object.values(REPRINT_STAGE_QTY_FIELD))].join(', ')
+  ...new Set(Object.values(REPRINT_STAGE_QTY_FIELD)), 'qty_done'].join(', ') // R25.7D: + «Выполнено» своих этапов
 
 const ORDER_COLS = 'id, number, custom_number, order_type, status, qty, width_mm, height_mm, deadline, priority, stickers_per_pack, client:k24_clients(name)'
 

@@ -7,11 +7,11 @@ import { useEffect, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { usePlanStore } from '../store/plan-store'
-import { ACTIVE_ORDER_STATUSES } from '@/shared/constants'
+import { getActiveOrderStatuses } from '@/shared/constants'
 
 // R13.0 (бриф 02.06): batch_layout удалён из активных маршрутов.
 // R25.1: все активные статусы из констант (этапы ОП v2 — вехи в buckets.js).
-const ACTIVE_STATUSES = ACTIVE_ORDER_STATUSES
+// R25.7D: + свои этапы каталога (вычисляется в момент запроса).
 
 const PLANNING_SETTING_KEYS = [
   'planning:norms',
@@ -36,11 +36,11 @@ async function loadInitial(store) {
       supabase
         .from('k24_orders_full')
         .select('id, number, custom_number, order_type, status, width_mm, height_mm, qty, design_variants, stickers_per_pack, need_lam, design_status, film_type, bopp_bag, route_version, route_snapshot, delivery_type, needs_montage_film, is_subcontract, product_name, priority, is_urgent, deadline, client_id, price_final, created_at, client:k24_clients!client_id(name)')
-        .in('status', ACTIVE_STATUSES)
+        .in('status', getActiveOrderStatuses())
         .order('deadline', { ascending: true, nullsFirst: false }),
       supabase
         .from('k24_production_logs')
-        .select('id, order_id, stage, track, stickers_printed, backgrounds_printed, lamination_qty, qty_cut, stickers_good, qty_selected, packs_assembled, packs_packaged, defects, deleted_at, created_at')
+        .select('id, order_id, stage, track, stickers_printed, backgrounds_printed, lamination_qty, qty_cut, stickers_good, qty_selected, packs_assembled, packs_packaged, qty_done, defects, deleted_at, created_at')
         .is('deleted_at', null),
       supabase
         .from('k24_order_items')
@@ -118,7 +118,7 @@ export function usePlannerData() {
         makeRealtimeHandler({
           upsertFn: (row) => {
             // Только активные заказы держим в сторе
-            if (!ACTIVE_STATUSES.includes(row.status)) {
+            if (!getActiveOrderStatuses().includes(row.status)) {
               usePlanStore.getState().removeOrder(row.id)
               return
             }

@@ -387,3 +387,55 @@ describe('R25.7A: реестр типов заказов и снимок мар�
     expect(store).toMatch(/from\('k24_stage_defs'\)\.select\(STAGE_COLUMNS\)/)
   })
 })
+
+describe('R25.7D: свои этапы (миграция 104)', () => {
+  const read = (f) => readFileSync(resolve(process.cwd(), f), 'utf-8')
+  const strip = (sql) => sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n')
+  const sql104 = strip(read('supabase/migrations/104_r25_7_custom_stages.sql'))
+  const sql099 = strip(read('supabase/migrations/099_r25_4_order_intake.sql'))
+
+  it('RPC каталога: SECURITY DEFINER + search_path, отзыв у anon, право order_type:manage', () => {
+    const fns = [
+      'create_stage_def(TEXT, TEXT, TEXT[], NUMERIC, BOOLEAN, BOOLEAN)',
+      'update_stage_def(TEXT, JSONB)',
+      'archive_stage_def(TEXT, BOOLEAN)',
+      'delete_stage_def(TEXT)',
+      'delete_order_type(TEXT)',
+    ]
+    for (const sig of fns) {
+      expect(sql104, sig).toContain(`REVOKE ALL ON FUNCTION public.${sig} FROM PUBLIC, anon`)
+      const name = sig.slice(0, sig.indexOf('('))
+      const body = sql104.slice(sql104.indexOf(`FUNCTION public.${name}(`))
+      expect(body.slice(0, body.indexOf('$function$;')), name).toContain("k24_user_can('order_type:manage')")
+    }
+    // Служебные функции не вызываются клиентом напрямую.
+    expect(sql104).toContain('REVOKE ALL ON FUNCTION public.k24_seed_stage_permissions(TEXT, TEXT[]) FROM PUBLIC, anon, authenticated')
+    expect(sql104).toContain('REVOKE EXECUTE ON FUNCTION public.auto_advance_drying() FROM PUBLIC, anon, authenticated')
+    for (const fn of sql104.split('CREATE OR REPLACE FUNCTION').slice(1)) {
+      if (/SECURITY DEFINER/.test(fn)) expect(fn).toMatch(/SET search_path/)
+    }
+  })
+
+  it('check_stage_completion v8 = тело v7 (099) дословно + ветка своих этапов', () => {
+    const body = (sql) => {
+      const start = sql.indexOf('CREATE OR REPLACE FUNCTION public.check_stage_completion')
+      return sql.slice(start, sql.indexOf('$function$;', start))
+    }
+    const branchRe = /\n {2}ELSIF p_stage ~ '\^custom_\[0-9\]\+\$' THEN[\s\S]*?v_total := GREATEST\(0, v_total - v_defects\);/
+    const v8 = body(sql104)
+    expect(v8).toMatch(branchRe)
+    expect(v8.replace(branchRe, '')).toBe(body(sql099))
+  })
+
+  it('qty_done: NOT NULL DEFAULT 0, CHECK ≥ 0; CHECK defect_stage допускает custom_<N>', () => {
+    expect(sql104).toMatch(/ADD COLUMN IF NOT EXISTS qty_done INTEGER NOT NULL DEFAULT 0/)
+    expect(sql104).toMatch(/CHECK \(qty_done >= 0\)/)
+    expect(sql104).toMatch(/defect_stage ~ '\^custom_\[0-9\]\+\$'/)
+    expect(sql104).toMatch(/VALIDATE CONSTRAINT k24_production_logs_defect_stage_check/)
+  })
+
+  it('auto_advance_drying v4: снимок маршрута, прежний CASE для заказов без снимка', () => {
+    expect(sql104).toMatch(/route_snapshot->'stages'\) \? 'drying'/)
+    expect(sql104).toContain("CASE WHEN r.order_type = 'stickerpack3D' THEN 'assembly_3d' ELSE 'selection' END")
+  })
+})

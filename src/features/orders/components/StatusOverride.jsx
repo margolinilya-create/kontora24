@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
+import { getOrderRoute, getStatusMeta } from '@/shared/constants'
 import { updateOrderStatus } from '../hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -35,7 +35,7 @@ export function StatusOverride({ order, onUpdated }) {
     setOpen(false)
     try {
       await updateOrderStatus(order.id, order.status, toStatus, { isRollback: true, kind: 'rollback' })
-      toast.success(`Заказ возвращён на «${ORDER_STATUSES[toStatus]?.label}»`)
+      toast.success(`Заказ возвращён на «${getStatusMeta(toStatus)?.label}»`)
       onUpdated?.()
     } catch (err) {
       toast.error(translateError(err).message || err.message)
@@ -63,7 +63,7 @@ export function StatusOverride({ order, onUpdated }) {
               onClick={() => handleRollback(s)}
               className="w-full text-left px-3 py-2 text-sm hover:bg-surface-2 transition-colors"
             >
-              {ORDER_STATUSES[s]?.label || s}
+              {getStatusMeta(s)?.label || s}
             </button>
           ))}
         </div>

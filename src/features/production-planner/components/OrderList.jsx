@@ -4,7 +4,7 @@
 
 import { useMemo } from 'react'
 import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
-import { ORDER_STATUSES } from '@/shared/constants'
+import { getStatusMeta } from '@/shared/constants'
 import { usePlanStore } from '../store/plan-store'
 import { useScheduleResult } from '../hooks/useScheduleResult'
 import { getOrderPalette } from '../lib/order-colors'
@@ -80,7 +80,7 @@ export function OrderList() {
         const palette = getOrderPalette(o.id)
         const isSelected = selectedOrderId === o.id
         const isRush = o.priority === 'urgent' || o.is_urgent
-        const stageLabel = ORDER_STATUSES[o.status]?.label || o.status
+        const stageLabel = getStatusMeta(o.status)?.label || o.status
         const typeLabel = formatOrderType(o)
         return (
           <button

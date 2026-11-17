@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useOrders, updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { COLS } from '../components/PipelineSummary'
-import { ORDER_STATUSES, getOrderRoute, PRIORITIES, isStageAllowed, needsNoPaymentConfirm } from '@/shared/constants'
+import { getKanbanColumns } from '../lib/kanban-columns'
+import { useOrderTypesStore } from '@/features/order-types/store'
+import { getOrderRoute, PRIORITIES, isStageAllowed, needsNoPaymentConfirm, getStatusMeta } from '@/shared/constants'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
@@ -12,7 +13,6 @@ import { supabase } from '@/shared/lib/supabase'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 
-const PRODUCTION_STATUSES = new Set(COLS)
 const ARCHIVED_STATUSES = new Set(['done', 'cancelled'])
 
 export function useProductionBoard({ includeArchived = false } = {}) {
@@ -30,6 +30,9 @@ export function useProductionBoard({ includeArchived = false } = {}) {
   const [scrollState, setScrollState] = useState({ start: true, end: false })
 
   const { orders: allFetchedOrders, loading, error, refetch } = useOrders()
+  // R25.7D: колонки = встроенные + свои этапы каталога (пересчёт после загрузки реестра).
+  const stageDefs = useOrderTypesStore((s) => s.stages)
+  const COLS = useMemo(() => getKanbanColumns(stageDefs.filter((d) => !d.archived_at)), [stageDefs])
 
   const fetchTodayDone = useCallback(async () => {
     try {
@@ -52,8 +55,9 @@ export function useProductionBoard({ includeArchived = false } = {}) {
   useRefetchOnFocus(fetchTodayDone)
 
   const allOrders = useMemo(() => {
+    const productionStatuses = new Set(COLS)
     const orders = allFetchedOrders.filter((o) =>
-      PRODUCTION_STATUSES.has(o.status) || (includeArchived && ARCHIVED_STATUSES.has(o.status))
+      productionStatuses.has(o.status) || (includeArchived && ARCHIVED_STATUSES.has(o.status))
     )
     if (pendingMove) {
       return orders.map((o) =>
@@ -61,7 +65,7 @@ export function useProductionBoard({ includeArchived = false } = {}) {
       )
     }
     return orders
-  }, [allFetchedOrders, pendingMove, includeArchived])
+  }, [allFetchedOrders, pendingMove, includeArchived, COLS])
 
   const filterAndSort = useCallback((orders) => {
     let filtered = showMine && profile ? orders.filter((o) => o.assigned_to === profile.id) : orders
@@ -90,7 +94,7 @@ export function useProductionBoard({ includeArchived = false } = {}) {
       result[s] = filterAndSort(allOrders.filter((o) => o.status === s))
     }
     return result
-  }, [allOrders, filterAndSort, includeArchived])
+  }, [allOrders, filterAndSort, includeArchived, COLS])
 
   const activeOrder = activeId ? allFetchedOrders.find((o) => o.id === activeId) : null
   const total = allOrders.length
@@ -122,7 +126,7 @@ export function useProductionBoard({ includeArchived = false } = {}) {
     // Запрещаем drop в стадию, которая не входит в маршрут заказа
     // (без дизайна / без 3D / без ламинации). Откат разрешён через StatusOverride.
     if (!isStageAllowed(order, targetStatus)) {
-      const stageLabel = ORDER_STATUSES[targetStatus]?.label || targetStatus
+      const stageLabel = getStatusMeta(targetStatus)?.label || targetStatus
       toast.error(`Этап «${stageLabel}» не нужен для заказа #${formatOrderNumber(order)}`)
       return
     }
@@ -170,12 +174,12 @@ export function useProductionBoard({ includeArchived = false } = {}) {
             const res = await updateOrderStatus(orderId, currentStatus, nextStep, moveOpts)
             currentStatus = res?.status || nextStep
           } catch (stepErr) {
-            toast.error(`Не удалось обновить «${ORDER_STATUSES[currentStatus]?.label || currentStatus}» → «${ORDER_STATUSES[nextStep]?.label || nextStep}»: ${translateError(stepErr).message}`)
+            toast.error(`Не удалось обновить «${getStatusMeta(currentStatus)?.label || currentStatus}» → «${getStatusMeta(nextStep)?.label || nextStep}»: ${translateError(stepErr).message}`)
             // Откат: вернуть заказ на исходную стадию, если он успел сдвинуться.
             if (currentStatus !== originalStatus) {
               try {
                 await updateOrderStatus(orderId, currentStatus, originalStatus, { isRollback: true, kind: 'rollback' })
-                toast.error(`Заказ откачен на «${ORDER_STATUSES[originalStatus]?.label || originalStatus}»`)
+                toast.error(`Заказ откачен на «${getStatusMeta(originalStatus)?.label || originalStatus}»`)
               } catch (rollbackErr) {
                 captureError(rollbackErr, { tags: { source: 'useProductionBoard.rollback' }, extra: { orderId, currentStatus, originalStatus } })
               }
@@ -187,7 +191,7 @@ export function useProductionBoard({ includeArchived = false } = {}) {
         await updateOrderStatus(orderId, order.status, targetStatus)
       }
 
-      toast.success(`Заказ #${formatOrderNumber(order)} → ${ORDER_STATUSES[targetStatus]?.label}`)
+      toast.success(`Заказ #${formatOrderNumber(order)} → ${getStatusMeta(targetStatus)?.label}`)
     } catch (err) {
       toast.error(translateError(err).message)
     } finally {

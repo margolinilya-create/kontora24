@@ -1,7 +1,7 @@
-import { ORDER_STATUSES } from '@/shared/constants'
+import { getStatusMeta } from '@/shared/constants'
 
 export function StatusBadge({ status }) {
-  const s = ORDER_STATUSES[status]
+  const s = getStatusMeta(status)
   if (!s) return <span className="text-xs text-text-muted">{status}</span>
 
   return (

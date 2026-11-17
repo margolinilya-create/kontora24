@@ -1,3 +1,5 @@
+import { getStageDef, isCustomStageKey } from '@/shared/lib/route-registry'
+
 // R17.3 (бриф 5.06 «Планирование производства»): разворот R12-решения
 // «единый post_print бакет». 3DO (заливка/сушка) и ОСК (выборка/сборка/
 // упаковка/выдача) — раздельные отделы по структуре производства.
@@ -83,8 +85,26 @@ export const BUCKET_STAGES = Object.freeze(
   }, {})
 )
 
+// R25.7D (ТЗ 7.4): отдел своего этапа → бакет. Без нормы (norm_per_8h) свой
+// этап — веха (ёмкость не занимает).
+export const DEPARTMENT_TO_BUCKET = Object.freeze({
+  sales:    BUCKETS.milestone,
+  prepress: BUCKETS.prepress,
+  print:    BUCKETS.oprl_print,
+  '3d':     BUCKETS.bucket_3do,
+  osk:      BUCKETS.bucket_osk,
+})
+
+/** Бакет своего этапа по каталогу (или milestone). */
+export function getCustomStageBucket(def) {
+  if (!def || !(Number(def.norm_per_8h) > 0)) return BUCKETS.milestone
+  return DEPARTMENT_TO_BUCKET[def.department] || BUCKETS.milestone
+}
+
 export function getBucketForStage(stage) {
-  return STAGE_TO_BUCKET[stage] || BUCKETS.milestone
+  if (STAGE_TO_BUCKET[stage]) return STAGE_TO_BUCKET[stage]
+  if (isCustomStageKey(stage)) return getCustomStageBucket(getStageDef(stage))
+  return BUCKETS.milestone
 }
 
 export function isPlannableBucket(bucket) {

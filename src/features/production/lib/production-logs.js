@@ -1,3 +1,5 @@
+import { isCustomStageKey, getStageDef } from '@/shared/lib/route-registry'
+
 /**
  * Production logs — pure functions для stage-based учёта количества.
  *
@@ -215,11 +217,46 @@ export const STAGE_FIELDS = {
 }
 
 /**
+ * R25.7D (ТЗ 7.4): форма учёта своего этапа (custom_<N> из каталога
+ * k24_stage_defs) — «Выполнено, шт» (qty_done, миграция 104) и «Брак, шт».
+ * Прогресс = выполнено − брак от тиража (subtractDefects), то же сравнивает
+ * check_stage_completion v8.
+ */
+export function customStageConfig(stage) {
+  if (!isCustomStageKey(stage)) return undefined
+  return {
+    label: getStageDef(stage)?.name || 'Свой этап',
+    quantityField: 'qty_done',
+    subtractDefects: true,
+    custom: true,
+    fields: [
+      { key: 'qty_done', label: 'Выполнено', unit: 'шт' },
+      { key: 'defects', label: 'Брак', unit: 'шт' },
+    ],
+  }
+}
+
+// Свои этапы видны через STAGE_FIELDS[key] во всех местах (форма, история,
+// кабинет, аудит) без правки каждого: промах по собственному ключу уходит в
+// прототип-прокси, который отдаёт customStageConfig. Ключи встроенных этапов,
+// Object.keys / for…in / `in` не меняются; методы Object.prototype — как были.
+Object.setPrototypeOf(STAGE_FIELDS, new Proxy(Object.prototype, {
+  get(target, prop, receiver) {
+    if (typeof prop === 'string' && isCustomStageKey(prop)) return customStageConfig(prop)
+    return Reflect.get(target, prop, receiver)
+  },
+}))
+
+/**
  * Значение поля лога для показа в UI: у полей-списков (STAGE_FIELDS.otk.
  * defect_stage) — подпись варианта вместо сырого ключа.
  */
 export function fieldValueLabel(field, value) {
-  if (field?.options) return field.options.find((o) => o.value === value)?.label ?? value
+  if (field?.options) {
+    return field.options.find((o) => o.value === value)?.label
+      ?? (isCustomStageKey(value) ? getStageDef(value)?.name : undefined)
+      ?? value
+  }
   return value
 }
 
@@ -267,7 +304,8 @@ export function computeStageProgress(logs, stage, targetQty, track) {
   if (track && isTrackedStage) stageLogs = stageLogs.filter((l) => l.track === track)
   const totalRaw = stageLogs.reduce((sum, l) => sum + (Number(l[qtyField]) || 0), 0)
   const defects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
-  const total = SUBTRACT_DEFECTS_STAGES.has(stage) ? Math.max(0, totalRaw - defects) : totalRaw
+  const subtract = SUBTRACT_DEFECTS_STAGES.has(stage) || config.subtractDefects === true
+  const total = subtract ? Math.max(0, totalRaw - defects) : totalRaw
   const percentage = targetQty > 0 ? Math.min(100, Math.round((total / targetQty) * 100)) : 0
   return { total, target: targetQty, percentage, isComplete: total >= targetQty }
 }
@@ -521,11 +559,13 @@ export function reprintStageFields(stage, order = null) {
  * вызывающим). total = Σ поля этапа − брак (для REPRINT_SUBTRACT_DEFECTS).
  */
 export function computeSubtaskStageProgress(subtaskLogs, stage, qty) {
-  const field = REPRINT_STAGE_QTY_FIELD[stage]
+  // R25.7D: свой этап допечатки — «Выполнено» − брак.
+  const isCustom = isCustomStageKey(stage)
+  const field = REPRINT_STAGE_QTY_FIELD[stage] || (isCustom ? 'qty_done' : undefined)
   const stageLogs = (subtaskLogs || []).filter((l) => l.stage === stage && !l.deleted_at)
   const raw = field ? stageLogs.reduce((s, l) => s + (Number(l[field]) || 0), 0) : 0
   const defects = stageLogs.reduce((s, l) => s + (Number(l.defects) || 0), 0)
-  const total = REPRINT_SUBTRACT_DEFECTS.has(stage) ? Math.max(0, raw - defects) : raw
+  const total = REPRINT_SUBTRACT_DEFECTS.has(stage) || isCustom ? Math.max(0, raw - defects) : raw
   const target = qty || 0
   const percentage = target > 0 ? Math.round((total / target) * 100) : 0
   return { total, target, percentage, isComplete: total >= target }
@@ -662,11 +702,33 @@ export const OTK_DEFECT_LABELS = {
   pouring: 'Заливка',
 }
 
+/** R25.7D: тип брака ТК — встроенный (OTK_DEFECT_STAGES) или свой этап custom_<N>. */
+export function isOtkDefectStage(stage) {
+  return OTK_DEFECT_STAGES.includes(stage) || isCustomStageKey(stage)
+}
+
+/** Подпись типа брака ТК (свой этап — название из каталога). */
+export function otkDefectLabel(stage) {
+  return OTK_DEFECT_LABELS[stage] || getStageDef(stage)?.name || stage
+}
+
+/**
+ * R25.7D (ТЗ 7.4): типы брака формы ТК для маршрута заказа — четыре
+ * встроенных из маршрута + свои этапы маршрута с отметкой «Тип брака на ТК»
+ * (k24_stage_defs.otk_defect, по умолчанию да), в порядке маршрута.
+ */
+export function otkDefectStagesForRoute(route) {
+  const list = Array.isArray(route) ? route : []
+  const builtin = OTK_DEFECT_STAGES.filter((x) => list.includes(x))
+  const custom = list.filter((x) => isCustomStageKey(x) && getStageDef(x)?.otk_defect !== false)
+  return [...builtin, ...custom]
+}
+
 /** Активные (не удалённые) записи брака ТК с валидным типом и количеством. */
 export function otkDefectLogs(logs) {
   return (logs || []).filter(
     (l) => l.stage === 'otk' && !l.deleted_at
-      && OTK_DEFECT_STAGES.includes(l.defect_stage)
+      && isOtkDefectStage(l.defect_stage)
       && (Number(l.defects) || 0) > 0,
   )
 }
@@ -683,7 +745,7 @@ export function sumOtkDefectsByStage(logs, { itemIdx = null, excludeItemLogs = f
     if (itemIdx != null && l.item_idx !== itemIdx) continue
     if (excludeItemLogs && l.item_idx != null) continue
     const n = Number(l.defects) || 0
-    out[l.defect_stage] += n
+    out[l.defect_stage] = (out[l.defect_stage] || 0) + n
     out.total += n
   }
   return out
@@ -699,7 +761,9 @@ export function otkDeductionForStage(byStage, route, stage) {
   const idx = route.indexOf(stage)
   if (idx < 0) return 0
   let d = 0
-  for (const x of OTK_DEFECT_STAGES) {
+  // R25.7D: + свои этапы (ключи custom_<N> в byStage).
+  const types = [...OTK_DEFECT_STAGES, ...Object.keys(byStage || {}).filter(isCustomStageKey)]
+  for (const x of types) {
     const xi = route.indexOf(x)
     if (xi >= 0 && xi <= idx) d += byStage?.[x] || 0
   }
@@ -767,9 +831,10 @@ export function computeOtkStageProgress(logs, route, target) {
 
 /** Комментарий допечатки: «Брак ТК: печать 10, рез 5». */
 export function buildOtkReprintComment(byStage) {
-  const parts = OTK_DEFECT_STAGES
+  const types = [...OTK_DEFECT_STAGES, ...Object.keys(byStage || {}).filter(isCustomStageKey)]
+  const parts = types
     .filter((x) => (byStage?.[x] || 0) > 0)
-    .map((x) => `${OTK_DEFECT_LABELS[x].toLowerCase()} ${byStage[x]}`)
+    .map((x) => `${otkDefectLabel(x).toLowerCase()} ${byStage[x]}`)
   return parts.length ? `Брак ТК: ${parts.join(', ')}` : 'Брак ТК'
 }
 

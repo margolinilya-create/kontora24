@@ -1,4 +1,4 @@
-import { OTK_DEFECT_STAGES } from '@/features/production/lib/production-logs'
+import { OTK_DEFECT_STAGES, isOtkDefectStage } from '@/features/production/lib/production-logs'
 
 /**
  * Отчёт «Качество» по заказам (useQualityReport).
@@ -30,8 +30,9 @@ export function buildQualityRows(orders, logs) {
     acc.good += l.stickers_good || 0
     const def = Number(l.defects) || 0
     if (l.stage === 'otk') {
-      if (OTK_DEFECT_STAGES.includes(l.defect_stage) && def > 0) {
-        acc[`otk_${l.defect_stage}`] += def
+      // R25.7D: брак ТК своих этапов входит в итог ТК (отдельной колонки нет).
+      if (isOtkDefectStage(l.defect_stage) && def > 0) {
+        if (OTK_DEFECT_STAGES.includes(l.defect_stage)) acc[`otk_${l.defect_stage}`] += def
         acc.otk_total += def
       }
     } else if (l.stage === 'print' || l.stage === 'lamination' || l.stage === 'cutting') {

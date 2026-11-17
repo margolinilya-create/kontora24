@@ -8,7 +8,7 @@ import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import Spinner from '@/shared/components/Spinner'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
-import { ORDER_STATUSES } from '@/shared/constants'
+import { ORDER_STATUSES, getStatusMeta } from '@/shared/constants'
 import { ORDER_FIELDS } from '@/features/warehouse/lib/order-material-categories'
 
 // R25.7B (ТЗ 7.5): этапы, на которых можно вносить расход материала.
@@ -27,7 +27,7 @@ function categoryFlagsSummary(row) {
   if (row.show_in_order) {
     const field = ORDER_FIELDS[row.order_field]?.label
     parts.push(field ? `В заказе: ${field.toLowerCase()}` : 'В заказе')
-    if (row.consume_stage) parts.push(`списание — ${ORDER_STATUSES[row.consume_stage]?.label || row.consume_stage}`)
+    if (row.consume_stage) parts.push(`списание — ${getStatusMeta(row.consume_stage).label}`)
     if (Number(row.norm_per_item) > 0) parts.push(`норма ${row.norm_per_item} на изделие`)
   }
   if (row.count_in_costs) parts.push('в расходах заказа')

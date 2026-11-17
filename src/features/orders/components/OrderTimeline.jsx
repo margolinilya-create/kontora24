@@ -1,4 +1,4 @@
-import { ORDER_STATUSES, getOrderRoute } from '@/shared/constants'
+import { getOrderRoute, getStatusMeta } from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
 
 export function OrderTimeline({ order, history }) {
@@ -55,7 +55,7 @@ export function OrderTimeline({ order, history }) {
             {FLOW.map((status, i) => {
               const isCompleted = i <= currentIdx
               const isCurrent = i === currentIdx
-              const s = ORDER_STATUSES[status]
+              const s = getStatusMeta(status)
               const ts = timestamps[status]
 
               return (

@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import {
-  isDualTrack, getNextStatus, ORDER_STATUSES, DUAL_TRACK_STAGES, isStageAllowed, canAdvanceFrom,
-  needsNoPaymentConfirm, getAutoPassTarget, isReprintGateTransition, PAYMENT_STATUSES,
+  isDualTrack, getNextStatus, DUAL_TRACK_STAGES, isStageAllowed, canAdvanceFrom, needsNoPaymentConfirm, getAutoPassTarget, isReprintGateTransition, PAYMENT_STATUSES, getStatusMeta,
 } from '@/shared/constants'
 import { useRolePermissionsStore, canRoleDo } from '@/features/auth/role-permissions-store'
 import { useAuthStore } from '@/features/auth/store'
@@ -354,7 +353,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
   // isRollback / force — admin escape (StatusOverride / StageJumper).
   if (!options.isRollback && !options.force) {
     if (orderForRoute && !isStageAllowed(orderForRoute, toStatus)) {
-      const stageLabel = ORDER_STATUSES[toStatus]?.label || toStatus
+      const stageLabel = getStatusMeta(toStatus)?.label || toStatus
       throw new Error(`Этап «${stageLabel}» не входит в маршрут заказа`)
     }
 
@@ -375,7 +374,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
       const store = useRolePermissionsStore.getState()
       const dynamicPerms = store.loaded ? store.permissions : null
       if (role && !canAdvanceFrom(role, fromStatus, dynamicPerms)) {
-        const stageLabel = ORDER_STATUSES[fromStatus]?.label || fromStatus
+        const stageLabel = getStatusMeta(fromStatus)?.label || fromStatus
         throw new Error(`У роли «${role}» нет права продвигать этап «${stageLabel}»`)
       }
     }
@@ -427,7 +426,7 @@ export async function updateOrderStatus(orderId, fromStatus, toStatus, options =
       }
     }
     if (incompleteTracks.length > 0) {
-      const stageLabel = ORDER_STATUSES[fromStatus]?.label || fromStatus
+      const stageLabel = getStatusMeta(fromStatus)?.label || fromStatus
       const suffix = incompleteTracks.filter(Boolean).join(',')
       toast.info(`Этап «${stageLabel}»${suffix} не завершён — данные не введены, но заказ продвинут.`)
     }

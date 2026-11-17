@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useOrders, deleteOrder } from '../hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { StatusBadge } from '../components/StatusBadge'
-import { PRIORITIES, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
+import { PRIORITIES, getActiveOrderStatuses } from '@/shared/constants'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { Pagination } from '@/shared/components/Pagination'
 import { OrdersKanban } from '../components/OrdersKanban'
@@ -25,7 +25,6 @@ import { ReprintMobileRow, ReprintDesktopRow, ReprintsChip } from '../components
 
 // R25.1: списки статусов строятся из констант/описания отделов — новый этап
 // не может «потеряться» в фильтрах и группах (см. тест-«сторож» routes-v2).
-const ACTIVE_STATUSES = ACTIVE_ORDER_STATUSES
 const ARCHIVED_STATUSES = ['done', 'cancelled']
 
 // Группы по отделам — таблица заказов разбивается на эти секции.
@@ -90,8 +89,8 @@ export default function OrdersPage() {
   const effectiveStatuses = statusFilters.length > 0
     ? statusFilters
     : includeArchived
-      ? [...ACTIVE_STATUSES, ...ARCHIVED_STATUSES]
-      : ACTIVE_STATUSES
+      ? [...getActiveOrderStatuses(), ...ARCHIVED_STATUSES]
+      : getActiveOrderStatuses()
 
   const { orders, totalCount, loading, error, refetch } = useOrders({
     statuses: effectiveStatuses,

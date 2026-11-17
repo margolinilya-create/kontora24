@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { REPRINT_STATUS_LABELS, ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, PRIORITIES } from '@/shared/constants'
+import { REPRINT_STATUS_LABELS, ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, PRIORITIES, getStatusMeta } from '@/shared/constants'
 import { STAGE_FIELDS, fieldValueLabel } from '@/features/production/lib/production-logs'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { supabase } from '@/shared/lib/supabase'
@@ -190,9 +190,9 @@ export function OrderHistoryTab({ order, history }) {
               {it.type === 'status' ? (
                 <p>
                   {it.from && (
-                    <><span className="text-text-muted">{ORDER_STATUSES[it.from]?.label || it.from}</span>{' → '}</>
+                    <><span className="text-text-muted">{getStatusMeta(it.from)?.label || it.from}</span>{' → '}</>
                   )}
-                  <span className="font-medium">{ORDER_STATUSES[it.to]?.label || it.to}</span>
+                  <span className="font-medium">{getStatusMeta(it.to)?.label || it.to}</span>
                   {it.kind && HISTORY_KIND_LABELS[it.kind] && (
                     <span className="text-xs text-text-muted ml-1.5">({HISTORY_KIND_LABELS[it.kind]})</span>
                   )}

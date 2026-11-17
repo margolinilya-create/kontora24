@@ -9,7 +9,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import {
-  ORDER_STATUSES, ORDER_TYPES,
+  ORDER_STATUSES,
   DESIGN_STATUSES, ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES,
   PRIORITIES, SIZE_PRESETS, STICKER_SHAPES,
   PRODUCT_NAME_MAX, LAMINATION_FORM_EXCLUDE_CODES, canToggleSubcontract,
@@ -25,6 +25,9 @@ import { FilmSelect } from './FilmSelect'
 import { LaminationSelect } from './LaminationSelect'
 import { MontageFilmSelect } from './MontageFilmSelect'
 import { ContractorSelect } from '@/features/contractors/components/ContractorSelect'
+import { useOrderTypeOptions } from '@/features/order-types/hooks/useOrderTypeOptions'
+import { ApplyTypeRouteButton } from '@/features/order-types/components/ApplyTypeRouteButton'
+import { getTypeDef } from '@/shared/lib/route-registry'
 
 // R22.4 (ТЗ 20.07 Фаза 4Б): упразднённые этапы — недоступны для назначения.
 const DEPRECATED_STATUSES = ['batch_layout', 'selection_pouring']
@@ -72,6 +75,8 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
     })
     return extraCategoriesForRoute(whCategories, route)
   }, [order, whCategories, form.order_type, form.design_status, form.need_lam, form.needs_montage_film, form.delivery_type, form.is_subcontract, form.bopp_bag])
+  // R25.7C: активные типы реестра (+ текущий, даже если в архиве).
+  const typeOptions = useOrderTypeOptions(order?.order_type)
 
   useEffect(() => {
     if (!order) return
@@ -289,7 +294,9 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
     }
   }
 
+  // R25.7C: свой тип-набор тоже показывает «Стикеров в паке».
   const isStickerpack = form.order_type === 'stickerpack' || form.order_type === 'stickerpack3D'
+    || (!!getTypeDef(form.order_type)?.is_set && !getTypeDef(form.order_type)?.is_builtin)
   const isStickerpack3D = form.order_type === 'stickerpack3D'
   const isSticker3D = form.order_type === 'sticker3D'
   // R25.4 (ТЗ 4.2): переключать субподряд можно только до цеха (и только v2).
@@ -410,10 +417,13 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
           <Field label="Тип заказа">
             <select value={form.order_type || ''} onChange={(e) => changeOrderType(e.target.value)} className={SELECT_CLASS}>
               <option value="">—</option>
-              {Object.entries(ORDER_TYPES).map(([k, { label }]) => (
-                <option key={k} value={k}>{label}</option>
+              {typeOptions.map(({ key, label }) => (
+                <option key={key} value={key}>{label}</option>
               ))}
             </select>
+            {form.order_type === order?.order_type && (
+              <ApplyTypeRouteButton order={order} onApplied={(patch) => onSaved(patch)} />
+            )}
           </Field>
           {form.order_type === 'other' && (
             <Field label="Название продукции *">

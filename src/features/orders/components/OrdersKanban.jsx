@@ -3,9 +3,9 @@ import { DndContext, DragOverlay, useDroppable, closestCorners, PointerSensor, T
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { DraggableCard, DragOverlayCard } from '@/features/production/components/DraggableCard'
 import { useProductionBoard } from '@/features/production/hooks/useProductionBoard'
-import { ORDER_STATUSES, isStageAllowed, NO_PAYMENT_CONFIRM_MESSAGE } from '@/shared/constants'
-import { stageBorderClass, stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
-import { COLS } from '@/features/production/components/PipelineSummary'
+import { isStageAllowed, NO_PAYMENT_CONFIRM_MESSAGE, getStatusMeta } from '@/shared/constants'
+import { stageBorderClass, stageDotClass, getStageGroupKey, DEPT_GROUPS } from '@/shared/lib/department-mapping'
+import { getKanbanColumns } from '@/features/production/lib/kanban-columns'
 import MultiSelect from '@/shared/components/MultiSelect'
 import ErrorState from '@/shared/components/ErrorState'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
@@ -23,7 +23,7 @@ const DroppableColumn = memo(function DroppableColumn({ status, orders, reprints
   // Колонка disabled для активного заказа, если этап не входит в его маршрут
   // или совпадает с текущим. dnd-kit не вернёт `over` для такой колонки.
   const { setNodeRef, isOver } = useDroppable({ id: status, disabled: isActive && (!allowed || isSameAsCurrent) })
-  const label = ORDER_STATUSES[status]?.label || status
+  const label = getStatusMeta(status)?.label || status
   const dotCls = stageDotClass(status)
   const borderCls = stageBorderClass(status)
   const isBlocked = isActive && !allowed
@@ -115,14 +115,15 @@ export function OrdersKanban({ deptFilter, onDeptFilterChange, includeArchived, 
 
   // Фильтр по отделу: показываем только релевантные колонки
   const visibleCols = (() => {
-    let cols = [...COLS]
+    // R25.7D: + свои этапы каталога после колонок своего отдела.
+    let cols = getKanbanColumns()
     if (includeArchived) cols.push('done')
     if (deptFilter && deptFilter.length > 0) {
       const allowedStages = new Set()
       deptFilter.forEach((key) => {
         DEPT_GROUPS[key]?.stages.forEach((s) => allowedStages.add(s))
       })
-      cols = cols.filter((s) => allowedStages.has(s))
+      cols = cols.filter((s) => allowedStages.has(s) || deptFilter.includes(getStageGroupKey(s)))
     }
     return cols
   })()

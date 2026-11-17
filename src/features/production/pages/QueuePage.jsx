@@ -12,6 +12,7 @@ import { playNotificationSound } from '@/shared/lib/sound'
 import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
+import { customQueueConfig } from '../lib/queue-config'
 
 // R22.4 (ТЗ 20.07 Фаза 4Б): dual-track очередь подзадач (фоны/стикеры) упразднена
 // вместе с selection_pouring. stickerpack3D теперь идёт линейно и показывается
@@ -73,7 +74,10 @@ function sortOrders(orders, sortBy) {
 }
 
 export default function QueuePage({ queueType, hideHeader, enableBatchView = false }) {
+  // R25.7D: очередь своего этапа (/production/stage/:key) — конфиг из каталога.
   const config = QUEUE_CONFIG[queueType]
+    || customQueueConfig(queueType)
+    || { title: 'Этап', subtitle: 'Этап не найден в каталоге', status: queueType }
   const { profile } = useAuth()
   const allStatuses = useMemo(() => [config.status, ...(config.extraStatuses || [])], [config.status, config.extraStatuses])
   const { orders: allOrders, loading, refetch } = useOrders({ statuses: allStatuses })

@@ -4,7 +4,7 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
-import { isDualTrack, IS_3D_STICKERPACK, FILM_TYPES, ORDER_STATUSES } from '@/shared/constants'
+import { isDualTrack, IS_3D_STICKERPACK, FILM_TYPES, getStatusMeta } from '@/shared/constants'
 import { usePackagingMaterials } from '../../hooks/usePackagingMaterials'
 import { useExtraConsumptionFields } from '../../hooks/useExtraConsumptionFields'
 import { buildExtraConsumption } from '@/features/warehouse/lib/order-material-categories'
@@ -75,7 +75,7 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   const [forms, setForms] = useState({})
 
   if (!config && extraFields.length === 0) return null
-  const stageTitle = config?.label || ORDER_STATUSES[stage]?.label || stage
+  const stageTitle = config?.label || getStatusMeta(stage).label
 
   function getForm(key) {
     return forms[key] || {}

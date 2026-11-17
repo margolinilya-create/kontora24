@@ -21,7 +21,7 @@ import { OrderList } from '../components/OrderList'
 import { OrderDetailsPanel } from '../components/OrderDetailsPanel'
 import { PlannerCalendar, DragOverlayChip } from '../components/PlannerCalendar'
 import { parseDragId, parseDropId } from '../lib/dnd-ids'
-import { STAGE_TO_BUCKET } from '../lib/buckets'
+import { getBucketForStage } from '../lib/buckets'
 import { pinStage, pinStageWithFreeze } from '../lib/plan-overrides'
 
 // R17.3 (бриф 5.06): пресеты горизонта планирования в рабочих днях.
@@ -71,7 +71,7 @@ export default function PlannerPage() {
     const dropped = parseDragId(evt.active?.id)
     const cell = parseDropId(evt.over?.id)
     if (!dropped || !cell) return
-    const expectedBucket = STAGE_TO_BUCKET[dropped.stage]
+    const expectedBucket = getBucketForStage(dropped.stage)
     if (expectedBucket !== cell.bucket) {
       toast.info('Этап нельзя перенести в другой отдел. Можно двигать только по своему бакету.')
       return

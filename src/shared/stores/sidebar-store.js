@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
-import { ACTIVE_ORDER_STATUSES, SALES_STAGES } from '@/shared/constants'
+import { getActiveOrderStatuses, SALES_STAGES } from '@/shared/constants'
 
 export const useSidebarStore = create((set) => ({
   collapsed: localStorage.getItem('sidebar-collapsed') === 'true',
@@ -24,7 +24,7 @@ export const useSidebarStore = create((set) => ({
           .from('k24_orders')
           .select('status')
           // R25.1: все активные статусы (включая этапы отдела продаж v2).
-          .in('status', ACTIVE_ORDER_STATUSES),
+          .in('status', getActiveOrderStatuses()),
         supabase
           .from('k24_materials')
           .select('stock_qty, min_qty'),

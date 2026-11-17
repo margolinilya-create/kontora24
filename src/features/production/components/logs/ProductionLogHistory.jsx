@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { STAGE_FIELDS, OTK_DEFECT_LABELS } from '../../lib/production-logs'
+import { STAGE_FIELDS, otkDefectLabel } from '../../lib/production-logs'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -147,7 +147,7 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
                 {/* R20.5: поэвидовой лог по размерному виду (k24_order_items).
                     Лейбл «Размер» — чтобы не сливался с дизайн-видом выше
                     (на sticker3D multi-design оба бейджа могут стоять рядом). */}
-                {log.stage === 'otk' && log.defect_stage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-danger/10 text-danger">Брак: {(OTK_DEFECT_LABELS[log.defect_stage] || log.defect_stage).toLowerCase()}</span>}
+                {log.stage === 'otk' && log.defect_stage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-danger/10 text-danger">Брак: {otkDefectLabel(log.defect_stage).toLowerCase()}</span>}
                 {log.item_idx != null && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-2 text-text-muted">Размер #{log.item_idx}</span>}
               </div>
               <div className="flex items-center gap-3 text-xs text-text-muted mt-0.5 flex-wrap">

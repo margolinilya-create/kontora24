@@ -27,8 +27,9 @@ import {
   computeFilmMeters, computeLamMeters, getPrintBlockWidth,
 } from '@/features/orders/lib/material-forecast'
 import {
-  STAGE_TO_BUCKET, BUCKETS, VISIBLE_BUCKETS,
+  BUCKETS, VISIBLE_BUCKETS, getBucketForStage,
 } from './buckets'
+import { getStageDef, isCustomStageKey } from '@/shared/lib/route-registry'
 import {
   resolveNorms, resolveCapacity, bucketHoursPerDay, DEFAULT_NORMS,
 } from './norms'
@@ -184,8 +185,14 @@ export function getStageDurationHours(stage, order, items, normsValue) {
     case 'color_approval':
     case 'done':
     case 'cancelled':
-    default:
       return 0
+    default: {
+      // R25.7D: свой этап — тираж ÷ норма (шт за 8 ч) × 8 ч; без нормы — веха.
+      if (!isCustomStageKey(stage)) return 0
+      const per8h = Number(getStageDef(stage)?.norm_per_8h)
+      if (!(per8h > 0)) return 0
+      return ((Number(order?.qty) || 0) / per8h) * HOURS_PER_DAY
+    }
   }
 }
 
@@ -321,7 +328,7 @@ export function schedule({
     let outOfHorizon = false
 
     for (const stage of stages) {
-      const bucket = STAGE_TO_BUCKET[stage]
+      const bucket = getBucketForStage(stage)
       const hours = getStageDurationHours(stage, order, itemsByOrder[order.id] || [], norms)
 
       if (bucket === BUCKETS.milestone || (hours <= 0 && bucket !== BUCKETS.passive)) {

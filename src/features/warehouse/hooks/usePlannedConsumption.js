@@ -13,7 +13,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { forecastMaterials } from '@/features/orders/lib/material-forecast'
-import { ACTIVE_ORDER_STATUSES } from '@/shared/constants'
+import { getActiveOrderStatuses } from '@/shared/constants'
 import { fetchWarehouseCategories } from './useWarehouseCategories'
 import { categoriesForField } from '../lib/order-material-categories'
 
@@ -63,7 +63,7 @@ async function addExtraMaterialsPlan(orders, materials, result) {
 
 // R25.1: из общего списка активных статусов. Не входят: «Новый заказ» и
 // «Ждёт оплаты» (заказ ещё не запущен) и «Субподряд» (цех не расходует материалы).
-const ACTIVE_STATUSES = ACTIVE_ORDER_STATUSES.filter((s) => !['new', 'awaiting_payment', 'subcontract'].includes(s))
+const activeStatuses = () => getActiveOrderStatuses().filter((s) => !['new', 'awaiting_payment', 'subcontract'].includes(s))
 
 export function usePlannedConsumption(materials) {
   const [plan, setPlan] = useState(new Map())
@@ -82,7 +82,7 @@ export function usePlannedConsumption(materials) {
         supabase
           .from('k24_orders')
           .select('id, number, custom_number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, bopp_bag, status, needs_montage_film, montage_material_id, is_subcontract')
-          .in('status', ACTIVE_STATUSES),
+          .in('status', activeStatuses()),
         supabase
           .from('k24_order_items')
           .select('order_id, width_mm, height_mm, qty'),

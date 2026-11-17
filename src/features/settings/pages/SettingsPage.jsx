@@ -11,6 +11,7 @@ import { WarehouseSettings } from '../components/WarehouseSettings'
 import { ContractorsSettings } from '../components/ContractorsSettings'
 import { PlanningSettings } from '@/features/production-planner/components/PlanningSettings'
 import { CalculatorSettings } from '@/features/calculator/components/CalculatorSettings'
+import { OrderTypesSettings } from '@/features/order-types/components/OrderTypesSettings'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import Tabs from '@/shared/components/Tabs'
 
@@ -22,6 +23,8 @@ const SETTINGS_TABS = [
   { key: 'warehouse', label: 'Настройки склада' },
   { key: 'contractors', label: 'Подрядчики' },
   { key: 'planning', label: 'Производство (бета)' },
+  // R25.7C (ТЗ 7.1): типы заказов и свои этапы — право order_type:manage.
+  { key: 'order_types', label: 'Типы заказов', permission: 'order_type:manage' },
   // R25.5 (ТЗ 5.5): видна только с правом calc:settings.
   { key: 'calculator', label: 'Калькулятор', permission: 'calc:settings' },
   { key: 'bitrix', label: 'Bitrix24' },
@@ -32,7 +35,9 @@ const SETTINGS_TABS = [
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
   const canCalcSettings = useCanDo('calc:settings')
-  const tabs = SETTINGS_TABS.filter((t) => t.permission !== 'calc:settings' || canCalcSettings)
+  const canOrderTypes = useCanDo('order_type:manage')
+  const allowed = { 'calc:settings': canCalcSettings, 'order_type:manage': canOrderTypes }
+  const tabs = SETTINGS_TABS.filter((t) => !t.permission || allowed[t.permission])
 
   return (
     <div className="space-y-8">
@@ -56,6 +61,7 @@ export default function SettingsPage() {
       {activeTab === 'contractors' && <ContractorsSettings />}
       {activeTab === 'planning' && <PlanningSettings />}
       {activeTab === 'calculator' && canCalcSettings && <CalculatorSettings />}
+      {activeTab === 'order_types' && canOrderTypes && <OrderTypesSettings />}
       {activeTab === 'bitrix' && <BitrixSettings />}
       {activeTab === 'logs' && <IntegrationLog />}
       {activeTab === 'import' && <SheetsImport />}

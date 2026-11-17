@@ -48,7 +48,11 @@ export default async function handler(req, res) {
     // Validate input
     const { email, password, display_name, role } = req.body || {}
 
-    if (!email || !password || !display_name || !role) {
+    if (
+      typeof email !== 'string' || typeof password !== 'string'
+      || typeof display_name !== 'string' || typeof role !== 'string'
+      || !email || !password || !display_name.trim() || !role
+    ) {
       return res.status(400).json({ error: 'Заполните все поля: email, пароль, имя, роль' })
     }
 
@@ -57,7 +61,7 @@ export default async function handler(req, res) {
     }
 
     if (!VALID_ROLES.includes(role)) {
-      return res.status(400).json({ error: `Недопустимая роль: ${role}` })
+      return res.status(400).json({ error: 'Недопустимая роль' })
     }
 
     // Create auth user
@@ -73,7 +77,7 @@ export default async function handler(req, res) {
       if (authError.message.includes('already been registered') || authError.message.includes('already registered')) {
         return res.status(409).json({ error: 'Пользователь с таким email уже существует' })
       }
-      return res.status(400).json({ error: `Ошибка создания пользователя: ${authError.message}` })
+      return res.status(400).json({ error: 'Ошибка создания пользователя. Проверьте email и пароль.' })
     }
 
     // Update profile with correct role and display_name
@@ -101,6 +105,6 @@ export default async function handler(req, res) {
     })
   } catch (err) {
     console.error('User creation error:', err)
-    return res.status(500).json({ error: `Ошибка создания пользователя: ${err.message}` })
+    return res.status(500).json({ error: 'Ошибка создания пользователя' })
   }
 }

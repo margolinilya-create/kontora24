@@ -157,7 +157,7 @@ describe('POST /api/bitrix/incoming', () => {
     // history error was null → no impact
   })
 
-  it('returns 500 with detail when k24_clients insert fails (H2 behaviour)', async () => {
+  it('returns 500 without internal detail when k24_clients insert fails (H2 behaviour)', async () => {
     // 1) client search → not found
     // 2) client insert → error
     const clientSearchBuilder = makeQueryBuilder([{ data: null, error: null }])
@@ -175,10 +175,8 @@ describe('POST /api/bitrix/incoming', () => {
     await handler(req, res)
 
     expect(res.statusCode).toBe(500)
-    expect(res.body).toMatchObject({
-      error: 'Client create failed',
-      detail: 'duplicate key value',
-    })
+    // Внутренние детали (текст ошибки БД) клиенту не отдаются
+    expect(res.body).toEqual({ error: 'Client create failed' })
     // Order should NOT have been touched
     expect(mockSupabase.from).toHaveBeenCalledTimes(3)
   })
@@ -260,5 +258,21 @@ describe('POST /api/bitrix/incoming', () => {
     expect(res.statusCode).toBe(200)
     expect(orderInsertBuilder.insert.mock.calls[0][0].order_type).toBe('sticker_cut')
     expect(mockSupabase.from).toHaveBeenCalledTimes(4)
+  })
+
+  it('отклоняет неизвестные поля', async () => {
+    const res = buildRes()
+    await handler(buildReq({ body: { ...VALID_BODY, evil: 1 } }), res)
+    expect(res.statusCode).toBe(400)
+    expect(res.body.error).toMatch(/Unknown fields: evil/)
+    expect(mockSupabase.from).not.toHaveBeenCalled()
+  })
+
+  it('отклоняет неверные типы/длины', async () => {
+    const res = buildRes()
+    await handler(buildReq({ body: { ...VALID_BODY, qty: 'abc', client_name: 'x'.repeat(500) } }), res)
+    expect(res.statusCode).toBe(400)
+    expect(res.body.error).toMatch(/qty/)
+    expect(res.body.error).toMatch(/client_name/)
   })
 })

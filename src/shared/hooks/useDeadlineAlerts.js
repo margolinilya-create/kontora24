@@ -4,6 +4,30 @@ import { toast } from '@/shared/stores/toast-store'
 import { captureError } from '@/shared/lib/sentry'
 import { formatOrderNumber } from '@/shared/lib/utils'
 
+/** Дата YYYY-MM-DD по локальному календарю устройства (в цеху — Москва), не UTC. */
+export function localDateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Делит заказы на просроченные (дедлайн раньше сегодняшнего дня) и ближайшие
+ * (сегодня/завтра). Сравнение по календарному дню: `deadline` — DATE без времени,
+ * и `new Date('2026-11-17')` = полночь UTC (03:00 МСК), из-за чего сегодняшний
+ * дедлайн считался просроченным уже с утра.
+ */
+export function splitByDeadline(orders, now = new Date()) {
+  const today = localDateKey(now)
+  const overdue = []
+  const upcoming = []
+  for (const o of orders) {
+    const day = String(o.deadline || '').slice(0, 10)
+    if (!day) continue
+    if (day < today) overdue.push(o)
+    else upcoming.push(o)
+  }
+  return { overdue, upcoming }
+}
+
 export function useDeadlineAlerts() {
   const hasChecked = useRef(false)
 
@@ -15,21 +39,20 @@ export function useDeadlineAlerts() {
       try {
         const tomorrow = new Date()
         tomorrow.setDate(tomorrow.getDate() + 1)
-        tomorrow.setHours(23, 59, 59, 999)
 
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('k24_orders')
           .select('number, custom_number, deadline, status')
-          .lte('deadline', tomorrow.toISOString().split('T')[0])
+          .lte('deadline', localDateKey(tomorrow))
           .not('status', 'in', '("done","cancelled")')
           .order('deadline')
           .limit(5)
+        if (error) throw error
 
         if (!data || data.length === 0) return
 
         // Check localStorage for dismissed alerts today (use local date, not UTC)
-        const now = new Date()
-        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+        const today = localDateKey(new Date())
         const dismissKey = `deadline_alerts_${today}`
         const dismissed = JSON.parse(localStorage.getItem(dismissKey) || '[]')
 
@@ -37,8 +60,7 @@ export function useDeadlineAlerts() {
         if (urgent.length === 0) return
 
         // Show one combined toast
-        const overdue = urgent.filter((o) => new Date(o.deadline) < new Date())
-        const upcoming = urgent.filter((o) => new Date(o.deadline) >= new Date())
+        const { overdue, upcoming } = splitByDeadline(urgent)
 
         if (overdue.length > 0) {
           toast.error(`Просрочено: ${overdue.map((o) => `#${formatOrderNumber(o)}`).join(', ')}`)

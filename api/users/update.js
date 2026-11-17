@@ -25,19 +25,12 @@ export default async function handler(req, res) {
   const { data: userData, error: userError } = await supabase.auth.getUser(token)
   const caller = userData?.user
   if (userError || !caller) {
-    const supaUrl = process.env.VITE_SUPABASE_URL || ''
-    const supaHost = supaUrl.replace(/^https?:\/\//, '').split('.')[0]
+    // Детали — только в серверный лог, клиенту общее сообщение.
     console.error('[users/update] auth.getUser failed:', {
       msg: userError?.message,
       status: userError?.status,
-      tokenLen: token.length,
-      supaHost,
     })
-    return res.status(401).json({
-      error: 'Недействительный токен',
-      detail: userError?.message || 'no user',
-      supaHost,
-    })
+    return res.status(401).json({ error: 'Недействительный токен' })
   }
 
   const { data: callerProfile } = await supabase
@@ -56,19 +49,67 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'userId обязателен' })
   }
 
+  if (typeof userId !== 'string') {
+    return res.status(400).json({ error: 'Некорректный userId' })
+  }
+
   // Validate role if provided
   if (role !== undefined && !VALID_ROLES.includes(role)) {
-    return res.status(400).json({ error: `Недопустимая роль: ${role}` })
+    return res.status(400).json({ error: 'Недопустимая роль' })
   }
 
   // Validate password if provided
-  if (password !== undefined && password.length < 6) {
+  if (password !== undefined && (typeof password !== 'string' || password.length < 6)) {
     return res.status(400).json({ error: 'Пароль должен быть минимум 6 символов' })
   }
 
   // Validate display_name if provided
-  if (display_name !== undefined && !display_name.trim()) {
+  if (display_name !== undefined && (typeof display_name !== 'string' || !display_name.trim())) {
     return res.status(400).json({ error: 'Имя не может быть пустым' })
+  }
+
+  if (email !== undefined && (typeof email !== 'string' || !email.includes('@'))) {
+    return res.status(400).json({ error: 'Некорректный email' })
+  }
+
+  if (approved !== undefined && typeof approved !== 'boolean') {
+    return res.status(400).json({ error: 'Некорректное значение подтверждения' })
+  }
+
+  // Админ не может понизить или «отключить» сам себя — иначе потеряет доступ к настройкам.
+  if (userId === caller.id) {
+    if (role !== undefined && role !== 'admin') {
+      return res.status(400).json({ error: 'Нельзя понизить собственную роль' })
+    }
+    if (approved === false) {
+      return res.status(400).json({ error: 'Нельзя отключить собственный аккаунт' })
+    }
+  }
+
+  // Нельзя снять роль с последнего администратора.
+  if (role !== undefined && role !== 'admin') {
+    const { data: target, error: targetErr } = await supabase
+      .from('k24_profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
+    if (targetErr) {
+      console.error('[users/update] target lookup failed:', targetErr.message)
+      return res.status(404).json({ error: 'Пользователь не найден' })
+    }
+    if (target?.role === 'admin') {
+      const { count, error: countErr } = await supabase
+        .from('k24_profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'admin')
+      if (countErr) {
+        console.error('[users/update] admin count failed:', countErr.message)
+        return res.status(500).json({ error: 'Ошибка обновления пользователя' })
+      }
+      if ((count ?? 0) <= 1) {
+        return res.status(409).json({ error: 'Нельзя снять роль с последнего администратора' })
+      }
+    }
   }
 
   try {

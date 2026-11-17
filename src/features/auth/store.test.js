@@ -210,4 +210,27 @@ describe('useAuthStore', () => {
       expect(useAuthStore.getState().hasRole('admin')).toBe(false)
     })
   })
+
+  describe('onAuthStateChange (TOKEN_REFRESHED)', () => {
+    it('не пересоздаёт user/profile, если пользователь и профиль не изменились', async () => {
+      const user = { id: 'u1', email: 'a@b.c', updated_at: 't1' }
+      const profileRow = { id: 'u1', role: 'manager', display_name: 'M' }
+      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: { user } }, error: null })
+      mockSupabase.from.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: { ...profileRow } }),
+      })
+      await useAuthStore.getState().initialize()
+      const before = useAuthStore.getState()
+      const cb = mockSupabase.auth.onAuthStateChange.mock.calls.at(-1)[0]
+
+      cb('TOKEN_REFRESHED', { user: { ...user } })
+      await new Promise((r) => setTimeout(r, 5))
+
+      const after = useAuthStore.getState()
+      expect(after.user).toBe(before.user)
+      expect(after.profile).toBe(before.profile)
+    })
+  })
 })

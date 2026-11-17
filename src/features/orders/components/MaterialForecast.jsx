@@ -16,6 +16,7 @@ export function MaterialForecast({
   filmType, filmTypeStickers, lamType, boppBag,
   items, // [{widthMm, heightMm, qty}] для multi-variant — приоритет над одиночными полями
   needsMontageFilm = false, montageMaterialId = null, isSubcontract = false, // R25.4
+  extraRows = null, // R25.7B: доп. материалы (норма × тираж), lookup по materialId
 }) {
   const { materials, loading } = useMaterials()
 
@@ -24,11 +25,15 @@ export function MaterialForecast({
     return (materials || []).filter((m) => m.type === 'packaging_bag' && m.archived_at == null)
   }, [materials])
 
-  const rows = useMemo(() => forecastMaterials({
+  const baseRows = useMemo(() => forecastMaterials({
     orderType, widthMm, heightMm, qty,
     filmType, filmTypeStickers, lamType, boppBag, items,
     boppCandidates, needsMontageFilm, montageMaterialId, isSubcontract,
   }), [orderType, widthMm, heightMm, qty, filmType, filmTypeStickers, lamType, boppBag, items, boppCandidates, needsMontageFilm, montageMaterialId, isSubcontract])
+  const rows = useMemo(
+    () => (extraRows?.length ? [...baseRows, ...extraRows] : baseRows),
+    [baseRows, extraRows],
+  )
 
   const stockByCode = useMemo(() => {
     const map = {}

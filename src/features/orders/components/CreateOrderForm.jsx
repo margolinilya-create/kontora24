@@ -29,6 +29,7 @@ import {
   needsLamination, STICKER_SHAPES,
   PRODUCT_NAME_MAX, MAX_ORDER_ITEMS, LAMINATION_FORM_EXCLUDE_CODES,
   isIndividualCutHidden, individualCutForOrderType, orderTypeForIndividualCut,
+  getOrderRoute,
 } from '@/shared/constants'
 import { applyPackShapes } from '@/features/production/hooks/usePackDesigns'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -49,6 +50,10 @@ import { buildVariantRows, variantsTotalQty, resizeVariants } from '../lib/order
 import { replaceOrderItems } from '../hooks/useOrderItems'
 import { forecastMaterials } from '../lib/material-forecast'
 import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
+import { useWarehouseCategories } from '@/features/warehouse/hooks/useWarehouseCategories'
+import { extraCategoriesForRoute, forecastExtraMaterials } from '@/features/warehouse/lib/order-material-categories'
+import { saveOrderMaterials } from '../hooks/useOrderMaterials'
+import { ExtraMaterialsFields } from './ExtraMaterialsFields'
 
 const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm min-h-[44px]'
 const IMAGE_RX = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i
@@ -402,6 +407,30 @@ export function CreateOrderForm({
 
   // R11.4: считаем прогноз расхода и складские остатки для warning'ов.
   const { materials } = useMaterials()
+
+  // R25.7B (ТЗ 7.5): дополнительные материалы — категории «Дополнительный
+  // материал», чей этап списания есть в маршруте будущего заказа (v2).
+  const { categories: whCategories } = useWarehouseCategories()
+  const [extraSelection, setExtraSelection] = useState({})
+  const designStatus = watch('design_status')
+  const extraCategories = useMemo(() => {
+    if (!orderType) return []
+    const route = getOrderRoute({
+      route_version: 2,
+      order_type: orderType,
+      design_status: designStatus,
+      need_lam: needLam,
+      needs_montage_film: needsMontageFilm,
+      delivery_type: deliveryType,
+      is_subcontract: isSubcontract,
+      bopp_bag: boppBag,
+    })
+    return extraCategoriesForRoute(whCategories, route)
+  }, [whCategories, orderType, designStatus, needLam, needsMontageFilm, deliveryType, isSubcontract, boppBag])
+  const extraForecastRows = useMemo(
+    () => forecastExtraMaterials(extraCategories, extraSelection, qty, materials),
+    [extraCategories, extraSelection, qty, materials],
+  )
   const forecastRows = useMemo(() => forecastMaterials({
     orderType, widthMm, heightMm, qty, filmType, lamType, boppBag,
     items: forecastItems,
@@ -434,8 +463,16 @@ export function CreateOrderForm({
         out.push({ label: r.label, expected: r.expected, stock, unit: r.unit, missing: r.expected - stock })
       }
     }
+    // R25.7B: доп. материалы — остаток выбранной позиции.
+    for (const r of extraForecastRows) {
+      const m = (materials || []).find((x) => x.id === r.lookup.value)
+      const stock = Number(m?.stock_qty) || 0
+      if (r.expected > stock) {
+        out.push({ label: r.label, expected: r.expected, stock, unit: r.unit, missing: r.expected - stock })
+      }
+    }
     return out
-  }, [forecastRows, stockByCode])
+  }, [forecastRows, stockByCode, extraForecastRows, materials])
 
   // Smart defaults: 3D-стикерпак → auto-BOPP; первый выбор 3D → плёнка G по дефолту.
   // R25.6: срабатывают только при СМЕНЕ типа — начальные значения (из расчёта:
@@ -632,6 +669,19 @@ export function CreateOrderForm({
             extra: { orderId: order.id },
           })
           toast.error('Заказ создан, но формы стикеров не сохранились — задайте на странице заказа')
+        }
+      }
+
+      // R25.7B: дополнительные материалы заказа (нужен order.id).
+      if (extraCategories.length > 0) {
+        try {
+          await saveOrderMaterials(order.id, extraSelection, extraCategories.map((c) => c.id), [])
+        } catch (matErr) {
+          captureError(matErr, {
+            tags: { source: 'CreateOrderPage.saveOrderMaterials' },
+            extra: { orderId: order.id },
+          })
+          toast.error('Заказ создан, но дополнительные материалы не сохранились — выберите их в редакторе заказа')
         }
       }
 
@@ -1007,6 +1057,16 @@ export function CreateOrderForm({
               </div>
             )}
 
+            {/* R25.7B (ТЗ 7.5): дополнительные материалы по категориям склада */}
+            {extraCategories.length > 0 && (
+              <ExtraMaterialsFields
+                extraCategories={extraCategories}
+                materials={materials}
+                value={extraSelection}
+                onChange={(next) => { setExtraSelection(next); setExtraDirty(true) }}
+              />
+            )}
+
             {/* Заказчик + Срочность */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1161,6 +1221,7 @@ export function CreateOrderForm({
             needsMontageFilm={needsMontageFilm}
             montageMaterialId={montageMaterialId}
             isSubcontract={isSubcontract}
+            extraRows={extraForecastRows}
           />
 
           <div className="bg-surface rounded-2xl border border-border shadow-card p-5 space-y-3">

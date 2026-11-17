@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { updateOrder } from '../hooks/useOrders'
 import { ClientCombobox } from '@/features/clients/components/ClientCombobox'
 import { supabase } from '@/shared/lib/supabase'
@@ -14,7 +14,13 @@ import {
   PRIORITIES, SIZE_PRESETS, STICKER_SHAPES,
   PRODUCT_NAME_MAX, LAMINATION_FORM_EXCLUDE_CODES, canToggleSubcontract,
   isIndividualCutHidden, individualCutForOrderType, orderTypeForIndividualCut,
+  getOrderRoute,
 } from '@/shared/constants'
+import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
+import { useWarehouseCategories } from '@/features/warehouse/hooks/useWarehouseCategories'
+import { extraCategoriesForRoute } from '@/features/warehouse/lib/order-material-categories'
+import { useOrderMaterials, saveOrderMaterials } from '../hooks/useOrderMaterials'
+import { ExtraMaterialsFields } from './ExtraMaterialsFields'
 import { FilmSelect } from './FilmSelect'
 import { LaminationSelect } from './LaminationSelect'
 import { MontageFilmSelect } from './MontageFilmSelect'
@@ -44,6 +50,28 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   const [currentClient, setCurrentClient] = useState(null)
   const [saving, setSaving] = useState(false)
   const canSeeFinance = useCanDo('view:finance')
+  // R25.7B (ТЗ 7.5): дополнительные материалы заказа.
+  const { materials } = useMaterials()
+  const { categories: whCategories } = useWarehouseCategories()
+  const { rows: orderMaterialRows } = useOrderMaterials(order?.id)
+  const [extraSelection, setExtraSelection] = useState({})
+  useEffect(() => {
+    setExtraSelection(Object.fromEntries(orderMaterialRows.map((r) => [r.category_id, r.material_id])))
+  }, [orderMaterialRows])
+  const extraCategories = useMemo(() => {
+    if (!order || !form.order_type) return []
+    const route = getOrderRoute({
+      ...order,
+      order_type: form.order_type,
+      design_status: form.design_status,
+      need_lam: !!form.need_lam,
+      needs_montage_film: !!form.needs_montage_film,
+      delivery_type: form.delivery_type,
+      is_subcontract: !!form.is_subcontract,
+      bopp_bag: !!form.bopp_bag,
+    })
+    return extraCategoriesForRoute(whCategories, route)
+  }, [order, whCategories, form.order_type, form.design_status, form.need_lam, form.needs_montage_film, form.delivery_type, form.is_subcontract, form.bopp_bag])
 
   useEffect(() => {
     if (!order) return
@@ -242,6 +270,15 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       }
 
       const patch = await updateOrder(order.id, updates)
+      // R25.7B: доп. материалы — после сохранения заказа (видимые категории).
+      if (extraCategories.length > 0) {
+        try {
+          await saveOrderMaterials(order.id, extraSelection, extraCategories.map((c) => c.id), orderMaterialRows)
+        } catch (matErr) {
+          captureError(matErr, { tags: { source: 'AdminOrderEditor.saveOrderMaterials' }, extra: { orderId: order.id } })
+          toast.error(`Заказ сохранён, но дополнительные материалы — нет: ${translateError(matErr).message}`)
+        }
+      }
       toast.success('Заказ обновлён')
       onSaved(patch)
     } catch (err) {
@@ -499,6 +536,18 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               )}
             </div>
           </Field>
+          {extraCategories.length > 0 && (
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className={FIELD_LABEL}>Дополнительные материалы</label>
+              <ExtraMaterialsFields
+                extraCategories={extraCategories}
+                materials={materials}
+                value={extraSelection}
+                onChange={setExtraSelection}
+                idPrefix="admin-extra-mat"
+              />
+            </div>
+          )}
           <Field label="Ссылка на макет" className="sm:col-span-2 lg:col-span-3">
             <Input value={form.mockup_path || ''} onChange={(e) => update('mockup_path', e.target.value)} placeholder="https://… или путь на сервере" />
           </Field>

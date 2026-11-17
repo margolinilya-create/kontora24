@@ -14,6 +14,52 @@ import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { forecastMaterials } from '@/features/orders/lib/material-forecast'
 import { ACTIVE_ORDER_STATUSES } from '@/shared/constants'
+import { fetchWarehouseCategories } from './useWarehouseCategories'
+import { categoriesForField } from '../lib/order-material-categories'
+
+/**
+ * R25.7B (ТЗ 7.5): план трат дополнительных материалов = норма × тираж по
+ * выбранной в заказе позиции (k24_order_materials). Позиция исключается из
+ * плана, если по ней в заказе уже есть фактический расход (extra_consumption).
+ * Отдельный блок с собственной обработкой ошибок: до миграции 105 таблицы и
+ * колонки нет — основной план работает как раньше.
+ */
+async function addExtraMaterialsPlan(orders, materials, result) {
+  const orderIds = orders.map((o) => o.id)
+  if (orderIds.length === 0) return
+  const categories = await fetchWarehouseCategories()
+  const normByCat = new Map(
+    categoriesForField(categories, 'extra')
+      .filter((c) => Number(c.norm_per_item) > 0)
+      .map((c) => [c.id, Number(c.norm_per_item)]),
+  )
+  if (normByCat.size === 0) return
+  const [omRes, logsRes] = await Promise.all([
+    supabase.from('k24_order_materials').select('order_id, category_id, material_id').in('order_id', orderIds),
+    supabase.from('k24_production_logs').select('order_id, extra_consumption').in('order_id', orderIds).is('deleted_at', null),
+  ])
+  if (omRes.error) throw omRes.error
+  if (logsRes.error) throw logsRes.error
+  const consumed = new Set()
+  for (const l of logsRes.data || []) {
+    for (const [mid, q] of Object.entries(l.extra_consumption || {})) {
+      if (Number(q) > 0) consumed.add(`${l.order_id}:${mid}`)
+    }
+  }
+  const orderById = new Map(orders.map((o) => [o.id, o]))
+  for (const row of omRes.data || []) {
+    const norm = normByCat.get(row.category_id)
+    const order = orderById.get(row.order_id)
+    if (!norm || !order || consumed.has(`${row.order_id}:${row.material_id}`)) continue
+    const mat = materials.find((m) => m.id === row.material_id)
+    const expected = norm * (Number(order.qty) || 0)
+    if (!mat || !(expected > 0)) continue
+    const prev = result.get(mat.id) || { planned: 0, orders: [] }
+    prev.planned += expected
+    prev.orders.push({ id: order.id, number: order.number, custom_number: order.custom_number, qty: expected, unit: mat.unit })
+    result.set(mat.id, prev)
+  }
+}
 
 // R25.1: из общего списка активных статусов. Не входят: «Новый заказ» и
 // «Ждёт оплаты» (заказ ещё не запущен) и «Субподряд» (цех не расходует материалы).
@@ -123,6 +169,12 @@ export function usePlannedConsumption(materials) {
             }
           }
         }
+      }
+      const extraOrders = orders.filter((o) => !o.is_subcontract)
+      try {
+        await addExtraMaterialsPlan(extraOrders, materials, result)
+      } catch (extraErr) {
+        captureError(extraErr, { tags: { source: 'usePlannedConsumption.extra' } })
       }
       setPlan(result)
     } catch (err) {

@@ -487,6 +487,8 @@ function ExpensesTab({ period }) {
     const cost = costForOrder(o, costMap)
     return { ...o, cost, prod_cost: cost.total + (Number(o.labor_cost) || 0) + cost.contractor }
   })
+  // R25.7B (ТЗ 7.5): колонка доп. материалов — только если они есть в периоде.
+  const hasExtra = rows.some((o) => o.cost.extra > 0)
 
   function handleExport() {
     // R20.3 (бриф 3.07): «Стоимость труда» и «Затраты на производство» —
@@ -497,6 +499,7 @@ function ExpensesTab({ period }) {
       'Ламинация, м', 'Себест. лам., ₽',
       'Коробки, шт', 'Себест. коробок, ₽',
       'Смола, г', 'Себест. смолы, ₽',
+      ...(hasExtra ? ['Доп. материалы, ₽'] : []),
       'Итого материалов, ₽', 'Стоимость труда, ₽', 'Подрядчик, ₽', 'Затраты на производство, ₽',
     ]
     const aoa = [header, ...rows.map((o) => [
@@ -506,6 +509,7 @@ function ExpensesTab({ period }) {
       (Number(o.actual_lam || 0) + Number(o.actual_montage || 0)).toFixed(1), Math.round(o.cost.lam),
       o.boxes_used || 0, Math.round(o.cost.box),
       Math.round(o.actual_resin), Math.round(o.cost.resin),
+      ...(hasExtra ? [Math.round(o.cost.extra)] : []),
       Math.round(o.cost.total), Math.round(o.labor_cost || 0),
       Math.round(o.cost.contractor),
       Math.round(o.prod_cost),
@@ -525,6 +529,7 @@ function ExpensesTab({ period }) {
             <Th right>Лам.</Th><Th right>₽</Th>
             <Th right>Кор.</Th><Th right>₽</Th>
             <Th right>Смола</Th><Th right>₽</Th>
+            {hasExtra && <Th right>Доп. мат. ₽</Th>}
             <Th right>Мат. ₽</Th><Th right>Труд ₽</Th><Th right>Подряд. ₽</Th><Th right>Затраты ₽</Th>
           </tr>
         </thead>
@@ -544,6 +549,7 @@ function ExpensesTab({ period }) {
               <Td right muted>{Math.round(o.cost.box)}</Td>
               <Td right>{Math.round(o.actual_resin)}г</Td>
               <Td right muted>{Math.round(o.cost.resin)}</Td>
+              {hasExtra && <Td right muted>{Math.round(o.cost.extra)}</Td>}
               <Td right>{formatPrice(o.cost.total)}</Td>
               <Td right muted>{formatPrice(o.labor_cost)}</Td>
               <Td right muted>{formatPrice(o.cost.contractor)}</Td>

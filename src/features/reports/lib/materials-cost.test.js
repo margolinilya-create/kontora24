@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildCostMap, costForOrder } from './materials-cost'
+import { buildCostMap, costForOrder, summarizeExtraMaterials } from './materials-cost'
 
 const MATERIALS = [
   { material_code: 'G', type: 'film', unit_cost: 200 },
@@ -126,5 +126,43 @@ describe('R25.4 costForOrder — монтажная плёнка и подряд
     expect(r.contractor).toBe(5000)
     expect(r.total).toBe(0)
     expect(costForOrder({}, costMap).contractor).toBe(0)
+  })
+})
+
+describe('R25.7B: доп. материалы в себестоимости', () => {
+  const costMap = buildCostMap(MATERIALS)
+  const base = {
+    film_material: { unit_cost: 100 }, actual_film: 10, actual_film_by_type: {},
+    actual_lam: 2, actual_lam_by_type: { matte: 2 }, actual_resin: 40, boxes_used: 1,
+  }
+
+  it('заказ без доп. материалов — себестоимость прежняя', () => {
+    const r = costForOrder(base, costMap)
+    expect(r.extra).toBe(0)
+    // 10×100 + 2×130 + 40×2.5 + 1×40 = 1400
+    expect(r.total).toBe(1400)
+    expect(costForOrder({ ...base, extra_materials_cost: 0 }, costMap).total).toBe(1400)
+    expect(costForOrder({ ...base, extra_materials_cost: null }, costMap).total).toBe(1400)
+  })
+
+  it('доп. материалы с отметкой входят в total отдельной строкой', () => {
+    const r = costForOrder({ ...base, extra_materials_cost: 250 }, costMap)
+    expect(r.extra).toBe(250)
+    expect(r.total).toBe(1650)
+    expect(r.film).toBe(1000)
+  })
+
+  it('summarizeExtraMaterials: в cost только in_order_costs=true, без цены — 0', () => {
+    const by = summarizeExtraMaterials([
+      { order_id: 'o1', material_id: 'm1', material_name: 'Магнит', category_name: 'Комплектующие', unit: 'шт', in_order_costs: true, qty: 10, cost: 30 },
+      { order_id: 'o1', material_id: 'm2', material_name: 'Бумага', category_name: 'Бумага', unit: 'м', in_order_costs: false, qty: 2, cost: 100 },
+      { order_id: 'o2', material_id: 'm1', material_name: 'Магнит', in_order_costs: true, qty: 5, cost: null },
+    ])
+    expect(by.o1.cost).toBe(30)
+    expect(by.o1.items).toHaveLength(2)
+    expect(by.o1.items[1].inCosts).toBe(false)
+    expect(by.o2.cost).toBe(0)
+    expect(by.o2.items[0].cost).toBeNull()
+    expect(summarizeExtraMaterials(null)).toEqual({})
   })
 })

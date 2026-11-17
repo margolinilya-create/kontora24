@@ -10,6 +10,8 @@ import { formatPrice } from '@/shared/lib/utils'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { InfoField } from './InfoField'
 import { CalcSnapshotCard } from './CalcSnapshotCard'
+import { fetchExtraMaterialsByOrder } from '@/features/reports/hooks/useReports'
+import { captureError } from '@/shared/lib/sentry'
 
 /**
  * Финансы заказа: 3 крупных плитки (Итого / Себестоимость / Маржинальность),
@@ -43,12 +45,24 @@ export function FinanceTab({ order }) {
   }, [order.id, order.sticker_shape])
   const payout = calculateWorkerPayout(logs, { ordersById: { [order.id]: order }, ...payoutExtra })
 
+  // R25.7B (ТЗ 7.5): дополнительные материалы заказа (списания по факту).
+  // В себестоимость входят только с отметкой категории «Учитывать в расходах».
+  const [extraMaterials, setExtraMaterials] = useState({ cost: 0, items: [] })
+  useEffect(() => {
+    let cancelled = false
+    fetchExtraMaterialsByOrder([order.id])
+      .then((byOrder) => { if (!cancelled) setExtraMaterials(byOrder[order.id] || { cost: 0, items: [] }) })
+      .catch((err) => captureError(err, { tags: { source: 'FinanceTab.extraMaterials' }, extra: { orderId: order.id } }))
+    return () => { cancelled = true }
+  }, [order.id, logs])
+  const extraCost = extraMaterials.cost || 0
+
   const total = Number(order.price_final) || 0
   const manualLabor = Number(order.cost_labor) || 0
   const autoLabor = payout.total
   const labor = autoLabor > 0 ? autoLabor : manualLabor
   const manualMaterials = Number(order.cost_materials) || 0
-  const materials = actual.total > 0 ? actual.total : manualMaterials
+  const materials = (actual.total > 0 ? actual.total : manualMaterials) + extraCost
   // R25.4 (ТЗ 4.2): работа подрядчика — отдельная строка себестоимости.
   const contractor = Number(order.contractor_cost) || 0
   const cost = materials + labor + contractor
@@ -126,6 +140,27 @@ export function FinanceTab({ order }) {
               Ручной cost_materials: {formatPrice(manualMaterials)} (используется фактический расход)
             </p>
           )}
+        </div>
+      )}
+
+      {/* R25.7B: дополнительные материалы заказа */}
+      {extraMaterials.items.length > 0 && (
+        <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
+          <h2 className="font-semibold mb-3">Дополнительные материалы</h2>
+          <div className="divide-y divide-border text-sm">
+            {extraMaterials.items.map((it) => (
+              <div key={`${it.materialId}-${it.inCosts}`} className="py-2 flex items-center justify-between gap-3">
+                <span className="text-text-muted">
+                  {it.category ? `${it.category}: ` : ''}{it.name} · {it.qty} {it.unit || ''}
+                  {!it.inCosts && <span className="ml-1">(общие расходы цеха)</span>}
+                </span>
+                <span className="font-medium tabular-nums">{it.cost != null ? formatPrice(it.cost) : '—'}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-text-muted mt-3">
+            В себестоимость входят категории с отметкой «Учитывать в расходах».
+          </p>
         </div>
       )}
 

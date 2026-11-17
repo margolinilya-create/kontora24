@@ -7,6 +7,24 @@ import { calculateWorkerPayout, settingsToRates, resolvePayoutRates } from '@/sh
 import { buildQualityRows } from '../lib/quality-report'
 import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog } from '@/shared/lib/payout-context'
 import { buildBonusRows, logPayoutTotals } from '../lib/payout-report'
+import { summarizeExtraMaterials } from '../lib/materials-cost'
+
+/**
+ * R25.7B (ТЗ 7.5): расход доп. материалов по заказам (RPC order_extra_materials,
+ * стоимость маскируется без view:finance). До миграции 105 RPC нет — без
+ * доп. материалов (отчёты как раньше).
+ */
+export async function fetchExtraMaterialsByOrder(orderIds, from = null, to = null) {
+  if (!orderIds?.length) return {}
+  const { data, error } = await supabase.rpc('order_extra_materials', {
+    p_order_ids: orderIds, p_from: from, p_to: to,
+  })
+  if (error) {
+    if (error.code === 'PGRST202' || error.code === '42883') return {}
+    throw error
+  }
+  return summarizeExtraMaterials(data)
+}
 
 // R13.3 (бриф 02.06): период расширен — `today` (с начала дня), `custom:from:to`
 // (YYYY-MM-DD строки), плюс legacy '7' / '30' / 'month'.
@@ -159,6 +177,9 @@ export function useOrdersCostReport(period = '30') {
         for (const it of itemsData || []) (itemsByOrder[it.order_id] ||= []).push(it)
       }
 
+      // R25.7B: доп. материалы с отметкой «Учитывать в расходах» — за тот же период.
+      const extraByOrder = await fetchExtraMaterialsByOrder(orderIds, getSince(period), getUntil(period))
+
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
       const payoutRates = settingsToRates(ratesRes.data?.value)
       const shapeByDesign = await fetchShapeByDesign((logsRes.data || []).map((l) => l.order_id))
@@ -258,6 +279,8 @@ export function useOrdersCostReport(period = '30') {
           drying_defects: dryingDefects,
           reject_pct: rejectPct, surplus, surplus_pct: surplusPct,
           labor_cost: laborCost,
+          extra_materials_cost: extraByOrder[o.id]?.cost || 0,
+          extra_materials: extraByOrder[o.id]?.items || [],
           profit: (Number(o.price_final) || 0) - (Number(o.cost_total) || 0),
           margin_pct: o.price_final > 0 ? Math.round(((o.price_final - o.cost_total) / o.price_final) * 100) : 0,
         }

@@ -863,3 +863,15 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 - **Render crashes:** ловятся `<ErrorBoundary>` в routes.jsx — auto-reset на смену route, eventId в UI для support
 - **Silent fails:** запрещены — каждый `await supabase.*` либо проверяет `error` поле, либо обёрнут в try/catch с `captureError`
 - **`captureError(err, { tags: { source: 'модуль.метод' } })`** — единая конвенция тегов для фильтрации в Sentry
+
+## R26 — большое код-ревью 17.11 (миграции 106–109)
+
+Ревью всего проекта 5 агентами + исправления 4 агентами (заказы / производство+планировщик / склад+отчёты+аналитика / общие+настройки+api). Ключевое:
+- **Безопасность БД:** 106 — SECURITY DEFINER-функции не исполняемы анонимно (`k24_get_orders_safe` отдавал заказы без входа). 107 — роль новой учётки не берётся из метаданных регистрации (всегда post_printer, api/users/create ставит нужную); k24_profiles — authenticated правит только display_name/name/avatar_url/role (роль — только admin по RLS); `k24_protect_order_columns` защищает и поля оплаты/маршрута (stickers_per_pack, bopp_bag, размеры, плёнка, ламинация, delivery_type…); гейт допечаток v2 — при любом входе в зону после ТК; `k24_settings['calculator']` читают только view:calculator/calc:settings; FK-индексы. 108 — допечатка для субподряда запрещена триггером. 109 — `delete_order_cascade` (проверял переданный p_caller, а не auth.uid()) и складские reserve/release/consume/auto_deduct доступны только service_role.
+- **Деактивация пользователя** (`approved=false`) = бан в Supabase Auth (api/users/update ставит ban_duration).
+- **Смена статуса:** UPDATE с `.eq('status', fromStatus)` + проверка числа строк; AdminOrderEditor больше не пишет status напрямую; откат — только с order:edit.
+- **Отчёты/аналитика:** постраничная загрузка (`shared/lib/fetch-all.js`) вместо среза 1000 строк; аналитика оплаты с embed заказа; финансы аналитики только с view:finance; P&L/UE — заказы по дате приёма, логи без среза, cancelled исключены (цифры UE/Расходы/P&L изменились, «Сдельная»/«Качество»/«3D отдел» — нет).
+- **Производство:** правка лога заливки пересчитывает stickers_good; клиентский id лога допечатки (без дублей); планировщик планирует все заказы, фильтр — только показ; «сегодня» по Москве.
+- Agentation только в DEV. Bitrix webhook: timingSafeEqual + белый список полей (неизвестное поле → 400), status-update без редиректов.
+
+**Открыто:** норма выборки stickerpack3D в планировщике (стикеры 2184/8ч vs фоны 600/8ч) — решение менеджера; атомарные RPC для смены статуса / replaceOrderItems / перевода маршрута; leaked password protection — включить в дашборде Auth.

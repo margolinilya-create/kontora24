@@ -91,7 +91,10 @@ export const STAGE_FIELDS = {
     fields: [
       { key: 'lamination_qty', label: 'Заламинировано', unit: 'шт' },
       { key: 'defects', label: 'Брак', unit: 'шт' },
-      { key: 'lamination_meters', label: 'Ламинация (расход)', unit: 'м', step: '0.1', appendFilm: 'backgrounds' },
+      // R25.4 (ТЗ 4.3): при монтажной плёнке — два поля расхода. Поле
+      // ламинации скрыто, если у заказа только монтажная плёнка (when).
+      { key: 'lamination_meters', label: 'Ламинация (расход)', unit: 'м', step: '0.1', appendFilm: 'backgrounds', when: (o) => !o?.needs_montage_film || !!o?.need_lam },
+      { key: 'montage_meters', label: 'Монтажная плёнка (расход)', unit: 'м', step: '0.1', when: (o) => !!o?.needs_montage_film },
     ],
   },
 
@@ -456,7 +459,17 @@ const REPRINT_SUBTRACT_DEFECTS = new Set(['print', 'cutting', 'lamination', 'pac
  * STAGE_FIELDS.fields, но: печать без per-трек/плёнки фонов (одно изделие),
  * сушка = «Высушено» + «Брак».
  */
-export function reprintStageFields(stage) {
+/**
+ * R25.4: поля одиночной формы этапа с учётом заказа — поле с предикатом
+ * `when(order)` показывается, только если он истинен (без заказа — всегда).
+ */
+export function stageFieldsForOrder(stage, order) {
+  const fields = STAGE_FIELDS[stage]?.fields || []
+  if (!order) return fields
+  return fields.filter((f) => typeof f.when !== 'function' || f.when(order))
+}
+
+export function reprintStageFields(stage, order = null) {
   if (stage === 'drying') {
     return [
       { key: 'qty_dried', label: 'Высушено', unit: 'шт' },
@@ -469,7 +482,7 @@ export function reprintStageFields(stage) {
       { key: 'film_meters', label: 'Плёнка', unit: 'м', step: '0.1', filmFrom: 'backgrounds' },
     ]
   }
-  return STAGE_FIELDS[stage]?.fields || []
+  return stageFieldsForOrder(stage, order)
 }
 
 /**

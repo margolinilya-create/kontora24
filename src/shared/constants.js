@@ -609,6 +609,21 @@ export function individualCutForOrderType(orderType) {
   return null
 }
 
+/**
+ * R25.4 (ТЗ 4.2): субподряд можно включить/выключить, пока заказ не дошёл до
+ * цеха — этапы от «Новый заказ» до «Препресс» или «Субподряд». Только v2
+ * (маршрут v1 субподряд не учитывает).
+ */
+export const SUBCONTRACT_TOGGLE_STATUSES = [
+  'new', 'awaiting_payment', 'design', 'design_approval',
+  'sample_layout', 'sample_print', 'color_approval', 'prepress', 'subcontract',
+]
+
+export function canToggleSubcontract(order) {
+  if (Number(order?.route_version) < 2) return false
+  return SUBCONTRACT_TOGGLE_STATUSES.includes(order?.status || 'new')
+}
+
 /** R25.4 (ТЗ 4.6): максимум видов изделий в заказе (как в калькуляторе). */
 export const MAX_ORDER_ITEMS = 9
 
@@ -631,6 +646,8 @@ export const LAMINATION_TYPES = {
 // списываются как раньше).
 export const LAMINATION_FORM_TYPES = ['matte', 'glossy']
 export const MONTAGE_MATERIAL_CODE = 'transfer'
+/** Коды, исключённые из выбора ламинации в форме заказа (стабильная ссылка). */
+export const LAMINATION_FORM_EXCLUDE_CODES = [MONTAGE_MATERIAL_CODE]
 
 export function needsLamination(lamType) {
   return lamType != null && lamType !== '' && Object.prototype.hasOwnProperty.call(LAMINATION_TYPES, lamType)

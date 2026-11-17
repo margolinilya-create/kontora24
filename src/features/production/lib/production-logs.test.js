@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog, compute3DPouringReport, computeStageProgressPerItem, computeIncomingPerItem, computeDryingBar } from './production-logs'
+import { computeStageProgress, computeDualTrackProgress, computeIncoming, validateLogEntry, STAGE_FIELDS, hasSubtaskLog, compute3DPouringReport, computeStageProgressPerItem, computeIncomingPerItem, computeDryingBar, stageFieldsForOrder, reprintStageFields } from './production-logs'
 
 const ROUTE = ['new', 'design', 'prepress', 'print', 'lamination', 'cutting', 'packaging', 'otk', 'done']
 
@@ -637,5 +637,25 @@ describe('computeDryingBar (R24 фидбэк 24.07)', () => {
     const r = computeDryingBar({ incoming: 10, defects: 0, target: 0 })
     expect(r.pct).toBe(0)
     expect(r.complete).toBe(false)
+  })
+})
+
+describe('R25.4 ламинация + монтажная плёнка — поля формы', () => {
+  const keys = (fields) => fields.map((f) => f.key)
+  it('обе опции — два поля расхода', () => {
+    expect(keys(stageFieldsForOrder('lamination', { need_lam: true, needs_montage_film: true })))
+      .toEqual(['lamination_qty', 'defects', 'lamination_meters', 'montage_meters'])
+  })
+  it('только ламинация (и старые заказы с переносом) — как раньше', () => {
+    expect(keys(stageFieldsForOrder('lamination', { need_lam: true, lam_type: 'transfer' })))
+      .toEqual(['lamination_qty', 'defects', 'lamination_meters'])
+  })
+  it('только монтажная плёнка — поле ламинации скрыто', () => {
+    expect(keys(stageFieldsForOrder('lamination', { need_lam: false, needs_montage_film: true })))
+      .toEqual(['lamination_qty', 'defects', 'montage_meters'])
+  })
+  it('без заказа — все поля; допечатка учитывает заказ', () => {
+    expect(keys(stageFieldsForOrder('lamination', null))).toContain('montage_meters')
+    expect(keys(reprintStageFields('lamination', { need_lam: true }))).not.toContain('montage_meters')
   })
 })

@@ -4,8 +4,10 @@ import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
-import { isDualTrack, IS_3D_STICKERPACK, FILM_TYPES } from '@/shared/constants'
+import { isDualTrack, IS_3D_STICKERPACK, FILM_TYPES, ORDER_STATUSES } from '@/shared/constants'
 import { usePackagingMaterials } from '../../hooks/usePackagingMaterials'
+import { useExtraConsumptionFields } from '../../hooks/useExtraConsumptionFields'
+import { buildExtraConsumption } from '@/features/warehouse/lib/order-material-categories'
 
 function ProgressBar({ p }) {
   if (!p) return null
@@ -40,6 +42,10 @@ function ProgressBar({ p }) {
  *   Используется для 3D-стикерпака: количество стикеров вводится поэвидово
  *   (PackDesignsForm), поэтому трек «Стикеры» теряет количественные поля
  *   (а если у трека не осталось полей — он скрывается целиком).
+ * — R25.7B (ТЗ 7.5): доп. материалы заказа, списываемые на этом этапе, —
+ *   поля «Расход: <категория>» → extra_consumption {material_id: qty} в той же
+ *   записи (у single-track) или отдельной записью без трека (dual-track).
+ *   Если у этапа нет своих полей, форма показывается только ради расхода.
  */
 export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, omitFields }) {
   const config = STAGE_FIELDS[stage]
@@ -47,6 +53,7 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   const useTracks = !!config?.tracks && isPack3D && isDualTrack(stage, order)
   const isPackaging = stage === 'packaging'
   const { bags: packagingBags, boxes: packagingBoxes } = usePackagingMaterials()
+  const extraFields = useExtraConsumptionFields(order?.id, stage)
   const activeTracks = useTracks
     ? config.tracks
         .map((t) => {
@@ -67,7 +74,8 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   // Состояние формы — { [trackKey || 'single']: { fieldKey: value }, notes, resin }
   const [forms, setForms] = useState({})
 
-  if (!config) return null
+  if (!config && extraFields.length === 0) return null
+  const stageTitle = config?.label || ORDER_STATUSES[stage]?.label || stage
 
   function getForm(key) {
     return forms[key] || {}
@@ -107,6 +115,7 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   }
 
   function isFormEmpty(data) {
+    if (!config) return true
     return !data || Object.entries(data).every(([k, v]) => k === 'notes' || v === '' || v == null || Number(v) === 0)
   }
 
@@ -142,6 +151,10 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
 
     const root = getForm('_root')
     const allowOvershoot = stage === 'packaging' // ТЗ: упаковка может превышать тираж
+    // R25.7B: расход доп. материалов заказа.
+    const extra = buildExtraConsumption(getForm('_extra'), extraFields)
+    if (extra.error) { toast.error(extra.error); return }
+    const hasExtra = Object.keys(extra.value).length > 0
 
     if (useTracks) {
       // Собираем логи по трекам
@@ -161,6 +174,9 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
       const resinValue = Number(root.resin_grams || 0)
       if (resinValue > 0) {
         trackEntries.push({ track: null, data: { resin_grams: resinValue, notes: root.notes || null } })
+      }
+      if (hasExtra) {
+        trackEntries.push({ track: null, data: { extra_consumption: extra.value, notes: root.notes || null } })
       }
       if (trackEntries.length === 0) {
         toast.error('Заполните хотя бы одно поле')
@@ -184,16 +200,22 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
 
     // Single-track
     const data = { ...getForm('single'), notes: root.notes || null }
-    if (isFormEmpty(data)) { toast.error('Заполните хотя бы одно поле'); return }
-    const validationRes = validateLogEntry(stage, data, { progress, incoming, allowOvershoot })
-    if (!applyValidation(validationRes, null)) return
+    const emptyMain = isFormEmpty(data)
+    if (emptyMain && !hasExtra) { toast.error('Заполните хотя бы одно поле'); return }
+    if (!emptyMain) {
+      const validationRes = validateLogEntry(stage, data, { progress, incoming, allowOvershoot })
+      if (!applyValidation(validationRes, null)) return
+    }
 
     setSaving(true)
     try {
-      await onSubmit(stage, attachComputedGood(stage, data, null))
+      const mainPayload = emptyMain
+        ? { notes: root.notes || null }
+        : attachComputedGood(stage, data, null)
+      await onSubmit(stage, hasExtra ? { ...mainPayload, extra_consumption: extra.value } : mainPayload)
       // Доп. resin-лог если есть
       const resinValue = Number(root.resin_grams || 0)
-      if (resinValue > 0 && config.resinExtra) {
+      if (resinValue > 0 && config?.resinExtra) {
         await onSubmit(stage, { resin_grams: resinValue, notes: null })
       }
       toast.success('Записано')
@@ -253,9 +275,9 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
 
   return (
     <div className="bg-surface rounded-xl border border-border p-5">
-      <h3 className="font-semibold mb-2">{config.label}</h3>
+      <h3 className="font-semibold mb-2">{stageTitle}</h3>
 
-      {!useTracks && !config.noProgressBar && <ProgressBar p={progress} />}
+      {config && !useTracks && !config.noProgressBar && <ProgressBar p={progress} />}
       {singleIncoming && (
         <p className="text-xs text-text-muted mb-3">
           Поступило на этап: {singleIncoming.total} шт
@@ -297,6 +319,32 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
               {singleFields.map((f) => renderField(f, null))}
             </div>
           )
+        )}
+
+        {extraFields.length > 0 && (
+          <div className="rounded-xl border border-border bg-surface-2/40 p-3 space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+              Расход материалов заказа
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {extraFields.map((f) => (
+                <Input
+                  key={f.materialId}
+                  id={`log-extra-${f.materialId}`}
+                  label={`${f.label}${f.materialName ? ` · ${f.materialName}` : ''}${f.unit ? ` (${f.unit})` : ''}`}
+                  type="text"
+                  inputMode="decimal"
+                  value={getForm('_extra')[f.materialId] ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    if (raw !== '' && !/^[\d.,]*$/.test(raw)) return
+                    updateField('_extra', f.materialId, raw.replace(',', '.'))
+                  }}
+                  placeholder="0"
+                />
+              ))}
+            </div>
+          </div>
         )}
 
         {isPackaging && (
@@ -371,7 +419,7 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
         )}
 
         {/* Отдельный лог расхода смолы (для selection_pouring) */}
-        {config.resinExtra && (
+        {config?.resinExtra && (
           <div className="rounded-xl border border-warning/40 bg-warning/5 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide mb-2 text-warning">
               Расход смолы (общий)

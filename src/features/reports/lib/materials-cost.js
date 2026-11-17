@@ -36,7 +36,10 @@ export function buildCostMap(materials) {
  *   и (R20.2) джойны film_material / film_stickers_material / lam_material с unit_cost.
  *   R17.0: bopp_bags_used убрано — поле не пишется в k24_production_logs.
  * @param {object} costMap — результат buildCostMap.
- * @returns {{ film: number, lam: number, resin: number, box: number, total: number, contractor: number }}
+ * @returns {{ film: number, lam: number, resin: number, box: number, extra: number, total: number, contractor: number }}
+ *   R25.7B (ТЗ 7.5): extra — доп. материалы с отметкой «Учитывать в расходах»
+ *   (row.extra_materials_cost из RPC order_extra_materials, NULL без
+ *   view:finance → 0). Заказ без доп. материалов: extra = 0, total прежний.
  *   R25.4: lam включает монтажную плёнку (actual_montage × позиция заказа или
  *   код 'transfer'); contractor — стоимость работ подрядчика (contractor_cost),
  *   НЕ входит в total (total — материалы). Себестоимость = total + труд + contractor.
@@ -91,6 +94,32 @@ export function costForOrder(row, costMap) {
 
   const resin = (Number(row.actual_resin) || 0) * (costMap.byCode.resin || 0)
   const box = (Number(row.boxes_used) || 0) * (costMap.avgByType.box || 0)
+  const extra = Number(row.extra_materials_cost) || 0
   const contractor = Number(row.contractor_cost) || 0
-  return { film, lam, resin, box, total: film + lam + resin + box, contractor }
+  return { film, lam, resin, box, extra, total: film + lam + resin + box + extra, contractor }
+}
+
+/**
+ * R25.7B (ТЗ 7.5): строки RPC order_extra_materials → { [order_id]: { cost, items } }.
+ * В себестоимость (cost) входят только списания с in_order_costs=true;
+ * items — все доп. материалы заказа (для расшифровки), с флагом inCosts.
+ */
+export function summarizeExtraMaterials(rows) {
+  const byOrder = {}
+  for (const r of rows || []) {
+    if (!r?.order_id) continue
+    const acc = (byOrder[r.order_id] ||= { cost: 0, items: [] })
+    const cost = r.cost == null ? null : Number(r.cost) || 0
+    if (r.in_order_costs && cost != null) acc.cost += cost
+    acc.items.push({
+      materialId: r.material_id,
+      name: r.material_name,
+      category: r.category_name,
+      unit: r.unit,
+      qty: Number(r.qty) || 0,
+      cost,
+      inCosts: !!r.in_order_costs,
+    })
+  }
+  return byOrder
 }

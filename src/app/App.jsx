@@ -8,7 +8,11 @@ import { InstallPrompt } from '@/shared/components/InstallPrompt'
 import Spinner from '@/shared/components/Spinner'
 import { routes } from './routes'
 
-const AgentationComponent = lazy(() => import('agentation').then((m) => ({ default: m.Agentation })))
+// Виджет разметки для разработки. Только в dev: в прод-сборке ветка вырезается
+// (import.meta.env.DEV === false → динамический import не попадает в бандл).
+const AgentationComponent = import.meta.env.DEV
+  ? lazy(() => import('agentation').then((m) => ({ default: m.Agentation })))
+  : null
 
 const router = createBrowserRouter(routes)
 
@@ -37,9 +41,11 @@ export function App() {
       <Toaster />
       <OfflineIndicator />
       <InstallPrompt />
-      <Suspense fallback={null}>
-        <AgentationComponent />
-      </Suspense>
+      {AgentationComponent && (
+        <Suspense fallback={null}>
+          <AgentationComponent />
+        </Suspense>
+      )}
     </>
   )
 }

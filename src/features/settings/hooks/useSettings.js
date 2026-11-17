@@ -1,28 +1,51 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { getFreshAccessToken } from '@/shared/lib/auth-token'
 import { toast } from '@/shared/stores/toast-store'
 import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
+import { readApiResponse, apiErrorMessage } from '../lib/api-response'
+
+/**
+ * Флаг «компонент смонтирован» — защита от setState после unmount
+ * (ответ сети пришёл, когда вкладку настроек уже закрыли).
+ */
+function useMountedRef() {
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  return mounted
+}
 
 export function useSettings(key) {
   const [value, setValue] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const mounted = useMountedRef()
+  // Спиннер только на первой загрузке: фоновый рефетч (фокус вкладки) не должен
+  // размонтировать форму и терять ввод.
+  const loadedOnceRef = useRef(false)
 
   const fetchSettings = useCallback(async () => {
-    setLoading(true)
+    if (!loadedOnceRef.current) setLoading(true)
     setError(null)
     try {
       const { data, error: err } = await supabase.from('k24_settings').select('value').eq('key', key).single()
       // PGRST116 = no rows; first-run scenario, not a real error
       if (err && err.code !== 'PGRST116') throw err
+      if (!mounted.current) return
       setValue(data?.value || null)
+      loadedOnceRef.current = true
     } catch (err) {
-      setError(err)
+      if (mounted.current) setError(err)
     } finally {
-      setLoading(false)
+      if (mounted.current) setLoading(false)
     }
-  }, [key])
+  }, [key, mounted])
+
+  // Смена ключа — снова показываем первичную загрузку.
+  useEffect(() => { loadedOnceRef.current = false }, [key])
 
   useEffect(() => { fetchSettings() }, [fetchSettings])
   useRefetchOnFocus(fetchSettings)
@@ -32,7 +55,7 @@ export function useSettings(key) {
       .from('k24_settings')
       .upsert({ key, value: newValue, updated_at: new Date().toISOString() })
     if (error) throw error
-    setValue(newValue)
+    if (mounted.current) setValue(newValue)
     toast.success('Настройки сохранены')
   }
 
@@ -43,9 +66,11 @@ export function useUsers() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const mounted = useMountedRef()
+  const loadedOnceRef = useRef(false)
 
   const fetchUsers = useCallback(async () => {
-    setLoading(true)
+    if (!loadedOnceRef.current) setLoading(true)
     setError(null)
     try {
       const { data, error: err } = await supabase
@@ -53,13 +78,15 @@ export function useUsers() {
         .select('*')
         .order('created_at', { ascending: false })
       if (err) throw err
+      if (!mounted.current) return
       setUsers(data || [])
+      loadedOnceRef.current = true
     } catch (err) {
-      setError(err)
+      if (mounted.current) setError(err)
     } finally {
-      setLoading(false)
+      if (mounted.current) setLoading(false)
     }
-  }, [])
+  }, [mounted])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
   useRefetchOnFocus(fetchUsers)
@@ -84,13 +111,8 @@ export function useUsers() {
       },
       body: JSON.stringify({ userId, ...updates }),
     })
-    const result = await res.json()
-    if (!res.ok) {
-      const msg = result.detail
-        ? `${result.error} — ${result.detail}${result.supaHost ? ` (host: ${result.supaHost})` : ''}`
-        : result.error
-      throw new Error(msg)
-    }
+    const result = await readApiResponse(res)
+    if (!res.ok) throw new Error(apiErrorMessage(res, result, 'Не удалось обновить пользователя'))
     toast.success('Пользователь обновлён')
     fetchUsers()
   }
@@ -105,13 +127,8 @@ export function useUsers() {
       },
       body: JSON.stringify({ userId }),
     })
-    const result = await res.json()
-    if (!res.ok) {
-      const msg = result.detail
-        ? `${result.error} — ${result.detail}`
-        : result.error
-      throw new Error(msg)
-    }
+    const result = await readApiResponse(res)
+    if (!res.ok) throw new Error(apiErrorMessage(res, result, 'Не удалось удалить пользователя'))
     toast.success('Пользователь удалён')
     fetchUsers()
   }

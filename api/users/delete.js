@@ -24,6 +24,7 @@ export default async function handler(req, res) {
   const { data: userData, error: userError } = await supabase.auth.getUser(token)
   const caller = userData?.user
   if (userError || !caller) {
+    console.error('[users/delete] auth.getUser failed:', userError?.message)
     return res.status(401).json({ error: 'Недействительный токен' })
   }
 
@@ -39,7 +40,7 @@ export default async function handler(req, res) {
 
   const { userId } = req.body || {}
 
-  if (!userId) {
+  if (!userId || typeof userId !== 'string') {
     return res.status(400).json({ error: 'userId обязателен' })
   }
 
@@ -53,10 +54,11 @@ export default async function handler(req, res) {
     // (assigned_to/created_by/worker_id в k24_orders, k24_production_logs, k24_material_transactions
     //  и т.д. — на стороне БД FK уже определяют политику).
     // Также сбросим assigned_to чтобы не упереться в FK RESTRICT, если он есть.
-    await supabase
+    const { error: unassignError } = await supabase
       .from('k24_orders')
       .update({ assigned_to: null })
       .eq('assigned_to', userId)
+    if (unassignError) throw unassignError
 
     // Удаление из auth.users — каскад на k24_profiles через FK ON DELETE CASCADE
     const { error: deleteError } = await supabase.auth.admin.deleteUser(userId)
@@ -73,7 +75,6 @@ export default async function handler(req, res) {
       error: isFk
         ? 'У пользователя есть связанные данные (заказы/логи). Сначала переназначьте их.'
         : 'Ошибка удаления пользователя',
-      detail: err?.message,
     })
   }
 }

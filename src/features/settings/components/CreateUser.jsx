@@ -3,6 +3,7 @@ import { ROLES } from '@/shared/constants'
 import { getFreshAccessToken } from '@/shared/lib/auth-token'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { readApiResponse, apiErrorMessage } from '../lib/api-response'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 
@@ -28,8 +29,8 @@ export function CreateUser() {
         },
         body: JSON.stringify(form),
       })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error)
+      const result = await readApiResponse(res)
+      if (!res.ok) throw new Error(apiErrorMessage(res, result, 'Не удалось создать пользователя'))
       toast.success(`Пользователь ${form.display_name} создан`)
       setForm({ display_name: '', email: '', password: '', role: 'post_printer' })
     } catch (err) {

@@ -3,6 +3,28 @@ import { supabase } from '@/shared/lib/supabase'
 import { useRolePermissionsStore } from './role-permissions-store'
 import { useOrderTypesStore } from '@/features/order-types/store'
 
+// Тот же пользователь (TOKEN_REFRESHED приносит новый объект user с теми же данными).
+function isSameUser(a, b) {
+  if (!a || !b) return false
+  return a.id === b.id && a.email === b.email && a.updated_at === b.updated_at
+}
+
+// Профиль из БД не изменился — сравниваем по значению (плоская строка k24_profiles).
+export function isSameProfile(a, b) {
+  if (a === b) return true
+  if (!a || !b) return false
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  for (const k of keys) {
+    const va = a[k]
+    const vb = b[k]
+    if (va === vb) continue
+    if (va && vb && typeof va === 'object' && typeof vb === 'object'
+      && JSON.stringify(va) === JSON.stringify(vb)) continue
+    return false
+  }
+  return true
+}
+
 export const useAuthStore = create((set, get) => ({
   user: null,
   profile: null,
@@ -68,7 +90,17 @@ export const useAuthStore = create((set, get) => ({
             set({ user: null, profile: null })
             return
           }
-          set({ user: session.user, profile })
+          // TOKEN_REFRESHED каждые ~час: если пользователь и профиль те же —
+          // не трогаем стор (иначе ререндер всего дерева, зависящего от profile).
+          const cur = get()
+          const sameUser = isSameUser(cur.user, session.user)
+          const sameProfile = isSameProfile(cur.profile, profile)
+          if (!sameUser || !sameProfile) {
+            set({
+              user: sameUser ? cur.user : session.user,
+              profile: sameProfile ? cur.profile : profile,
+            })
+          }
           // Подгружаем права при первом профиле или смене юзера
           if (!useRolePermissionsStore.getState().loaded) {
             useRolePermissionsStore.getState().load()

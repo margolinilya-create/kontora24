@@ -1,11 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export default function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-md' }) {
   const dialogRef = useRef(null)
   const previousFocusRef = useRef(null)
-  const titleId = `modal-title-${title?.replace(/\s/g, '-')}`
+  // useId: уникален и стабилен; title может быть JSX/с кавычками/повторяться в двух модалках.
+  const titleId = `modal-title-${useId()}`
 
   useEffect(() => {
     if (!isOpen) return

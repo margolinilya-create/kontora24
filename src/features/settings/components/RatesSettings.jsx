@@ -7,6 +7,8 @@ import { useState, useEffect } from 'react'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 import { STICKER_SHAPES, WORKER_RATES } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 
@@ -47,15 +49,17 @@ export function RatesSettings() {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // Подтягиваем значение из БД только пока нет несохранённых правок:
+  // фоновый рефетч (фокус вкладки) не должен затирать ввод.
   useEffect(() => {
-    if (value) {
+    if (value && !dirty) {
       setRates({
         ...DEFAULT_RATES,
         ...value,
         pouring_shapes: { ...DEFAULT_RATES.pouring_shapes, ...(value.pouring_shapes || {}) },
       })
     }
-  }, [value])
+  }, [value, dirty])
 
   if (loading) return <div className="text-sm text-text-muted">Загрузка ставок…</div>
 
@@ -76,7 +80,8 @@ export function RatesSettings() {
       await save(payload)
       setDirty(false)
     } catch (err) {
-      toast.error(`Не удалось сохранить: ${err.message || err}`)
+      captureError(err, { tags: { source: 'RatesSettings.handleSave' } })
+      toast.error(translateError(err).message)
     } finally {
       setSaving(false)
     }

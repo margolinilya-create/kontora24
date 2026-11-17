@@ -3,6 +3,7 @@
 // POST /api/bitrix/status-update
 
 import { createClient } from '@supabase/supabase-js'
+import { secretsEqual } from '../_lib/secrets.js'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -16,12 +17,12 @@ export default async function handler(req, res) {
 
   // Verify shared secret
   const secret = req.headers['x-bitrix-secret']
-  if (!secret || secret !== process.env.BITRIX_WEBHOOK_SECRET) {
+  if (!secretsEqual(secret, process.env.BITRIX_WEBHOOK_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
   try {
-    const { order_number, status, price_final, cost_total, bitrix_deal_id } = req.body
+    const { order_number, status, price_final, cost_total, bitrix_deal_id } = req.body || {}
 
     if (!bitrix_deal_id) {
       return res.status(200).json({ skipped: true, reason: 'No Bitrix deal ID' })
@@ -88,9 +89,13 @@ export default async function handler(req, res) {
 
     const stage = STAGE_MAP[status] || 'EXECUTING'
 
-    // Send to Bitrix24
+    // Send to Bitrix24.
+    // redirect: 'error' — проверка хоста выше не защищает от 30x на внутренний
+    // адрес (SSRF через редирект): любой редирект прерывает запрос.
     const response = await fetch(`${bitrix_webhook_url}/crm.deal.update`, {
       method: 'POST',
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: bitrix_deal_id,
@@ -105,7 +110,14 @@ export default async function handler(req, res) {
       }),
     })
 
-    const result = await response.json()
+    const text = await response.text().catch(() => '')
+    let result = null
+    try { result = text ? JSON.parse(text) : null } catch { result = null }
+
+    if (!response.ok) {
+      console.error('[bitrix/status-update] Bitrix responded', response.status, text.slice(0, 500))
+      return res.status(502).json({ error: 'Bitrix request failed' })
+    }
 
     return res.status(200).json({ success: true, bitrix_response: result })
   } catch (err) {

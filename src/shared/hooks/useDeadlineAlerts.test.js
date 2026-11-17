@@ -20,7 +20,7 @@ vi.mock('@/shared/lib/supabase', () => ({
   },
 }))
 
-import { useDeadlineAlerts } from './useDeadlineAlerts'
+import { useDeadlineAlerts, splitByDeadline } from './useDeadlineAlerts'
 
 // Helper: flush setTimeout(fn, 3000) + microtasks
 async function flushDelayedCheck() {
@@ -157,5 +157,21 @@ describe('useDeadlineAlerts', () => {
     expect(consoleSpy).toHaveBeenCalled()
     expect(mockToast.error).not.toHaveBeenCalled()
     consoleSpy.mockRestore()
+  })
+})
+
+describe('splitByDeadline', () => {
+  it('сегодняшний дедлайн — не просрочен (сравнение по календарному дню)', () => {
+    const now = new Date(2026, 10, 17, 23, 30) // 17.11 23:30 локально
+    const { overdue, upcoming } = splitByDeadline(
+      [
+        { number: 1, deadline: '2026-11-16' },
+        { number: 2, deadline: '2026-11-17' },
+        { number: 3, deadline: '2026-11-18' },
+      ],
+      now,
+    )
+    expect(overdue.map((o) => o.number)).toEqual([1])
+    expect(upcoming.map((o) => o.number)).toEqual([2, 3])
   })
 })

@@ -6,6 +6,8 @@ import { formatDateTime } from '@/shared/lib/utils'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 
 export function UserManagement() {
   const { users, loading, updateUser, deleteUser } = useUsers()
@@ -21,7 +23,8 @@ export function UserManagement() {
       await deleteUser(deletingUser.id)
       setDeletingUser(null)
     } catch (err) {
-      toast.error(err.message)
+      captureError(err, { tags: { source: 'UserManagement.handleDelete' } })
+      toast.error(translateError(err).message)
     } finally {
       setDeleting(false)
     }

@@ -13,7 +13,14 @@ const { mockSupabase, singleQueue, rpcResultRef } = vi.hoisted(() => {
       _calls: { select: [], eq: [], update: [], insert: [], single: 0 },
       select: vi.fn().mockImplementation(function (...args) { this._calls.select.push(args); return this }),
       eq: vi.fn().mockImplementation(function (...args) { this._calls.eq.push(args); return this }),
-      update: vi.fn().mockImplementation(function (...args) { this._calls.update.push(args); return this }),
+      // Ревью R25: UPDATE статуса идёт с .eq('status', from).select('id') —
+      // по умолчанию «обновлена одна строка».
+      update: vi.fn().mockImplementation(function (...args) {
+        this._calls.update.push(args)
+        this._resolveValue = this._updateResult ?? { data: [{ id: 'order-1' }], error: null }
+        return this
+      }),
+      is: vi.fn().mockImplementation(function () { return this }),
       insert: vi.fn().mockImplementation(function (...args) { this._calls.insert.push(args); return this }),
       single: vi.fn().mockImplementation(function () {
         this._calls.single += 1
@@ -98,7 +105,7 @@ vi.mock('@/shared/stores/role-switcher-store', () => ({
 }))
 
 // Now import the function under test.
-import { updateOrderStatus, addProductionLogAndCheckAdvance } from './useOrders'
+import { updateOrderStatus, addProductionLogAndCheckAdvance, stageRequiresCompletion, buildStatusHistoryRows } from './useOrders'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function resetSingleQueue() {
@@ -152,8 +159,9 @@ describe('updateOrderStatus', () => {
   })
 
   it('with { force: true } skips the route check and updates the order', async () => {
-    // No order pre-fetch (force skips it). notifyBitrix will trigger one
-    // .select().eq().single() — return order with no bitrix_deal_id.
+    // Ревью R25: заказ читается всегда (гейт допечаток / оплата), но force
+    // пропускает проверку маршрута. notifyBitrix — ещё один .single().
+    singleQueue.push({ data: SAMPLE_REGULAR_ORDER, error: null })
     singleQueue.push({ data: { number: 42, bitrix_deal_id: null, price_final: null, cost_total: null }, error: null })
 
     await expect(
@@ -173,6 +181,7 @@ describe('updateOrderStatus', () => {
   })
 
   it('with { isRollback: true } skips route + STAGES_REQUIRING_COMPLETION RPC (cutting → print)', async () => {
+    singleQueue.push({ data: SAMPLE_REGULAR_ORDER, error: null }) // route
     // notifyBitrix → 1 select.single() call
     singleQueue.push({ data: { number: 42, bitrix_deal_id: null }, error: null })
 
@@ -313,8 +322,11 @@ describe('updateOrderStatus — маршрут v2', () => {
     expect(hist).toHaveLength(1)
     const rows = hist[0].payload
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toMatchObject({ from_status: 'new', to_status: 'awaiting_payment', kind: 'paid_at_intake', note: 'Оплата отмечена при приёме: Нал' })
-    expect(rows[1]).toMatchObject({ from_status: 'awaiting_payment', to_status: 'design', kind: 'paid_at_intake' })
+    // Ревью R25 (12c): первая запись сохраняет пометку вызывающего (здесь —
+    // никакой), paid_at_intake — только у автопрохода.
+    expect(rows[0]).toMatchObject({ from_status: 'new', to_status: 'awaiting_payment' })
+    expect(rows[0].kind).toBeUndefined()
+    expect(rows[1]).toMatchObject({ from_status: 'awaiting_payment', to_status: 'design', kind: 'paid_at_intake', note: 'Оплата отмечена при приёме: Нал' })
     expect(rows[0].created_at).toBe(rows[1].created_at)
   })
 
@@ -361,6 +373,107 @@ describe('updateOrderStatus — маршрут v2', () => {
 
     await expect(updateOrderStatus('order-1', 'otk', 'awaiting_pickup'))
       .rejects.toThrow(/Нельзя выпустить заказ с ТК/)
+  })
+})
+
+// ─── Ревью R25: optimistic-lock, гейт допечаток, оплата при force ─────────
+describe('updateOrderStatus — ревью R25', () => {
+  const V2_ORDER = {
+    order_type: 'sticker_cut', design_status: 'needs_development', need_lam: true,
+    number: 7, bopp_bag: false, route_version: 2, delivery_type: 'pickup',
+    needs_montage_film: false, payment_status: 'not_paid',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSingleQueue()
+    mockSupabase._resetState()
+    rpcResultRef.value = { data: { is_complete: true }, error: null }
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
+    mockSupabase.from.mockImplementation(mockSupabase._defaultFromImpl)
+    mockSupabase.rpc.mockImplementation(() => Promise.resolve(rpcResultRef.value))
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete globalThis.fetch
+  })
+
+  it('UPDATE фильтруется по исходному статусу; 0 строк → ошибка без записи истории', async () => {
+    singleQueue.push({ data: SAMPLE_REGULAR_ORDER, error: null })
+    singleQueue.push({ data: ACTOR_ADMIN, error: null })
+    mockSupabase.from.mockImplementation((table) => {
+      const q = mockSupabase._defaultFromImpl(table)
+      if (table === 'k24_orders') q._updateResult = { data: [], error: null }
+      return q
+    })
+
+    await expect(updateOrderStatus('order-1', 'design', 'prepress'))
+      .rejects.toThrow('Статус заказа изменился, обновите страницу')
+    const q = mockSupabase._recentQueriesByTable['k24_orders']
+    expect(q._calls.eq).toContainEqual(['status', 'design'])
+    expect(mockSupabase._allInsertCalls.filter((c) => c.table === 'k24_order_status_history')).toHaveLength(0)
+  })
+
+  it('ошибка чтения заказа не глотается', async () => {
+    singleQueue.push({ data: null, error: { message: 'read failed' } })
+    await expect(updateOrderStatus('order-1', 'design', 'prepress', { force: true }))
+      .rejects.toMatchObject({ message: 'read failed' })
+  })
+
+  it('прыжок с force мимо ТК (v2) блокируется незавершённой допечаткой', async () => {
+    singleQueue.push({ data: V2_ORDER, error: null })
+    mockSupabase.from.mockImplementation((table) => {
+      const q = mockSupabase._defaultFromImpl(table)
+      if (table === 'k24_order_subtasks') {
+        q.neq = vi.fn().mockReturnThis()
+        q.limit = vi.fn().mockResolvedValue({ data: [{ id: 'sub-1' }], error: null })
+      }
+      return q
+    })
+    await expect(updateOrderStatus('order-1', 'packaging', 'awaiting_pickup', { force: true, kind: 'manual_skip' }))
+      .rejects.toThrow(/Нельзя выпустить заказ с ТК/)
+  })
+
+  it('прыжок с force мимо «Ждёт оплаты» без оплаты требует подтверждения и пишет no_payment', async () => {
+    singleQueue.push({ data: V2_ORDER, error: null })
+    await expect(updateOrderStatus('order-1', 'new', 'design', { force: true, kind: 'manual_skip', note: 'Пропущен вручную: Ждёт оплаты' }))
+      .rejects.toMatchObject({ code: 'PAYMENT_CONFIRM_REQUIRED' })
+
+    singleQueue.push({ data: V2_ORDER, error: null })
+    singleQueue.push({ data: { number: 7, bitrix_deal_id: null }, error: null })
+    await updateOrderStatus('order-1', 'new', 'design', { force: true, kind: 'manual_skip', note: 'Пропущен вручную: Ждёт оплаты', confirmNoPayment: true })
+    const hist = mockSupabase._allInsertCalls.filter((c) => c.table === 'k24_order_status_history')
+    expect(hist[0].payload).toMatchObject({ kind: 'no_payment' })
+    expect(hist[0].payload.note).toMatch(/Запущен без оплаты/)
+  })
+
+  it('перенос назад без пометки пишется как откат', async () => {
+    singleQueue.push({ data: SAMPLE_REGULAR_ORDER, error: null })
+    singleQueue.push({ data: ACTOR_ADMIN, error: null })
+    singleQueue.push({ data: { number: 42, bitrix_deal_id: null }, error: null })
+    await updateOrderStatus('order-1', 'cutting', 'print')
+    const hist = mockSupabase._allInsertCalls.filter((c) => c.table === 'k24_order_status_history')
+    expect(hist[0].payload).toMatchObject({ from_status: 'cutting', to_status: 'print', kind: 'rollback' })
+  })
+})
+
+describe('stageRequiresCompletion / buildStatusHistoryRows', () => {
+  it('свои этапы custom_N требуют проверки завершения', () => {
+    expect(stageRequiresCompletion('custom_3')).toBe(true)
+    expect(stageRequiresCompletion('print')).toBe(true)
+    expect(stageRequiresCompletion('otk')).toBe(false)
+    expect(stageRequiresCompletion('customer')).toBe(false)
+  })
+
+  it('автопроход: первая запись с пометкой вызывающего, вторая — paid_at_intake', () => {
+    const rows = buildStatusHistoryRows({
+      orderId: 'o', userId: 'u', fromStatus: 'new', toStatus: 'awaiting_payment', finalStatus: 'design',
+      kind: 'manual_skip', note: 'x', autoPass: 'design', paidNote: 'Оплата отмечена при приёме: Нал', nowIso: 't',
+    })
+    expect(rows[0]).toMatchObject({ to_status: 'awaiting_payment', kind: 'manual_skip', note: 'x', created_at: 't' })
+    expect(rows[1]).toMatchObject({ from_status: 'awaiting_payment', to_status: 'design', kind: 'paid_at_intake', note: 'Оплата отмечена при приёме: Нал' })
   })
 })
 

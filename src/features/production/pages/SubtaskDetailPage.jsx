@@ -8,7 +8,7 @@ import { computeSubtaskOverallProgress, getReprintRollbackTargets } from '../lib
 import { ReprintRollbackDialog } from '../components/ReprintRollbackDialog'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import {
-  REPRINT_STATUS_LABELS, REPRINT_REASONS, FILM_TYPES, reprintViewLabel,
+  REPRINT_STATUS_LABELS, REPRINT_REASONS, FILM_TYPES, reprintViewLabel, canRollbackReprintForOrder,
 } from '@/shared/constants'
 import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { DryingTimer } from '@/features/orders/components/DryingTimer'
@@ -48,11 +48,11 @@ export default function SubtaskDetailPage() {
   const overall = computeSubtaskOverallProgress(subtask, logs)
   const filmName = order.film_material?.name || FILM_TYPES[order.film_type]?.label || order.film_type
   const viewLabel = reprintViewLabel(order.order_type, subtask.view_ref)
-  // R25.3: «Вернуть на этап…» — право subtask:rollback, есть пройденные этапы,
-  // родитель не готов и не отменён (сервер проверяет то же самое).
+  // R25.3: «Вернуть на этап…» — право subtask:rollback, есть пройденные этапы.
+  // Ревью R25 (п.15): родитель не на ТК и не дальше (RPC запрещает откат после ТК).
   const canRollback = canRollbackPerm
     && getReprintRollbackTargets(subtask).length > 0
-    && !['done', 'cancelled'].includes(order.status)
+    && canRollbackReprintForOrder(order)
 
   async function handleSubmit(stage, data) {
     const res = await addLogAndAdvance(stage, data)

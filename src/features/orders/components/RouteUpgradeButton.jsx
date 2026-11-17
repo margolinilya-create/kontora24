@@ -4,6 +4,7 @@ import { updateOrder } from '../hooks/useOrders'
 import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 import { getOrderRoute, isRouteV2, getStatusMeta } from '@/shared/constants'
 import Button from '@/shared/components/Button'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
@@ -28,6 +29,15 @@ export function RouteUpgradeButton({ order, onUpdated }) {
     setBusy(true)
     try {
       await updateOrder(order.id, { route_version: 2 })
+    } catch (err) {
+      toast.error(translateError(err).message)
+      setBusy(false)
+      return
+    }
+    // Ревью R25 (п.19): перевод и аудит — два запроса (атомарность — RPC на
+    // стороне БД, отдельная задача). Если аудит упал, заказ УЖЕ переведён —
+    // сообщаем именно это и отправляем ошибку в Sentry.
+    try {
       const { error: auditErr } = await supabase.from('k24_order_audit').insert({
         order_id: order.id,
         field_name: 'route_version',
@@ -37,10 +47,11 @@ export function RouteUpgradeButton({ order, onUpdated }) {
       })
       if (auditErr) throw auditErr
       toast.success('Заказ переведён на новый маршрут')
-      onUpdated?.()
     } catch (err) {
-      toast.error(translateError(err).message)
+      captureError(err, { tags: { source: 'RouteUpgradeButton.audit' }, extra: { orderId: order.id } })
+      toast.error(`Заказ переведён на новый маршрут, но запись в историю изменений не сохранена: ${translateError(err).message}`)
     } finally {
+      onUpdated?.()
       setBusy(false)
     }
   }

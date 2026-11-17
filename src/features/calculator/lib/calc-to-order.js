@@ -46,7 +46,9 @@ export function mapCalcToOrder(result, { film = null, lam = null } = {}) {
     // оставляет значение по умолчанию, как при ручном выборе такой позиции).
     film_material_id: film?.id || null,
     film_type: film?.material_code || 'G',
-    lam_type: o.lamination && lam ? (lam.material_code || '') : '',
+    // Ревью R25 (п.7): позиция без кода — фолбэк 'glossy', иначе форма
+    // посчитала бы ламинацию выключенной и обнулила lam_material_id.
+    lam_type: o.lamination && lam ? (lam.material_code || 'glossy') : '',
     lam_material_id: o.lamination && lam ? lam.id : null,
     // Монтажная плёнка: пустая позиция = «Позиция по умолчанию» (списание по коду transfer).
     needs_montage_film: !!o.montage,

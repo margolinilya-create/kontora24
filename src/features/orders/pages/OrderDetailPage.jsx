@@ -36,6 +36,7 @@ import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { toast } from '@/shared/stores/toast-store'
 import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { laminationLabel, montageLabel, designEditNote } from '../lib/order-labels'
+import { patchNeedsRefetch } from '../lib/order-edit'
 
 function GearIcon({ className = '' }) {
   return (
@@ -565,12 +566,15 @@ export default function OrderDetailPage() {
       <Modal isOpen={editorOpen} onClose={() => setEditorOpen(false)} title="Редактирование заказа" maxWidth="max-w-5xl">
         <AdminOrderEditor
           order={order}
-          onSaved={(patch) => {
+          onSaved={(patch, opts = {}) => {
             setEditorOpen(false)
             // R9.3B: optimistic merge без полного refetch — UI не «перезагружается».
             // Безопасно: patch содержит только обновлённые поля + updated_at.
+            // Ревью R25 (п.5): если поменялись поля маршрута (триггер БД
+            // пересобрал route_snapshot) или статус (история) — полный refetch.
+            const needsRefetch = !patch || opts.refetch || patchNeedsRefetch(order, patch)
             if (patch) setOrder((prev) => (prev ? { ...prev, ...patch } : prev))
-            else refetch()
+            if (needsRefetch) refetch()
           }}
           onCancel={() => setEditorOpen(false)}
         />

@@ -429,6 +429,31 @@ export function getReprintRoute(order) {
   return [...stages, 'done']
 }
 
+/**
+ * Ревью R25: можно ли создать допечатку для заказа. Субподрядный заказ (v2)
+ * производится у подрядчика — производственной части маршрута нет, допечатка
+ * вырождалась в ['done']. Возвращает { ok, reason }.
+ */
+export function canCreateReprint(order) {
+  if (!order) return { ok: false, reason: 'Заказ не загружен' }
+  if (isRouteV2(order) && order.is_subcontract === true) {
+    return { ok: false, reason: 'Допечатка недоступна для субподрядного заказа — производство у подрядчика' }
+  }
+  return { ok: true, reason: null }
+}
+
+// Этапы, на которых заказ уже дошёл до ТК или прошёл его (v1: otk → done;
+// v2: otk → awaiting_pickup/delivery → done). Отменённый — тоже «закрыт».
+const AT_OR_PAST_OTK_STATUSES = ['otk', 'awaiting_pickup', 'delivery', 'done', 'cancelled']
+
+/**
+ * Ревью R25: откат допечатки разрешён, только пока родитель не дошёл до ТК
+ * (RPC rollback_reprint_subtask запрещает его после ТК).
+ */
+export function canRollbackReprintForOrder(order) {
+  return !!order && !AT_OR_PAST_OTK_STATUSES.includes(order.status)
+}
+
 // R23.5: лейбл привязки допечатки к виду. Для stickerpack3D — «Вид #N»
 // (design_index из k24_pack_designs), для мульти-вида — «Размер #N» (idx из
 // k24_order_items). Возвращает null если вид не задан (заказ с одним видом).
@@ -478,7 +503,20 @@ export function getAutoPassTarget(order, fromStatus, toStatus) {
 export function isReprintGateTransition(order, fromStatus, toStatus) {
   if (toStatus === 'done') return true
   if (!isRouteV2(order)) return false
-  return fromStatus === 'otk' && ['awaiting_pickup', 'delivery'].includes(toStatus)
+  // Ревью R25: гейт срабатывает при любом переходе, который ПОКИДАЕТ ТК вперёд
+  // или ПЕРЕПРЫГИВАЕТ его (force из StageJumper, канбан). Откат с ТК назад —
+  // не гейт.
+  const route = getOrderRoute(order)
+  const otk = route.indexOf('otk')
+  if (otk < 0) return fromStatus === 'otk' && ['awaiting_pickup', 'delivery'].includes(toStatus)
+  const to = route.indexOf(toStatus)
+  if (to <= otk) {
+    // Цель вне маршрута (грязные данные) — консервативно по хвосту v2.
+    return to < 0 && ['awaiting_pickup', 'delivery'].includes(toStatus)
+  }
+  if (fromStatus === 'otk') return true
+  // Источник до ТК (или вне маршрута) → переход через ТК вперёд.
+  return route.indexOf(fromStatus) < otk
 }
 
 // Whether a stage is part of the order's effective route.
@@ -727,7 +765,9 @@ export const SUBCONTRACT_TOGGLE_STATUSES = [
 ]
 
 export function canToggleSubcontract(order) {
-  if (Number(order?.route_version) < 2) return false
+  // Ревью R25: Number(undefined) < 2 → false (NaN), заказ без route_version
+  // ошибочно считался v2. isRouteV2 — единый критерий версии маршрута.
+  if (!isRouteV2(order)) return false
   return SUBCONTRACT_TOGGLE_STATUSES.includes(order?.status || 'new')
 }
 

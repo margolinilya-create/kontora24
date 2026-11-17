@@ -21,8 +21,8 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { createOrder } from '../hooks/useOrders'
+import { makeOrderSchema } from '../lib/order-schema'
 import {
   ORDER_SOURCES, PAYMENT_STATUSES, DELIVERY_TYPES, DESIGN_STATUSES, SIZE_PRESETS,
   needsLamination, STICKER_SHAPES,
@@ -148,63 +148,6 @@ function SizePresetPicker({ activePreset, onSelect, isPack }) {
   )
 }
 
-const schema = z.object({
-  // Deal
-  deal_name: z.string().optional(),
-  bitrix_deal_id: z.string().optional(),
-  price_final: z.coerce.number({ invalid_type_error: 'Укажите цену' }).positive('Цена должна быть больше 0'),
-  is_partner: z.boolean().default(false),
-  source: z.string().optional(),
-  source_referrer: z.string().optional(),
-  payment_status: z.string().default('not_paid'),
-
-  // Order
-  order_type: z.string().min(1, 'Выберите тип'),
-  qty: z.coerce.number().min(1, 'Минимум 1'),
-  width_mm: z.coerce.number().min(1, 'Укажите ширину'),
-  height_mm: z.coerce.number().min(1, 'Укажите высоту'),
-  film_type: z.string().default('G'),
-  film_type_stickers: z.string().optional().nullable(),
-  film_material_id: z.string().optional().nullable(),
-  film_stickers_material_id: z.string().optional().nullable(),
-  lam_type: z.string().optional(),
-  lam_material_id: z.string().optional().nullable(),
-  design_status: z.string().default('provided'),
-  mockup_path: z.string().optional(),
-  stickers_per_pack: z.coerce.number().optional(),
-  client_name: z.string().trim().min(1, 'Укажите заказчика'),
-  deadline: z.string().min(1, 'Укажите срок сдачи'),
-  is_urgent: z.boolean().default(false),
-  notes: z.string().optional(),
-  bopp_bag: z.boolean().default(false),
-
-  // Delivery
-  delivery_type: z.string().default('pickup'),
-  delivery_city: z.string().optional(),
-  delivery_address: z.string().optional(),
-  delivery_notes: z.string().optional(),
-
-  // R25.4 (ТЗ Фаза 4)
-  product_name: z.string().optional(),
-  needs_individual_cut: z.boolean().default(false),
-  needs_montage_film: z.boolean().default(false),
-  montage_material_id: z.string().optional().nullable(),
-  is_subcontract: z.boolean().default(false),
-  contractor_id: z.string().optional().nullable(),
-  contractor_notes: z.string().optional(),
-  contractor_cost: z.union([z.literal(''), z.coerce.number().min(0, 'Стоимость не может быть отрицательной')]).optional(),
-}).superRefine((v, ctx) => {
-  // «Прочее» требует название продукции (ТЗ 4.1).
-  if (v.order_type === 'other') {
-    const name = (v.product_name || '').trim()
-    if (!name) ctx.addIssue({ code: 'custom', path: ['product_name'], message: 'Укажите название продукции' })
-    else if (name.length > PRODUCT_NAME_MAX) ctx.addIssue({ code: 'custom', path: ['product_name'], message: `Название — до ${PRODUCT_NAME_MAX} символов` })
-  }
-  // Субподряд: подрядчик обязателен (ТЗ 4.2).
-  if (v.is_subcontract && !v.contractor_id) {
-    ctx.addIssue({ code: 'custom', path: ['contractor_id'], message: 'Выберите подрядчика' })
-  }
-})
 
 export function CreateOrderForm({
   initialValues,
@@ -281,6 +224,7 @@ export function CreateOrderForm({
   // ТЗ 6.2: цена из расчёта пишется и без права на финансы (поле скрыто, но заполнено).
   const pricePrefilled = prefilled.has('price_final')
   const canWritePrice = canSeeFinance || pricePrefilled
+  const orderSchema = useMemo(() => makeOrderSchema({ requirePrice: canSeeFinance }), [canSeeFinance])
 
   function selectPreviewFile(file) {
     if (!file) return
@@ -338,7 +282,7 @@ export function CreateOrderForm({
 
   const formRef = useRef(null)
   const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(orderSchema),
     defaultValues: initial.values,
   })
 
@@ -365,7 +309,10 @@ export function CreateOrderForm({
   }, [])
 
   const lamType = watch('lam_type')
-  const needLam = needsLamination(lamType)
+  const lamMaterialId = watch('lam_material_id')
+  // Ревью R25 (п.7): выбранная позиция ламинации без material_code тоже
+  // означает ламинацию — раньше need_lam выводился только из кода.
+  const needLam = needsLamination(lamType) || !!lamMaterialId
   const orderType = watch('order_type')
   const source = watch('source')
   const deliveryType = watch('delivery_type')
@@ -592,7 +539,7 @@ export function CreateOrderForm({
         width_mm: values.width_mm,
         height_mm: values.height_mm,
         need_lam: lamOn,
-        lam_type: lamOn ? values.lam_type : null,
+        lam_type: lamOn ? (values.lam_type || 'glossy') : null,
         lam_material_id: lamOn ? (values.lam_material_id || null) : null,
         film_type: values.film_type,
         film_material_id: values.film_material_id || null,
@@ -1037,7 +984,8 @@ export function CreateOrderForm({
                 value={watch('lam_material_id') || lamType}
                 onChange={({ materialId, code }) => {
                   setValue('lam_material_id', materialId, { shouldDirty: true })
-                  setValue('lam_type', code || '', { shouldDirty: true })
+                  // Позиция без кода — фолбэк 'glossy' (как в AdminOrderEditor).
+                  setValue('lam_type', code || (materialId ? 'glossy' : ''), { shouldDirty: true })
                 }}
                 expected={lamType ? expectedByCode[lamType] : undefined}
                 excludeCodes={LAMINATION_FORM_EXCLUDE_CODES}

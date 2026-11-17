@@ -5,13 +5,16 @@ import { supabase } from '@/shared/lib/supabase'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import Modal from '@/shared/components/Modal'
+import { getStatusMeta } from '@/shared/constants'
+import { getColorApprovalNext } from '../lib/order-edit'
 
 /**
  * R11.1: специальный контрол для этапа color_approval — менеджер показывает
  * напечатанный образец заказчику и фиксирует ответ.
  *
- *  • Утверждено  → updateOrderStatus(..., 'prepress')
- *    (R14.5: batch_layout удалён, заменён prepress — этапы дублирующие.)
+ *  • Утверждено  → updateOrderStatus(..., <следующий этап маршрута>)
+ *    (ревью R25: раньше хардкод 'prepress' — у своего типа маршрута после
+ *    согласования может стоять другой этап.)
  *  • Не утверждено → модалка с обязательным комментарием (мин 5 символов)
  *    → INSERT k24_order_comments + rollback на 'sample_print' (цикл «печать
  *    нового образца → согласование» повторяется до утверждения).
@@ -27,11 +30,18 @@ export function ColorApprovalControls({ order, onUpdated }) {
 
   if (!profile || !order) return null
 
+  const nextStatus = getColorApprovalNext(order)
+  const nextLabel = getStatusMeta(nextStatus)?.label || nextStatus
+
   async function handleApprove() {
+    if (!nextStatus) {
+      toast.error('Этап «Согласование цвета» не входит в маршрут заказа')
+      return
+    }
     setLoading(true)
     try {
-      await updateOrderStatus(order.id, 'color_approval', 'prepress')
-      toast.success('Цвет утверждён → Препресс')
+      await updateOrderStatus(order.id, 'color_approval', nextStatus)
+      toast.success(`Цвет утверждён → ${nextLabel}`)
       onUpdated?.()
     } catch (err) {
       toast.error(translateError(err).message)

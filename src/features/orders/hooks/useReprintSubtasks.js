@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
-import { getReprintRoute } from '@/shared/constants'
+import { getReprintRoute, canCreateReprint } from '@/shared/constants'
 import { computeSubtaskOverallProgress, reprintUiStatus } from '@/features/production/lib/production-logs'
 import { rollbackReprintSubtask } from '@/features/production/hooks/useReprintSubtask'
 
@@ -78,6 +78,10 @@ export function useReprintSubtasks(orderId) {
   }, [orderId])
 
   const createReprint = useCallback(async (order, { qty, reason, comment, viewRef }) => {
+    // Ревью R25 (п.14): у субподрядного заказа нет производственной части
+    // маршрута — допечатка вырождалась в ['done'].
+    const allowed = canCreateReprint(order)
+    if (!allowed.ok) throw new Error(allowed.reason)
     const route = getReprintRoute(order)
     const { data, error: err } = await supabase.rpc('create_reprint_subtask', {
       p_order_id: orderId,

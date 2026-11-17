@@ -3,15 +3,19 @@ import { getOrderRoute, getStatusMeta } from '@/shared/constants'
 import { updateOrderStatus } from '../hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { useCanDo } from '@/features/auth/hooks/useCanDo'
 
 /**
  * Dropdown с пройденными этапами для отката статуса заказа.
- * По ТЗ: откат разрешён всем (логи не удаляются — только меняется status).
+ * Ревью R25 (п.9): откат — только с правом order:edit (admin/manager по
+ * умолчанию) и не для готового/отменённого заказа (логи не удаляются —
+ * меняется только status).
  */
 export function StatusOverride({ order, onUpdated }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const ref = useRef(null)
+  const canEdit = useCanDo('order:edit')
 
   useEffect(() => {
     function onClickOutside(e) {
@@ -21,7 +25,7 @@ export function StatusOverride({ order, onUpdated }) {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [open])
 
-  if (!order || order.status === 'cancelled') return null
+  if (!order || !canEdit || order.status === 'cancelled' || order.status === 'done') return null
 
   const route = getOrderRoute(order)
   const currentIdx = route.indexOf(order.status)

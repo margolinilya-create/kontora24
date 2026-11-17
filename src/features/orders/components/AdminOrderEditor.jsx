@@ -1,5 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
-import { updateOrder } from '../hooks/useOrders'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { updateOrder, updateOrderStatus, PAYMENT_CONFIRM_REQUIRED } from '../hooks/useOrders'
+import { useOrderItems, syncSingleOrderItem } from '../hooks/useOrderItems'
+import { validateOrderSize, planManualStatusChange } from '../lib/order-edit'
+import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { ClientCombobox } from '@/features/clients/components/ClientCombobox'
 import { supabase } from '@/shared/lib/supabase'
 import Button from '@/shared/components/Button'
@@ -14,7 +17,7 @@ import {
   PRIORITIES, SIZE_PRESETS, STICKER_SHAPES,
   PRODUCT_NAME_MAX, LAMINATION_FORM_EXCLUDE_CODES, canToggleSubcontract,
   isIndividualCutHidden, individualCutForOrderType, orderTypeForIndividualCut,
-  getOrderRoute,
+  getOrderRoute, needsNoPaymentConfirm, NO_PAYMENT_CONFIRM_MESSAGE, isRouteV2,
 } from '@/shared/constants'
 import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
 import { useWarehouseCategories } from '@/features/warehouse/hooks/useWarehouseCategories'
@@ -52,7 +55,12 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   const [profilesError, setProfilesError] = useState(null)
   const [currentClient, setCurrentClient] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false)
   const canSeeFinance = useCanDo('view:finance')
+  // Ревью R25 (п.6): у multi-variant заказа тираж/размер правятся по видам.
+  const { items: orderItems, loading: itemsLoading } = useOrderItems(order?.id)
+  const isMultiItem = orderItems.length > 1
+  const sizeLocked = itemsLoading || isMultiItem
   // R25.7B (ТЗ 7.5): дополнительные материалы заказа.
   const { materials } = useMaterials()
   const { categories: whCategories } = useWarehouseCategories()
@@ -78,8 +86,14 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   // R25.7C: активные типы реестра (+ текущий, даже если в архиве).
   const typeOptions = useOrderTypeOptions(order?.order_type)
 
+  // Ревью R25 (п.4): форма инициализируется один раз на заказ (при открытии
+  // редактора). Повторные refetch страницы (фокус вкладки, realtime) больше
+  // не перетирают несохранённые правки.
+  const initializedIdRef = useRef(null)
   useEffect(() => {
     if (!order) return
+    if (initializedIdRef.current === order.id) return
+    initializedIdRef.current = order.id
     setForm({
       order_type: order.order_type || '',
       width_mm: order.width_mm ?? '',
@@ -192,7 +206,12 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
     }))
   }
 
-  async function handleSave() {
+  async function handleSave({ confirmNoPayment = false } = {}) {
+    // Ревью R25 (п.6): тираж и размер — не пустые и не меньше 1.
+    if (!sizeLocked) {
+      const sizeError = validateOrderSize(form)
+      if (sizeError) { toast.error(sizeError); return }
+    }
     // R25.4 (ТЗ 4.1 / 4.2): «Прочее» требует название, субподряд — подрядчика.
     if (form.order_type === 'other') {
       const name = (form.product_name || '').trim()
@@ -203,13 +222,21 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       toast.error('Выберите подрядчика')
       return
     }
+    // Ревью R25 (п.1): статус не пишется прямым UPDATE — только через
+    // updateOrderStatus (история, optimistic-lock, гейты).
+    const statusChanged = !!form.status && form.status !== order.status
+    if (statusChanged && !confirmNoPayment) {
+      const nextOrder = { ...order, payment_status: form.payment_status, design_status: form.design_status,
+        order_type: form.order_type, delivery_type: form.delivery_type, is_subcontract: !!form.is_subcontract }
+      if (needsNoPaymentConfirm(nextOrder, order.status, form.status)) {
+        setPaymentConfirmOpen(true)
+        return
+      }
+    }
     setSaving(true)
     try {
       const updates = {
         order_type: form.order_type || null,
-        width_mm: form.width_mm !== '' ? Number(form.width_mm) : null,
-        height_mm: form.height_mm !== '' ? Number(form.height_mm) : null,
-        qty: form.qty !== '' ? Number(form.qty) : null,
         need_lam: form.need_lam,
         lam_type: form.need_lam ? form.lam_type : null,
         lam_material_id: form.need_lam ? (form.lam_material_id || null) : null,
@@ -228,7 +255,6 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         notes: form.notes || null,
         client_id: form.client_id || null,
         assigned_to: form.assigned_to || null,
-        status: form.status,
         bopp_bag: form.bopp_bag,
         is_urgent: form.is_urgent,
         needs_montage_film: form.needs_montage_film,
@@ -274,7 +300,42 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         updates.contractor_cost = form.is_subcontract && form.contractor_cost !== '' ? Number(form.contractor_cost) : null
       }
 
+      // Ревью R25 (п.6): размер/тираж заказа с одним видом — вместе с
+      // k24_order_items idx=1; у multi-variant эти поля не трогаем.
+      const sizeChanged = !sizeLocked && (
+        Number(form.width_mm) !== Number(order.width_mm)
+        || Number(form.height_mm) !== Number(order.height_mm)
+        || Number(form.qty) !== Number(order.qty)
+      )
+      if (!sizeLocked) {
+        updates.width_mm = Number(form.width_mm)
+        updates.height_mm = Number(form.height_mm)
+        updates.qty = Number(form.qty)
+      }
+
       const patch = await updateOrder(order.id, updates)
+      let needsRefetch = false
+      if (sizeChanged) {
+        try {
+          await syncSingleOrderItem(order.id, { width_mm: updates.width_mm, height_mm: updates.height_mm, qty: updates.qty })
+        } catch (itemErr) {
+          captureError(itemErr, { tags: { source: 'AdminOrderEditor.syncSingleOrderItem' }, extra: { orderId: order.id } })
+          toast.error(`Заказ сохранён, но размер вида не обновлён: ${translateError(itemErr).message}`)
+        }
+      }
+      if (statusChanged) {
+        needsRefetch = true
+        try {
+          const plan = planManualStatusChange({ ...order, ...updates }, order.status, form.status)
+          const res = await updateOrderStatus(order.id, order.status, form.status, { ...plan, confirmNoPayment })
+          patch.status = res?.status || form.status
+        } catch (stErr) {
+          if (stErr?.code !== PAYMENT_CONFIRM_REQUIRED) {
+            captureError(stErr, { tags: { source: 'AdminOrderEditor.updateStatus' }, extra: { orderId: order.id } })
+          }
+          toast.error(`Заказ сохранён, но статус не изменён: ${translateError(stErr).message}`)
+        }
+      }
       // R25.7B: доп. материалы — после сохранения заказа (видимые категории).
       if (extraCategories.length > 0) {
         try {
@@ -285,7 +346,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         }
       }
       toast.success('Заказ обновлён')
-      onSaved(patch)
+      onSaved(patch, { refetch: needsRefetch })
     } catch (err) {
       captureError(err, { tags: { source: 'AdminOrderEditor.save' }, extra: { orderId: order.id } })
       toast.error(translateError(err).message)
@@ -301,7 +362,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   const isSticker3D = form.order_type === 'sticker3D'
   // R25.4 (ТЗ 4.2): переключать субподряд можно только до цеха (и только v2).
   const subcontractToggleable = canToggleSubcontract(order)
-  const subcontractVisible = Number(order?.route_version) >= 2 || !!form.is_subcontract
+  const subcontractVisible = isRouteV2(order) || !!form.is_subcontract
 
   // 3D-стикерпак → BOPP обязателен
   useEffect(() => {
@@ -465,7 +526,8 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
                   key={k}
                   type="button"
                   onClick={() => applyPreset(k)}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-border bg-surface hover:bg-surface-2 transition-colors"
+                  disabled={sizeLocked}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-border bg-surface hover:bg-surface-2 transition-colors disabled:opacity-50"
                 >
                   {kind === 'square' ? `${label}×${label}` : `${label} (${width}×${height})`}
                 </button>
@@ -474,17 +536,20 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="admin_width_mm" className="block text-xs text-text-muted mb-0.5">Ширина, мм</label>
-                <Input id="admin_width_mm" type="number" placeholder="100" value={form.width_mm ?? ''} onChange={(e) => update('width_mm', e.target.value)} />
+                <Input id="admin_width_mm" type="number" min={1} placeholder="100" disabled={sizeLocked} value={form.width_mm ?? ''} onChange={(e) => update('width_mm', e.target.value)} />
               </div>
               <div>
                 <label htmlFor="admin_height_mm" className="block text-xs text-text-muted mb-0.5">Длина, мм</label>
-                <Input id="admin_height_mm" type="number" placeholder="100" value={form.height_mm ?? ''} onChange={(e) => update('height_mm', e.target.value)} />
+                <Input id="admin_height_mm" type="number" min={1} placeholder="100" disabled={sizeLocked} value={form.height_mm ?? ''} onChange={(e) => update('height_mm', e.target.value)} />
               </div>
             </div>
+            {isMultiItem && (
+              <p className="text-xs text-text-muted mt-1">В заказе несколько видов — размер и тираж редактируются по видам.</p>
+            )}
           </div>
 
           <Field label="Тираж, шт">
-            <Input type="number" value={form.qty ?? ''} onChange={(e) => update('qty', e.target.value)} />
+            <Input type="number" min={1} disabled={sizeLocked} value={form.qty ?? ''} onChange={(e) => update('qty', e.target.value)} />
           </Field>
           <Field label="Видов дизайна">
             <Input type="number" value={form.design_variants ?? ''} onChange={(e) => update('design_variants', e.target.value)} />
@@ -731,8 +796,18 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       {/* Sticky footer */}
       <div className="sticky bottom-0 -mx-5 -mb-5 px-5 py-4 bg-surface border-t border-border flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel}>Отмена</Button>
-        <Button onClick={handleSave} loading={saving}>Сохранить</Button>
+        <Button onClick={() => handleSave()} loading={saving}>Сохранить</Button>
       </div>
+
+      <ConfirmDialog
+        isOpen={paymentConfirmOpen}
+        onClose={() => setPaymentConfirmOpen(false)}
+        onConfirm={() => { setPaymentConfirmOpen(false); handleSave({ confirmNoPayment: true }) }}
+        title="Запуск без оплаты"
+        message={NO_PAYMENT_CONFIRM_MESSAGE}
+        confirmText="Запустить без оплаты"
+        variant="primary"
+      />
     </div>
   )
 }

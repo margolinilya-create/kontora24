@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { StatusBadge } from './StatusBadge'
-import { ORDER_TYPES, reprintViewLabel } from '@/shared/constants'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { reprintViewLabel } from '@/shared/constants'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
 import { reprintDisplayTitle } from '../lib/active-reprints'
 
@@ -112,7 +112,7 @@ export function ReprintDesktopRow({ reprint, extraCell = false }) {
         </div>
         <p className="text-xs text-text-muted pl-3 truncate max-w-[360px]">{order.client?.name || '—'}</p>
       </td>
-      <td className="px-4 py-2.5 text-text-muted">{viewLabel || ORDER_TYPES[order.order_type]?.label || order.order_type}</td>
+      <td className="px-4 py-2.5 text-text-muted">{viewLabel || formatOrderType(order)}</td>
       <td className="px-4 py-2.5 text-text-muted">—</td>
       <td className="px-4 py-2.5 text-right text-text-muted whitespace-nowrap">{reprint.qty} шт</td>
       <td className="px-4 py-2.5 text-right"><ProgressMini pct={pct} done={reprint.status === 'done'} /></td>

@@ -3,9 +3,9 @@ import sampleLogo from '@/assets/sample-logo-dark.png'
 import iconNadsechka from '@/assets/sample-nadsechka.png'
 import iconSkvoznoy from '@/assets/sample-skvoznoy.png'
 import iconGlaza from '@/assets/sample-glaza.png'
-import { formatOrderNumberShort } from '@/shared/lib/utils'
+import { formatOrderNumberShort, formatOrderType } from '@/shared/lib/utils'
 import { findPreviewAttachment, getAttachmentUrl } from '@/features/orders/lib/order-attachments'
-import { ORDER_TYPES, FILM_TYPES } from '@/shared/constants'
+import { FILM_TYPES } from '@/shared/constants'
 
 // R23.7 (детальный спек 24.07) — производственная цветопроба A5 Portrait.
 // Спек задаёт холст 1748×2480 px (300 DPI, 148×210 мм). Рендерим DOM в
@@ -45,7 +45,7 @@ export const SampleProof = forwardRef(function SampleProof({ order }, ref) {
     : '—'
   const dateStr = fmtDate(genDate)
 
-  const typeLabel = ORDER_TYPES[order?.order_type]?.label || order?.order_type || '—'
+  const typeLabel = formatOrderType(order)
   const materialLabel = order?.film_material?.name
     || FILM_TYPES[order?.film_type]?.label || order?.film_type || '—'
   const sizeLabel = order?.width_mm && order?.height_mm

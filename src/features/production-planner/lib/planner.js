@@ -115,7 +115,9 @@ export function getStageDurationHours(stage, order, items, normsValue) {
 
   switch (stage) {
     case 'design': {
-      const days = Math.max(0, Number(norms.design_days) || 0)
+      // R25.4 (ТЗ 4.4): правка макета — отдельный норматив (по умолчанию 1 день).
+      const daysKey = order?.design_status === 'needs_edit' ? 'design_edit_days' : 'design_days'
+      const days = Math.max(0, Number(norms[daysKey]) || 0)
       const multi = norms.design_multiply_kinds ? vol.designVariants : 1
       return days * HOURS_PER_DAY * multi
     }

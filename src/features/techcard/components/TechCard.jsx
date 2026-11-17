@@ -1,7 +1,8 @@
 import { forwardRef, memo, useRef, useState } from 'react'
 import { formatOrderType } from '../utils'
 import { formatOrderNumber } from '@/shared/lib/utils'
-import { getFilmMaterialName, IS_3D_TYPE, IS_3D_STICKERPACK, LAMINATION_TYPES } from '@/shared/constants'
+import { getFilmMaterialName, IS_3D_TYPE, IS_3D_STICKERPACK } from '@/shared/constants'
+import { laminationSummary, designEditNote } from '@/features/orders/lib/order-labels'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useOrderItems } from '@/features/orders/hooks/useOrderItems'
 import { isMultiVariant, sumVariantQty, formatVariantSizes } from '@/features/orders/lib/order-items-format'
@@ -54,9 +55,9 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
   // когда для заказа выбрана другая плёнка (QA 04.07) — риск взять не тот
   // материал в цеху. Гвард need_lam обязателен: lam_material_id может быть
   // заполнен и у заказа без ламинации.
-  const lamLabel = order.need_lam
-    ? (order.lam_material?.name || LAMINATION_TYPES[order.lam_type]?.label || 'Да')
-    : 'Нет'
+  // R25.4 (ТЗ 4.3): монтажная плёнка — отдельно от ламинации, обе опции в одной строке.
+  const lamLabel = laminationSummary(order)
+  const designNote = designEditNote(order)
   const filmLabel = order.film_material?.name || getFilmMaterialName(order.film_type)
   // Если отдельная плёнка стикеров не задана вовсе — стикеры физически идут
   // на плёнке фонов (так же списывает и триггер, миграция 057): печатаем
@@ -138,7 +139,11 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
           boxSizing: 'border-box',
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 3 * MM }}>
-            <Field label="Комментарий заказчика" value={order.client_brief || order.notes || '—'} valueFontSize={9} />
+            <Field
+              label={designNote ? `Комментарий заказчика · ${designNote}` : 'Комментарий заказчика'}
+              value={order.client_brief || order.notes || '—'}
+              valueFontSize={9}
+            />
             <Field label="Заказчик" value={order.client?.name || '—'} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
@@ -146,7 +151,7 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
             <Field label={multiVariant ? 'Размеры (по видам)' : 'Формат'} value={multiVariant ? formatVariantSizes(items) : `${order.width_mm || 0}×${order.height_mm || 0} мм`} valueFontSize={multiVariant ? 9 : undefined} />
             {/* R20.0 (бриф 3.07): для multi-variant — фактическое число видов изделий */}
             <Field label="Кол-во видов" value={multiVariant ? items.length : (order.design_variants || 1)} />
-            <Field label="Вид сдачи" value={formatOrderType(order.order_type)} />
+            <Field label="Вид сдачи" value={formatOrderType(order)} />
           </div>
           {multiVariant && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(items.length, 4)}, 1fr)`, gap: 3 * MM }}>

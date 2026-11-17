@@ -3,9 +3,9 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
 import { OperationChecklist } from './OperationChecklist'
-import { ORDER_TYPES, PRIORITIES, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
+import { PRIORITIES, MS_PER_HOUR, MS_PER_MINUTE } from '@/shared/constants'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { supabase } from '@/shared/lib/supabase'
 
 const PRIORITY_BORDER = {
@@ -67,7 +67,7 @@ const CardContent = memo(function CardContent({ order, isOverlay = false }) {
       {/* Type + specs */}
       <div>
         <p className="text-sm font-medium text-text leading-tight">
-          {ORDER_TYPES[order.order_type]?.label}
+          {formatOrderType(order)}
         </p>
         <p className="text-xs text-text-muted mt-0.5">
           {order.width_mm} x {order.height_mm} мм · {order.qty} шт

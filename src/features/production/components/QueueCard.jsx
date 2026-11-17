@@ -2,8 +2,8 @@ import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { StatusSwitcher } from '@/features/orders/components/StatusSwitcher'
 import { StageProgressBar } from './logs/StageProgressBar'
-import { ORDER_TYPES, PRIORITIES, TRACK_LABELS } from '@/shared/constants'
-import { formatDate, formatOrderNumber } from '@/shared/lib/utils'
+import { PRIORITIES, TRACK_LABELS } from '@/shared/constants'
+import { formatDate, formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass } from '@/shared/lib/deadline'
 
 const PRIORITY_BORDER = {
@@ -51,7 +51,7 @@ export const QueueCard = memo(function QueueCard({ order, onUpdated, track = nul
 
       {/* Specs */}
       <p className="text-sm text-text-muted">
-        {ORDER_TYPES[order.order_type]?.label || order.order_type}
+        {formatOrderType(order)}
         {' · '}{order.width_mm}x{order.height_mm}
         {' · '}{order.qty} шт
       </p>

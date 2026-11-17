@@ -15,6 +15,7 @@ export function MaterialForecast({
   orderType, widthMm, heightMm, qty,
   filmType, filmTypeStickers, lamType, boppBag,
   items, // [{widthMm, heightMm, qty}] для multi-variant — приоритет над одиночными полями
+  needsMontageFilm = false, montageMaterialId = null, isSubcontract = false, // R25.4
 }) {
   const { materials, loading } = useMaterials()
 
@@ -26,8 +27,8 @@ export function MaterialForecast({
   const rows = useMemo(() => forecastMaterials({
     orderType, widthMm, heightMm, qty,
     filmType, filmTypeStickers, lamType, boppBag, items,
-    boppCandidates,
-  }), [orderType, widthMm, heightMm, qty, filmType, filmTypeStickers, lamType, boppBag, items, boppCandidates])
+    boppCandidates, needsMontageFilm, montageMaterialId, isSubcontract,
+  }), [orderType, widthMm, heightMm, qty, filmType, filmTypeStickers, lamType, boppBag, items, boppCandidates, needsMontageFilm, montageMaterialId, isSubcontract])
 
   const stockByCode = useMemo(() => {
     const map = {}
@@ -57,7 +58,9 @@ export function MaterialForecast({
       <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
         <h3 className="font-semibold text-sm mb-1">Расход материалов</h3>
         <p className="text-xs text-text-muted">
-          Заполните размер, тираж и тип плёнки — появится прогноз расхода.
+          {isSubcontract
+            ? 'Заказ на субподряде — материалы цеха не расходуются.'
+            : 'Заполните размер, тираж и тип плёнки — появится прогноз расхода.'}
         </p>
       </div>
     )

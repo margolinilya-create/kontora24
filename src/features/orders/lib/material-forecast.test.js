@@ -320,3 +320,33 @@ describe('pickBoppMaterial (R17.6)', () => {
     expect(picked.id).toBe('b')
   })
 })
+
+describe('R25.4 forecastMaterials — монтажная плёнка, субподряд, «Прочее»', () => {
+  const base = { widthMm: 100, heightMm: 100, qty: 100, filmType: 'G' }
+
+  it('монтажная плёнка — отдельная строка по формуле ламинации', () => {
+    const rows = forecastMaterials({ ...base, orderType: 'sticker_cut', lamType: 'glossy', needsMontageFilm: true })
+    const lam = rows.find((r) => r.key === 'lam')
+    const montage = rows.find((r) => r.key === 'montage')
+    expect(montage).toBeDefined()
+    expect(montage.expected).toBeCloseTo(lam.expected, 6)
+    expect(montage.lookup).toEqual({ by: 'code', value: 'transfer' })
+  })
+
+  it('монтажная плёнка с выбранной позицией — lookup по materialId', () => {
+    const rows = forecastMaterials({ ...base, orderType: 'sticker_cut', needsMontageFilm: true, montageMaterialId: 'm1' })
+    expect(rows.find((r) => r.key === 'montage').lookup).toEqual({ by: 'materialId', value: 'm1' })
+    expect(rows.find((r) => r.key === 'lam')).toBeUndefined()
+  })
+
+  it('субподряд — прогноза нет', () => {
+    expect(forecastMaterials({ ...base, orderType: 'sticker3D', boppBag: true, isSubcontract: true })).toEqual([])
+  })
+
+  it('«Прочее» — плёнка и ламинация как у вырубного, без смолы', () => {
+    const rows = forecastMaterials({ ...base, orderType: 'other', lamType: 'matte' })
+    expect(rows.map((r) => r.key)).toEqual(['film', 'lam'])
+    const cut = forecastMaterials({ ...base, orderType: 'sticker_cut', lamType: 'matte' })
+    expect(rows[0].expected).toBe(cut[0].expected)
+  })
+})

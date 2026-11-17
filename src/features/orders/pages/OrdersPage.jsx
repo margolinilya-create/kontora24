@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useOrders, deleteOrder } from '../hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { StatusBadge } from '../components/StatusBadge'
-import { ORDER_TYPES, PRIORITIES, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
+import { PRIORITIES, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { Pagination } from '@/shared/components/Pagination'
 import { OrdersKanban } from '../components/OrdersKanban'
@@ -18,7 +18,7 @@ import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { getDeadlineLevel, getDeadlineClasses, getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
 import { stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { toast } from '@/shared/stores/toast-store'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 
 // R25.1: списки статусов строятся из констант/описания отделов — новый этап
 // не может «потеряться» в фильтрах и группах (см. тест-«сторож» routes-v2).
@@ -392,7 +392,7 @@ function MobileRow({ order, isAdmin, onDelete }) {
         <p className="text-sm text-text truncate">{order.client?.name || '—'}</p>
         <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
           <span className="truncate">
-            {ORDER_TYPES[order.order_type]?.label || order.order_type}
+            {formatOrderType(order)}
             {order.width_mm && order.height_mm ? ` · ${order.width_mm}×${order.height_mm}` : ''}
             {' · '}{order.qty} шт
           </span>
@@ -442,7 +442,7 @@ function DesktopRow({ order, isAdmin, onDelete }) {
         </div>
       </td>
       <td className="px-4 py-2.5 text-text truncate max-w-[220px]">{order.client?.name || '—'}</td>
-      <td className="px-4 py-2.5 text-text-muted">{ORDER_TYPES[order.order_type]?.label || order.order_type}</td>
+      <td className="px-4 py-2.5 text-text-muted">{formatOrderType(order)}</td>
       <td className="px-4 py-2.5 text-text-muted whitespace-nowrap">
         {order.width_mm && order.height_mm ? `${order.width_mm}×${order.height_mm} мм` : '—'}
       </td>

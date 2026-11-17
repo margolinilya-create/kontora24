@@ -4,8 +4,8 @@
 // со статусами, кнопку «Снять закрепления заказа».
 
 import { Link } from 'react-router-dom'
-import { formatOrderNumber } from '@/shared/lib/utils'
-import { ORDER_STATUSES, ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES } from '@/shared/constants'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
+import { ORDER_STATUSES, FILM_TYPES, LAMINATION_TYPES } from '@/shared/constants'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { forecastMaterials } from '@/features/orders/lib/material-forecast'
 import { usePlanStore } from '../store/plan-store'
@@ -85,7 +85,7 @@ export function OrderDetailsPanel() {
   const r = result.byOrder[selectedOrderId]
   const palette = getOrderPalette(order.id)
   const isRush = order.priority === 'urgent' || order.is_urgent
-  const typeLabel = ORDER_TYPES[order.order_type]?.label || order.order_type
+  const typeLabel = formatOrderType(order)
   const filmLabel = order.film_type ? (FILM_TYPES[order.film_type]?.label || order.film_type) : '—'
   const lamLabel = order.lam_type ? (LAMINATION_TYPES[order.lam_type]?.label || order.lam_type) : 'без'
   const designSource = order.design_status === 'provided' ? 'клиент' : 'разработка'

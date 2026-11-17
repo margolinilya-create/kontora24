@@ -35,14 +35,14 @@ export function usePlannedConsumption(materials) {
       const [ordersRes, itemsRes, logsRes] = await Promise.all([
         supabase
           .from('k24_orders')
-          .select('id, number, custom_number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, bopp_bag, status')
+          .select('id, number, custom_number, order_type, qty, width_mm, height_mm, film_type, film_type_stickers, lam_type, bopp_bag, status, needs_montage_film, montage_material_id, is_subcontract')
           .in('status', ACTIVE_STATUSES),
         supabase
           .from('k24_order_items')
           .select('order_id, width_mm, height_mm, qty'),
         supabase
           .from('k24_production_logs')
-          .select('order_id, film_meters, lamination_meters, resin_grams, qty_cut, lamination_qty')
+          .select('order_id, film_meters, lamination_meters, montage_meters, resin_grams, qty_cut, lamination_qty')
           .is('deleted_at', null),
       ])
       if (ordersRes.error) throw ordersRes.error
@@ -58,6 +58,7 @@ export function usePlannedConsumption(materials) {
       ;(logsRes.data || []).forEach((l) => {
         const has = Number(l.film_meters) > 0
           || Number(l.lamination_meters) > 0
+          || Number(l.montage_meters) > 0
           || Number(l.resin_grams) > 0
           || Number(l.qty_cut) > 0
           || Number(l.lamination_qty) > 0
@@ -87,11 +88,22 @@ export function usePlannedConsumption(materials) {
           lamType: order.lam_type,
           boppBag: order.bopp_bag,
           items: itemsByOrder.get(order.id),
+          // R25.4: монтажная плёнка — отдельная строка; субподряд — без плана.
+          needsMontageFilm: !!order.needs_montage_film,
+          montageMaterialId: order.montage_material_id,
+          isSubcontract: !!order.is_subcontract,
         })
         for (const row of rows) {
           if (!row.expected || row.expected <= 0 || !row.lookup) continue
           if (row.lookup.by === 'code') {
             const mat = byCode.get(row.lookup.value)
+            if (!mat) continue
+            const prev = result.get(mat.id) || { planned: 0, orders: [] }
+            prev.planned += row.expected
+            prev.orders.push({ id: order.id, number: order.number, custom_number: order.custom_number, qty: row.expected, unit: row.unit })
+            result.set(mat.id, prev)
+          } else if (row.lookup.by === 'materialId') {
+            const mat = materials.find((m) => m.id === row.lookup.value)
             if (!mat) continue
             const prev = result.get(mat.id) || { planned: 0, orders: [] }
             prev.planned += row.expected

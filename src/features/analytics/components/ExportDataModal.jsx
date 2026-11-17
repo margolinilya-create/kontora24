@@ -2,10 +2,11 @@ import { useState } from 'react'
 import Modal from '@/shared/components/Modal'
 import Button from '@/shared/components/Button'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_TYPES, ORDER_STATUSES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES, ORDER_SOURCES, PAYMENT_STATUSES, calculateActualMaterialsCost } from '@/shared/constants'
+import { ORDER_STATUSES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES, ORDER_SOURCES, PAYMENT_STATUSES, calculateActualMaterialsCost } from '@/shared/constants'
 import { downloadXlsx } from '@/shared/lib/export-xlsx'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { formatOrderType } from '@/shared/lib/utils'
 
 const EXPORTS = [
   { id: 'orders_full', label: 'Полная таблица заказов (с фактическим расходом материалов)' },
@@ -128,7 +129,7 @@ async function exportOrdersFull() {
       o.number,
       o.client?.name || '',
       o.client?.phone || '',
-      ORDER_TYPES[o.order_type]?.label || o.order_type,
+      formatOrderType(o),
       o.width_mm && o.height_mm ? `${o.width_mm}x${o.height_mm}` : '',
       o.qty || '',
       FILM_TYPES[o.film_type]?.label || o.film_type || '',

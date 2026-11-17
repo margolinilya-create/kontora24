@@ -5,7 +5,7 @@
 // в единицах материала (метры для плёнки/ламинации, граммы для смолы,
 // штуки для БОПП-пакетов и коробок).
 
-import { FILM_TYPES, LAMINATION_TYPES, needsLamination } from '@/shared/constants'
+import { FILM_TYPES, LAMINATION_TYPES, needsLamination, MONTAGE_MATERIAL_CODE } from '@/shared/constants'
 
 // Ширина печатного блока по типу плёнки (мм) — из брифа.
 const PRINT_BLOCK_WIDTH_MM = {
@@ -134,8 +134,14 @@ export function forecastMaterials({
   lamType,
   boppBag,
   items,
+  needsMontageFilm = false,
+  montageMaterialId = null,
+  isSubcontract = false,
 }) {
   const rows = []
+  // R25.4 (ТЗ 4.2): заказ на субподряде делает подрядчик — материалы цеха не
+  // расходуются, прогноза нет (и «План трат» склада его не учитывает).
+  if (isSubcontract) return rows
   const is3D = orderType === 'sticker3D' || orderType === 'stickerpack3D'
   const isStickerpack3D = orderType === 'stickerpack3D'
   const needLam = needsLamination(lamType)
@@ -189,7 +195,24 @@ export function forecastMaterials({
     })
   }
 
-  // 3. Смола
+  // 2б. R25.4 (ТЗ 4.3): монтажная плёнка — отдельная строка по формуле
+  // ламинации. Позиция — выбранная в заказе, иначе material_code='transfer'.
+  if (needsMontageFilm) {
+    const montageMeters = itemList.reduce((sum, it) => sum + computeLamMeters({
+      widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty,
+    }), 0)
+    rows.push({
+      key: 'montage',
+      label: 'Монтажная плёнка',
+      expected: montageMeters,
+      unit: 'м',
+      lookup: montageMaterialId
+        ? { by: 'materialId', value: montageMaterialId }
+        : { by: 'code', value: MONTAGE_MATERIAL_CODE },
+    })
+  }
+
+  // 3. Смола (только 3D; у «Прочего» смола не прогнозируется — ТЗ 4.1)
   if (is3D) {
     const resinG = itemList.reduce((sum, it) => sum + computeResinGrams({
       orderType, widthMm: it.widthMm, heightMm: it.heightMm, qty: it.qty,

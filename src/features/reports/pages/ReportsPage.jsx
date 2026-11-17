@@ -5,8 +5,8 @@ import { ThreeDPouringTab } from '../components/ThreeDPouringTab'
 import { buildCostMap, costForOrder } from '../lib/materials-cost'
 import { buildEmployeeReportAoa, parseDayKey } from '../lib/employee-report'
 import Input from '@/shared/components/Input'
-import { ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PAYMENT_STATUSES } from '@/shared/constants'
-import { formatPrice, formatOrderNumber, formatDate } from '@/shared/lib/utils'
+import { FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PAYMENT_STATUSES } from '@/shared/constants'
+import { formatPrice, formatOrderNumber, formatDate, formatOrderType } from '@/shared/lib/utils'
 import { downloadXlsx } from '@/shared/lib/export-xlsx'
 import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
@@ -186,7 +186,7 @@ function UnitEconomicsTab({ period }) {
       const first = o._first
       return [
         o.id, o._num, formatDate(o.created_at), o.deadline || '—',
-        o.client_name || '—', ORDER_TYPES[o.order_type]?.label || o.order_type,
+        o.client_name || '—', formatOrderType(o),
         o.order_type === 'sticker3D' || o.order_type === 'stickerpack3D' ? 'Да' : 'Нет',
         `${o.width_mm}×${o.height_mm}`, o.qty, o.stickers_per_pack || '—',
         o.film_material?.name || FILM_TYPES[o.film_type]?.label || o.film_type || '—',
@@ -225,7 +225,7 @@ function UnitEconomicsTab({ period }) {
                 <Td bold>{o._num}</Td>
                 <Td>{formatDate(o.created_at)}</Td>
                 <Td>{o.client_name || '—'}</Td>
-                <Td>{ORDER_TYPES[o.order_type]?.label}</Td>
+                <Td>{formatOrderType(o)}</Td>
                 <Td right>{o.width_mm}×{o.height_mm}</Td>
                 <Td right>{o.qty}</Td>
                 <Td>{o.film_material?.name || FILM_TYPES[o.film_type]?.label || '—'}</Td>

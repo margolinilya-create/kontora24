@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { ORDER_TYPES, ORDER_STATUSES } from '@/shared/constants'
-import { formatPrice, formatDate, formatOrderNumber } from '@/shared/lib/utils'
+import { ORDER_STATUSES } from '@/shared/constants'
+import { laminationSummary, designEditNote } from '../lib/order-labels'
+import { formatPrice, formatDate, formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 
@@ -43,11 +44,13 @@ export function OrderPdfExport({ order }) {
       doc.setFontSize(10)
 
       const params = [
-        ['Тип', ORDER_TYPES[order.order_type]?.label || order.order_type],
+        ['Тип', formatOrderType(order)],
         ['Размер', `${order.width_mm} × ${order.height_mm} мм`],
         ['Тираж', `${order.qty} шт`],
         ['Кол-во видов', `${order.design_variants || 1}`],
-        ['Ламинация', order.need_lam ? 'Да' : 'Нет'],
+        // R25.4: ламинация + монтажная плёнка одной строкой; правка макета.
+        ['Ламинация', laminationSummary(order)],
+        ...(designEditNote(order) ? [['Макет', designEditNote(order)]] : []),
         ['Срок', `${order.prod_days || '—'} дней`],
       ]
       params.forEach(([label, value]) => {

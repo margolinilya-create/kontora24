@@ -9,10 +9,10 @@ import { ru } from 'date-fns/locale'
 import { captureError } from '@/shared/lib/sentry'
 import Spinner from '@/shared/components/Spinner'
 import Sheet from '@/shared/components/Sheet'
-import { ORDER_TYPES, PRIORITIES, IS_3D_TYPE } from '@/shared/constants'
+import { PRIORITIES, IS_3D_TYPE } from '@/shared/constants'
 import { stageDotClass, DEPT_GROUPS } from '@/shared/lib/department-mapping'
 import { getDeadlineDotClass } from '@/shared/lib/deadline'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 
 const LOAD_COLORS = {
   empty: 'bg-surface',
@@ -50,7 +50,7 @@ export function ProductionCalendar() {
         const toDate = endOfWeek(monthEnd, { weekStartsOn: 1 })
         const { data, error: err } = await supabase
           .from('k24_orders')
-          .select('id, number, custom_number, order_type, deadline, status, qty, priority, client:k24_clients(name)')
+          .select('id, number, custom_number, order_type, product_name, deadline, status, qty, priority, client:k24_clients(name)')
           .not('status', 'in', '("done","cancelled")')
           .not('deadline', 'is', null)
           .gte('deadline', fromDate.toISOString().split('T')[0])
@@ -260,7 +260,7 @@ export function ProductionCalendar() {
                   )}
                 </div>
                 <p className="text-xs text-text-muted">
-                  {ORDER_TYPES[o.order_type]?.label || o.order_type} · {o.qty} шт
+                  {formatOrderType(o)} · {o.qty} шт
                 </p>
               </Link>
             )

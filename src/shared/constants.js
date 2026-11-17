@@ -113,6 +113,10 @@ export const ORDER_ROUTES = {
   stickerpack3D: ROUTE_3D_STICKERPACK,
   rect: ROUTE_RECT,
   big: ROUTE_BIG,
+  // R25.4: «Прочее» создаётся только в v2 (default route_version=2). Для v1 —
+  // универсальный маршрут на случай смены типа у старого заказа (снапшот v1
+  // типы 'other' не включает — эталон не меняется).
+  other: [...HEAD, 'print', 'lamination', 'cutting', 'selection', 'pouring', 'drying', 'assembly_3d', 'packaging', 'otk', 'done'],
 }
 
 // --- R25.1 (ТЗ 17.11 Фаза 1): маршруты версии 2 ---
@@ -435,6 +439,8 @@ export const PERMISSIONS = {
   actions: [
     'order:create', 'order:edit', 'order:cancel',
     'user:manage',
+    // R25.4: справочник подрядчиков (сид — миграция 099).
+    'contractor:manage',
   ],
   materials: [
     'material:add_transaction', 'material:manage', 'material:edit_name',
@@ -484,6 +490,7 @@ export const PERMISSION_LABELS = {
   'material:delete': 'Полное удаление позиций склада',
   'warehouse:edit_operation': 'Уточнять операции склада (дата, поставщик, вид)',
   'user:manage': 'Управлять пользователями',
+  'contractor:manage': 'Управлять подрядчиками',
 }
 
 // Legacy: hard-coded fallback. Используется до загрузки динамических прав
@@ -568,7 +575,42 @@ export const ORDER_TYPES = {
   stickerpack3D: { label: '3D стикерпак' },
   rect: { label: 'Прямоугольный' },
   big: { label: 'Большой формат' },
+  // R25.4 (ТЗ 4.1): «Прочее» — магниты и т.п. Название продукции хранится в
+  // order.product_name и показывается вместо «Прочее» (formatOrderType).
+  other: { label: 'Прочее' },
 }
+
+/** R25.4: «Прочее» — тип с обязательным названием продукции. */
+export const ORDER_TYPE_OTHER = 'other'
+export const PRODUCT_NAME_MAX = 100
+
+/**
+ * R25.4 (ТЗ 4.5): «Поштучная резка» связана с типом у винилового стикера:
+ * включена — «Стикер вырубной», выключена — «Стикер на подложке».
+ * У стикерпаков галочка скрыта; у 3D-стикера и прочих — независимая.
+ */
+export const INDIVIDUAL_CUT_LINKED_TYPES = { on: 'sticker_cut', off: 'sticker_kiss' }
+
+export function isIndividualCutHidden(orderType) {
+  return orderType === 'stickerpack' || orderType === 'stickerpack3D'
+}
+
+/** Тип при переключении галочки «Поштучная резка» (только виниловый стикер). */
+export function orderTypeForIndividualCut(orderType, checked) {
+  if (orderType !== 'sticker_cut' && orderType !== 'sticker_kiss') return orderType
+  return checked ? INDIVIDUAL_CUT_LINKED_TYPES.on : INDIVIDUAL_CUT_LINKED_TYPES.off
+}
+
+/** Значение галочки при выборе типа: null — не трогать (независимая/скрытая). */
+export function individualCutForOrderType(orderType) {
+  if (orderType === 'sticker_cut') return true
+  if (orderType === 'sticker_kiss') return false
+  if (isIndividualCutHidden(orderType)) return false
+  return null
+}
+
+/** R25.4 (ТЗ 4.6): максимум видов изделий в заказе (как в калькуляторе). */
+export const MAX_ORDER_ITEMS = 9
 
 // --- Lamination types (включая перенос на монтажную плёнку — R8.2 серии 25.05) ---
 // Все три варианта проходят через стадию `lamination` производственного маршрута;
@@ -583,6 +625,13 @@ export const LAMINATION_TYPES = {
  * Нужна ли стадия `lamination` в маршруте.
  * Принимает значение поля order.lam_type (matte/glossy/transfer/null).
  */
+// R25.4 (ТЗ 4.3): в форме заказа ламинация — только матовая/глянцевая.
+// Монтажная плёнка — отдельная галочка (needs_montage_film + montage_material_id).
+// 'transfer' остаётся в LAMINATION_TYPES для старых заказов (читаются и
+// списываются как раньше).
+export const LAMINATION_FORM_TYPES = ['matte', 'glossy']
+export const MONTAGE_MATERIAL_CODE = 'transfer'
+
 export function needsLamination(lamType) {
   return lamType != null && lamType !== '' && Object.prototype.hasOwnProperty.call(LAMINATION_TYPES, lamType)
 }
@@ -646,6 +695,9 @@ export const DELIVERY_TYPES = {
 export const DESIGN_STATUSES = {
   provided: { label: 'Предоставлен заказчиком' },
   needs_development: { label: 'Требуется разработка' },
+  // R25.4 (ТЗ 4.4): правка макета — «Дизайн» и «Утверждение дизайна»
+  // остаются в маршруте, как при разработке.
+  needs_edit: { label: 'Требуется правка макета' },
 }
 
 // --- Quick size presets ---
@@ -1031,6 +1083,7 @@ export const OPERATION_CHECKLISTS = {
   stickerpack3D: ['Препресс', 'Печать фонов', 'Печать стикеров', 'Ламинация фонов', 'Резка', 'Выборка фонов', 'Заливка стикеров', 'Сборка 3D', 'Проверка качества'],
   rect: ['Препресс', 'Печать', 'Резка', 'Проверка качества'],
   big: ['Препресс', 'Печать', 'Ламинация', 'Проверка качества'],
+  other: ['Препресс', 'Производство', 'Проверка качества'],
 }
 
 // --- Stage notification roles: when order enters status, notify these roles ---

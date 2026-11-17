@@ -27,12 +27,13 @@ import Modal from '@/shared/components/Modal'
 import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
 import {
-  ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES, DELIVERY_TYPES, PRIORITIES,
+  FILM_TYPES, DELIVERY_TYPES, PRIORITIES,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { toast } from '@/shared/stores/toast-store'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
+import { laminationLabel, montageLabel, designEditNote } from '../lib/order-labels'
 
 function GearIcon({ className = '' }) {
   return (
@@ -339,20 +340,31 @@ function OverviewTab({ order, onUpdated }) {
       <div className="space-y-3">
         {/* Row 1: Тип / Размер / Тираж / Плёнка */}
         <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <InfoField label="Тип" value={ORDER_TYPES[order.order_type]?.label || order.order_type} />
+          <InfoField label="Тип" value={formatOrderType(order)} />
           <InfoField label={multi ? 'Размеры (по видам)' : 'Размер'} value={sizeValue} />
           <InfoField label={multi ? 'Тираж (всего)' : 'Тираж'} value={qtyValue} />
           <InfoField label="Плёнка" value={order.film_material?.name || FILM_TYPES[order.film_type]?.label || (order.film_type && order.film_type !== 'white' ? order.film_type : '—')} />
         </div>
         {/* Row 2: Ламинация / БОПП / Стикеров в паке (только пак) / Отгрузка */}
         <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <InfoField label="Ламинация" value={order.need_lam ? (order.lam_material?.name || LAMINATION_TYPES[order.lam_type]?.label || 'Да') : 'Нет'} />
+          <InfoField label="Ламинация" value={laminationLabel(order) || 'Нет'} />
+          {/* R25.4 (ТЗ 4.3): монтажная плёнка — отдельно от ламинации */}
+          {order.needs_montage_film && (
+            <InfoField label="Монтажная плёнка" value={montageLabel(order)} />
+          )}
           <InfoField label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
           {isPack && (
             <InfoField label="Стикеров в паке" value={order.stickers_per_pack || '—'} />
           )}
           <InfoField label="Отгрузка" value={DELIVERY_TYPES[order.delivery_type]?.label || 'Самовывоз'} />
         </div>
+        {/* R25.4 (ТЗ 4.2): субподряд — подрядчик и что заказано */}
+        {order.is_subcontract && (
+          <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <InfoField label="Подрядчик" value={order.contractor?.name || '—'} />
+            <InfoField label="Что заказано у подрядчика" value={order.contractor_notes || '—'} />
+          </div>
+        )}
         {/* Виды изделий (multi-variant, R8.3 серии 25.05) */}
         <OrderItemsList orderId={order.id} />
 
@@ -442,6 +454,17 @@ export default function OrderDetailPage() {
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <EditableOrderNumber order={order} canEdit={canEdit} onUpdated={refetch} />
+            {/* R25.4 (ТЗ 4.4 / 4.2): правка макета и субподряд — видны в шапке */}
+            {designEditNote(order) && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-warning/15 text-warning">
+                {designEditNote(order)}
+              </span>
+            )}
+            {order.is_subcontract && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-info/15 text-info">
+                Субподряд{order.contractor?.name ? `: ${order.contractor.name}` : ''}
+              </span>
+            )}
             {order.priority && order.priority !== 'normal' && (
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITIES[order.priority]?.color}`}>
                 {PRIORITIES[order.priority]?.label}

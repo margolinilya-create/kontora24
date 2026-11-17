@@ -2,12 +2,12 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy, Suspense
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { supabase } from '@/shared/lib/supabase'
-import { ORDER_TYPES, ROLES, getNextStatus, MS_PER_DAY, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
+import { ROLES, getNextStatus, MS_PER_DAY, ACTIVE_ORDER_STATUSES } from '@/shared/constants'
 import { useRolePermissionsStore } from '@/features/auth/role-permissions-store'
 import { StatusBadge } from '@/features/orders/components/StatusBadge'
 import { updateOrderStatus } from '@/features/orders/hooks/useOrders'
 import { getDeadlineDotClass, getDeadlineBorderClass } from '@/shared/lib/deadline'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 
 const CompleteTaskModal = lazy(() => import('@/features/production/components/CompleteTaskModal').then(m => ({ default: m.CompleteTaskModal })))
 import Button from '@/shared/components/Button'
@@ -34,7 +34,7 @@ const WorkerTaskCard = memo(function WorkerTaskCard({ order, onUpdated }) {
           <Suspense fallback={null}><CompleteTaskModal order={order} isOpen={showComplete} onClose={() => setShowComplete(false)} onCompleted={onUpdated} /></Suspense>
         </div>
       </div>
-      <p className="text-sm font-medium">{ORDER_TYPES[order.order_type]?.label}</p>
+      <p className="text-sm font-medium">{formatOrderType(order)}</p>
       <p className="text-sm text-text-muted">{order.width_mm} x {order.height_mm} мм · {order.qty} шт</p>
       {order.deadline && (
         <p className={`text-xs mt-1 ${new Date(order.deadline) < new Date() ? 'text-danger font-medium' : 'text-text-muted'}`}>
@@ -523,7 +523,7 @@ function MetricOrdersList({ orders, onClose, showDeadline }) {
           >
             <span className="font-semibold text-text shrink-0">#{formatOrderNumber(o)}</span>
             <span className="text-text-muted truncate text-xs">
-              {ORDER_TYPES[o.order_type]?.label} · {o.qty} шт
+              {formatOrderType(o)} · {o.qty} шт
               {o.client?.name && ` · ${o.client.name}`}
             </span>
           </Link>

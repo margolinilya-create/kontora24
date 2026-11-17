@@ -4,7 +4,8 @@
 
 import { useMemo } from 'react'
 import { usePlanStore } from '../store/plan-store'
-import { schedule } from '../lib/planner'
+import { schedule, filterScheduleForDisplay } from '../lib/planner'
+import { moscowTodayISO, fromISODate } from '../lib/working-days'
 
 export function useScheduleResult({ horizonDays = 30 } = {}) {
   const orders = usePlanStore((s) => s.orders)
@@ -17,18 +18,23 @@ export function useScheduleResult({ horizonDays = 30 } = {}) {
   const today = usePlanStore((s) => s.today)
   // R17.3 (бриф 5.06): горизонт планирования из store (1/2/3 мес.).
   const horizonOverride = usePlanStore((s) => s.horizonDays)
+  // Ревью 17.11: «сегодня» по Москве считается на каждом рендере и входит в
+  // зависимости — после полуночи план пересчитывается от нового дня.
+  const todayISO = moscowTodayISO()
 
-  return useMemo(() => {
-    const filtered = filterType ? orders.filter((o) => o.order_type === filterType) : orders
-    return schedule({
-      orders: filtered,
-      items,
-      overrides,
-      norms,
-      capacity,
-      holidays,
-      today: today || new Date(),
-      horizonDays: horizonOverride || horizonDays,
-    })
-  }, [orders, items, overrides, norms, capacity, holidays, filterType, today, horizonDays, horizonOverride])
+  const full = useMemo(() => schedule({
+    orders,
+    items,
+    overrides,
+    norms,
+    capacity,
+    holidays,
+    today: today || fromISODate(todayISO),
+    horizonDays: horizonOverride || horizonDays,
+  }), [orders, items, overrides, norms, capacity, holidays, today, todayISO, horizonDays, horizonOverride])
+
+  return useMemo(
+    () => filterScheduleForDisplay(full, orders, filterType),
+    [full, orders, filterType],
+  )
 }

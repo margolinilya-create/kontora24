@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isWeekend, isWorkingDay, addDays, addWorkingDays, getWorkingDays,
-  previousWorkingDay, toISODate, fromISODate, startOfUTCDay,
+  previousWorkingDay, toISODate, fromISODate, startOfUTCDay, moscowTodayISO, moscowToday,
 } from './working-days'
 
 const D = (iso) => new Date(`${iso}T00:00:00.000Z`)
@@ -73,5 +73,16 @@ describe('working-days', () => {
   it('startOfUTCDay обнуляет время', () => {
     const d = new Date('2026-06-03T15:42:00.000Z')
     expect(toISODate(startOfUTCDay(d))).toBe('2026-06-03')
+  })
+})
+
+describe('moscowTodayISO (ревью 17.11)', () => {
+  it('после 21:00 UTC в Москве уже следующий день', () => {
+    expect(moscowTodayISO(new Date('2026-11-16T21:30:00.000Z'))).toBe('2026-11-17')
+    expect(moscowTodayISO(new Date('2026-11-16T20:59:00.000Z'))).toBe('2026-11-16')
+  })
+
+  it('moscowToday возвращает UTC-полночь московской даты', () => {
+    expect(moscowToday(new Date('2026-11-16T22:00:00.000Z')).toISOString()).toBe('2026-11-17T00:00:00.000Z')
   })
 })

@@ -3,7 +3,7 @@ import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useReprintQueue } from '../hooks/useReprintQueue'
 import { useBatchProductionLogs } from '../hooks/useProductionLogs'
-import { computeOtkStageProgress } from '../lib/production-logs'
+import { computeOtkStageProgress, computeQueueStageProgress } from '../lib/production-logs'
 import { getOrderRoute } from '@/shared/constants'
 import { QueueCard } from '../components/QueueCard'
 import { SubtaskCard } from '../components/SubtaskCard'
@@ -13,6 +13,7 @@ import Spinner from '@/shared/components/Spinner'
 import Tabs from '@/shared/components/Tabs'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { customQueueConfig } from '../lib/queue-config'
+import { translateError } from '@/shared/lib/error-translator'
 
 // R22.4 (ТЗ 20.07 Фаза 4Б): dual-track очередь подзадач (фоны/стикеры) упразднена
 // вместе с selection_pouring. stickerpack3D теперь идёт линейно и показывается
@@ -83,7 +84,7 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
   const { orders: allOrders, loading, refetch } = useOrders({ statuses: allStatuses })
   // R22.1 (ТЗ 20.07 Фаза 1): допечатки (track='reprint') видны в очереди своего
   // текущего этапа наравне с заказами. Статус допечатки = ключ этапа.
-  const { items: reprintItems, loading: reprintsLoading, refetch: refetchReprints } = useReprintQueue(config.status)
+  const { items: reprintItems, loading: reprintsLoading, error: reprintsError, refetch: refetchReprints } = useReprintQueue(config.status)
   const [showMine, setShowMine] = useState(false)
   const [sortBy, setSortBy] = useState('deadline')
   const [viewMode, setViewMode] = useState('list')
@@ -105,11 +106,13 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
   // Page-level batch fetch для production_logs (был N+1: каждая QueueCard
   // открывала свой SELECT + WS-канал). Дедуплицируем — 3D-pack идёт двумя items.
   const orderIds = useMemo(() => [...new Set(items.map((it) => it.order.id))], [items])
-  const { getStageProgress, logsByOrder, error: logsError } = useBatchProductionLogs(orderIds)
+  const { logsByOrder, error: logsError } = useBatchProductionLogs(orderIds)
   // R25.2: на ТК прогресс карточки — «годных после ТК» (брак ТК по типам).
+  // Ревью 17.11: у 3D-стикерпака заливка/сушка — в стикерах (тираж × в паке),
+  // на сушке годных = залитые − брак сушки (как виджет заказа, R23.6).
   const progressFor = (it) => (it.order.status === 'otk'
     ? computeOtkStageProgress(logsByOrder[it.order.id] || [], getOrderRoute(it.order), it.order.qty)
-    : getStageProgress(it.order.id, it.order.status, it.order.qty, it.track))
+    : computeQueueStageProgress(logsByOrder[it.order.id] || [], it.order, it.order.status, it.track))
 
   const totalInQueue = queueItems.length + reprintItems.length
 
@@ -120,14 +123,19 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
 
   const handleRefetch = () => { refetch(); refetchReprints() }
 
-  // Sound notification when new orders appear in queue
-  const prevCountRef = useRef(totalInQueue)
+  // Sound notification when new orders appear in queue.
+  // Ревью 17.11: пока очередь грузится, счётчик растёт с 0 до гидрированного
+  // значения — это не «новые заказы». Базу фиксируем только после окончания
+  // первой загрузки (null = ещё не зафиксирована) и первое значение пропускаем.
+  const queueReady = !loading && !reprintsLoading
+  const prevCountRef = useRef(null)
   useEffect(() => {
-    if (totalInQueue > prevCountRef.current) {
+    if (!queueReady) return
+    if (prevCountRef.current !== null && totalInQueue > prevCountRef.current) {
       playNotificationSound()
     }
     prevCountRef.current = totalInQueue
-  }, [totalInQueue])
+  }, [totalInQueue, queueReady])
 
   return (
     <div className="space-y-4">
@@ -174,6 +182,19 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
               ))}
             </select>
           </div>
+        </div>
+      )}
+
+      {reprintsError && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+          <span>Не удалось загрузить допечатки: {translateError(reprintsError).message}</span>
+          <button
+            type="button"
+            onClick={refetchReprints}
+            className="min-h-[44px] px-3 text-sm font-medium text-accent hover:text-accent-hover"
+          >
+            Повторить
+          </button>
         </div>
       )}
 

@@ -14,6 +14,7 @@ import { usePlanStore } from '../store/plan-store'
 import { useScheduleResult } from '../hooks/useScheduleResult'
 import { getOrderPalette } from '../lib/order-colors'
 import { makeDragId, makeDropId } from '../lib/dnd-ids'
+import { moscowTodayISO } from '../lib/working-days'
 
 const DOW_RU = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
 const WEEKEND_GAP_PX = 14
@@ -63,8 +64,6 @@ function loadPct(hours, capacity) {
   if (!capacity || !hours) return 0
   return Math.round((hours / capacity) * 100)
 }
-
-const TODAY_ISO = new Date().toISOString().slice(0, 10)
 
 function StageChip({ item, ordersById, selectedOrderId, onSelectOrder }) {
   const order = ordersById[item.order_id]
@@ -190,6 +189,9 @@ export function PlannerCalendar() {
 
   const days = result.days
   const visibleBuckets = VISIBLE_BUCKETS
+  // Ревью 17.11: «сегодня» по Москве на каждом рендере (раньше — UTC-константа
+  // модуля, замороженная на момент загрузки страницы).
+  const todayISO = moscowTodayISO()
 
   // R14.3: вставляем gap-колонки между рабочими днями с разрывом > 1 (выходные / праздники)
   const layout = useMemo(() => daysWithGaps(days), [days])
@@ -232,7 +234,7 @@ export function PlannerCalendar() {
           const h = formatDayHeader(d.date)
           const deadlines = deadlinesByDate[d.date] || []
           const isSelectedDeadline = d.date === selectedDeadline
-          const isToday = d.date === TODAY_ISO
+          const isToday = d.date === todayISO
           return (
             <div
               key={d.date}
@@ -270,6 +272,7 @@ export function PlannerCalendar() {
             ordersById={ordersById}
             selectedOrderId={selectedOrderId}
             selectedDeadline={selectedDeadline}
+            todayISO={todayISO}
             onSelectOrder={setSelectedOrderId}
           />
         ))}
@@ -278,7 +281,7 @@ export function PlannerCalendar() {
   )
 }
 
-function BucketRow({ bucket, layout, ordersById, selectedOrderId, selectedDeadline, onSelectOrder }) {
+function BucketRow({ bucket, layout, ordersById, selectedOrderId, selectedDeadline, todayISO, onSelectOrder }) {
   const label = BUCKET_LABELS[bucket]
   const isPassive = bucket === BUCKETS.passive
   return (
@@ -302,7 +305,7 @@ function BucketRow({ bucket, layout, ordersById, selectedOrderId, selectedDeadli
         }
         const d = slot.day
         const isDeadlineCol = d.date === selectedDeadline
-        const isToday = d.date === TODAY_ISO
+        const isToday = d.date === todayISO
         if (isPassive) {
           const passives = d.passives || []
           return (

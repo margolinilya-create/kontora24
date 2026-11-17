@@ -360,6 +360,11 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
   // (таргет = design_variants), а не штуки. Без скипа печать получала
   // «Поступило: 2 шт» при тираже 500 и ложный warning на каждый ввод
   // (ревью фиксов QA 04.07).
+  // Ревью 17.11: брак сушки. У drying нет quantityField (completion — таймер),
+  // поэтому раньше этап просто пропускался и его брак терялся: сборка/выборка
+  // после сушки видели «поступило» = все залитые. Копим брак сушки и вычитаем
+  // его из ближайшего количественного этапа до неё (заливки).
+  let carriedDefects = 0
   for (let i = idx - 1; i >= 0; i--) {
     const prev = route[i]
     // sample_print пропускаем по той же причине: его sample_film_meters —
@@ -368,6 +373,12 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
     if (prev === 'prepress' || prev === 'sample_print') continue
     const cfg = STAGE_FIELDS[prev]
     if (!cfg) continue
+    if (prev === 'drying') {
+      let dryLogs = logs.filter((l) => l.stage === 'drying')
+      if (track) dryLogs = dryLogs.filter((l) => l.track === track)
+      carriedDefects += dryLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
+      continue
+    }
     // На предыдущем этапе считаем по его quantityField и трек-фильтру.
     // Strict track filter — если track задан, ищем ИМЕННО его (фидбэк 17.05).
     // Раньше пропускался `!l.track || l.track === track`, что случайно работало
@@ -381,9 +392,15 @@ export function computeIncoming(logs, route, stage, targetQty, track) {
     if (track) stageLogs = stageLogs.filter((l) => l.track === track)
     const produced = stageLogs.reduce((sum, l) => sum + (Number(l[prevQtyField]) || 0), 0)
     // Из «поступило» вычитаем брак на предыдущем этапе — нельзя пустить дальше больше чем годных.
-    const prevDefects = stageLogs.reduce((sum, l) => sum + (Number(l.defects) || 0), 0)
-    const total = Math.max(0, produced - prevDefects)
-    if (produced > 0) return { total, source: prev, produced, defects: prevDefects }
+    // Исключение — stickers_good (заливка): он уже нетто (залито − брак), брак
+    // таких логов повторно не вычитаем (ревью 17.11).
+    const prevDefects = stageLogs.reduce((sum, l) => {
+      if (prevQtyField === 'stickers_good' && l.stickers_good != null) return sum
+      return sum + (Number(l.defects) || 0)
+    }, 0)
+    const defects = prevDefects + carriedDefects
+    const total = Math.max(0, produced - defects)
+    if (produced > 0) return { total, source: prev, produced, defects }
   }
   // Не нашли предыдущего этапа с количественным логом → это стартовый этап производства.
   return { total: null, source: null, isStart: true }
@@ -419,6 +436,71 @@ export function computeIncomingPerDesign(logs, route, stage, designIndex) {
     }
   }
   return { total: null, source: null, isStart: true }
+}
+
+/**
+ * Ревью 17.11 — правка лога заливки в истории (ProductionLogHistory). Поле
+ * «Хорошо залитых» (stickers_good) убрано из форм с 28.05 и пишется
+ * автоматически = max(0, залито − брак); по нему считаются оплата и прогресс.
+ * При правке «Залито» (или брака) пересчитываем его так же, иначе исправленное
+ * количество не доходит ни до прогресса, ни до сдельной оплаты.
+ *
+ * Пересчёт только если «Залито»/брак реально изменились — легаси-логи с
+ * вручную введённым stickers_good (без stickers_poured) не трогаем.
+ *
+ * @param {object} log   — исходный лог
+ * @param {object} patch — изменения из формы правки (числа / null)
+ * @returns {object} patch, при необходимости дополненный stickers_good
+ */
+export function withRecomputedGood(log, patch) {
+  if (!log || !patch) return patch
+  if (log.stage !== 'pouring' && log.stage !== 'selection_pouring') return patch
+  if (!('stickers_poured' in patch) && !('defects' in patch)) return patch
+  const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v))
+  const oldPoured = num(log.stickers_poured)
+  const oldDefects = num(log.defects) || 0
+  const newPoured = 'stickers_poured' in patch ? num(patch.stickers_poured) : oldPoured
+  const newDefects = 'defects' in patch ? (num(patch.defects) || 0) : oldDefects
+  if (newPoured === oldPoured && newDefects === oldDefects) return patch
+  if (newPoured == null) {
+    // «Залито» стёрто — годных из этого лога больше нет.
+    return oldPoured == null ? patch : { ...patch, stickers_good: null }
+  }
+  return { ...patch, stickers_good: Math.max(0, newPoured - newDefects) }
+}
+
+/**
+ * Ревью 17.11 — цель прогресса карточки очереди. Для 3D-стикерпака заливка и
+ * сушка считаются в стикерах (тираж × стикеров в паке), как строка виджета и
+ * форма в OrderProgressTab (R23.6) и серверная check_stage_completion (091).
+ */
+export function queueStageTarget(order, stage) {
+  const qty = Number(order?.qty) || 0
+  if (order?.order_type === 'stickerpack3D' && (stage === 'pouring' || stage === 'drying')) {
+    return qty * (Number(order?.stickers_per_pack) || 1)
+  }
+  return qty
+}
+
+/**
+ * Ревью 17.11 — прогресс карточки очереди по этапу заказа. На сушке нет
+ * quantityField, поэтому как в виджете заказа: годных = залитые − брак сушки.
+ */
+export function computeQueueStageProgress(logs, order, stage, track = null) {
+  const target = queueStageTarget(order, stage)
+  if (stage === 'drying') {
+    const list = logs || []
+    const poured = list
+      .filter((l) => l.stage === 'pouring' || l.stage === 'selection_pouring')
+      .reduce((s, l) => s + (Number(l.stickers_good) || Number(l.stickers_poured) || 0), 0)
+    const defects = list
+      .filter((l) => l.stage === 'drying')
+      .reduce((s, l) => s + (Number(l.defects) || 0), 0)
+    const total = Math.max(0, poured - defects)
+    const percentage = target > 0 ? Math.min(100, Math.round((total / target) * 100)) : 0
+    return { total, target, percentage, isComplete: target > 0 && total >= target }
+  }
+  return computeStageProgress(logs || [], stage, target, track)
 }
 
 /**

@@ -3,6 +3,7 @@ import { reprintStageFields, computeSubtaskStageProgress } from '../../lib/produ
 import { usePackagingMaterials } from '../../hooks/usePackagingMaterials'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { generateUuid } from '@/shared/lib/uuid'
 import Button from '@/shared/components/Button'
 import Input from '@/shared/components/Input'
 import { FILM_TYPES, REPRINT_STATUS_LABELS } from '@/shared/constants'
@@ -19,6 +20,9 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
   const [values, setValues] = useState({})
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  // Ревью 17.11: клиентский PK лога живёт до успеха или правки значений —
+  // повторное «Сохранить» после ошибки не создаёт дубль (23505 = уже записано).
+  const [pendingLogId, setPendingLogId] = useState(null)
 
   // R24 (фидбэк 24.07): на упаковке подзадачи — учёт БОПП/коробок как на упаковке
   // заказа. Списание со склада делает триггер deduct_materials_from_log (миграция
@@ -36,6 +40,12 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
     const name = order?.film_material?.name
       || FILM_TYPES[order?.film_type]?.label || order?.film_type
     return name ? `${field.label} · ${name}` : field.label
+  }
+
+  // Любая правка значений = новый лог: сбрасываем клиентский PK.
+  function edit(setter, value) {
+    setPendingLogId(null)
+    setter(value)
   }
 
   async function handleSubmit(e) {
@@ -67,6 +77,11 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
       }
     }
     if (notes) data.notes = notes
+    const logId = pendingLogId || generateUuid()
+    if (logId) {
+      data.id = logId
+      setPendingLogId(logId)
+    }
 
     setSaving(true)
     try {
@@ -74,13 +89,20 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
       setValues({})
       setNotes('')
       setBagId(''); setBoxId(''); setBoxesUsed('')
+      setPendingLogId(null)
       if (res?.advanced) {
         toast.success(`Этап завершён → ${REPRINT_STATUS_LABELS[res.new_status] || res.new_status}`)
       } else {
         toast.success('Сохранено')
       }
     } catch (err) {
-      toast.error(translateError(err).message)
+      if (err?.logSaved) {
+        // Лог записан, упало только продвижение. Значения и PK оставляем:
+        // повторное «Сохранить» повторит продвижение без дубля записи.
+        toast.error(`Данные сохранены, этап не продвинут: ${translateError(err).message}. Нажмите «Сохранить» ещё раз — запись не задвоится.`)
+      } else {
+        toast.error(translateError(err).message)
+      }
     } finally {
       setSaving(false)
     }
@@ -113,7 +135,7 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
             step={f.step || '1'}
             min="0"
             value={values[f.key] ?? ''}
-            onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))}
+            onChange={(e) => edit(setValues, (p) => ({ ...p, [f.key]: e.target.value }))}
             placeholder="0"
           />
         ))}
@@ -129,7 +151,7 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
               <span className="block text-xs text-text-muted mb-1">БОПП-пакет</span>
               <select
                 value={bagId}
-                onChange={(e) => setBagId(e.target.value)}
+                onChange={(e) => edit(setBagId, e.target.value)}
                 className="w-full rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
                 <option value="">— без БОПП —</option>
@@ -142,7 +164,7 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
               <span className="block text-xs text-text-muted mb-1">Коробка</span>
               <select
                 value={boxId}
-                onChange={(e) => setBoxId(e.target.value)}
+                onChange={(e) => edit(setBoxId, e.target.value)}
                 className="w-full rounded-lg border border-border px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
                 <option value="">— без коробки —</option>
@@ -168,13 +190,13 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
                   min="0"
                   step="1"
                   value={boxesUsed}
-                  onChange={(e) => setBoxesUsed(e.target.value)}
+                  onChange={(e) => edit(setBoxesUsed, e.target.value)}
                   placeholder={suggested ? String(suggested) : '1'}
                 />
                 {showSuggestion && (
                   <button
                     type="button"
-                    onClick={() => setBoxesUsed(String(suggested))}
+                    onClick={() => edit(setBoxesUsed, String(suggested))}
                     className="mt-1 text-[11px] text-accent hover:underline"
                   >
                     Рекомендуется {suggested} шт ({packs} ÷ {capacity}) — применить
@@ -193,7 +215,7 @@ export function SubtaskLogForm({ stage, subtask, order, logs, onSubmit }) {
         id="subtask-notes"
         label="Комментарий"
         value={notes}
-        onChange={(e) => setNotes(e.target.value)}
+        onChange={(e) => edit(setNotes, e.target.value)}
         placeholder="Необязательно"
       />
 

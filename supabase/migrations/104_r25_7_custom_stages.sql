@@ -315,7 +315,7 @@ BEGIN
     RETURN json_build_object('ok', false, 'error', 'Этап не найден — обновите страницу.');
   END IF;
 
-  IF EXISTS (SELECT 1 FROM k24_order_types WHERE production ? p_key) THEN
+  IF EXISTS (SELECT 1 FROM k24_order_types WHERE production ? p_key OR default_production ? p_key) THEN
     RETURN json_build_object('ok', false, 'error', 'Этап есть в маршруте типа заказа — уберите его из типов или отправьте этап в архив.');
   END IF;
   IF EXISTS (SELECT 1 FROM k24_orders

@@ -84,12 +84,14 @@ BEGIN
     RETURN json_build_object('ok', false, 'error', 'Этап уже изменился — обновите страницу.');
   END IF;
 
-  SELECT status INTO v_order_status FROM k24_orders WHERE id = v_order_id;
-  IF v_order_status IN ('done', 'cancelled') THEN
+  SELECT status INTO v_order_status FROM k24_orders WHERE id = v_order_id FOR SHARE;
+  IF v_order_status IN ('done', 'cancelled', 'awaiting_pickup', 'delivery') THEN
     RETURN json_build_object('ok', false, 'error',
       CASE WHEN v_order_status = 'done'
         THEN 'Заказ уже готов — допечатку вернуть нельзя.'
-        ELSE 'Заказ отменён — допечатку вернуть нельзя.'
+        WHEN v_order_status = 'cancelled'
+        THEN 'Заказ отменён — допечатку вернуть нельзя.'
+        ELSE 'Заказ уже прошёл ТК — допечатку вернуть нельзя.'
       END);
   END IF;
 

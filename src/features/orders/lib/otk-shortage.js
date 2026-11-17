@@ -12,7 +12,7 @@ import { computeOtkSummary, otkTargetQty } from '@/features/production/lib/produ
 export async function fetchOtkShortage(order) {
   const [logsRes, itemsRes] = await Promise.all([
     supabase.from('k24_production_logs')
-      .select('stage, track, subtask_id, item_idx, defect_stage, defects, deleted_at, stickers_printed, backgrounds_printed, lamination_qty, qty_cut, stickers_good, qty_selected, packs_assembled, packs_packaged, prepared_qty, sample_film_meters')
+      .select('stage, track, subtask_id, item_idx, defect_stage, defects, deleted_at, stickers_printed, backgrounds_printed, lamination_qty, qty_cut, stickers_good, qty_selected, packs_assembled, packs_packaged, prepared_qty, sample_film_meters, qty_done')
       .eq('order_id', order.id)
       .is('deleted_at', null),
     supabase.from('k24_order_items').select('idx, qty').eq('order_id', order.id),

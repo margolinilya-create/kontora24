@@ -40,7 +40,7 @@ async function loadInitial(store) {
         .order('deadline', { ascending: true, nullsFirst: false }),
       supabase
         .from('k24_production_logs')
-        .select('id, order_id, stage, track, stickers_printed, backgrounds_printed, lamination_qty, qty_cut, stickers_good, qty_selected, packs_assembled, packs_packaged, defects, deleted_at, created_at')
+        .select('id, order_id, stage, track, stickers_printed, backgrounds_printed, lamination_qty, qty_cut, stickers_good, qty_selected, packs_assembled, packs_packaged, qty_done, defects, deleted_at, created_at')
         .is('deleted_at', null),
       supabase
         .from('k24_order_items')

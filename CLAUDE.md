@@ -829,6 +829,32 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 - **Деньги склада** (суммы, цены, средняя цена) видны только с `view:finance` — на экранах, в Excel и (после 098) на сервере.
 - **Порядок применения**: 096 → 097 (перенос: классификация, «Начальный остаток» на разницу без суммы, NOT NULL; самопроверка остатков/WAC) → деплой фронта → **098 только после деплоя** (REVOKE `total_cost/unit_cost` и `k24_materials.unit_cost` у authenticated). Процесс для новых колонок этих таблиц: колоночный GRANT + для `k24_materials` — колонка в конец `k24_materials_full`. Никаких `select('*')` по `k24_materials` / `k24_material_transactions` (security-тест).
 
+## R25 — ТЗ «Доработки в Контору 24 (16.11)» (8 фаз, миграции 093–105)
+
+ТЗ от 17.11.2026 (Google Doc 1mmUreOg…), 8 фаз. Сделано за одну серию 17.11 агентами в worktree, каждая фаза: ревью миграции → применение через Supabase MCP → `npm run check` → сверка с эталоном отчётов → деплой → браузерный смоук (read-only, 375px + десктоп). Ветка `claude/document-review-and-plan-txwipp`.
+
+**Сквозное:** `k24_orders.route_version` (1 — все заказы до 17.11, 2 — новые); v1-маршруты защищены снапшот-тестом `routes-v1.snapshot.test.js`. Эталон отчётов май–ноябрь — `scripts/baseline/` (`r25_reports_baseline.sql` + `compare.mjs`): оплата 278 164 ₽, брак 13 602, годных 122 715 — совпадают после всех миграций. Оплата — единый `computeLogPayout(log, order, rates)` в constants.js.
+
+| Фаза | Что | Миграции |
+|------|-----|----------|
+| 0 | Эталон отчётов, единый `computeLogPayout` | — |
+| 1 | Маршрут v2: этапы ОП `awaiting_payment`/`design_approval`/`subcontract`/`awaiting_pickup`/`delivery`, «ТК» вместо «ОТК», раздел `/sales`, история статусов с `kind`/`note`, гейт допечаток на выходе с ТК, упаковка оплачивается v1 / 3D / БОПП | 093 |
+| 2 | ТК: брак по типам (`production_logs.defect_stage`), `applyOtkDefects`, `OtkDefectsForm`, «Создать допечатку» из недостачи, вкладка «Качество», «Брак ТК» в 3D-отделе; ТК не оплачивается | 094 |
+| 3 | Допечатки в списке/канбане/календаре заказов, `rollback_reprint_subtask` (право `subtask:rollback`, запрещён после ТК), счётчик на вкладке «Подзадачи» | 095 |
+| 4 | Форма заказа: «Прочее» + `product_name`, субподряд (`k24_contractors`, `contractor_cost` — финансовая), монтажная плёнка (`montage_material_id`, `montage_meters`, списание), `needs_edit`, до 9 видов, `formatOrderType(order)` в shared/lib/utils | 099 |
+| 5 | Калькулятор `/calculator` (`src/features/calculator`), 6 контрольных расчётов А.4 до рубля, настройки + история `k24_calc_settings_history`, плёнки по `k24_materials.calc_price_group` | 100 |
+| 6 | «Создать заказ» из калькулятора (`CreateOrderForm` вынесен из страницы), `k24_orders.calc_snapshot` (финансовая), блок «Расчёт из калькулятора» в Финансах | 101 |
+| 7 | Типы заказов и свои этапы: `k24_order_types`/`k24_stage_defs`, `k24_orders.route_snapshot` (+FK order_type), `route-registry.js`, конструктор маршрута в настройках, свои этапы `custom_N` (очередь `/production/stage/:key`, `qty_done`, ставки типа), материалы по категориям склада (`show_in_order`/`order_field`/`consume_stage`, `k24_order_materials`, `extra_consumption`) | 102–105 |
+| 8 | Склад: журнал операций, поступления, Excel, деньги склада только с `view:finance` | 096–098 |
+
+**Порядок `getOrderRoute`:** v1 → константы как было; v2 субподряд → `ROUTE_SUBCONTRACT_V2`; v2 со снимком → `route_snapshot.stages`; v2 без снимка → тип из реестра; иначе константы. Фильтры v2 — `applyV2Rules`.
+
+**Процесс для новых колонок:** `k24_orders` — колоночный GRANT (если не финансовая) + в конец `k24_orders_full` (последняя версия — 103) + при необходимости в `k24_protect_order_columns`; `k24_materials` — в конец `k24_materials_full` (последняя — 100). Подписи этапов — только через `getStatusMeta` (тест-сторож в `custom-stages.test.js`).
+
+**Смоук-фиксы 17.11:** «Калькулятор» в меню; журнал изменений во вкладке «История» (embed `k24_profiles!changed_by` на `k24_order_audit` падал PGRST200 — FK ведёт в auth.users, с R14.3); полоса `Tabs` прокручивается внутри (горизонтальный скролл на 375px).
+
+**Открыто:** часть 104c (пересоздание CHECK `defect_stage` под `custom_N` + RPC `delete_stage_def`/`delete_order_type`) — подтверждение Supabase не успевает за таймаут MCP, выполнить вручную в SQL Editor (`supabase/migrations/104_r25_7_custom_stages.sql`, секции defect_stage и delete_*). Калькулятору нужны ценовые группы плёнок (Настройки → Калькулятор). Пачки ценовых уровней стикерпаков в ТЗ не заданы — взяты 2 000–4 999 / 5 000–9 999 / 10 000–20 000, сверить с порталом.
+
 ## Обработка ошибок
 
 - **toast.error в action handlers:** `toast.error(translateError(err).message)` — перевод Supabase ошибок на человеческий русский

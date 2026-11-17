@@ -128,9 +128,10 @@ export async function unpinAll() {
 
 /**
  * Режим «Только этап»: помимо закрепления перетаскиваемого этапа,
- * также фиксируем все остальные запланированные этапы заказа на их
- * текущих датах. Принимает map { stage → 'YYYY-MM-DD' } — даты берутся
- * из результата schedule() ДО drop'а (первый день в plannedStages.days).
+ * также фиксируем остальные этапы заказа на их текущих датах. Принимает
+ * map { stage → 'YYYY-MM-DD' } из freezeStagesForThisOnly() (planner.js):
+ * только однодневные этапы — закрепление хранит один день, и многодневный
+ * этап сжался бы в него целиком (ревью 17.11).
  */
 export async function pinStageWithFreeze({ orderId, droppedStage, droppedDate, otherStages, userId }) {
   // 1) Закрепляем основной

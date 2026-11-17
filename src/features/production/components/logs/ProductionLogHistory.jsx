@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { STAGE_FIELDS, otkDefectLabel } from '../../lib/production-logs'
+import { STAGE_FIELDS, otkDefectLabel, withRecomputedGood } from '../../lib/production-logs'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
@@ -37,7 +37,7 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
   async function saveEdit(logId) {
     setBusy(true)
     try {
-      const patch = {}
+      let patch = {}
       Object.entries(editDraft).forEach(([k, v]) => {
         if (v === '' || v === null || v === undefined) {
           patch[k] = null
@@ -47,6 +47,9 @@ export function ProductionLogHistory({ logs, stage, onUpdateLog, onDeleteLog }) 
           patch[k] = v
         }
       })
+      // Заливка: «Хорошо залитых» (по нему оплата и прогресс) = залито − брак.
+      const original = logs.find((l) => l.id === logId)
+      patch = withRecomputedGood(original, patch)
       await onUpdateLog(logId, patch)
       toast.success('Запись обновлена')
       setEditingId(null)

@@ -92,6 +92,9 @@ export function useReprintSubtask(subtaskId) {
   const addLogAndAdvance = useCallback(async (stage, data) => {
     if (!profile) throw new Error('Не авторизован')
     if (!subtask) throw new Error('Допечатка не загружена')
+    // Ревью 17.11: форма выдаёт клиентский PK лога (data.id) и держит его до
+    // успеха/правки значений. Повтор после потерянного ответа или ошибки
+    // продвижения упирается в 23505 — лог уже записан, дубль не создаём.
     const { error: insErr } = await supabase.from('k24_production_logs').insert({
       order_id: subtask.order_id,
       subtask_id: subtask.id,
@@ -99,25 +102,38 @@ export function useReprintSubtask(subtaskId) {
       worker_id: profile.id,
       ...data,
     })
-    if (insErr) throw insErr
+    if (insErr && !(insErr.code === '23505' && data?.id)) throw insErr
 
-    // Пересчитываем прогресс этапа с учётом только что внесённого лога.
-    const { data: fresh } = await supabase
-      .from('k24_production_logs').select('*')
-      .eq('subtask_id', subtask.id).eq('stage', stage).is('deleted_at', null)
-    const prog = computeSubtaskStageProgress(fresh || [], stage, subtask.qty)
+    // Лог сохранён. Дальше ошибка — только продвижения: помечаем её, чтобы
+    // форма не теряла данные и сказала, что запись уже есть.
+    try {
+      // Пересчитываем прогресс этапа с учётом только что внесённого лога.
+      const { data: fresh, error: freshErr } = await supabase
+        .from('k24_production_logs').select('*')
+        .eq('subtask_id', subtask.id).eq('stage', stage).is('deleted_at', null)
+      if (freshErr) throw freshErr
+      const prog = computeSubtaskStageProgress(fresh || [], stage, subtask.qty)
 
-    let advanced = false
-    let newStatus = subtask.status
-    if (prog.isComplete) {
-      const { data: adv, error: advErr } = await supabase.rpc('advance_reprint_subtask', {
-        p_subtask_id: subtask.id, p_expected_status: stage,
-      })
-      if (advErr) throw advErr
-      if (adv?.ok) { advanced = true; newStatus = adv.new_status }
+      let advanced = false
+      let newStatus = subtask.status
+      if (prog.isComplete) {
+        const { data: adv, error: advErr } = await supabase.rpc('advance_reprint_subtask', {
+          p_subtask_id: subtask.id, p_expected_status: stage,
+        })
+        if (advErr) throw advErr
+        if (adv?.ok) { advanced = true; newStatus = adv.new_status }
+      }
+      await fetchData()
+      return { advanced, new_status: newStatus }
+    } catch (advanceErr) {
+      captureError(advanceErr, { tags: { source: 'useReprintSubtask.advance' }, extra: { subtaskId: subtask.id, stage } })
+      fetchData()
+      const wrapped = new Error(advanceErr?.message || 'Не удалось продвинуть этап')
+      wrapped.code = advanceErr?.code
+      wrapped.cause = advanceErr
+      wrapped.logSaved = true
+      throw wrapped
     }
-    await fetchData()
-    return { advanced, new_status: newStatus }
   }, [profile, subtask, fetchData])
 
   // R23.5: досрочный переход (менеджер/админ) — минует qty-сверку. Отдельная RPC,

@@ -29,6 +29,27 @@ export function startOfUTCDay(date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
 }
 
+// Ревью 17.11: «сегодня» планировщика — календарный день по Москве (цех
+// работает по МСК), а не по UTC: с 00:00 до 03:00 МСК UTC-дата ещё вчерашняя.
+// Возвращает 'YYYY-MM-DD'. Считается на каждый вызов — не кешировать в модуле.
+const MOSCOW_TZ = 'Europe/Moscow'
+const MOSCOW_OFFSET_MS = 3 * 60 * 60 * 1000 // фолбэк без Intl-tz: МСК = UTC+3 без перехода на летнее
+export function moscowTodayISO(now = new Date()) {
+  try {
+    // en-CA форматирует дату как YYYY-MM-DD.
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: MOSCOW_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(now)
+  } catch {
+    return toISODate(new Date(now.getTime() + MOSCOW_OFFSET_MS))
+  }
+}
+
+// То же как Date в UTC-полночь (формат, который принимают функции модуля).
+export function moscowToday(now = new Date()) {
+  return fromISODate(moscowTodayISO(now))
+}
+
 export function isHoliday(date, holidays) {
   if (!holidays || holidays.length === 0) return false
   return holidays.includes(toISODate(date))

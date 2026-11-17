@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   schedule, getActiveStages, getStageDurationHours, computeOrderVolumes,
-  dryingWaitDays,
+  dryingWaitDays, freezeStagesForThisOnly, filterScheduleForDisplay,
 } from './planner'
 import { DEFAULT_NORMS, DEFAULT_CAPACITY } from './norms'
 
@@ -407,5 +407,75 @@ describe('schedule', () => {
     expect(r.horizon.length).toBe(30)
     expect(r.horizon.startISO).toBe('2026-06-08')
     expect(r.horizon.endISO).toBeDefined()
+  })
+})
+
+// ============================================================
+// Ревью 17.11
+// ============================================================
+
+describe('freezeStagesForThisOnly (режим «Только этап»)', () => {
+  function call(orders, opts = {}) {
+    return schedule({
+      orders, items: [], overrides: opts.overrides || [], norms: DEFAULT_NORMS,
+      capacity: DEFAULT_CAPACITY, holidays: [], today: TODAY, horizonDays: 30,
+    })
+  }
+
+  it('многодневный этап не закрепляется (иначе сжался бы в один день)', () => {
+    const heavy = makeOrder({ id: 'H', qty: 100000, width_mm: 100, height_mm: 100 })
+    const planned = call([heavy]).byOrder.H.plannedStages
+    const print = planned.find((s) => s.stage === 'print')
+    expect(print.days.length).toBeGreaterThan(1)
+    const frozen = freezeStagesForThisOnly(planned, 'cutting')
+    expect(frozen).not.toHaveProperty('print')
+    expect(frozen).not.toHaveProperty('cutting')
+    for (const [stage, day] of Object.entries(frozen)) {
+      const ps = planned.find((s) => s.stage === stage)
+      expect(ps.days).toEqual([day])
+    }
+  })
+
+  it('однодневные — закрепляются, уже закреплённые/пассив/вехи — нет', () => {
+    const planned = [
+      { stage: 'design', bucket: 'design', days: ['2026-06-08'], pinned: false },
+      { stage: 'print', bucket: 'oprl_print', days: ['2026-06-09'], pinned: true },
+      { stage: 'cutting', bucket: 'oprl_cut', days: ['2026-06-10', '2026-06-11'], pinned: false },
+      { stage: 'drying', bucket: 'passive', days: ['2026-06-12'], pinned: false },
+      { stage: 'otk', bucket: 'post_osk', days: ['2026-06-15'], pinned: false },
+      { stage: 'done', bucket: 'milestone', days: [], pinned: false },
+    ]
+    expect(freezeStagesForThisOnly(planned, 'otk')).toEqual({ design: '2026-06-08' })
+  })
+
+  it('с заморозкой многодневный этап сохраняет свою раскладку', () => {
+    const heavy = makeOrder({ id: 'H', qty: 100000, width_mm: 100, height_mm: 100 })
+    const before = call([heavy]).byOrder.H.plannedStages
+    const frozen = freezeStagesForThisOnly(before, 'otk')
+    const overrides = Object.entries(frozen).map(([stage, d]) => ({ order_id: 'H', stage, pinned_date: d }))
+    const after = call([heavy], { overrides }).byOrder.H.plannedStages
+    expect(after.find((s) => s.stage === 'print').days)
+      .toEqual(before.find((s) => s.stage === 'print').days)
+  })
+})
+
+describe('filterScheduleForDisplay (фильтр типа — только отображение)', () => {
+  it('скрытые заказы занимают ёмкость, но их чипы не показываются', () => {
+    const a = makeOrder({ id: 'A', order_type: 'sticker_cut', qty: 100000, width_mm: 100, height_mm: 100 })
+    const b = makeOrder({ id: 'B', order_type: 'rect', qty: 100 })
+    const full = schedule({
+      orders: [a, b], items: [], overrides: [], norms: DEFAULT_NORMS,
+      capacity: DEFAULT_CAPACITY, holidays: [], today: TODAY, horizonDays: 30,
+    })
+    const shown = filterScheduleForDisplay(full, [a, b], 'rect')
+    expect(shown.orders.map((r) => r.order_id)).toEqual(['B'])
+    for (const d of shown.days) {
+      for (const slot of Object.values(d.buckets)) {
+        expect(slot.items.every((it) => it.order_id === 'B')).toBe(true)
+      }
+    }
+    expect(shown.days[0].buckets.oprl_print.hours).toBe(full.days[0].buckets.oprl_print.hours)
+    expect(shown.byOrder.B.finishDay).toBe(full.byOrder.B.finishDay)
+    expect(filterScheduleForDisplay(full, [a, b], null)).toBe(full)
   })
 })

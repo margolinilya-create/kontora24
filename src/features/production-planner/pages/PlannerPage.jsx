@@ -23,6 +23,7 @@ import { PlannerCalendar, DragOverlayChip } from '../components/PlannerCalendar'
 import { parseDragId, parseDropId } from '../lib/dnd-ids'
 import { getBucketForStage } from '../lib/buckets'
 import { pinStage, pinStageWithFreeze } from '../lib/plan-overrides'
+import { freezeStagesForThisOnly } from '../lib/planner'
 
 // R17.3 (бриф 5.06): пресеты горизонта планирования в рабочих днях.
 // 22 ≈ 1 месяц, 44 ≈ 2 месяца, 66 ≈ 3 месяца.
@@ -85,14 +86,9 @@ export default function PlannerPage() {
         userId: profile?.id,
       })
     } else {
-      // 'this_only': фиксируем все остальные этапы на их первых днях
-      const others = {}
-      for (const ps of r?.plannedStages || []) {
-        if (ps.stage === dropped.stage) continue
-        if (!ps.days || ps.days.length === 0) continue
-        if (ps.pinned) continue // уже закреплён, не трогаем
-        others[ps.stage] = ps.days[0]
-      }
+      // 'this_only': фиксируем остальные однодневные этапы на их днях.
+      // Многодневные не закрепляем — закрепление сжало бы их в один день.
+      const others = freezeStagesForThisOnly(r?.plannedStages, dropped.stage)
       await pinStageWithFreeze({
         orderId: dropped.orderId,
         droppedStage: dropped.stage,

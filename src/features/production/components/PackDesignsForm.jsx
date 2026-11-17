@@ -77,7 +77,15 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
   }, [drafts])
 
   function setField(idx, key, value) {
-    setDrafts((prev) => ({ ...prev, [idx]: { ...prev[idx], [key]: value } }))
+    setDrafts((prev) => {
+      const next = { ...prev[idx], [key]: value }
+      // Правка значений = новый лог: сбрасываем клиентский PK (как
+      // VariantLogForm.setField, R21). Иначе повтор после потерянного ответа
+      // упрётся в 23505 и молча выбросит новые цифры, показав «Сохранено»
+      // со старыми данными в БД. Цена — редкий видимый дубль, а не тихая потеря.
+      delete next.logId
+      return { ...prev, [idx]: next }
+    })
   }
 
   function designStats(designIndex) {
@@ -109,6 +117,11 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
       .reduce((s, l) => s + (Number(l.stickers_good) || Number(l.stickers_poured) || 0), 0)
   }
 
+  // Сколько брака ещё можно внести на сушке по виду: поступило − сохранённый брак.
+  function dryingDefectLimit(designIndex) {
+    return Math.max(0, pouringIncoming(designIndex) - designStats(designIndex).defects)
+  }
+
   async function handleSubmitAll() {
     // Собираем все непустые ряды → пишем их batch (N отдельных insert'ов).
     // Упавшие виды автоматически повторяем ОДИН раз: QA 04.07 поймал потерю
@@ -124,10 +137,32 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
     // Math.random-фолбэк не годится для uuid-колонки PK.
     const pending = []
     const draftsWithIds = { ...drafts }
+    // Ревью 17.11: лимит брака сушки держал только HTML-атрибут max — его
+    // обходит ввод с клавиатуры. Проверяем перед записью: брак вида не больше
+    // поступившего с заливки за вычетом уже сохранённого брака.
+    if (stage === 'drying') {
+      const over = []
+      for (const d of designs) {
+        const v = Number(drafts[d.design_index]?.value || 0)
+        // Заливка этого вида не учтена по видам (например, общей формой) —
+        // «поступило» неизвестно, не блокируем ввод.
+        if (!v || pouringIncoming(d.design_index) <= 0) continue
+        const max = dryingDefectLimit(d.design_index)
+        if (v > max) over.push(`#${d.design_index} (не больше ${max})`)
+      }
+      if (over.length > 0) {
+        toast.error(`Брак больше, чем поступило с заливки: вид ${over.join(', ')}. Исправьте значения.`)
+        return
+      }
+    }
     for (const d of designs) {
       const draft = draftsWithIds[d.design_index] || {}
       const value = Number(draft.value || 0)
       const defects = labels.showDefects ? Number(draft.defects || 0) : 0
+      if (!Number.isFinite(value) || value < 0 || !Number.isFinite(defects) || defects < 0) {
+        toast.error(`Вид #${d.design_index}: введите неотрицательное число`)
+        return
+      }
       if (value === 0 && defects === 0) continue
       const logId = draft.logId || generateUuid()
       draftsWithIds[d.design_index] = { ...draft, logId }
@@ -228,7 +263,7 @@ function PackDesignsFormImpl({ designs, logs = [], stage, incoming: _incoming, r
         const incomingTotal = isDrying ? dryIncoming : perDesignIncoming?.total
         // Ограничение поля брака: не больше чем поступило (за вычетом уже
         // сохранённого брака этого вида).
-        const dryDefectMax = isDrying ? Math.max(0, dryIncoming - defects) : null
+        const dryDefectMax = isDrying ? dryingDefectLimit(d.design_index) : null
         const isEditingName = editingNameId === d.id
 
         return (

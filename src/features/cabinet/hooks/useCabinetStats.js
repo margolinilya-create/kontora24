@@ -6,6 +6,18 @@ import { subDays, startOfMonth, subMonths, format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { calculateWorkerPayout, settingsToRates } from '@/shared/constants'
 import { fetchShapeByDesign, orderShapeFromLogs } from '@/shared/lib/payout-context'
+import { fetchAllChunked } from '@/shared/lib/export-xlsx'
+
+// PostgREST отдаёт ≤ 1000 строк за запрос: логи за 6 месяцев у активного
+// работника легко больше — график и заработок молча срезались (ревью 17.11).
+// Порции по 1000 со стабильной сортировкой (created_at, id).
+function fetchLogsChunked(buildQuery) {
+  return fetchAllChunked(async (from, to) => {
+    const { data, error } = await buildQuery().range(from, to)
+    if (error) throw error
+    return data || []
+  }, { cap: 200000 })
+}
 
 /**
  * Personal stats for worker cabinet:
@@ -34,14 +46,15 @@ export function useCabinetStats(period = '30') {
       // Для графика берём 6 месяцев независимо от выбранного периода
       const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5)).toISOString()
 
-      const [logsRes, shiftsRes, monthlyRes, ratesRes] = await Promise.all([
-        supabase
+      const [logsData, shiftsRes, monthlyData, ratesRes] = await Promise.all([
+        fetchLogsChunked(() => supabase
           .from('k24_production_logs')
           .select('*, order:k24_orders!order_id(number, custom_number, order_type, qty, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
           .gte('created_at', since)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })),
         supabase
           .from('k24_shift_entries')
           .select('*')
@@ -49,23 +62,23 @@ export function useCabinetStats(period = '30') {
           .gte('started_at', since)
           .not('ended_at', 'is', null)
           .order('started_at', { ascending: false }),
-        supabase
+        fetchLogsChunked(() => supabase
           .from('k24_production_logs')
-          .select('stage, order_id, design_index, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, lamination_qty, qty_done, defects, created_at, order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot)')
+          .select('id, stage, order_id, design_index, stickers_printed, stickers_good, qty_cut, qty_selected, packs_packaged, packs_assembled, lamination_qty, qty_done, defects, created_at, order:k24_orders!order_id(order_type, stickers_per_pack, sticker_shape, bopp_bag, route_version, route_snapshot)')
           .eq('worker_id', profile.id)
           .is('deleted_at', null)
-          .gte('created_at', sixMonthsAgo),
+          .gte('created_at', sixMonthsAgo)
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })),
         supabase.from('k24_settings').select('value').eq('key', 'bonus_rates').single(),
       ])
-      if (logsRes.error) throw logsRes.error
       if (shiftsRes.error) throw shiftsRes.error
-      if (monthlyRes.error) throw monthlyRes.error
 
       // R25.2 (ТЗ 2.5): записи брака ТК (stage='otk') — контроль менеджера,
       // не работа сотрудника: не входят ни в заработок, ни в счётчики кабинета.
-      const logs = (logsRes.data || []).filter((l) => l.stage !== 'otk')
+      const logs = logsData.filter((l) => l.stage !== 'otk')
       const shifts = shiftsRes.data || []
-      const monthly = (monthlyRes.data || []).filter((l) => l.stage !== 'otk')
+      const monthly = monthlyData.filter((l) => l.stage !== 'otk')
 
       // R19: ставки из настроек + формы стикеров для дифф. оплаты заливки.
       const payoutRates = settingsToRates(ratesRes.data?.value)

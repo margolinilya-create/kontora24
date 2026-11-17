@@ -269,7 +269,8 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
   // На этой стадии единственное поле — брак, который вычитается из суммы залитых.
   const dryingNetGood = (() => {
     if (stage !== 'drying' || !singleIncoming) return null
-    const draftDefects = Number(getForm('_root').defects || 0) || 0
+    // Поле брака одиночной формы пишется в forms.single (renderField → updateField('single')).
+    const draftDefects = Number(getForm('single').defects || 0) || 0
     return Math.max(0, singleIncoming.total - draftDefects)
   })()
 

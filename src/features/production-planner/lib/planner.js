@@ -35,7 +35,7 @@ import {
 } from './norms'
 import {
   addWorkingDays, getWorkingDays, previousWorkingDay,
-  toISODate, fromISODate, startOfUTCDay,
+  toISODate, fromISODate, startOfUTCDay, moscowToday,
 } from './working-days'
 
 // ============================================================
@@ -255,7 +255,7 @@ export function schedule({
   today,
   horizonDays = 30,
 }) {
-  const todayUtc = today ? startOfUTCDay(today) : startOfUTCDay(new Date())
+  const todayUtc = today ? startOfUTCDay(today) : moscowToday()
   const cap = resolveCapacity(capacity)
 
   // 1. Список рабочих дней горизонта
@@ -439,6 +439,56 @@ export function schedule({
     horizon: { startISO: workdayISO[0], endISO: horizonLastISO, length: workdayISO.length },
     byOrder,
     orders: Object.values(byOrder),
+  }
+}
+
+/**
+ * Ревью 17.11 — режим DnD «Только этап». Закрепление (k24_plan_overrides)
+ * хранит ОДИН день на этап, и закреплённый этап целиком кладётся в этот день.
+ * Раньше режим закреплял все остальные этапы заказа на первый день их
+ * диапазона — многодневный этап сжимался в один перегруженный день.
+ *
+ * Теперь замораживаем только этапы, занимающие ровно один день (их
+ * закрепление ничего не меняет в раскладке); многодневные остаются
+ * незакреплёнными и раскладываются каскадом от соседей. Уже закреплённые
+ * и сам перетаскиваемый этап не трогаем.
+ *
+ * @param {Array} plannedStages — byOrder[id].plannedStages из schedule()
+ * @param {string} droppedStage
+ * @returns {Object<string,string>} { stage → 'YYYY-MM-DD' }
+ */
+export function freezeStagesForThisOnly(plannedStages, droppedStage) {
+  const out = {}
+  for (const ps of plannedStages || []) {
+    if (ps.stage === droppedStage) continue
+    if (ps.pinned) continue
+    if (ps.bucket === BUCKETS.passive || ps.bucket === BUCKETS.milestone) continue
+    if (!ps.days || ps.days.length !== 1) continue
+    out[ps.stage] = ps.days[0]
+  }
+  return out
+}
+
+/**
+ * Ревью 17.11: фильтр типа заказа — только фильтр ОТОБРАЖЕНИЯ. Планируются
+ * все заказы (скрытые фильтром тоже занимают ёмкость цеха), иначе загрузка
+ * бакетов и даты готовности видимых заказов были бы занижены/ранними.
+ * Из результата убираются лишь чипы/пассивы/строки скрытых заказов; часы и
+ * перегруз ячеек остаются полными.
+ */
+export function filterScheduleForDisplay(result, orders, filterType) {
+  if (!filterType) return result
+  const visible = new Set(orders.filter((o) => o.order_type === filterType).map((o) => o.id))
+  return {
+    ...result,
+    days: result.days.map((d) => {
+      const buckets = {}
+      for (const [b, slot] of Object.entries(d.buckets)) {
+        buckets[b] = { ...slot, items: slot.items.filter((it) => visible.has(it.order_id)) }
+      }
+      return { ...d, buckets, passives: d.passives.filter((p) => visible.has(p.order_id)) }
+    }),
+    orders: result.orders.filter((r) => visible.has(r.order_id)),
   }
 }
 

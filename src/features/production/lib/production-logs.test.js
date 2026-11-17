@@ -384,7 +384,8 @@ describe('STAGE_FIELDS config', () => {
     // Поле остаётся quantityField для backward-compat агрегаций.
     // R11.0: drying не имеет quantityField вовсе — completion определяется
     // таймером 36ч, а не количеством.
-    const SKIP_QUANTITY_CHECK = new Set(['pouring', 'selection_pouring', 'drying'])
+    // R25.2: otk — запись брака ТК, «годных» этап не производит.
+    const SKIP_QUANTITY_CHECK = new Set(['pouring', 'selection_pouring', 'drying', 'otk'])
     for (const [stage, config] of Object.entries(STAGE_FIELDS)) {
       const fieldKeys = config.fields.map(f => f.key)
       if (SKIP_QUANTITY_CHECK.has(stage)) continue

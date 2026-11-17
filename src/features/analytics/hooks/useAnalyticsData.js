@@ -240,7 +240,7 @@ export function useAnalyticsData(period) {
     // печать (printMeters), ламинация (lamMeters), резка (cutMeters).
     // Менеджер просил «виджеты с учётом печати, ламинации и реза, измерять
     // в погонных метрах» — параллельно с «штучными» виджетами.
-    const OPS = ['poured', 'selected', 'assembled', 'packaged', 'printed', 'laminated', 'cut', 'prepared', 'samplePrint', 'drying', 'selection', 'printMeters', 'lamMeters', 'cutMeters']
+    const OPS = ['poured', 'selected', 'assembled', 'packaged', 'printed', 'laminated', 'cut', 'prepared', 'samplePrint', 'drying', 'selection', 'printMeters', 'lamMeters', 'cutMeters', 'otkDefects']
     const tot = {}
     const byOp = {}
     const workersByOp = {}
@@ -303,6 +303,10 @@ export function useAnalyticsData(period) {
       }
       if (log.stage === 'selection') {
         bump('selection', log, Number(log.qty_selected) || 0)
+      }
+      // R25.2 (ТЗ 2.4): брак, найденный на ТК (все типы).
+      if (log.stage === 'otk') {
+        bump('otkDefects', log, Number(log.defects) || 0)
       }
     }
     return { totals: tot, byOrder: byOp, byWorker: workersByOp, ordersById: ordersByIdLocal }

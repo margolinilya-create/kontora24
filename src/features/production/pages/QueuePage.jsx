@@ -3,6 +3,8 @@ import { useOrders } from '@/features/orders/hooks/useOrders'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useReprintQueue } from '../hooks/useReprintQueue'
 import { useBatchProductionLogs } from '../hooks/useProductionLogs'
+import { computeOtkStageProgress } from '../lib/production-logs'
+import { getOrderRoute } from '@/shared/constants'
 import { QueueCard } from '../components/QueueCard'
 import { SubtaskCard } from '../components/SubtaskCard'
 import { BatchView } from '../components/BatchView'
@@ -99,7 +101,11 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
   // Page-level batch fetch для production_logs (был N+1: каждая QueueCard
   // открывала свой SELECT + WS-канал). Дедуплицируем — 3D-pack идёт двумя items.
   const orderIds = useMemo(() => [...new Set(items.map((it) => it.order.id))], [items])
-  const { getStageProgress, error: logsError } = useBatchProductionLogs(orderIds)
+  const { getStageProgress, logsByOrder, error: logsError } = useBatchProductionLogs(orderIds)
+  // R25.2: на ТК прогресс карточки — «годных после ТК» (брак ТК по типам).
+  const progressFor = (it) => (it.order.status === 'otk'
+    ? computeOtkStageProgress(logsByOrder[it.order.id] || [], getOrderRoute(it.order), it.order.qty)
+    : getStageProgress(it.order.id, it.order.status, it.order.qty, it.track))
 
   const totalInQueue = queueItems.length + reprintItems.length
 
@@ -203,7 +209,7 @@ export default function QueuePage({ queueType, hideHeader, enableBatchView = fal
               order={it.order}
               track={it.track}
               onUpdated={handleRefetch}
-              progress={getStageProgress(it.order.id, it.order.status, it.order.qty, it.track)}
+              progress={progressFor(it)}
               logsError={logsError}
             />
           ))}

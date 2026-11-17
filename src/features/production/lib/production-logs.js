@@ -187,6 +187,37 @@ export const STAGE_FIELDS = {
       { key: 'defects', label: 'Брак', unit: 'шт' },
     ],
   },
+
+  // R25.2 (ТЗ 17.11 Фаза 2): брак, найденный на ТК, по типам. Каждая строка
+  // формы ТК — отдельный лог stage='otk' с defects + defect_stage (+ item_idx
+  // для мульти-вида). Количество «годных» этап не производит → quantityField
+  // нет (computeIncoming его пропускает). Поля здесь — для истории и правки.
+  otk: {
+    label: 'ТК',
+    fields: [
+      {
+        key: 'defect_stage',
+        label: 'Тип брака',
+        type: 'select',
+        options: [
+          { value: 'print', label: 'Печать' },
+          { value: 'lamination', label: 'Ламинация' },
+          { value: 'cutting', label: 'Рез' },
+          { value: 'pouring', label: 'Заливка' },
+        ],
+      },
+      { key: 'defects', label: 'Брак ТК', unit: 'шт' },
+    ],
+  },
+}
+
+/**
+ * Значение поля лога для показа в UI: у полей-списков (STAGE_FIELDS.otk.
+ * defect_stage) — подпись варианта вместо сырого ключа.
+ */
+export function fieldValueLabel(field, value) {
+  if (field?.options) return field.options.find((o) => o.value === value)?.label ?? value
+  return value
 }
 
 /**
@@ -595,6 +626,183 @@ export function validateLogEntry(stage, data, options = {}) {
   }
 
   return null
+}
+
+// ============================================================================
+// R25.2 (ТЗ 17.11 Фаза 2) — ТК: брак по типам.
+// Запись брака ТК = лог stage='otk' + defects + defect_stage (+ item_idx).
+// Брак ТК типа X вычитается из «годных» строки этапа X и ВСЕХ строк после неё
+// по маршруту заказа: испорченные изделия прошли дальше и годными там не были.
+// У стикерпаков брак вводится в паках и вычитается 1:1 и из строк в стикерах
+// (один испорченный пак = один испорченный стикер, ТЗ 2.3).
+// Единственная точка расчёта — applyOtkDefects / computeOtkSummary: их зовут
+// виджет «Прогресс по этапам», карточки очереди ТК и подтверждение выхода с ТК.
+// ============================================================================
+
+// Порядок = порядок типов в форме. Расширение под свои этапы — Фаза 7.
+export const OTK_DEFECT_STAGES = ['print', 'lamination', 'cutting', 'pouring']
+
+export const OTK_DEFECT_LABELS = {
+  print: 'Печать',
+  lamination: 'Ламинация',
+  cutting: 'Рез',
+  pouring: 'Заливка',
+}
+
+/** Активные (не удалённые) записи брака ТК с валидным типом и количеством. */
+export function otkDefectLogs(logs) {
+  return (logs || []).filter(
+    (l) => l.stage === 'otk' && !l.deleted_at
+      && OTK_DEFECT_STAGES.includes(l.defect_stage)
+      && (Number(l.defects) || 0) > 0,
+  )
+}
+
+/**
+ * Сумма брака ТК по типам. Фильтр по виду: itemIdx — только записи этого
+ * вида; excludeItemLogs — только записи без вида (order-level строка
+ * мульти-вида, см. getProgressLines). Без фильтра — все записи.
+ * @returns {{ print: number, lamination: number, cutting: number, pouring: number, total: number }}
+ */
+export function sumOtkDefectsByStage(logs, { itemIdx = null, excludeItemLogs = false } = {}) {
+  const out = { print: 0, lamination: 0, cutting: 0, pouring: 0, total: 0 }
+  for (const l of otkDefectLogs(logs)) {
+    if (itemIdx != null && l.item_idx !== itemIdx) continue
+    if (excludeItemLogs && l.item_idx != null) continue
+    const n = Number(l.defects) || 0
+    out[l.defect_stage] += n
+    out.total += n
+  }
+  return out
+}
+
+/**
+ * Сколько брака ТК вычитается из строки этапа `stage`: сумма типов X, у которых
+ * этап X стоит в маршруте не позже `stage`. Тип, чьего этапа нет в маршруте
+ * (маршрут поменялся после ввода), на строки не влияет — только на итог ТК.
+ */
+export function otkDeductionForStage(byStage, route, stage) {
+  if (!Array.isArray(route)) return 0
+  const idx = route.indexOf(stage)
+  if (idx < 0) return 0
+  let d = 0
+  for (const x of OTK_DEFECT_STAGES) {
+    const xi = route.indexOf(x)
+    if (xi >= 0 && xi <= idx) d += byStage?.[x] || 0
+  }
+  return d
+}
+
+/**
+ * Вычесть брак ТК из строк прогресса. Строка: { stage, total, itemIdx?,
+ * excludeItemLogs?, allowNegative? }. Возвращает новые строки с уменьшенным
+ * total (не ниже 0, кроме allowNegative) и otkDefects — сколько вычтено
+ * (для красной пометки «брак ТК: N»). Строки без вычета — otkDefects = 0.
+ */
+export function applyOtkDefects(rows, logs, route) {
+  const otk = otkDefectLogs(logs)
+  return (rows || []).map((r) => {
+    if (otk.length === 0) return { ...r, otkDefects: 0 }
+    const byStage = sumOtkDefectsByStage(otk, { itemIdx: r.itemIdx ?? null, excludeItemLogs: !!r.excludeItemLogs })
+    const d = otkDeductionForStage(byStage, route, r.stage)
+    if (!d) return { ...r, otkDefects: 0 }
+    const t = Number(r.total) || 0
+    return { ...r, total: r.allowNegative ? t - d : Math.max(0, t - d), otkDefects: d }
+  })
+}
+
+/**
+ * Итог ТК: «Поступило на ТК: N · Брак ТК: M · Годных: N − M из Q».
+ * N — годные с предыдущего количественного этапа (computeIncoming, включая
+ * логи допечаток). Если до ТК нет ни одной количественной записи — N
+ * неизвестно (incoming/good = null) и недостачу не считаем: иначе заказ без
+ * учёта работы получал бы ложное «Не хватает Q шт».
+ * @param {Array} logs — логи заказа
+ * @param {string[]} route — getOrderRoute(order)
+ * @param {number} target — тираж Q (у мульти-вида — сумма тиражей видов)
+ */
+export function computeOtkSummary(logs, route, target) {
+  const active = (logs || []).filter((l) => !l.deleted_at)
+  const byStage = sumOtkDefectsByStage(active)
+  const inc = computeIncoming(active, route, 'otk', target, null)
+  const incoming = inc.isStart || inc.total == null ? null : inc.total
+  const good = incoming == null ? null : Math.max(0, incoming - byStage.total)
+  const q = Number(target) || 0
+  const shortage = good == null ? 0 : Math.max(0, q - good)
+  return { incoming, defects: byStage.total, good, target: q, shortage, byStage }
+}
+
+/**
+ * Тираж Q для итога ТК: у мульти-вида (несколько размерных видов, не 3D-пак)
+ * — сумма тиражей видов, иначе order.qty (у стикерпаков — в паках).
+ */
+export function otkTargetQty(order, items) {
+  const list = Array.isArray(items) ? items : []
+  if (order?.order_type !== 'stickerpack3D' && list.length > 1) {
+    return list.reduce((s, it) => s + (Number(it.qty) || 0), 0)
+  }
+  return Number(order?.qty) || 0
+}
+
+/** Прогресс «Годных после ТК» в форме computeStageProgress (карточки очереди ТК). */
+export function computeOtkStageProgress(logs, route, target) {
+  const s = computeOtkSummary(logs, route, target)
+  const total = s.good ?? 0
+  const percentage = s.target > 0 ? Math.min(100, Math.round((total / s.target) * 100)) : 0
+  return { total, target: s.target, percentage, isComplete: s.good != null && total >= s.target }
+}
+
+/** Комментарий допечатки: «Брак ТК: печать 10, рез 5». */
+export function buildOtkReprintComment(byStage) {
+  const parts = OTK_DEFECT_STAGES
+    .filter((x) => (byStage?.[x] || 0) > 0)
+    .map((x) => `${OTK_DEFECT_LABELS[x].toLowerCase()} ${byStage[x]}`)
+  return parts.length ? `Брак ТК: ${parts.join(', ')}` : 'Брак ТК'
+}
+
+/**
+ * Предзаполнение окна «Создать допечатку» из итога ТК: количество = недостача,
+ * причина «Брак», вид — если весь брак ТК относится к одному виду.
+ */
+export function buildOtkReprintPrefill(logs, summary) {
+  const views = new Set(otkDefectLogs(logs).map((l) => l.item_idx ?? null))
+  const onlyView = views.size === 1 ? [...views][0] : null
+  return {
+    qty: summary?.shortage || 0,
+    reason: 'defect',
+    view: onlyView != null ? onlyView : null,
+    comment: buildOtkReprintComment(summary?.byStage),
+  }
+}
+
+/**
+ * Строки формы ТК → записи логов. Строка: { defectStage, qty, view }.
+ * Пустые строки (без типа и количества) пропускаются. Записи несут ТОЛЬКО
+ * defect_stage / defects / item_idx / track — без метров и упаковки, поэтому
+ * триггер deduct_materials_from_log их не списывает (проверяется тестом).
+ * @param {object} opts — allowedStages: типы из маршрута; viewRequired: видов > 1
+ * @returns {{ payloads: object[], error: string|null }}
+ */
+export function buildOtkLogPayloads(rows, { allowedStages = OTK_DEFECT_STAGES, viewRequired = false } = {}) {
+  const payloads = []
+  for (const r of rows || []) {
+    const hasType = !!r?.defectStage
+    const hasQty = r?.qty !== '' && r?.qty != null
+    if (!hasType && !hasQty) continue
+    if (!hasType || !allowedStages.includes(r.defectStage)) return { payloads: [], error: 'Выберите тип брака' }
+    const qty = Number(r.qty)
+    if (!Number.isInteger(qty) || qty < 1) return { payloads: [], error: 'Количество — целое число от 1' }
+    const hasView = r.view !== '' && r.view != null
+    if (viewRequired && !hasView) return { payloads: [], error: 'Выберите вид' }
+    payloads.push({
+      defect_stage: r.defectStage,
+      defects: qty,
+      item_idx: viewRequired && hasView ? Number(r.view) : null,
+      track: null,
+    })
+  }
+  if (payloads.length === 0) return { payloads: [], error: 'Добавьте хотя бы одну строку брака' }
+  return { payloads, error: null }
 }
 
 // ============================================================================

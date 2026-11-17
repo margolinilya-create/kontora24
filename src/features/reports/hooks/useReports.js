@@ -4,6 +4,7 @@ import { useRefetchOnFocus } from '@/shared/hooks/useRefetchOnFocus'
 import { captureError } from '@/shared/lib/sentry'
 import { subDays, startOfMonth, startOfDay, endOfDay, format, parseISO } from 'date-fns'
 import { calculateWorkerPayout, settingsToRates, resolvePayoutRates } from '@/shared/constants'
+import { buildQualityRows } from '../lib/quality-report'
 import { fetchShapeByDesign, orderShapeFromLogs, shapeForLog } from '@/shared/lib/payout-context'
 import { buildBonusRows, logPayoutTotals } from '../lib/payout-report'
 
@@ -428,31 +429,15 @@ export function useQualityReport(period = '30') {
         supabase.from('k24_orders').select('id, number, custom_number, qty, order_type')
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').order('number').limit(500),
         supabase.from('k24_production_logs')
-          .select('order_id, stickers_printed, stickers_poured, stickers_good')
+          .select('order_id, stage, defects, defect_stage, stickers_printed, stickers_poured, stickers_good')
           .is('deleted_at', null)
           .gte('created_at', getSince(period)).lte('created_at', getUntil(period) ?? '9999-12-31T23:59:59Z').limit(10000),
       ])
       if (ordersRes.error) throw ordersRes.error
       if (logsRes.error) throw logsRes.error
 
-      const logsByOrder = {}
-      ;(logsRes.data || []).forEach((l) => {
-        if (!logsByOrder[l.order_id]) logsByOrder[l.order_id] = { printed: 0, poured: 0, good: 0 }
-        logsByOrder[l.order_id].printed += l.stickers_printed || 0
-        logsByOrder[l.order_id].poured += l.stickers_poured || 0
-        logsByOrder[l.order_id].good += l.stickers_good || 0
-      })
-
-      const rows = (ordersRes.data || [])
-        .filter((o) => logsByOrder[o.id])
-        .map((o) => {
-          const l = logsByOrder[o.id]
-          const rejected = l.poured > 0 ? l.poured - l.good : 0
-          const rejectPct = l.poured > 0 ? Math.round((rejected / l.poured) * 100) : 0
-          const surplus = l.printed > 0 ? l.printed - o.qty : 0
-          const surplusPct = o.qty > 0 ? Math.round((surplus / o.qty) * 100) : 0
-          return { ...o, ...l, rejected, rejectPct, surplus, surplusPct }
-        })
+      // R25.2: + брак по этапам и «в т.ч. найдено на ТК» (quality-report.js).
+      const rows = buildQualityRows(ordersRes.data, logsRes.data)
       setData(rows)
     } catch (err) {
       captureError(err, { tags: { source: 'reports.useQualityReport' }, extra: { period } })

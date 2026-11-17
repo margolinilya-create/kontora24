@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useOrdersCostReport, useEmployeeReport } from '../hooks/useReports'
+import { useOrdersCostReport, useEmployeeReport, useQualityReport } from '../hooks/useReports'
 import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
 import { ThreeDPouringTab } from '../components/ThreeDPouringTab'
 import { buildCostMap, costForOrder } from '../lib/materials-cost'
@@ -32,6 +32,7 @@ const REPORT_TABS_ALL = [
   { key: 'unit',     label: 'Unit Economics', requiresFinance: true },
   { key: 'people',   label: 'Сотрудники',     requiresFinance: true },
   { key: 'team3d',   label: '3D отдел',       requiresFinance: false },
+  { key: 'quality',  label: 'Качество',       requiresFinance: false },
   { key: 'expenses', label: 'Расходы по заказам', requiresFinance: true },
   { key: 'pnl',      label: 'P&L',            requiresFinance: true },
 ]
@@ -116,6 +117,7 @@ export default function ReportsPage() {
       {activeTab === 'unit'     && <UnitEconomicsTab period={period} />}
       {activeTab === 'people'   && <EmployeesTab period={period} />}
       {activeTab === 'team3d'   && <ThreeDPouringTab period={period} />}
+      {activeTab === 'quality'  && <QualityTab period={period} />}
       {activeTab === 'expenses' && <ExpensesTab period={period} />}
       {activeTab === 'pnl'      && <PnLTab period={period} />}
     </div>
@@ -243,6 +245,74 @@ function UnitEconomicsTab({ period }) {
               </tr>
             )
           })}
+        </tbody>
+      </table>
+    </ReportFrame>
+  )
+}
+
+// ============================================================================
+// Качество — брак по этапам; R25.2 (ТЗ 2.4): брак ТК добавлен к браку этапа
+// своего типа + «в т.ч. найдено на ТК». Без финансов.
+// ============================================================================
+function QualityTab({ period }) {
+  const { data, loading, error, refetch } = useQualityReport(period)
+
+  if (loading) return <CenterSpinner />
+  if (error) return <ReportError text="Не удалось загрузить отчёт «Качество»" error={error} onRetry={refetch} />
+  if (data.length === 0) return <Empty text="Нет данных за период" />
+
+  // «12 (ТК 10)» — всего по этапу и сколько из этого найдено на ТК.
+  const withOtk = (total, otk) => (otk > 0 ? `${total} (ТК ${otk})` : total || '—')
+
+  function handleExport() {
+    const header = [
+      '№ заказа', 'Продукт', 'Тираж', 'Напечатано',
+      'Брак печати', 'в т.ч. найдено на ТК (печать)',
+      'Брак ламинации', 'в т.ч. найдено на ТК (ламинация)',
+      'Брак реза', 'в т.ч. найдено на ТК (рез)',
+      'Брак заливки', 'в т.ч. найдено на ТК (заливка)',
+      '% брака заливки', 'Брак ТК всего', 'Излишки, шт', 'Излишки, %',
+    ]
+    const aoa = [header, ...data.map((o) => [
+      formatOrderNumber(o), ORDER_TYPES[o.order_type]?.label || o.order_type, o.qty, o.printed,
+      o.defects_print, o.otk_print,
+      o.defects_lamination, o.otk_lamination,
+      o.defects_cutting, o.otk_cutting,
+      o.rejected, o.otk_pouring,
+      `${o.rejectPct}%`, o.otk_total, o.surplus, `${o.surplusPct}%`,
+    ])]
+    downloadXlsx(`качество-${period}`, 'Качество', aoa)
+      .catch((err) => toast.error(translateError(err).message))
+  }
+
+  return (
+    <ReportFrame title="Качество" onXlsx={handleExport}>
+      <table className="w-full text-xs">
+        <thead className="text-text-muted">
+          <tr className="border-b border-border">
+            <Th>№</Th><Th>Продукт</Th><Th right>Тираж</Th><Th right>Напечатано</Th>
+            <Th right>Брак печати</Th><Th right>Брак лам.</Th><Th right>Брак реза</Th>
+            <Th right>Брак заливки</Th><Th right>% брака</Th><Th right>Брак ТК</Th>
+            <Th right>Излиш.шт</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((o) => (
+            <tr key={o.id} className="border-b border-border last:border-0">
+              <Td bold>{formatOrderNumber(o)}</Td>
+              <Td>{ORDER_TYPES[o.order_type]?.label || o.order_type}</Td>
+              <Td right>{o.qty}</Td>
+              <Td right>{o.printed || '—'}</Td>
+              <Td right>{withOtk(o.defects_print, o.otk_print)}</Td>
+              <Td right>{withOtk(o.defects_lamination, o.otk_lamination)}</Td>
+              <Td right>{withOtk(o.defects_cutting, o.otk_cutting)}</Td>
+              <Td right>{withOtk(o.rejected, o.otk_pouring)}</Td>
+              <Td right danger={o.rejectPct > 15}>{o.rejectPct}%</Td>
+              <Td right danger={o.otk_total > 0}>{o.otk_total || '—'}</Td>
+              <Td right muted>{o.surplus > 0 ? `+${o.surplus}` : o.surplus}</Td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </ReportFrame>

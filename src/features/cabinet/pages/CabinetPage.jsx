@@ -2,7 +2,7 @@ import { useState, lazy, Suspense, useMemo } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useShiftTracker } from '@/features/production/hooks/useShiftTracker'
 import { useCabinetStats } from '../hooks/useCabinetStats'
-import { STAGE_FIELDS } from '@/features/production/lib/production-logs'
+import { STAGE_FIELDS, fieldValueLabel } from '@/features/production/lib/production-logs'
 import { ROLES, ORDER_TYPES } from '@/shared/constants'
 import { formatDateTime } from '@/shared/lib/utils'
 import { Link } from 'react-router-dom'
@@ -438,7 +438,7 @@ function ShiftLogValues({ log, stage }) {
   for (const f of config.fields) {
     const v = log[f.key]
     if (v === undefined || v === null || v === '' || v === 0) continue
-    parts.push(`${f.label}: ${v}${f.unit ? ' ' + f.unit : ''}`)
+    parts.push(`${f.label}: ${fieldValueLabel(f, v)}${f.unit ? ' ' + f.unit : ''}`)
   }
   if (parts.length === 0) return null
   return <span className="text-text-muted">— {parts.join(', ')}</span>

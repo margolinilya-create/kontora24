@@ -11,10 +11,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { captureError } from '@/shared/lib/sentry'
 import { normalizeSettings } from '../lib/calc'
+import { fetchWarehouseCategories } from '@/features/warehouse/hooks/useWarehouseCategories'
+import { orderFieldMaterials } from '@/features/warehouse/lib/order-material-categories'
 
 export const CALC_SETTINGS_KEY = 'calculator'
 
-const MATERIAL_COLS = 'id, type, name, material_code, archived_at, calc_price_group, calc_display_name'
+const MATERIAL_COLS = 'id, type, name, material_code, archived_at, calc_price_group, calc_display_name, category_id'
 
 function makeChannelId(prefix) {
   const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
@@ -33,22 +35,27 @@ export function useCalculatorSettings() {
     if (!silent) setLoading(true)
     setError(null)
     try {
-      const [settingsR, materialsR] = await Promise.all([
+      // R25.7B (ТЗ 7.5/7.7): плёнки и ламинация — по отметкам категорий склада
+      // («Материал печати» / «Ламинация»); без отметок — по служебному типу.
+      const [settingsR, materialsR, categories] = await Promise.all([
         supabase.from('k24_settings').select('key, value').eq('key', CALC_SETTINGS_KEY).maybeSingle(),
         supabase
           .from('k24_materials_full')
           .select(MATERIAL_COLS)
-          .in('type', ['film', 'lam_film'])
           .is('archived_at', null)
           .order('name'),
+        fetchWarehouseCategories().catch((err) => {
+          captureError(err, { tags: { source: 'useCalculatorSettings.categories' } })
+          return []
+        }),
       ])
       if (settingsR.error) throw settingsR.error
       if (materialsR.error) throw materialsR.error
       if (!mountedRef.current) return
       const mats = materialsR.data || []
       setRaw(settingsR.data?.value || null)
-      setFilms(mats.filter((m) => m.type === 'film'))
-      setLaminations(mats.filter((m) => m.type === 'lam_film'))
+      setFilms(orderFieldMaterials(mats, categories, 'print').items)
+      setLaminations(orderFieldMaterials(mats, categories, 'lamination').items)
     } catch (err) {
       captureError(err, { tags: { source: 'useCalculatorSettings.load' } })
       if (mountedRef.current) setError(err)

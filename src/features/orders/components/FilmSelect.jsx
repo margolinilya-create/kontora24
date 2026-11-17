@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { useMaterials } from '@/features/warehouse/hooks/useMaterials'
+import { useWarehouseCategories } from '@/features/warehouse/hooks/useWarehouseCategories'
+import { orderFieldMaterials, groupOptions } from '@/features/warehouse/lib/order-material-categories'
 import { FILM_TYPES } from '@/shared/constants'
 import { formatNumber } from '@/shared/lib/utils'
 
@@ -17,17 +19,28 @@ const SELECT_CLASS = 'w-full rounded-lg border border-border bg-surface px-3 py-
  *
  * Сортировка: позиции с остатком > 0 наверху, затем 0/out-of-stock, внутри —
  * по material_code (если есть) + имени.
+ *
+ * R25.7B (ТЗ 7.5): список строится по отметкам категорий склада
+ * («Показывать при заведении заказа» + поле «Материал печати») и группируется
+ * по категориям. Если ни одна категория не отмечена — прежний список по
+ * служебному типу 'film'.
  */
 export function FilmSelect({ label, value, onChange, includeOutOfStock = false, id, expected }) {
   const { materials } = useMaterials()
+  const { categories } = useWarehouseCategories()
 
-  const { options, currentMaterial } = useMemo(() => {
-    const films = materials.filter((m) => m.type === 'film' && !m.archived_at)
+  const { options, currentMaterial, grouped } = useMemo(() => {
+    const { items: films, grouped: isGrouped } = orderFieldMaterials(
+      materials.filter((m) => !m.archived_at), categories, 'print',
+    )
 
     const enriched = films.map((m) => ({
       id: m.id,
       name: m.name,
       code: m.material_code || null,
+      unit: m.unit || 'м',
+      group: m.group,
+      groupRank: m.groupRank,
       stock: Number(m.stock_qty) || 0,
       inStock: (Number(m.stock_qty) || 0) > 0,
     }))
@@ -47,6 +60,9 @@ export function FilmSelect({ label, value, onChange, includeOutOfStock = false, 
           id: stub.id,
           name: stub.name,
           code: stub.material_code || null,
+          unit: stub.unit || 'м',
+          group: isGrouped ? 'Текущий выбор' : null,
+          groupRank: -1,
           stock: Number(stub.stock_qty) || 0,
           inStock: false,
         }
@@ -65,13 +81,24 @@ export function FilmSelect({ label, value, onChange, includeOutOfStock = false, 
       return a.name.localeCompare(b.name)
     })
 
-    return { options: result, currentMaterial: current || null }
-  }, [materials, value, includeOutOfStock])
+    return { options: result, currentMaterial: current || null, grouped: isGrouped }
+  }, [materials, categories, value, includeOutOfStock])
 
   // Прогноз расхода считаем по выбранной позиции (а не по всем G).
   const shortage = (expected != null && currentMaterial)
     ? Math.max(0, expected - currentMaterial.stock)
     : 0
+
+  function renderOption(o) {
+    const codeLabel = o.code && FILM_TYPES[o.code]?.label
+    const suffix = codeLabel ? ` · ${codeLabel}` : ''
+    return (
+      <option key={o.id} value={o.id}>
+        {o.name}{suffix} · {formatNumber(o.stock, 1)} {o.unit}
+        {!o.inStock ? ' (нет на складе)' : ''}
+      </option>
+    )
+  }
 
   function handleChange(e) {
     const newId = e.target.value || null
@@ -94,16 +121,13 @@ export function FilmSelect({ label, value, onChange, includeOutOfStock = false, 
         {!currentMaterial && options.length > 0 && (
           <option value="" disabled>— выбрать плёнку —</option>
         )}
-        {options.map((o) => {
-          const codeLabel = o.code && FILM_TYPES[o.code]?.label
-          const suffix = codeLabel ? ` · ${codeLabel}` : ''
-          return (
-            <option key={o.id} value={o.id}>
-              {o.name}{suffix} · {formatNumber(o.stock, 1)} м
-              {!o.inStock ? ' (нет на складе)' : ''}
-            </option>
-          )
-        })}
+        {grouped
+          ? groupOptions(options).map((g) => (
+            <optgroup key={g.label || '—'} label={g.label || '—'}>
+              {g.options.map(renderOption)}
+            </optgroup>
+          ))
+          : options.map(renderOption)}
       </select>
       {shortage > 0 && (
         <p className="mt-1 text-xs text-danger">

@@ -279,7 +279,7 @@ function QualityTab({ period }) {
       '% брака заливки', 'Брак ТК всего', 'Излишки, шт', 'Излишки, %',
     ]
     const aoa = [header, ...data.map((o) => [
-      formatOrderNumber(o), ORDER_TYPES[o.order_type]?.label || o.order_type, o.qty, o.printed,
+      formatOrderNumber(o), formatOrderType(o), o.qty, o.printed,
       o.defects_print, o.otk_print,
       o.defects_lamination, o.otk_lamination,
       o.defects_cutting, o.otk_cutting,
@@ -305,7 +305,7 @@ function QualityTab({ period }) {
           {data.map((o) => (
             <tr key={o.id} className="border-b border-border last:border-0">
               <Td bold>{formatOrderNumber(o)}</Td>
-              <Td>{ORDER_TYPES[o.order_type]?.label || o.order_type}</Td>
+              <Td>{formatOrderType(o)}</Td>
               <Td right>{o.qty}</Td>
               <Td right>{o.printed || '—'}</Td>
               <Td right>{withOtk(o.defects_print, o.otk_print)}</Td>

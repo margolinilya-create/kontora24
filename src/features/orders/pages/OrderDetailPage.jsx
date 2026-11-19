@@ -29,12 +29,12 @@ import Modal from '@/shared/components/Modal'
 import Tabs from '@/shared/components/Tabs'
 import DropdownMenu from '@/shared/components/DropdownMenu'
 import {
-  FILM_TYPES, DELIVERY_TYPES, PRIORITIES,
+  DELIVERY_TYPES, PRIORITIES,
 } from '@/shared/constants'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { toast } from '@/shared/stores/toast-store'
-import { formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
+import { formatOrderNumber, formatOrderType, formatOrderMaterial, formatSubcontractMaterials } from '@/shared/lib/utils'
 import { laminationLabel, montageLabel, designEditNote } from '../lib/order-labels'
 import { patchNeedsRefetch } from '../lib/order-edit'
 
@@ -341,12 +341,12 @@ function OverviewTab({ order, onUpdated }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Left: 3 rows */}
       <div className="space-y-3">
-        {/* Row 1: Тип / Размер / Тираж / Плёнка */}
+        {/* Row 1: Тип / Размер / Тираж / Материал */}
         <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <InfoField label="Тип" value={formatOrderType(order)} />
           <InfoField label={multi ? 'Размеры (по видам)' : 'Размер'} value={sizeValue} />
           <InfoField label={multi ? 'Тираж (всего)' : 'Тираж'} value={qtyValue} />
-          <InfoField label="Плёнка" value={order.film_material?.name || FILM_TYPES[order.film_type]?.label || (order.film_type && order.film_type !== 'white' ? order.film_type : '—')} />
+          <InfoField label="Материал" value={(order.film_type !== 'white' || order.film_material?.name) ? (formatOrderMaterial(order) || '—') : '—'} />
         </div>
         {/* Row 2: Ламинация / БОПП / Стикеров в паке (только пак) / Отгрузка */}
         <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -366,6 +366,12 @@ function OverviewTab({ order, onUpdated }) {
           <div className="bg-surface rounded-2xl border border-border shadow-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <InfoField label="Подрядчик" value={order.contractor?.name || '—'} />
             <InfoField label="Что заказано у подрядчика" value={order.contractor_notes || '—'} />
+            {/* R27.1 (ТЗ 19.11, №3): материал/ламинация/монтаж — у подрядчика */}
+            {formatSubcontractMaterials(order) && (
+              <div className="sm:col-span-2 min-w-0 break-words">
+                <InfoField label="У подрядчика" value={formatSubcontractMaterials(order)} />
+              </div>
+            )}
           </div>
         )}
         {/* Виды изделий (multi-variant, R8.3 серии 25.05) */}

@@ -118,7 +118,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       qty: order.qty ?? '',
       need_lam: !!order.need_lam,
       lam_type: order.lam_type || 'glossy',
-      film_type: order.film_type || 'G',
+      film_type: order.film_material_id ? (order.film_type || null) : (order.film_type || 'G'),
       film_type_stickers: order.film_type_stickers || order.film_type || 'G',
       film_material_id: order.film_material_id || null,
       film_stickers_material_id: order.film_stickers_material_id || null,
@@ -540,12 +540,13 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
               />
             </Field>
           )}
-          <Field label="Плёнка">
+          <Field label="Материал">
             <FilmSelect
               value={form.film_material_id || form.film_type || 'G'}
               onChange={({ materialId, code }) => {
                 update('film_material_id', materialId)
-                if (code) update('film_type', code)
+                // R27.2: позиция без кода — film_type = null (не прежний код).
+                if (materialId) update('film_type', code || null)
               }}
               includeOutOfStock
             />

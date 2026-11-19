@@ -32,3 +32,20 @@ export function laminationSummary(order) {
 export function designEditNote(order) {
   return order?.design_status === 'needs_edit' ? DESIGN_STATUSES.needs_edit.label : null
 }
+
+/**
+ * R27.2 (ТЗ 19.11, №4.4): доп. материалы заказа (k24_order_materials с
+ * категорией order_field='extra') для тех-карты и наклейки. Позиция с «NFC»
+ * в названии подписывается «NFC-метка».
+ * @param {Array<{ material?: {name?:string}, category?: {order_field?:string} }>} rows
+ * @returns {Array<{ label:string, value:string, isNfc:boolean }>}
+ */
+export function extraMaterialLabels(rows) {
+  return (rows || [])
+    .filter((r) => r?.material?.name && (!r.category || r.category.order_field === 'extra'))
+    .map((r) => {
+      const name = String(r.material.name).trim()
+      const isNfc = /nfc/i.test(name)
+      return { label: isNfc ? 'NFC-метка' : 'Доп. материал', value: name, isNfc }
+    })
+}

@@ -233,9 +233,10 @@ function aggregateFilmUsage(logs, order) {
     if (l.stage !== 'print') continue
     const meters = Number(l.film_meters) || 0
     if (!meters) continue
-    const ft = isPack3D && l.track === 'stickers'
+    // R27.2: позиция без кода (бумага) — film_type = null, ключ '__material'.
+    const ft = (isPack3D && l.track === 'stickers'
       ? (order.film_type_stickers || order.film_type)
-      : order.film_type
+      : order.film_type) || (order.film_material_id ? '__material' : null)
     if (!ft) continue
     byType[ft] = (byType[ft] || 0) + meters
   }
@@ -831,11 +832,14 @@ function ProgressLinesWidget({ order, logs, items = [] }) {
 
       {isOnPrint && filmUsage && Object.keys(filmUsage).length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
-          <h3 className="font-semibold text-sm mb-2">Расход плёнки</h3>
+          <h3 className="font-semibold text-sm mb-2">Расход материала</h3>
           <div className="space-y-1.5">
             {Object.entries(filmUsage).map(([ft, m]) => (
               <div key={ft} className="flex items-center justify-between text-xs">
-                <span className="text-text-muted">{FILM_TYPES[ft]?.label || ft}</span>
+                <span className="text-text-muted">
+                  {((ft === order.film_type || ft === '__material') && order.film_material?.name)
+                    || FILM_TYPES[ft]?.label || (ft === '__material' ? 'Материал' : ft)}
+                </span>
                 <span className="font-medium tabular-nums">{m.toFixed(1)} м</span>
               </div>
             ))}

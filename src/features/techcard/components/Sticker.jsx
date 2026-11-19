@@ -1,7 +1,8 @@
 import { forwardRef, useLayoutEffect, useRef, useState, useImperativeHandle } from 'react'
 import kontoraLogo from '@/assets/kontora-logo.png'
 import { formatOrderNumberShort, formatOrderType } from '@/shared/lib/utils'
-import { laminationSummary } from '@/features/orders/lib/order-labels'
+import { laminationSummary, extraMaterialLabels } from '@/features/orders/lib/order-labels'
+import { useOrderExtraMaterials } from '@/features/orders/hooks/useOrderMaterials'
 
 // 120×75 мм. 1 мм = 2.833 px при 72dpi → 340×213 px.
 const MM = 2.833
@@ -39,6 +40,9 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
   useImperativeHandle(ref, () => rootRef.current, [])
 
   const isDelivery = type === 'delivery'
+  // R27.2 (ТЗ 4.4): NFC-метка — цеху на боксе (только производственная наклейка).
+  const extraRows = useOrderExtraMaterials(isDelivery ? null : order?.id)
+  const hasNfc = extraMaterialLabels(extraRows).some((x) => x.isNfc)
   const clientName = order?.client?.name || '—'
   const number = order ? formatOrderNumberShort(order) : ''
   const deadline = order?.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'
@@ -124,6 +128,7 @@ export const Sticker = forwardRef(function Sticker({ order, type = 'production' 
         ...((order.need_lam || order.needs_montage_film)
           ? [{ label: 'Ламинация', value: laminationSummary(order), small: true }]
           : []),
+        ...(hasNfc ? [{ label: 'NFC-метка', value: 'Да', small: true }] : []),
       ]
 
   return (

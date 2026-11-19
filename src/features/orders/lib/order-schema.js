@@ -24,7 +24,8 @@ const baseSchema = z.object({
   qty: z.coerce.number().min(1, 'Минимум 1'),
   width_mm: z.coerce.number().min(1, 'Укажите ширину'),
   height_mm: z.coerce.number().min(1, 'Укажите высоту'),
-  film_type: z.string().default('G'),
+  // R27.2: позиция склада без кода (бумага) — film_type = null.
+  film_type: z.string().nullable().default('G'),
   film_type_stickers: z.string().optional().nullable(),
   film_material_id: z.string().optional().nullable(),
   film_stickers_material_id: z.string().optional().nullable(),

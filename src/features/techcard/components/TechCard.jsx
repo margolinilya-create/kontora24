@@ -1,8 +1,9 @@
 import { forwardRef, memo, useRef, useState } from 'react'
 import { formatOrderType } from '../utils'
-import { formatOrderNumber } from '@/shared/lib/utils'
+import { formatOrderNumber, formatSubcontractMaterials } from '@/shared/lib/utils'
 import { getFilmMaterialName, IS_3D_TYPE, IS_3D_STICKERPACK } from '@/shared/constants'
-import { laminationSummary, designEditNote } from '@/features/orders/lib/order-labels'
+import { laminationSummary, designEditNote, extraMaterialLabels } from '@/features/orders/lib/order-labels'
+import { useOrderExtraMaterials } from '@/features/orders/hooks/useOrderMaterials'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useOrderItems } from '@/features/orders/hooks/useOrderItems'
 import { isMultiVariant, sumVariantQty, formatVariantSizes } from '@/features/orders/lib/order-items-format'
@@ -33,7 +34,10 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
   const { profile } = useAuth()
   // R18.3: хук вызываем до early-return (rules-of-hooks); useOrderItems терпит пустой id.
   const { items } = useOrderItems(order?.id)
+  // R27.2 (ТЗ 4.4): доп. материалы заказа (NFC-метка и т.п.).
+  const extraRows = useOrderExtraMaterials(order?.id)
   if (!order) return null
+  const extras = extraMaterialLabels(extraRows)
 
   const canEdit = editable && (profile?.role === 'admin' || profile?.role === 'manager')
 
@@ -58,7 +62,7 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
   // R25.4 (ТЗ 4.3): монтажная плёнка — отдельно от ламинации, обе опции в одной строке.
   const lamLabel = laminationSummary(order)
   const designNote = designEditNote(order)
-  const filmLabel = order.film_material?.name || getFilmMaterialName(order.film_type)
+  const filmLabel = order.film_material?.name || getFilmMaterialName(order.film_type) || '—'
   // Если отдельная плёнка стикеров не задана вовсе — стикеры физически идут
   // на плёнке фонов (так же списывает и триггер, миграция 057): печатаем
   // filmLabel, а не обобщённый маппинг по коду фонов.
@@ -166,10 +170,18 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
-            {isPack3D ? (
+            {order.is_subcontract ? (
               <>
-                <Field label="Плёнка фонов" value={filmLabel} valueFontSize={9} />
-                <Field label="Плёнка стикеров" value={stickersFilmLabel} valueFontSize={9} />
+                {/* R27.1 (ТЗ 19.11, №3): материал / ламинация / монтаж делает подрядчик */}
+                <div style={{ gridColumn: 'span 3', minWidth: 0 }}>
+                  <Field label="У подрядчика" value={formatSubcontractMaterials(order) || '—'} valueFontSize={9} />
+                </div>
+                <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
+              </>
+            ) : isPack3D ? (
+              <>
+                <Field label="Материал фонов" value={filmLabel} valueFontSize={9} />
+                <Field label="Материал стикеров" value={stickersFilmLabel} valueFontSize={9} />
                 <Field label="Ламинация" value={lamLabel} />
                 <Field label="БОПП пакет" value={order.bopp_bag ? 'Да' : 'Нет'} />
               </>
@@ -182,6 +194,13 @@ const TechCardInner = forwardRef(function TechCardInner({ order, editable = fals
               </>
             )}
           </div>
+          {extras.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 * MM }}>
+              {extras.map((x) => (
+                <Field key={`${x.label}-${x.value}`} label={x.label} value={x.value} valueFontSize={9} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Правая колонка — Срок сдачи (шрифт Guidy + перенос) */}

@@ -12,6 +12,9 @@
 //   buildExtraOrderData(values, payload) — доп. колонки заказа (снимок расчёта и т.п.)
 //   onDirtyChange(bool) — форма изменена пользователем (подтверждение закрытия)
 //   variant         — 'page' | 'modal' (панель кнопок закреплена всегда в попапе)
+//   initialExtraSelection — R27.2: доп. материалы заказа { [category_id]: material_id }
+//                     (калькулятор передаёт NFC-метку); сохраняются, только если
+//                     категория видна в форме (её этап есть в маршруте)
 //
 // Цена: без права view:finance поле скрыто. Если цена пришла из расчёта
 // (prefilledKeys содержит price_final) — она пишется в заказ и без права на
@@ -183,6 +186,7 @@ export function CreateOrderForm({
   buildExtraOrderData,
   onDirtyChange,
   variant = 'page',
+  initialExtraSelection,
 }) {
   const { profile } = useAuth()
   // Начальные значения фиксируются при монтировании: попап калькулятора берёт
@@ -389,7 +393,12 @@ export function CreateOrderForm({
   // R25.7B (ТЗ 7.5): дополнительные материалы — категории «Дополнительный
   // материал», чей этап списания есть в маршруте будущего заказа (v2).
   const { categories: whCategories } = useWarehouseCategories()
-  const [extraSelection, setExtraSelection] = useState({})
+  // R27.2: предзаполнение из калькулятора (фиксируется при монтировании).
+  const [extraSelection, setExtraSelection] = useState(() => (
+    initialExtraSelection && typeof initialExtraSelection === 'object'
+      ? Object.fromEntries(Object.entries(initialExtraSelection).filter(([k, v]) => k && v))
+      : {}
+  ))
   const designStatus = watch('design_status')
   const extraCategories = useMemo(() => {
     if (!orderType) return []
@@ -460,7 +469,8 @@ export function CreateOrderForm({
   useEffect(() => {
     if (orderType === lastOrderTypeRef.current) return
     lastOrderTypeRef.current = orderType
-    if (orderType === 'sticker3D' || orderType === 'stickerpack3D') {
+    // R27.2: код 'G' по умолчанию — только пока позиция материала не выбрана.
+    if ((orderType === 'sticker3D' || orderType === 'stickerpack3D') && !getValues('film_material_id')) {
       setValue('film_type', 'G')
     }
     if (orderType === 'stickerpack3D') {
@@ -471,7 +481,7 @@ export function CreateOrderForm({
     // у стикерпаков скрыта (сбрасываем).
     const cut = individualCutForOrderType(orderType)
     if (cut !== null) setValue('needs_individual_cut', cut)
-  }, [orderType, setValue])
+  }, [orderType, setValue, getValues])
 
   function applyPreset(key) {
     if (key === null) {
@@ -523,7 +533,7 @@ export function CreateOrderForm({
     // отличаются от фонов).
     // R25.4: на субподряде плёнку цеха не выбираем — изделие делает подрядчик.
     if (!values.is_subcontract && !values.film_material_id) {
-      toast.error('Выберите плёнку со склада (конкретную позицию) — без неё себестоимость считается неверно')
+      toast.error('Выберите материал со склада (конкретную позицию) — без неё себестоимость считается неверно')
       return
     }
     // R23.3 (ТЗ 23.07 Фаза 8.4): у stickerpack3D больше нет отдельной плёнки
@@ -556,9 +566,12 @@ export function CreateOrderForm({
       }
       stage = 'createOrder'
       const sub = !!values.is_subcontract
-      // На субподряде ламинация/монтаж цеха не выполняются.
-      const lamOn = needLam && !sub
-      const montageOn = !!values.needs_montage_film && !sub
+      // R27.1 (ТЗ 19.11, №3): у субподряда материал, ламинация и монтаж
+      // сохраняются — это то, что делает подрядчик («У подрядчика: …»).
+      // Этапов печати/ламинации в маршруте субподряда нет, со склада не
+      // списывается (маршрут ROUTE_SUBCONTRACT_V2 без applyV2Rules).
+      const lamOn = needLam
+      const montageOn = !!values.needs_montage_film
       const payload = {
         order_type: values.order_type,
         qty: itemsCount > 1 ? variantsTotal : values.qty,
@@ -567,7 +580,7 @@ export function CreateOrderForm({
         need_lam: lamOn,
         lam_type: lamOn ? (values.lam_type || 'glossy') : null,
         lam_material_id: lamOn ? (values.lam_material_id || null) : null,
-        film_type: values.film_type,
+        film_type: values.film_type || null,
         film_material_id: values.film_material_id || null,
         // R25.4 (ТЗ Фаза 4)
         product_name: values.order_type === 'other' ? (values.product_name || '').trim() : null,
@@ -985,18 +998,22 @@ export function CreateOrderForm({
               </div>
             )}
 
-            {/* Плёнка + Ламинация/перенос на монтаж.
-                R23.3 (ТЗ 23.07 Фаза 8.4): для stickerpack3D тоже ОДНА плёнка
-                (раньше были отдельные «Плёнка фонов» + «Плёнка стикеров»). */}
-            {!isSubcontract && (
+            {/* Материал + Ламинация/перенос на монтаж.
+                R23.3 (ТЗ 23.07 Фаза 8.4): для stickerpack3D тоже ОДИН материал.
+                R27.1: показываются и для субподряда (материал необязателен). */}
+            {isSubcontract && (
+              <p className="text-xs text-text-muted -mb-2">Материал и ламинация у подрядчика — для тех-карты, со склада не списываются.</p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <FilmSelect
-                label={<>Плёнка *<FromCalc show={isPrefilled('film_material_id')} /></>}
+                label={<>{isSubcontract ? 'Материал' : 'Материал *'}<FromCalc show={isPrefilled('film_material_id')} /></>}
                 id="film_type"
                 value={watch('film_material_id') || filmType}
                 onChange={({ materialId, code }) => {
                   setValue('film_material_id', materialId, { shouldDirty: true })
-                  if (code) setValue('film_type', code, { shouldDirty: true })
+                  // R27.2 (ТЗ 4.3): позиция без кода (бумага и т.п.) — film_type = null,
+                  // а не прежний код другой плёнки.
+                  if (materialId) setValue('film_type', code || null, { shouldDirty: true })
                 }}
                 expected={filmType ? expectedByCode[filmType] : undefined}
                 includeOutOfStock
@@ -1013,24 +1030,21 @@ export function CreateOrderForm({
                 excludeCodes={LAMINATION_FORM_EXCLUDE_CODES}
               />
             </div>
-            )}
 
             {/* R25.4 (ТЗ 4.3): монтажная плёнка — отдельно от ламинации */}
-            {!isSubcontract && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-                <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
-                  <input type="checkbox" {...register('needs_montage_film')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
-                  <span className="text-sm">Монтажная плёнка<FromCalc show={isPrefilled('needs_montage_film')} /></span>
-                </label>
-                {needsMontageFilm && (
-                  <MontageFilmSelect
-                    value={montageMaterialId}
-                    onChange={({ materialId }) => setValue('montage_material_id', materialId, { shouldDirty: true })}
-                    expected={forecastRows.find((r) => r.key === 'montage')?.expected}
-                  />
-                )}
-              </div>
-            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+              <label className="flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-border cursor-pointer hover:bg-surface-2">
+                <input type="checkbox" {...register('needs_montage_film')} className="w-5 h-5 rounded border-border text-accent focus:ring-accent" />
+                <span className="text-sm">Монтажная плёнка<FromCalc show={isPrefilled('needs_montage_film')} /></span>
+              </label>
+              {needsMontageFilm && (
+                <MontageFilmSelect
+                  value={montageMaterialId}
+                  onChange={({ materialId }) => setValue('montage_material_id', materialId, { shouldDirty: true })}
+                  expected={forecastRows.find((r) => r.key === 'montage')?.expected}
+                />
+              )}
+            </div>
 
             {/* R25.7B (ТЗ 7.5): дополнительные материалы по категориям склада */}
             {extraCategories.length > 0 && (

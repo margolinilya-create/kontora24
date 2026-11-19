@@ -1,7 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { updateOrder, updateOrderStatus, PAYMENT_CONFIRM_REQUIRED } from '../hooks/useOrders'
-import { useOrderItems, syncSingleOrderItem } from '../hooks/useOrderItems'
-import { validateOrderSize, planManualStatusChange } from '../lib/order-edit'
+import { useOrderItems, replaceOrderItems } from '../hooks/useOrderItems'
+import { useOrderVariantAccounting } from '../hooks/useOrderVariantAccounting'
+import { planManualStatusChange } from '../lib/order-edit'
+import {
+  itemsToEditorVariants, buildReplacePayload, variantsPayloadChanged,
+  validateEditorVariants, checkVariantsAgainstAccounting, variantsBelowPrinted,
+} from '../lib/order-variants'
+import { OrderVariantsEditor } from './OrderVariantsEditor'
 import ConfirmDialog from '@/shared/components/ConfirmDialog'
 import { ClientCombobox } from '@/features/clients/components/ClientCombobox'
 import { supabase } from '@/shared/lib/supabase'
@@ -57,10 +63,21 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
   const [saving, setSaving] = useState(false)
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false)
   const canSeeFinance = useCanDo('view:finance')
-  // Ревью R25 (п.6): у multi-variant заказа тираж/размер правятся по видам.
-  const { items: orderItems, loading: itemsLoading } = useOrderItems(order?.id)
-  const isMultiItem = orderItems.length > 1
-  const sizeLocked = itemsLoading || isMultiItem
+  // R27.0 (ТЗ 19.11, №5.2): виды изделий правятся в редакторе. Тираж и размер
+  // заказа пишет RPC replace_order_items (сумма видов / размер 1-го вида).
+  const { items: orderItems, loading: itemsLoading, error: itemsError, refetch: refetchItems } = useOrderItems(order?.id)
+  const { accounting, printed, error: accountingError } = useOrderVariantAccounting(order?.id, order?.order_type)
+  const [variants, setVariants] = useState(null)
+  const [belowPrinted, setBelowPrinted] = useState(null)
+  const variantsSrcRef = useRef(null)
+  useEffect(() => {
+    if (!order || itemsLoading || itemsError) return
+    if (variantsSrcRef.current === orderItems) return
+    variantsSrcRef.current = orderItems
+    setVariants(itemsToEditorVariants(orderItems, order))
+  }, [order, orderItems, itemsLoading, itemsError])
+  // Пока виды не загружены (или учёт по ним не прочитан) — размер/тираж не правим.
+  const sizeLocked = !variants || !!accountingError
   // R25.7B (ТЗ 7.5): дополнительные материалы заказа.
   const { materials } = useMaterials()
   const { categories: whCategories } = useWarehouseCategories()
@@ -206,11 +223,32 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
     }))
   }
 
-  async function handleSave({ confirmNoPayment = false } = {}) {
-    // Ревью R25 (п.6): тираж и размер — не пустые и не меньше 1.
+  async function handleSave({ confirmNoPayment = false, confirmBelowPrinted = false } = {}) {
+    // R27.0: виды — тираж и размер каждого не меньше 1; учёт работы не даёт
+    // убрать / перенумеровать вид; тираж ниже напечатанного — подтверждение.
+    let itemsPayload = null
     if (!sizeLocked) {
-      const sizeError = validateOrderSize(form)
-      if (sizeError) { toast.error(sizeError); return }
+      if (variants.length === 1 && !(Number(form.width_mm) >= 1 && Number(form.height_mm) >= 1)) {
+        toast.error('Размер — не меньше 1 мм')
+        return
+      }
+      const payload = buildReplacePayload(variants, form.width_mm, form.height_mm)
+      const err = validateEditorVariants(payload)
+      if (err) { toast.error(err); return }
+      if (variants.some((v) => !Number.isInteger(Number(v.qty)))) {
+        toast.error('Тираж — целое число')
+        return
+      }
+      if (variantsPayloadChanged(orderItems, payload)) {
+        const accErr = checkVariantsAgainstAccounting(payload, accounting, orderItems.length)
+        if (accErr) { toast.error(accErr); return }
+        const below = variantsBelowPrinted(payload, printed)
+        if (below.length > 0 && !confirmBelowPrinted) {
+          setBelowPrinted(below)
+          return
+        }
+        itemsPayload = payload
+      }
     }
     // R25.4 (ТЗ 4.1 / 4.2): «Прочее» требует название, субподряд — подрядчика.
     if (form.order_type === 'other') {
@@ -300,29 +338,35 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
         updates.contractor_cost = form.is_subcontract && form.contractor_cost !== '' ? Number(form.contractor_cost) : null
       }
 
-      // Ревью R25 (п.6): размер/тираж заказа с одним видом — вместе с
-      // k24_order_items idx=1; у multi-variant эти поля не трогаем.
-      const sizeChanged = !sizeLocked && (
-        Number(form.width_mm) !== Number(order.width_mm)
-        || Number(form.height_mm) !== Number(order.height_mm)
-        || Number(form.qty) !== Number(order.qty)
-      )
-      if (!sizeLocked) {
-        updates.width_mm = Number(form.width_mm)
-        updates.height_mm = Number(form.height_mm)
-        updates.qty = Number(form.qty)
-      }
-
-      const patch = await updateOrder(order.id, updates)
-      let needsRefetch = false
-      if (sizeChanged) {
+      // R27.0: состав видов — первым (одна транзакция в RPC). Тираж и размер
+      // заказа пишет RPC; в updates их нет. Ошибка — ничего не сохраняем.
+      let itemsSaved = false
+      if (itemsPayload) {
         try {
-          await syncSingleOrderItem(order.id, { width_mm: updates.width_mm, height_mm: updates.height_mm, qty: updates.qty })
+          await replaceOrderItems(order.id, itemsPayload, orderItems.length)
+          itemsSaved = true
         } catch (itemErr) {
-          captureError(itemErr, { tags: { source: 'AdminOrderEditor.syncSingleOrderItem' }, extra: { orderId: order.id } })
-          toast.error(`Заказ сохранён, но размер вида не обновлён: ${translateError(itemErr).message}`)
+          captureError(itemErr, { tags: { source: 'AdminOrderEditor.replaceOrderItems' }, extra: { orderId: order.id } })
+          toast.error(`Виды не сохранены: ${translateError(itemErr).message}`)
+          refetchItems()
+          return
         }
       }
+
+      let patch
+      try {
+        patch = await updateOrder(order.id, updates)
+      } catch (updErr) {
+        // Виды уже сохранены — перечитываем, чтобы повтор не упёрся в
+        // «Виды заказа изменились».
+        if (itemsSaved) {
+          refetchItems()
+          toast.info('Виды сохранены, остальные поля — нет')
+        }
+        throw updErr
+      }
+      // После правки видов тираж/размер заказа изменил сервер — перечитываем.
+      let needsRefetch = itemsSaved
       if (statusChanged) {
         needsRefetch = true
         try {
@@ -519,7 +563,7 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
           </Field>
 
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className={FIELD_LABEL}>Размер, мм</label>
+            <label className={FIELD_LABEL}>{variants && variants.length > 1 ? 'Общий размер, мм' : 'Размер, мм'}</label>
             <div className="flex gap-1.5 flex-wrap mb-2">
               {Object.entries(SIZE_PRESETS).map(([k, { label, kind, width, height }]) => (
                 <button
@@ -543,14 +587,29 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
                 <Input id="admin_height_mm" type="number" min={1} placeholder="100" disabled={sizeLocked} value={form.height_mm ?? ''} onChange={(e) => update('height_mm', e.target.value)} />
               </div>
             </div>
-            {isMultiItem && (
-              <p className="text-xs text-text-muted mt-1">В заказе несколько видов — размер и тираж редактируются по видам.</p>
-            )}
           </div>
 
-          <Field label="Тираж, шт">
-            <Input type="number" min={1} disabled={sizeLocked} value={form.qty ?? ''} onChange={(e) => update('qty', e.target.value)} />
-          </Field>
+          {/* R27.0 (ТЗ 19.11, №5.2): виды изделий — количество, размер, тираж */}
+          <div className="sm:col-span-2 lg:col-span-3">
+            {(itemsError || accountingError) && (
+              <p role="alert" className="text-xs text-danger mb-2">
+                Не удалось загрузить виды заказа — размер и тираж сейчас не редактируются. Обновите страницу.
+              </p>
+            )}
+            {variants ? (
+              <OrderVariantsEditor
+                variants={variants}
+                onChange={setVariants}
+                commonWidth={form.width_mm}
+                commonHeight={form.height_mm}
+                accounting={accounting}
+                currentCount={orderItems.length}
+                disabled={sizeLocked}
+              />
+            ) : (
+              !itemsError && <p className="text-xs text-text-muted">Загрузка видов…</p>
+            )}
+          </div>
           <Field label="Видов дизайна">
             <Input type="number" value={form.design_variants ?? ''} onChange={(e) => update('design_variants', e.target.value)} />
           </Field>
@@ -802,10 +861,21 @@ export function AdminOrderEditor({ order, onSaved, onCancel }) {
       <ConfirmDialog
         isOpen={paymentConfirmOpen}
         onClose={() => setPaymentConfirmOpen(false)}
-        onConfirm={() => { setPaymentConfirmOpen(false); handleSave({ confirmNoPayment: true }) }}
+        onConfirm={() => { setPaymentConfirmOpen(false); handleSave({ confirmNoPayment: true, confirmBelowPrinted: true }) }}
         title="Запуск без оплаты"
         message={NO_PAYMENT_CONFIRM_MESSAGE}
         confirmText="Запустить без оплаты"
+        variant="primary"
+      />
+      <ConfirmDialog
+        isOpen={!!belowPrinted}
+        onClose={() => setBelowPrinted(null)}
+        onConfirm={() => { setBelowPrinted(null); handleSave({ confirmBelowPrinted: true }) }}
+        title="Тираж меньше напечатанного"
+        message={(belowPrinted || [])
+          .map((b) => `Вид ${b.position}: напечатано ${b.printed} шт, новый тираж ${b.qty} шт.`)
+          .join(' ') + ' Сохранить?'}
+        confirmText="Сохранить"
         variant="primary"
       />
     </div>

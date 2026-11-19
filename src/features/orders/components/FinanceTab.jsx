@@ -9,6 +9,7 @@ import { formatPrice } from '@/shared/lib/utils'
 import { useProductionLogs } from '@/features/production/hooks/useProductionLogs'
 import { InfoField } from './InfoField'
 import { CalcSnapshotCard } from './CalcSnapshotCard'
+import { useOrderItems } from '../hooks/useOrderItems'
 import { fetchExtraMaterialsByOrder } from '@/features/reports/hooks/useReports'
 import {
   aggregateMaterialUsage, buildCostMap, costForOrder, withMaterialUnitCosts,
@@ -27,6 +28,8 @@ import { captureError } from '@/shared/lib/sentry'
  */
 export function FinanceTab({ order }) {
   const { logs } = useProductionLogs(order.id, order.qty)
+  // R27.0: виды заказа — сверка с расчётом калькулятора.
+  const { items: orderItems } = useOrderItems(order.calc_snapshot ? order.id : null)
   // Средние цены склада (unit_cost маскируется view без view:finance; вкладка
   // и так открыта только с правом). Архивные позиции тоже нужны — заказ мог
   // списывать с позиции, которую потом убрали в архив.
@@ -136,7 +139,7 @@ export function FinanceTab({ order }) {
       </div>
 
       {/* R25.6: снимок расчёта калькулятора (если заказ создан из калькулятора) */}
-      <CalcSnapshotCard order={order} />
+      <CalcSnapshotCard order={order} items={orderItems} />
 
       {/* Actual materials breakdown (WAC) */}
       {stock.error && (

@@ -11,8 +11,12 @@ import { OPTION_LABELS } from '@/features/calculator/lib/calc'
 import { calcPriceDiff, restoreCalcState } from '@/features/calculator/lib/calc-to-order'
 import { formatInt, formatPrice, formatRub } from '@/features/calculator/lib/copy-text'
 import { InfoField } from './InfoField'
+import { itemsViewsQty, snapshotViewsChanged } from '../lib/order-variants'
 
-export function CalcSnapshotCard({ order }) {
+// R27.0: items — виды заказа (k24_order_items). Если тиражи видов отличаются
+// от расчёта — пометка «Виды изменены после расчёта»; «Открыть в калькуляторе»
+// подставляет текущие виды заказа.
+export function CalcSnapshotCard({ order, items = [] }) {
   const navigate = useNavigate()
   const canCalc = useCanDo('view:calculator')
   const snap = order?.calc_snapshot
@@ -24,7 +28,12 @@ export function CalcSnapshotCard({ order }) {
     .filter(([k, on]) => on && OPTION_LABELS[k])
     .map(([k]) => OPTION_LABELS[k])
   const diff = calcPriceDiff(order)
-  const restore = restoreCalcState(snap)
+  const baseRestore = restoreCalcState(snap)
+  const currentViews = itemsViewsQty(items).filter((q) => q > 0)
+  const viewsChanged = snapshotViewsChanged(snap, items)
+  const restore = baseRestore && currentViews.length > 0
+    ? { ...baseRestore, views: currentViews }
+    : baseRestore
 
   const tirage = views.length > 1
     ? `${formatInt(snap.qty)} шт (${views.map((v, i) => `вид ${i + 1} — ${formatInt(v)}`).join(', ')})`
@@ -55,6 +64,12 @@ export function CalcSnapshotCard({ order }) {
       {diff && (
         <p className="mb-4 rounded-xl border border-warning/50 bg-warning/15 px-3 py-2 text-sm font-medium" role="status">
           Цена изменена вручную: в расчёте {formatRub(diff.calcTotal)}
+        </p>
+      )}
+
+      {viewsChanged && (
+        <p className="mb-4 rounded-xl border border-warning/50 bg-warning/15 px-3 py-2 text-sm font-medium" role="status">
+          Виды изменены после расчёта: сейчас {currentViews.map((v) => formatInt(v)).join(' + ')} шт
         </p>
       )}
 

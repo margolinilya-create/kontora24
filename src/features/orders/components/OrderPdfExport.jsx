@@ -4,6 +4,9 @@ import { laminationSummary, designEditNote } from '../lib/order-labels'
 import { formatPrice, formatDate, formatOrderNumber, formatOrderType } from '@/shared/lib/utils'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
+import { supabase } from '@/shared/lib/supabase'
+import { variantsCountForDisplay } from '../lib/order-variants'
 
 export function OrderPdfExport({ order }) {
   const [exporting, setExporting] = useState(false)
@@ -11,6 +14,12 @@ export function OrderPdfExport({ order }) {
   async function handleExport() {
     setExporting(true)
     try {
+      // R27.0: виды заказа грузим до рендера — «Кол-во видов» как в тех-карте.
+      const { data: items, error: itemsErr } = await supabase
+        .from('k24_order_items')
+        .select('idx')
+        .eq('order_id', order.id)
+      if (itemsErr) throw itemsErr
       const { jsPDF } = await import('jspdf')
       const doc = new jsPDF('p', 'mm', 'a4')
       const W = 210
@@ -47,7 +56,7 @@ export function OrderPdfExport({ order }) {
         ['Тип', formatOrderType(order)],
         ['Размер', `${order.width_mm} × ${order.height_mm} мм`],
         ['Тираж', `${order.qty} шт`],
-        ['Кол-во видов', `${order.design_variants || 1}`],
+        ['Кол-во видов', `${variantsCountForDisplay(order, items)}`],
         // R25.4: ламинация + монтажная плёнка одной строкой; правка макета.
         ['Ламинация', laminationSummary(order)],
         ...(designEditNote(order) ? [['Макет', designEditNote(order)]] : []),
@@ -123,6 +132,7 @@ export function OrderPdfExport({ order }) {
       doc.save(`order-${order.number}.pdf`)
       toast.success('PDF экспортирован')
     } catch (err) {
+      captureError(err, { tags: { source: 'OrderPdfExport.export' }, extra: { orderId: order?.id } })
       toast.error(translateError(err).message)
     } finally {
       setExporting(false)

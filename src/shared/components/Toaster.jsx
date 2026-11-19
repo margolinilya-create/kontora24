@@ -25,7 +25,16 @@ export function Toaster() {
           key={t.id}
           className={`${STYLES[t.type] || STYLES.info} px-4 py-3 rounded-2xl shadow-modal text-sm font-medium flex items-center justify-between gap-3 animate-slide-in`}
         >
-          <span>{t.message}</span>
+          <span className="min-w-0 break-words">{t.message}</span>
+          {t.action && (
+            <button
+              type="button"
+              onClick={() => { removeToast(t.id); t.action.onClick() }}
+              className="shrink-0 rounded-xl bg-white/20 hover:bg-white/30 px-3 min-h-[44px] font-semibold"
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
             onClick={() => removeToast(t.id)}
             className="opacity-70 hover:opacity-100 text-lg leading-none p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"

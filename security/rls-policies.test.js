@@ -439,3 +439,40 @@ describe('R25.7D: свои этапы (миграция 104)', () => {
     expect(sql104).toContain("CASE WHEN r.order_type = 'stickerpack3D' THEN 'assembly_3d' ELSE 'selection' END")
   })
 })
+
+describe('R27.0: RPC replace_order_items (виды заказа)', () => {
+  const read = (f) => readFileSync(resolve(process.cwd(), f), 'utf-8')
+  const strip = (sql) => sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n')
+  const sql = strip(read('supabase/migrations/110_replace_order_items.sql'))
+  const sig = 'replace_order_items(uuid, jsonb, int)'
+
+  it('SECURITY DEFINER с фиксированным search_path; anon не исполняет', () => {
+    expect(sql).toMatch(/SECURITY DEFINER\s+SET search_path = public, pg_temp/)
+    expect(sql).toContain(`REVOKE ALL ON FUNCTION public.${sig} FROM PUBLIC, anon`)
+    expect(sql).toContain(`GRANT EXECUTE ON FUNCTION public.${sig} TO authenticated`)
+  })
+
+  it('права: order:edit или автор нового заказа с order:create; без входа — отказ', () => {
+    expect(sql).toContain('IF v_uid IS NULL THEN')
+    expect(sql).toContain("k24_user_can('order:edit')")
+    expect(sql).toMatch(/k24_user_can\('order:create'\)\s+AND v_order\.created_by = v_uid\s+AND v_order\.status = 'new'/)
+    expect(sql).toContain("v_order.status IN ('done', 'cancelled')")
+  })
+
+  it('блокировка строки заказа и оптимистичная проверка числа видов', () => {
+    expect(sql).toMatch(/FROM k24_orders\s+WHERE id = p_order_id\s+FOR UPDATE/)
+    expect(sql).toContain('p_expected_count <> v_cur_count')
+  })
+
+  it('учёт работы: логи с item_idx (включая удалённые) и допечатки с view_ref', () => {
+    expect(sql).toMatch(/FROM k24_production_logs\s+WHERE order_id = p_order_id AND item_idx IS NOT NULL/)
+    expect(sql).toMatch(/track = 'reprint'\s+AND view_ref IS NOT NULL/)
+  })
+
+  it('фронт пишет виды только через RPC, без прямой записи в k24_order_subtasks', () => {
+    const hook = read('src/features/orders/hooks/useOrderItems.js')
+    expect(hook).toContain("supabase.rpc('replace_order_items'")
+    expect(hook).not.toMatch(/from\('k24_order_subtasks'\)/)
+    expect(hook).not.toMatch(/from\('k24_order_items'\)\s*\.(insert|delete|update|upsert)/)
+  })
+})

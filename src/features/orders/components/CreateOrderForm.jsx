@@ -149,6 +149,32 @@ function SizePresetPicker({ activePreset, onSelect, isPack }) {
 }
 
 
+// R27.0: сохранить виды нового заказа; при ошибке — тост с «Повторить».
+async function saveItemsWithRetry(orderId, items) {
+  try {
+    // expectedCount по умолчанию = 1 (триггер создал вид idx=1).
+    await replaceOrderItems(orderId, items)
+    return true
+  } catch (itemsErr) {
+    captureError(itemsErr, {
+      tags: { source: 'CreateOrderPage.replaceOrderItems' },
+      extra: { orderId },
+    })
+    toast.error(
+      `Заказ создан, но доп. виды не сохранились: ${translateError(itemsErr).message}`,
+      {
+        action: {
+          label: 'Повторить',
+          onClick: async () => {
+            if (await saveItemsWithRetry(orderId, items)) toast.success('Виды заказа сохранены')
+          },
+        },
+      },
+    )
+    return false
+  }
+}
+
 export function CreateOrderForm({
   initialValues,
   prefilledKeys,
@@ -595,15 +621,11 @@ export function CreateOrderForm({
           .filter((r) => r.width_mm > 0 && r.height_mm > 0 && r.qty > 0)
           .map((r) => ({ width_mm: r.width_mm, height_mm: r.height_mm, qty: r.qty }))
         if (itemsToInsert.length > 1) {
-          try {
-            await replaceOrderItems(order.id, itemsToInsert)
-          } catch (itemsErr) {
-            captureError(itemsErr, {
-              tags: { source: 'CreateOrderPage.replaceOrderItems' },
-              extra: { orderId: order.id },
-            })
-            toast.error('Заказ создан, но доп. виды не сохранились — добавьте в редакторе заказа')
-          }
+          // R27.0 (ТЗ 19.11, №5.1): одна RPC replace_order_items. При ошибке
+          // заказ остаётся с одним видом; «Повторить» шлёт тот же запрос
+          // (expectedCount = 1 — если первая попытка всё же прошла, сервер
+          // ответит «Виды заказа изменились», а не задвоит виды).
+          await saveItemsWithRetry(order.id, itemsToInsert)
         }
       }
 

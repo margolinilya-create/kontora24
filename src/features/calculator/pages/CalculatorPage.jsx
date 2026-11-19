@@ -255,7 +255,9 @@ export default function CalculatorPage() {
   return (
     <div className="space-y-4 min-w-0">
       <div>
-        <h1 className="text-2xl font-bold font-display tracking-tight">Калькулятор</h1>
+        {/* Onder — широкий шрифт: «Калькулятор» в 24px ≈ 433px > 343px на 375 →
+            горизонтальная прокрутка. На телефоне 18px (≈325px), с sm — как везде. */}
+        <h1 className="text-lg sm:text-2xl font-bold font-display tracking-tight">Калькулятор</h1>
         <p className="text-text-muted text-sm">Стоимость тиража по общим ставкам — для расчёта клиенту</p>
       </div>
 

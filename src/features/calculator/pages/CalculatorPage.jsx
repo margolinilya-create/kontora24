@@ -17,14 +17,17 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import { useCalculatorSettings } from '../hooks/useCalculatorSettings'
 import {
-  calculate, optionDeltas, priceTiers, splitQty, clampQty, sumViews,
+  calculate, optionDeltas, priceTiers, splitQty, clampQty, sumViews, clampManualHours,
   MIN_QTY, MAX_QTY, MAX_VIEWS, OPTION_LABELS,
+  MANUAL_HOURS_MIN, MANUAL_HOURS_MAX, MANUAL_HOURS_STEP, MANUAL_HOURS_DEFAULT,
 } from '../lib/calc'
 import {
-  groupFilms, resolveFilm, filmDisplayName, laminationOptions, laminationDisplayName,
-} from '../lib/films'
+  groupMaterials, resolveMaterial, resolvePrice, materialDisplayName, resolveNfc,
+  laminationOptions, laminationDisplayName,
+} from '../lib/materials'
 import {
-  buildShortText, buildDetailedText, formatInt, formatPrice, formatRub, formatArea,
+  buildShortText, buildDetailedText, buildOptionLines, formatInt, formatPrice, formatRub, formatArea,
+  formatHours,
 } from '../lib/copy-text'
 import { OptionToggle } from '../components/OptionToggle'
 import { PriceTiersTable } from '../components/PriceTiersTable'
@@ -51,14 +54,18 @@ const SIZE_PRESETS = {
 const OPTION_HINTS = {
   montage: 'Не наценивается',
   bag: '₽ за штуку',
+  nfc: 'Метка в каждое изделие',
+  manual: 'Часы × ставка, не наценивается',
 }
 
 const SELECT_CLASS = 'w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-text min-h-[44px] focus:outline-none focus:ring-2 focus:ring-accent/60'
 
 const EMPTY_OPTIONS = {
   resin3d: false, lamination: false, montage: false, urgent: false, bag: false,
-  partner: false, cut: false, design: false, designEdit: false,
+  partner: false, cut: false, nfc: false, design: false, designEdit: false, manual: false,
 }
+
+const fmtCm2 = (v) => (Math.round(v * 10000) / 10000).toString().replace('.', ',')
 
 function hideCostKey(userId) {
   return `k24:calc:hide-cost:${userId || 'anon'}`
@@ -81,7 +88,9 @@ export default function CalculatorPage() {
   const { profile } = useAuth()
   const canFinance = useCanDo('view:finance')
   const canCreateOrder = useCanDo('order:create')
-  const { settings, films, laminations, loading, error, refetch } = useCalculatorSettings()
+  const {
+    settings, films, laminations, materials, prices, nfcRow, loading, error, refetch,
+  } = useCalculatorSettings()
   // R25.6: «Открыть в калькуляторе» из вкладки «Финансы» заказа передаёт
   // восстановленный расчёт через state роутера (restoreCalcState).
   const location = useLocation()
@@ -96,13 +105,17 @@ export default function CalculatorPage() {
   const [views, setViews] = useState(restored?.views || [500])
   const [viewTexts, setViewTexts] = useState(restored ? restored.views.map(String) : ['500'])
   const [options, setOptions] = useState(restored ? { ...EMPTY_OPTIONS, ...restored.options } : EMPTY_OPTIONS)
+  const [manualHours, setManualHours] = useState(restored?.manualHours ?? MANUAL_HOURS_DEFAULT)
+  const [manualText, setManualText] = useState(() => formatHours(restored?.manualHours ?? MANUAL_HOURS_DEFAULT))
   const [createOpen, setCreateOpen] = useState(false)
   const [hideCost, setHideCost] = useState(() => readHideCost(profile?.id))
 
   useEffect(() => { setHideCost(readHideCost(profile?.id)) }, [profile?.id])
 
-  const filmGroups = useMemo(() => groupFilms(films), [films])
-  const film = resolveFilm(films, filmId, settings.default_film_id)
+  const materialGroups = useMemo(() => groupMaterials(films, prices, settings), [films, prices, settings])
+  const film = resolveMaterial(films, prices, settings, filmId, settings.default_film_id)
+  const filmPrice = resolvePrice(film, prices, settings)
+  const nfc = useMemo(() => resolveNfc(settings, nfcRow, materials), [settings, nfcRow, materials])
   const lamOptions = useMemo(() => laminationOptions(laminations), [laminations])
   const lam = lamOptions.find((l) => l.id === lamId) || lamOptions[0] || null
 
@@ -114,9 +127,13 @@ export default function CalculatorPage() {
     widthMm: toInt(width),
     heightMm: toInt(height),
     filmGroup: film?.calc_price_group || 'white',
+    materialPriceCm2: filmPrice.source === 'warehouse' ? filmPrice.priceCm2Raw : null,
+    nfcPrice: nfc.available ? nfc.price : null,
+    manualHours,
     views,
     options,
-  }), [product, width, height, film?.calc_price_group, views, options])
+  }), [product, width, height, film?.calc_price_group, filmPrice.source, filmPrice.priceCm2Raw,
+    nfc.available, nfc.price, manualHours, views, options])
 
   const result = useMemo(() => calculate(input, settings), [input, settings])
   const deltas = useMemo(() => optionDeltas(input, settings), [input, settings])
@@ -127,7 +144,9 @@ export default function CalculatorPage() {
   const qtyValid = qty >= MIN_QTY
   const ready = sizeValid && qtyValid && !!film
 
-  const labels = { material: filmDisplayName(film), lamination: laminationDisplayName(lam) }
+  const labels = { material: materialDisplayName(film), lamination: laminationDisplayName(lam) }
+  const optionLines = buildOptionLines(result, settings)
+  const nfcShort = nfc.available && options.nfc && nfc.stock != null && nfc.stock < qty
 
   // --- handlers ------------------------------------------------------------
   function setOption(key, value) {
@@ -196,6 +215,16 @@ export default function CalculatorPage() {
     if (sumViews(next) < MIN_QTY) toast.info('Минимальный тираж — 20 шт')
   }
 
+  function onManualChange(e) {
+    setManualText(e.target.value.replace(/[^\d.,]/g, '').slice(0, 5))
+  }
+
+  function onManualBlur() {
+    const h = clampManualHours(manualText)
+    setManualHours(h)
+    setManualText(formatHours(h))
+  }
+
   function toggleHideCost() {
     const v = !hideCost
     setHideCost(v)
@@ -217,7 +246,11 @@ export default function CalculatorPage() {
     )
   }
 
-  const optionKeys = ['resin3d', 'lamination', 'montage', 'urgent', 'bag', 'partner', ...(product === 'sticker' ? ['cut'] : []), 'design', 'designEdit']
+  // Порядок переключателей = порядок строк «Дополнительно:» в тексте клиенту.
+  const optionKeys = [
+    'resin3d', 'lamination', 'montage', 'urgent', 'bag', 'partner',
+    ...(product === 'sticker' ? ['cut'] : []), 'nfc', 'design', 'designEdit', 'manual',
+  ]
 
   return (
     <div className="space-y-4 min-w-0">
@@ -261,21 +294,32 @@ export default function CalculatorPage() {
             </div>
 
             <div>
-              <label htmlFor="calc-film" className="block text-sm font-medium mb-1.5">Материал плёнки</label>
-              {filmGroups.length === 0 ? (
+              <label htmlFor="calc-film" className="block text-sm font-medium mb-1.5">Материал</label>
+              {materialGroups.length === 0 ? (
                 <p className="text-sm text-danger">
-                  Плёнки не настроены для калькулятора — назначьте ценовые группы в «Настройки → Калькулятор».
+                  Материалы не настроены для калькулятора — назначьте ценовые группы или цену склада в «Настройки → Калькулятор».
                 </p>
               ) : (
                 <select id="calc-film" className={SELECT_CLASS} value={film?.id || ''} onChange={(e) => setFilmId(e.target.value)}>
-                  {filmGroups.map((g) => (
-                    <optgroup key={g.group} label={g.label}>
-                      {g.items.map((f) => (
-                        <option key={f.id} value={f.id}>{f.name}</option>
+                  {!film && <option value="" disabled>Нет материала с ценой</option>}
+                  {materialGroups.map((g) => (
+                    <optgroup key={g.key} label={g.label}>
+                      {g.items.map((m) => (
+                        <option key={m.id} value={m.id} disabled={m.price.priceCm2 == null}>
+                          {m.name}{m.price.priceCm2 == null ? ` — ${m.price.reason}` : ''}
+                        </option>
                       ))}
                     </optgroup>
                   ))}
                 </select>
+              )}
+              {canFinance && film && filmPrice.priceCm2 != null && (
+                <p className="text-xs text-text-muted mt-1.5 tabular-nums">
+                  {fmtCm2(filmPrice.priceCm2)} ₽/см²
+                  {filmPrice.source === 'warehouse'
+                    ? ` · по цене склада (${fmtCm2(filmPrice.priceCm2Raw)} × ${String(settings.material_k).replace('.', ',')})`
+                    : ' · цена группы'}
+                </p>
               )}
             </div>
           </div>
@@ -336,10 +380,11 @@ export default function CalculatorPage() {
                 key={key}
                 id={`calc-opt-${key}`}
                 label={OPTION_LABELS[key]}
-                hint={OPTION_HINTS[key]}
-                checked={!!options[key]}
+                hint={key === 'nfc' && !nfc.available ? nfc.reason : OPTION_HINTS[key]}
+                checked={!!options[key] && !(key === 'nfc' && !nfc.available)}
                 onChange={(v) => setOption(key, v)}
                 delta={ready ? deltas[key] : 0}
+                disabled={key === 'nfc' && !nfc.available}
               >
                 {key === 'lamination' && (
                   lamOptions.length === 0
@@ -351,6 +396,26 @@ export default function CalculatorPage() {
                         ))}
                       </select>
                     )
+                )}
+                {key === 'nfc' && nfcShort && (
+                  <p className="text-xs font-medium text-warning" role="status">
+                    На складе {formatInt(nfc.stock)} шт — меньше тиража
+                  </p>
+                )}
+                {key === 'manual' && (
+                  <div className="max-w-[180px]">
+                    <Input
+                      label="Часов"
+                      inputMode="decimal"
+                      value={manualText}
+                      onChange={onManualChange}
+                      onBlur={onManualBlur}
+                      aria-describedby="calc-manual-hint"
+                    />
+                    <p id="calc-manual-hint" className="text-xs text-text-muted mt-1">
+                      Шаг {formatHours(MANUAL_HOURS_STEP)} ч, от {formatHours(MANUAL_HOURS_MIN)} до {MANUAL_HOURS_MAX}
+                    </p>
+                  </div>
                 )}
               </OptionToggle>
             ))}
@@ -402,6 +467,8 @@ export default function CalculatorPage() {
             )}
           </div>
 
+          {showCost && ready && <CostBreakdown result={result} />}
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Tile label="Площадь изделия" value={sizeValid ? `${formatArea(result.areaCm2)} см²` : '—'} />
             <Tile label="Тираж" value={`${formatInt(qty)} шт`} />
@@ -416,7 +483,6 @@ export default function CalculatorPage() {
                 <SummaryRow label="Продукция" value={result.productLabel} />
                 <SummaryRow label="Материал" value={labels.material} />
                 <SummaryRow label="Ламинация" value={options.lamination ? (labels.lamination || 'да') : 'нет'} />
-                {options.montage && <SummaryRow label="Монтажная плёнка" value="да" />}
                 <SummaryRow label="Размер" value={`${input.widthMm} × ${input.heightMm} мм`} />
                 <SummaryRow
                   label="Тираж"
@@ -425,12 +491,9 @@ export default function CalculatorPage() {
                     : `${formatInt(qty)} шт`}
                 />
                 <SummaryRow label="Цена за 1 шт" value={formatPrice(result.pricePerUnit)} />
-                {result.percentOptions.length > 0 && (
-                  <SummaryRow label="Опции" value={result.percentOptions.map((o) => `${o.label} ${o.text}`).join(', ')} />
-                )}
-                {result.extras.map((e) => (
-                  <SummaryRow key={e.key} label={e.label}
-                    value={e.count ? `${e.count} × ${formatRub(e.unit)}` : formatRub(e.amount)} />
+                {optionLines.length > 0 && <p className="text-text-muted pt-1">Дополнительно:</p>}
+                {optionLines.map((l) => (
+                  <SummaryRow key={l.key} label={l.label} value={l.text} />
                 ))}
                 <div className="flex justify-between gap-3 pt-2 mt-1 border-t border-border font-semibold">
                   <dt>Итого</dt>
@@ -439,7 +502,7 @@ export default function CalculatorPage() {
               </dl>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
                 <CopyButton getText={() => buildShortText(result)}>Скопировать</CopyButton>
-                <CopyButton getText={() => buildDetailedText(result, labels)}>Скопировать подробно</CopyButton>
+                <CopyButton getText={() => buildDetailedText(result, labels, settings)}>Скопировать подробно</CopyButton>
                 {canCreateOrder && (
                   <Button type="button" className="sm:col-span-2" onClick={() => setCreateOpen(true)}>
                     Создать заказ
@@ -475,6 +538,9 @@ export default function CalculatorPage() {
           result={result}
           film={film}
           lam={options.lamination ? lam : null}
+          nfc={result.input.options.nfc ? nfc.material : null}
+          materialPriceSource={filmPrice.source}
+          settings={settings}
           labels={labels}
           onClose={() => setCreateOpen(false)}
         />
@@ -495,6 +561,33 @@ function EyeIcon({ off }) {
         </>
       )}
     </svg>
+  )
+}
+
+/** Разбивка себестоимости (только view:finance): статьи 1 см² + NFC-метка за штуку. */
+function CostBreakdown({ result }) {
+  return (
+    <div className="bg-surface rounded-2xl border border-border p-4">
+      <h2 className="text-sm font-semibold mb-2">Разбивка себестоимости 1 см²</h2>
+      <dl className="text-sm space-y-1 tabular-nums">
+        {result.costBreakdown.map((i) => (
+          <div key={i.key} className="flex justify-between gap-3">
+            <dt className="text-text-muted min-w-0">{i.label}</dt>
+            <dd>{fmtCm2(i.value)} ₽</dd>
+          </div>
+        ))}
+        <div className="flex justify-between gap-3 pt-1.5 mt-1 border-t border-border font-semibold">
+          <dt>Итого за 1 см²</dt>
+          <dd>{fmtCm2(result.costPerCm2)} ₽</dd>
+        </div>
+        {result.nfcCostPerUnit > 0 && (
+          <div className="flex justify-between gap-3 pt-1.5">
+            <dt className="text-text-muted min-w-0">NFC-метка, ₽/шт</dt>
+            <dd>{formatPrice(result.nfcCostPerUnit)}</dd>
+          </div>
+        )}
+      </dl>
+    </div>
   )
 }
 

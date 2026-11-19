@@ -110,6 +110,11 @@ describe('CreateOrderModal', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
+  it('R27.3: ручные операции → примечание заказа; часы и ставка — в снимке', () => {
+    const { container } = renderModal({ manualHours: 2, options: { manual: true } })
+    expect(container.querySelector('textarea[name="notes"]').value).toBe('Ручные операции по расчёту: 2 ч')
+  })
+
   it('те же проверки, что на странице: без заказчика и срока заказ не создаётся', async () => {
     renderModal({})
     fireEvent.click(screen.getByRole('button', { name: 'Создать заказ' }))

@@ -6,9 +6,12 @@
 //   restoreCalcState    — «Открыть в калькуляторе»: снимок → состояние калькулятора
 // Без React и Supabase.
 
-import { OPTION_KEYS } from './calc'
+import { OPTION_KEYS, clampManualHours } from './calc'
+import { formatHours } from './copy-text'
 
-export const CALC_SNAPSHOT_VERSION = 1
+// v1 — R25.6; v2 — R27 (ТЗ 19.11): цена материала по складу, NFC, ручные
+// операции. restoreCalcState читает обе версии (заказы до релиза — v1).
+export const CALC_SNAPSHOT_VERSION = 2
 
 /** design / designEdit → design_status заказа (разработка важнее правки). */
 export function designStatusFor(options = {}) {
@@ -24,11 +27,15 @@ export function designStatusFor(options = {}) {
  * @param {Object} ctx
  * @param {Object|null} ctx.film — выбранная позиция плёнки склада { id, material_code }
  * @param {Object|null} ctx.lam  — выбранная позиция ламинации { id, material_code }
- * @returns {{ values: Object, variants: Array, prefilledKeys: string[] }}
+ * @param {Object|null} ctx.nfc  — позиция NFC-метки { id, category_id } (R27.2)
+ * @returns {{ values: Object, variants: Array, prefilledKeys: string[],
+ *             extraSelection: Object }}
  *   values — defaultValues формы (react-hook-form), variants — виды при N > 1
- *   (общий размер + свой тираж), prefilledKeys — поля с меткой «из расчёта».
+ *   (общий размер + свой тираж), prefilledKeys — поля с меткой «из расчёта»,
+ *   extraSelection — доп. материалы заказа { [category_id]: material_id }
+ *   (проп initialExtraSelection формы).
  */
-export function mapCalcToOrder(result, { film = null, lam = null } = {}) {
+export function mapCalcToOrder(result, { film = null, lam = null, nfc = null } = {}) {
   const input = result.input
   const o = input.options || {}
   const orderType = result.orderType
@@ -42,10 +49,11 @@ export function mapCalcToOrder(result, { film = null, lam = null } = {}) {
     width_mm: input.widthMm,
     height_mm: input.heightMm,
     qty: result.qty,
-    // Плёнка — та же позиция склада; film_type — код позиции (без кода форма
-    // оставляет значение по умолчанию, как при ручном выборе такой позиции).
+    // Материал — та же позиция склада (всегда: иначе триггер списания уйдёт в
+    // фолбэк по коду плёнки); film_type — код позиции, без кода (бумага и пр.)
+    // — пусто (R27.2, ТЗ 4.3).
     film_material_id: film?.id || null,
-    film_type: film?.material_code || 'G',
+    film_type: film?.material_code || null,
     // Ревью R25 (п.7): позиция без кода — фолбэк 'glossy', иначе форма
     // посчитала бы ламинацию выключенной и обнулила lam_material_id.
     lam_type: o.lamination && lam ? (lam.material_code || 'glossy') : '',
@@ -55,11 +63,16 @@ export function mapCalcToOrder(result, { film = null, lam = null } = {}) {
     montage_material_id: null,
     is_urgent: !!o.urgent,
     // 3D стикерпак всегда упаковывается (в форме галочка закреплена).
+    // NFC-метка bopp_bag НЕ ставит (R27.2): упаковка есть во всех v2-маршрутах,
+    // а флаг включил бы сдельную оплату упаковки и списание БОПП-пакета.
     bopp_bag: !!o.bag || orderType === 'stickerpack3D',
     is_partner: !!o.partner,
     design_status: designStatusFor(o),
     price_final: result.totalRounded,
   }
+  // R27.3: ручные операции — в примечание заказа (можно поправить до сохранения).
+  const manual = (result.extras || []).find((e) => e.key === 'manual')
+  if (o.manual && manual) values.notes = manualNote(manual.hours)
 
   const views = input.views || []
   const variants = views.length > 1
@@ -73,8 +86,18 @@ export function mapCalcToOrder(result, { film = null, lam = null } = {}) {
   ]
   if (!isPack) prefilledKeys.push('needs_individual_cut')
   if (variants.length > 1) prefilledKeys.push('variants')
+  if (values.notes) prefilledKeys.push('notes')
 
-  return { values, variants, prefilledKeys }
+  // R27.2: NFC-метка → доп. материал заказа (категория «Комплектующие»).
+  const extraSelection = {}
+  if (o.nfc && nfc?.id && nfc?.category_id) extraSelection[nfc.category_id] = nfc.id
+
+  return { values, variants, prefilledKeys, extraSelection }
+}
+
+/** «Ручные операции по расчёту: 2 ч» — примечание заказа. */
+export function manualNote(hours) {
+  return `Ручные операции по расчёту: ${formatHours(hours)} ч`
 }
 
 const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100
@@ -84,9 +107,11 @@ const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100
  * данные, цена за штуку, итого, себестоимость, наценка, текст «Скопировать подробно».
  */
 export function buildCalcSnapshot(result, {
-  film = null, lam = null, labels = {}, detailedText = '', author = null,
-  settingsHistoryId = null, now = new Date(),
+  film = null, lam = null, nfc = null, labels = {}, detailedText = '', author = null,
+  settingsHistoryId = null, now = new Date(), materialPriceSource = null,
 } = {}) {
+  const manual = (result.extras || []).find((e) => e.key === 'manual')
+  const opts = result.input.options || {}
   return {
     version: CALC_SNAPSHOT_VERSION,
     calculated_at: now.toISOString(),
@@ -102,7 +127,16 @@ export function buildCalcSnapshot(result, {
       lam_material_id: result.input.options?.lamination ? (lam?.id || null) : null,
       lam_name: result.input.options?.lamination ? (labels.lamination || lam?.name || null) : null,
       views: [...(result.input.views || [])],
-      options: { ...(result.input.options || {}) },
+      options: { ...opts },
+      // v2 (R27): цена материала по складу (₽/см², без K) и её источник,
+      // NFC-метка, ручные операции.
+      material_price_cm2: result.input.materialPriceCm2 ?? null,
+      material_price_source: materialPriceSource
+        || (result.input.materialPriceCm2 != null ? 'warehouse' : 'group'),
+      nfc_material_id: opts.nfc ? (nfc?.id || null) : null,
+      nfc_price: opts.nfc ? (result.input.nfcPrice ?? null) : null,
+      manual_hours: opts.manual && manual ? manual.hours : null,
+      manual_rate: opts.manual && manual ? manual.rate : null,
     },
     product_label: result.productLabel,
     order_type: result.orderType,
@@ -117,6 +151,7 @@ export function buildCalcSnapshot(result, {
     extras_total: result.extrasTotal,
     cost_per_cm2: result.costPerCm2,
     cost_per_unit: result.costPerUnit,
+    nfc_per_unit_delta: opts.nfc ? (result.nfcPerUnitDelta ?? null) : null,
     cost_total: result.costTotal,
     markup: result.markup,
     detailed_text: detailedText,
@@ -158,6 +193,7 @@ export function calcPriceDiff(order) {
 /**
  * «Открыть в калькуляторе»: снимок → начальное состояние CalculatorPage.
  * Пересчёт идёт по ТЕКУЩИМ ставкам. Битый снимок → null (калькулятор с дефолтами).
+ * Читает v1 (R25.6, без NFC/ручных операций — опции false, часы 1) и v2 (R27).
  */
 export function restoreCalcState(snapshot) {
   const inp = snapshot?.input
@@ -177,5 +213,6 @@ export function restoreCalcState(snapshot) {
     lamId: inp.lam_material_id || null,
     views,
     options,
+    manualHours: inp.manual_hours != null ? clampManualHours(inp.manual_hours) : null,
   }
 }

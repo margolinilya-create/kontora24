@@ -21,10 +21,16 @@ import { buildDetailedText } from '../lib/copy-text'
  * @param {Object} props.result — calculate() на момент нажатия кнопки
  * @param {Object|null} props.film — позиция плёнки склада
  * @param {Object|null} props.lam  — позиция ламинации склада
+ * @param {Object|null} [props.nfc] — позиция NFC-метки { id, category_id } (R27.2) —
+ *   уходит в форму доп. материалом заказа (initialExtraSelection)
+ * @param {'group'|'warehouse'|null} [props.materialPriceSource] — источник цены материала
+ * @param {Object} [props.settings] — настройки калькулятора (текст «подробно»)
  * @param {Object} props.labels — { material, lamination } для текста «подробно»
  * @param {() => void} props.onClose
  */
-export function CreateOrderModal({ result, film, lam, labels, onClose }) {
+export function CreateOrderModal({
+  result, film, lam, nfc = null, materialPriceSource = null, settings, labels, onClose,
+}) {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const [dirty, setDirty] = useState(false)
@@ -34,16 +40,17 @@ export function CreateOrderModal({ result, film, lam, labels, onClose }) {
 
   // Снимок «на момент открытия»: useState-инициализатор не пересчитывается.
   const [prepared] = useState(() => {
-    const mapped = mapCalcToOrder(result, { film, lam })
+    const mapped = mapCalcToOrder(result, { film, lam, nfc })
     const snapshot = buildCalcSnapshot(result, {
-      film, lam, labels,
-      detailedText: buildDetailedText(result, labels),
+      film, lam, nfc, labels, materialPriceSource,
+      detailedText: buildDetailedText(result, labels, settings),
       author: profile ? { id: profile.id, name: profile.display_name || null } : null,
       now: new Date(),
     })
     return {
       initialValues: { ...mapped.values, variants: mapped.variants },
       prefilledKeys: mapped.prefilledKeys,
+      extraSelection: mapped.extraSelection,
       snapshot,
     }
   })
@@ -142,6 +149,7 @@ export function CreateOrderModal({ result, film, lam, labels, onClose }) {
             variant="modal"
             initialValues={prepared.initialValues}
             prefilledKeys={prepared.prefilledKeys}
+            initialExtraSelection={prepared.extraSelection}
             buildExtraOrderData={buildExtraOrderData}
             onDirtyChange={setDirty}
             onCreated={handleCreated}

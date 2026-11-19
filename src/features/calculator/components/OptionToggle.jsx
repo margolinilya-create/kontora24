@@ -4,11 +4,11 @@ import { formatInt } from '../lib/copy-text'
  * Переключатель опции калькулятора с чипом «+X ₽» / «−X ₽» — изменение
  * стоимости тиража при включении (при остальных опциях как сейчас).
  */
-export function OptionToggle({ id, label, checked, onChange, delta, hint, children }) {
+export function OptionToggle({ id, label, checked, onChange, delta, hint, disabled = false, children }) {
   const rounded = Math.round(delta || 0)
   return (
-    <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
-      <label htmlFor={id} className="flex items-center gap-3 cursor-pointer min-h-[32px]">
+    <div className={`rounded-xl border border-border bg-surface px-3 py-2.5 ${disabled ? 'opacity-60' : ''}`}>
+      <label htmlFor={id} className={`flex items-center gap-3 min-h-[32px] ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
         <span className="relative inline-flex shrink-0">
           <input
             id={id}
@@ -16,6 +16,7 @@ export function OptionToggle({ id, label, checked, onChange, delta, hint, childr
             role="switch"
             aria-checked={checked}
             checked={checked}
+            disabled={disabled}
             onChange={(e) => onChange(e.target.checked)}
             className="peer sr-only"
           />
@@ -26,7 +27,7 @@ export function OptionToggle({ id, label, checked, onChange, delta, hint, childr
           {label}
           {hint && <span className="block text-xs font-normal text-text-muted">{hint}</span>}
         </span>
-        {rounded !== 0 && (
+        {rounded !== 0 && !disabled && (
           <span
             className={`shrink-0 text-xs font-semibold tabular-nums rounded-full px-2 py-0.5 ${
               rounded > 0 ? 'bg-surface-2 text-text' : 'bg-success/10 text-success'

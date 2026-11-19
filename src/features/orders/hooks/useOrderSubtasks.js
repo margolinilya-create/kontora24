@@ -6,11 +6,12 @@ import { captureError } from '@/shared/lib/sentry'
  * Подзадачи заказа — параллельные треки.
  *
  * 1) stickerpack3D: 2 треки фоны/стикеры (миграция 032).
- * 2) Multi-variant заказы (R8.4c, миграция 040): по одной подзадаче на
- *    каждый item из k24_order_items, track='variant', item_idx=1..N.
+ * 2) Подзадачи track='variant' (R8.4c) упразднены в R27.0: виды заказа
+ *    меняются RPC replace_order_items, которая такие подзадачи удаляет.
+ *    Хук их больше не читает.
  *
- * Хук грузит обе категории подзадач сразу (если они есть) и возвращает:
- *   { subtasks: { backgrounds, stickers }, variants: [array], advance(track, toStatus), advanceVariant(itemIdx, toStatus) }
+ * Возвращает:
+ *   { subtasks: { backgrounds, stickers }, extras, advance(track, toStatus), advanceById(id, toStatus) }
  *
  * `isMulti` — режим: грузить ли подзадачи. Передаётся из вызывающего
  * компонента (isPack3D || hasVariants).
@@ -21,7 +22,6 @@ export function useOrderSubtasks(orderId, _isMulti) {
   // оставлен в сигнатуре чтобы не ломать существующие вызовы; ранее использовался
   // для skip-логики, теперь load всегда полный.
   const [subtasks, setSubtasks] = useState({ backgrounds: null, stickers: null })
-  const [variants, setVariants] = useState([])
   const [extras, setExtras] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -29,7 +29,6 @@ export function useOrderSubtasks(orderId, _isMulti) {
   const fetchSubtasks = useCallback(async () => {
     if (!orderId) {
       setSubtasks({ backgrounds: null, stickers: null })
-      setVariants([])
       setExtras([])
       setLoading(false)
       return
@@ -43,22 +42,19 @@ export function useOrderSubtasks(orderId, _isMulti) {
         .order('item_idx', { ascending: true, nullsFirst: true })
       if (err) throw err
       const next = { backgrounds: null, stickers: null }
-      const vars = []
       const exts = []
       for (const row of data || []) {
         // R22.4 (ТЗ 20.07 Фаза 4Б): старая система подзадач (bg/stickers/extra)
         // упразднена и помечена is_legacy — не отдаём её в интерактивный UI
         // (Stepper-развилка, SubtaskIndicator). Архив доступен на вкладке
         // «Подзадачи» через useReprintSubtasks. Допечатки (track='reprint') —
-        // отдельный хук. Multi-variant (variant) не помечается legacy — активен.
+        // отдельный хук. track='variant' упразднён в R27.0.
         if (row.is_legacy) continue
-        if (row.track === 'reprint') continue
-        if (row.track === 'variant') vars.push(row)
-        else if (row.track === 'extra_stickers') exts.push(row)
+        if (row.track === 'reprint' || row.track === 'variant') continue
+        if (row.track === 'extra_stickers') exts.push(row)
         else if (row.track === 'backgrounds' || row.track === 'stickers') next[row.track] = row
       }
       setSubtasks(next)
-      setVariants(vars)
       setExtras(exts)
     } catch (err) {
       setError(err)
@@ -113,15 +109,6 @@ export function useOrderSubtasks(orderId, _isMulti) {
   }, [subtasks, advanceById])
 
   /**
-   * Продвинуть подзадачу-вариант (multi-variant) на toStatus.
-   */
-  const advanceVariant = useCallback(async (itemIdx, toStatus) => {
-    const sub = variants.find((v) => v.item_idx === itemIdx)
-    if (!sub) throw new Error(`Подзадача вида ${itemIdx} не найдена`)
-    return advanceById(sub.id, toStatus)
-  }, [variants, advanceById])
-
-  /**
    * R11.3: создать подзадачу «Стикеры дополнительно» с qty по видам.
    * @param {object} designsByIdx — { 1: 10, 2: 5 } — для каждого design_index сколько нужно
    */
@@ -136,9 +123,9 @@ export function useOrderSubtasks(orderId, _isMulti) {
   }, [orderId, fetchSubtasks])
 
   return {
-    subtasks, variants, extras, loading, error,
+    subtasks, extras, loading, error,
     refetch: fetchSubtasks,
-    advance, advanceVariant, advanceById,
+    advance, advanceById,
     createExtraStickers,
   }
 }

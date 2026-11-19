@@ -35,7 +35,7 @@ async function loadInitial(store) {
       // заказ прилетит без price_final до refetch — приемлемая деградация.
       supabase
         .from('k24_orders_full')
-        .select('id, number, custom_number, order_type, status, width_mm, height_mm, qty, design_variants, stickers_per_pack, need_lam, design_status, film_type, bopp_bag, route_version, route_snapshot, delivery_type, needs_montage_film, is_subcontract, product_name, priority, is_urgent, deadline, client_id, price_final, created_at, client:k24_clients!client_id(name)')
+        .select('id, number, custom_number, order_type, status, width_mm, height_mm, qty, design_variants, stickers_per_pack, need_lam, design_status, film_type, bopp_bag, route_version, route_snapshot, delivery_type, needs_montage_film, is_subcontract, product_name, priority, is_urgent, deadline, client_id, price_final, created_at, client:k24_clients!client_id(name), film_material:k24_materials!film_material_id(name)')
         .in('status', getActiveOrderStatuses())
         .order('deadline', { ascending: true, nullsFirst: false }),
       supabase

@@ -20,7 +20,8 @@ export function OrderReportsTab({ order }) {
   const boxedByMaterial = {}   // { material_id: boxes_total }
   for (const l of logs) {
     if (l.stage === 'print' && Number(l.film_meters) > 0) {
-      const ft = l.film_type || order.film_type
+      // R27.2: позиция без кода (бумага) — film_type = null, ключ '__material'.
+      const ft = l.film_type || order.film_type || (order.film_material_id ? '__material' : null)
       if (ft) printFilm[ft] = (printFilm[ft] || 0) + Number(l.film_meters)
     }
     if (l.stage === 'lamination' && Number(l.lamination_meters) > 0) {
@@ -53,7 +54,7 @@ export function OrderReportsTab({ order }) {
 
       {/* Плёнка для печати */}
       <div className="bg-surface rounded-2xl border border-border shadow-card p-5">
-        <h2 className="font-semibold mb-3">Расход плёнки для печати</h2>
+        <h2 className="font-semibold mb-3">Расход материала для печати</h2>
         {Object.keys(printFilm).length === 0 ? (
           <p className="text-sm text-text-muted">Нет данных. Расход появится после ввода на вкладке «Прогресс».</p>
         ) : (
@@ -61,8 +62,8 @@ export function OrderReportsTab({ order }) {
             {Object.entries(printFilm).map(([ft, m]) => {
               // R17.1: предпочитаем название конкретной позиции склада, если
               // менеджер её привязал к заказу. Fallback — generic-лейбл из enum.
-              let label = FILM_TYPES[ft]?.label || ft
-              if (ft === order.film_type && order.film_material?.name) label = order.film_material.name
+              let label = FILM_TYPES[ft]?.label || (ft === '__material' ? 'Материал' : ft)
+              if ((ft === order.film_type || ft === '__material') && order.film_material?.name) label = order.film_material.name
               if (ft === order.film_type_stickers && order.film_stickers_material?.name) label = order.film_stickers_material.name
               return (
                 <div key={ft} className="py-2 flex items-center justify-between text-sm">

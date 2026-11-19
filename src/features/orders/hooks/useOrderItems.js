@@ -45,87 +45,53 @@ export function useOrderItems(orderId) {
 }
 
 /**
- * Полностью заменить список items у заказа.
- * Используется при создании multi-variant заказа: удаляем дефолтный idx=1
- * (созданный триггером) и вставляем переданный массив.
+ * R27.0: заменить состав видов заказа одной RPC `replace_order_items`
+ * (миграция 110) — одна транзакция, без записи подзадач track='variant'
+ * (браузеру запись в k24_order_subtasks запрещена с 032).
  *
- * Для multi-variant (items.length > 1) дополнительно вставляет подзадачи
- * `track='variant', item_idx=1..N` (R8.4c) — каждая со стартовым статусом
- * текущего order.status. Не пересоздаёт подзадачи если они уже есть
- * (ON CONFLICT по уникальному индексу uq_subtasks_variant_item).
+ * Тираж заказа сервер пишет как сумму тиражей видов; размер заказа — размер
+ * первого вида, если у него свой. Виды с учётом работы сервер не даёт убрать.
  *
  * @param {string} orderId
- * @param {Array<{ width_mm:number, height_mm:number, qty:number }>} items
+ * @param {Array<{ width_mm:number|null, height_mm:number|null, qty:number, src_idx?:number|null }>} items
+ *   width/height null → общий размер заказа; src_idx — исходный номер вида
+ *   (null — новый вид; без ключа — позиционно).
+ * @param {number} [expectedCount=1] — сколько видов сейчас в базе (оптимистичная
+ *   проверка: если кто-то уже поменял виды, сервер откажет). По умолчанию 1 —
+ *   только что созданный заказ (триггер создал вид idx=1).
  */
-export async function replaceOrderItems(orderId, items) {
+export async function replaceOrderItems(orderId, items, expectedCount = 1) {
   if (!orderId || !Array.isArray(items) || items.length === 0) {
-    throw new Error('replaceOrderItems: нужен orderId и непустой массив')
+    throw new Error('Не удалось сохранить виды: пустой список')
   }
-
-  // 1) Удаляем существующие строки (триггер мог уже создать idx=1)
-  const { error: delErr } = await supabase
-    .from('k24_order_items')
-    .delete()
-    .eq('order_id', orderId)
-  if (delErr) throw delErr
-
-  // 2) Вставляем новые с idx=1..N
-  const rows = items.map((it, i) => ({
-    order_id: orderId,
-    idx: i + 1,
-    width_mm: Number(it.width_mm) || 0,
-    height_mm: Number(it.height_mm) || 0,
-    qty: Math.max(0, Math.floor(Number(it.qty) || 0)),
-  }))
-  const { error: insErr } = await supabase.from('k24_order_items').insert(rows)
-  if (insErr) throw insErr
-
-  // 3) Multi-variant subtasks (R8.4c). Только если действительно >1 видов.
-  if (rows.length > 1) {
-    const { data: order, error: ordErr } = await supabase
-      .from('k24_orders').select('status').eq('id', orderId).single()
-    if (ordErr) throw ordErr
-    const startStatus = order?.status || 'new'
-    const subtaskRows = rows.map((r) => ({
-      order_id: orderId,
-      track: 'variant',
-      item_idx: r.idx,
-      status: startStatus,
-    }))
-    // PostgREST upsert через .upsert() невозможен на partial unique index,
-    // но INSERT не упадёт если индекс не нарушен. Сначала чистим существующие
-    // variant-подзадачи для этого заказа (replace-семантика).
-    const { error: delStErr } = await supabase.from('k24_order_subtasks')
-      .delete().eq('order_id', orderId).eq('track', 'variant')
-    if (delStErr) throw delStErr
-    const { error: stErr } = await supabase.from('k24_order_subtasks').insert(subtaskRows)
-    if (stErr) throw stErr
-  } else {
-    // items.length === 1 — гарантируем что variant-подзадач нет (мог быть
-    // случай: было 3 вида, теперь 1, лишние треки удаляем).
-    const { error: delStErr } = await supabase.from('k24_order_subtasks')
-      .delete().eq('order_id', orderId).eq('track', 'variant')
-    if (delStErr) throw delStErr
+  if (!Number.isInteger(expectedCount) || expectedCount < 0) {
+    throw new Error('Не удалось сохранить виды: не известно текущее число видов')
   }
+  const payload = items.map((it) => {
+    const w = Number(it.width_mm)
+    const h = Number(it.height_mm)
+    const row = {
+      width_mm: w > 0 ? w : null,
+      height_mm: h > 0 ? h : null,
+      qty: Math.floor(Number(it.qty) || 0),
+    }
+    if (Object.prototype.hasOwnProperty.call(it, 'src_idx')) row.src_idx = it.src_idx ?? null
+    return row
+  })
+  const { data, error } = await supabase.rpc('replace_order_items', {
+    p_order_id: orderId,
+    p_items: payload,
+    p_expected_count: expectedCount,
+  })
+  if (error) throw error
+  return data
 }
 
 /**
  * Ревью R25 (п.6): заказ с одним видом — синхронизировать idx=1 с основными
- * полями заказа (размер/тираж правятся в AdminOrderEditor). Ошибку не глотаем.
+ * полями заказа (размер/тираж правятся в AdminOrderEditor). R27.0: через ту же
+ * RPC. Если у заказа ещё нет строки вида (старый заказ) — expectedCount=0.
  */
-export async function syncSingleOrderItem(orderId, { width_mm, height_mm, qty }) {
-  const { data, error } = await supabase
-    .from('k24_order_items')
-    .update({ width_mm, height_mm, qty })
-    .eq('order_id', orderId)
-    .eq('idx', 1)
-    .select('id')
-  if (error) throw error
-  if (data && data.length > 0) return
-  // Строки нет (старый заказ) или RLS не дала обновить — вставка либо
-  // создаст строку, либо вернёт понятную ошибку прав.
-  const { error: insErr } = await supabase
-    .from('k24_order_items')
-    .insert({ order_id: orderId, idx: 1, width_mm, height_mm, qty })
-  if (insErr) throw insErr
+export async function syncSingleOrderItem(orderId, { width_mm, height_mm, qty }, expectedCount = 1) {
+  return replaceOrderItems(orderId, [{ width_mm, height_mm, qty }], expectedCount)
 }

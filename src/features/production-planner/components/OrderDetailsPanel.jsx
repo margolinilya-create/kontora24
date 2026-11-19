@@ -86,7 +86,8 @@ export function OrderDetailsPanel() {
   const palette = getOrderPalette(order.id)
   const isRush = order.priority === 'urgent' || order.is_urgent
   const typeLabel = formatOrderType(order)
-  const filmLabel = order.film_type ? (FILM_TYPES[order.film_type]?.label || order.film_type) : '—'
+  // R27.2: позиция склада важнее кода (у бумаги film_type = null).
+  const filmLabel = order.film_material?.name || (order.film_type ? (FILM_TYPES[order.film_type]?.label || order.film_type) : '—')
   const lamLabel = order.lam_type ? (LAMINATION_TYPES[order.lam_type]?.label || order.lam_type) : 'без'
   const designSource = order.design_status === 'provided' ? 'клиент' : 'разработка'
   const myItems = items.filter((it) => it.order_id === order.id)
@@ -180,7 +181,7 @@ export function OrderDetailsPanel() {
             <Field label="Тираж" value={`${order.qty || 0} шт`} />
             <Field label="Размер" value={`${order.width_mm}×${order.height_mm} мм`} />
             <Field label="Тип" value={typeLabel} />
-            <Field label="Плёнка" value={filmLabel} />
+            <Field label="Материал" value={filmLabel} />
             <Field label="Ламинация" value={lamLabel} />
             <Field label="Макет" value={designSource} />
             {order.order_type === 'stickerpack' || order.order_type === 'stickerpack3D' ? (

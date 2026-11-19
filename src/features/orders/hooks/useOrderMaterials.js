@@ -44,6 +44,36 @@ export function useOrderMaterials(orderId) {
 }
 
 /**
+ * R27.2: доп. материалы заказа с названием позиции и полем категории — для
+ * тех-карты и производственной наклейки (строка «NFC-метка»). Ошибка
+ * уходит в Sentry, карточка рисуется без строки.
+ */
+export function useOrderExtraMaterials(orderId) {
+  const [rows, setRows] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    if (!orderId) { setRows([]); return undefined }
+    supabase
+      .from('k24_order_materials')
+      .select('category_id, material_id, material:k24_materials!material_id(name), category:k24_warehouse_categories!category_id(order_field)')
+      .eq('order_id', orderId)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          if (error.code !== '42P01' && error.code !== 'PGRST205') {
+            captureError(error, { tags: { source: 'useOrderExtraMaterials.load' }, extra: { orderId } })
+          }
+          setRows([])
+          return
+        }
+        setRows(data || [])
+      })
+    return () => { cancelled = true }
+  }, [orderId])
+  return rows
+}
+
+/**
  * Сохранить выбор доп. материалов заказа. Трогает только категории из
  * allowedCategoryIds (видимые в форме): выбранные — upsert по (order_id,
  * category_id), снятые — delete. Категории вне маршрута не удаляются, чтобы

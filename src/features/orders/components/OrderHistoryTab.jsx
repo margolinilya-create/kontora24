@@ -13,7 +13,7 @@ const TYPE_DOT = {
 }
 
 const FIELD_LABELS = {
-  number: 'Номер заказа', client_id: 'Заказчик', order_type: 'Тип', qty: 'Тираж',
+  number: 'Номер заказа', client_id: 'Заказчик', order_type: 'Тип', qty: 'Тираж', items: 'Виды',
   width_mm: 'Ширина', height_mm: 'Высота', film_type: 'Плёнка', lam_type: 'Ламинация',
   need_lam: 'Нужна ламинация', design_status: 'Дизайн макета', priority: 'Приоритет',
   is_partner: 'Партнёрский', is_urgent: 'Срочный', bopp_bag: 'БОПП пакет',
@@ -82,6 +82,8 @@ function formatAuditValue(field, value) {
   if (field === 'deadline' || field === 'changed_at') {
     return value ? new Date(value).toLocaleDateString('ru-RU') : '—'
   }
+  // R27.0: состав видов («2 вида, 100 шт (50×50 мм — 60; …)») — целиком.
+  if (field === 'items') return String(value)
   return String(value).length > 60 ? String(value).slice(0, 60) + '…' : String(value)
 }
 

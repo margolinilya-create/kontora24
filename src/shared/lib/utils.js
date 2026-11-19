@@ -1,6 +1,6 @@
 import { format, formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { ORDER_TYPES } from '@/shared/constants'
+import { ORDER_TYPES, FILM_TYPES, LAMINATION_TYPES } from '@/shared/constants'
 import { getTypeDef } from '@/shared/lib/route-registry'
 
 export function formatDate(date) {
@@ -94,4 +94,36 @@ export function formatOrderType(orderOrType) {
   if (!type) return '—'
   // R25.7A: название из реестра типов (k24_order_types), фолбэк — константы.
   return getTypeDef(type)?.name || ORDER_TYPES[type]?.label || type
+}
+
+/**
+ * R27.2: название материала заказа — позиция склада (film_material.name)
+ * важнее кода film_type (у бумаги и позиций без кода film_type = null).
+ * @returns {string} '' если материал не задан
+ */
+export function formatOrderMaterial(order) {
+  const name = order?.film_material?.name?.trim?.()
+  if (name) return name
+  const code = order?.film_type
+  if (!code) return ''
+  return FILM_TYPES[code]?.label || code
+}
+
+/**
+ * R27.1 (ТЗ 19.11, №3): что делает подрядчик — материал, ламинация, монтаж
+ * одной строкой: «Белая матовая · ламинация глянцевая · монтажная плёнка».
+ * @returns {string} '' если ничего не задано
+ */
+export function formatSubcontractMaterials(order) {
+  if (!order) return ''
+  const parts = []
+  const material = formatOrderMaterial(order)
+  if (material) parts.push(material)
+  if (order.need_lam) {
+    const lam = order.lam_material?.name?.trim?.()
+      || LAMINATION_TYPES[order.lam_type]?.label?.toLowerCase()
+    parts.push(lam ? `ламинация ${lam}` : 'ламинация')
+  }
+  if (order.needs_montage_film) parts.push('монтажная плёнка')
+  return parts.join(' · ')
 }

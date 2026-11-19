@@ -6,7 +6,7 @@ import { updateOrderStatus } from '../hooks/useOrders'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { canAdvanceFrom, getNextStatus, getStatusMeta } from '@/shared/constants'
-import { formatPrice } from '@/shared/lib/utils'
+import { formatPrice, formatSubcontractMaterials } from '@/shared/lib/utils'
 import Button from '@/shared/components/Button'
 
 /**
@@ -69,6 +69,13 @@ export function SubcontractStageCard({ order, onUpdated }) {
           <dt className="inline text-text-muted">Что заказано: </dt>
           <dd className="inline whitespace-pre-wrap break-words">{order.contractor_notes || '—'}</dd>
         </div>
+        {/* R27.1 (ТЗ 19.11, №3): материал / ламинация / монтаж у подрядчика */}
+        {formatSubcontractMaterials(order) && (
+          <div>
+            <dt className="inline text-text-muted">У подрядчика: </dt>
+            <dd className="inline break-words">{formatSubcontractMaterials(order)}</dd>
+          </div>
+        )}
         {canSeeFinance && (
           <div>
             <dt className="inline text-text-muted">Стоимость работ: </dt>

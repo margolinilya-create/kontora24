@@ -105,7 +105,8 @@ export function ProductionLogForm({ stage, order, progress, incoming, onSubmit, 
     }
     if (field.filmFrom && order) {
       const filmLabel = resolveFilmLabel(field.filmFrom)
-      return filmLabel ? `Плёнка ${filmLabel}` : field.label
+      // R27.2 (ТЗ 19.11, №4.1): «Материал», не «Плёнка» — печатают и на бумаге.
+      return filmLabel ? `Материал ${filmLabel}` : field.label
     }
     if (field.appendFilm && order) {
       const filmLabel = resolveFilmLabel(field.appendFilm)

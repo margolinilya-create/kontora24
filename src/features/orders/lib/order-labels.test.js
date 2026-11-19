@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { laminationLabel, montageLabel, laminationSummary, designEditNote } from './order-labels'
+import { laminationLabel, montageLabel, laminationSummary, designEditNote, extraMaterialLabels } from './order-labels'
 import { formatOrderType } from '@/shared/lib/utils'
 
 describe('R25.4 formatOrderType', () => {
@@ -40,5 +40,20 @@ describe('R25.4 ламинация и монтажная плёнка', () => {
   it('правка макета', () => {
     expect(designEditNote({ design_status: 'needs_edit' })).toBe('Требуется правка макета')
     expect(designEditNote({ design_status: 'needs_development' })).toBeNull()
+  })
+})
+
+describe('R27.2 доп. материалы на тех-карте и наклейке', () => {
+  it('позиция с «NFC» — подпись «NFC-метка»; прочие — «Доп. материал»; не-extra отбрасываются', () => {
+    expect(extraMaterialLabels([
+      { material: { name: 'NFC-метки (NTAG216)' }, category: { order_field: 'extra' } },
+      { material: { name: 'Магнит' }, category: { order_field: 'extra' } },
+      { material: { name: 'Бумага' }, category: { order_field: 'print' } },
+      { material: null, category: { order_field: 'extra' } },
+    ])).toEqual([
+      { label: 'NFC-метка', value: 'NFC-метки (NTAG216)', isNfc: true },
+      { label: 'Доп. материал', value: 'Магнит', isNfc: false },
+    ])
+    expect(extraMaterialLabels(null)).toEqual([])
   })
 })

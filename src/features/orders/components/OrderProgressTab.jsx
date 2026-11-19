@@ -233,9 +233,10 @@ function aggregateFilmUsage(logs, order) {
     if (l.stage !== 'print') continue
     const meters = Number(l.film_meters) || 0
     if (!meters) continue
-    const ft = isPack3D && l.track === 'stickers'
+    // R27.2: позиция без кода (бумага) — film_type = null, ключ '__material'.
+    const ft = (isPack3D && l.track === 'stickers'
       ? (order.film_type_stickers || order.film_type)
-      : order.film_type
+      : order.film_type) || (order.film_material_id ? '__material' : null)
     if (!ft) continue
     byType[ft] = (byType[ft] || 0) + meters
   }
@@ -831,11 +832,14 @@ function ProgressLinesWidget({ order, logs, items = [] }) {
 
       {isOnPrint && filmUsage && Object.keys(filmUsage).length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
-          <h3 className="font-semibold text-sm mb-2">Расход плёнки</h3>
+          <h3 className="font-semibold text-sm mb-2">Расход материала</h3>
           <div className="space-y-1.5">
             {Object.entries(filmUsage).map(([ft, m]) => (
               <div key={ft} className="flex items-center justify-between text-xs">
-                <span className="text-text-muted">{FILM_TYPES[ft]?.label || ft}</span>
+                <span className="text-text-muted">
+                  {((ft === order.film_type || ft === '__material') && order.film_material?.name)
+                    || FILM_TYPES[ft]?.label || (ft === '__material' ? 'Материал' : ft)}
+                </span>
                 <span className="font-medium tabular-nums">{m.toFixed(1)} м</span>
               </div>
             ))}
@@ -978,118 +982,6 @@ function SubtaskTrackBlock({ track, subtask, advance, onUpdated, canJump, order 
   )
 }
 
-function VariantSubtaskBlock({ item, status, route, onAdvance, canJump }) {
-  const [target, setTarget] = useState('')
-  const [saving, setSaving] = useState(false)
-  const currentIdx = route.indexOf(status)
-  const next = currentIdx >= 0 && currentIdx < route.length - 1 ? route[currentIdx + 1] : null
-  const otherOptions = route.filter((s) => s !== status)
-
-  async function complete() {
-    if (!next) return
-    setSaving(true)
-    try {
-      await onAdvance(item.idx, next)
-      toast.success(`Вид ${item.idx} → ${getStatusMeta(next)?.label || next}`)
-    } catch (err) {
-      toast.error(translateError(err).message || err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleJump() {
-    if (!target) return
-    setSaving(true)
-    try {
-      await onAdvance(item.idx, target)
-      toast.success(`Вид ${item.idx} → ${getStatusMeta(target)?.label || target}`)
-      setTarget('')
-    } catch (err) {
-      toast.error(translateError(err).message || err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="rounded-xl border border-border bg-surface-2 p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-accent text-on-accent">
-            Вид {item.idx}
-          </span>
-          <span className="text-xs text-text-muted ml-2">
-            {Number(item.width_mm)}×{Number(item.height_mm)} мм · {Number(item.qty)} шт
-          </span>
-        </div>
-        <span className="text-sm font-medium">{getStatusMeta(status)?.label || status}</span>
-      </div>
-
-      {/* Mini-stepper по order.route */}
-      <div className="flex items-center gap-1 flex-wrap text-xs">
-        {route.map((s, i) => {
-          const done = i < currentIdx
-          const current = i === currentIdx
-          return (
-            <span key={s} className="flex items-center gap-1">
-              <span
-                className={[
-                  'inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold',
-                  done ? 'bg-accent text-on-accent' : current ? 'bg-accent text-on-accent ring-2 ring-offset-1 ring-offset-surface-2 ring-current' : 'bg-surface-dim text-text-muted border border-border',
-                ].join(' ')}
-                title={getStatusMeta(s)?.label || s}
-              >
-                {i + 1}
-              </span>
-              {i < route.length - 1 && <span className="text-text-muted">·</span>}
-            </span>
-          )
-        })}
-      </div>
-
-      <div className="flex items-center gap-2 flex-wrap">
-        {next ? (
-          <button
-            onClick={complete}
-            disabled={saving}
-            className="bg-accent hover:bg-accent-hover text-on-accent font-medium rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50 min-h-[40px] flex-1 sm:flex-none"
-          >
-            {saving ? '…' : `Завершить «${getStatusMeta(status)?.label || status}» → ${getStatusMeta(next)?.label || next}`}
-          </button>
-        ) : (
-          <span className="text-xs text-text-muted px-2 py-1">Вид завершён</span>
-        )}
-
-        {canJump && (
-          <div className="flex items-center gap-1 ml-auto">
-            <select
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              className="rounded-md border border-border px-2 py-1 text-xs bg-surface focus:outline-none focus:ring-2 focus:ring-accent/50"
-              aria-label={`Перейти на другой статус вида ${item.idx}`}
-            >
-              <option value="">↺ откат / переход</option>
-              {otherOptions.map((s) => (
-                <option key={s} value={s}>{getStatusMeta(s)?.label || s}</option>
-              ))}
-            </select>
-            {target && (
-              <button
-                onClick={handleJump}
-                disabled={saving}
-                className="text-xs px-2.5 py-1 rounded-md bg-surface-dim border border-border font-medium disabled:opacity-50 hover:bg-surface-2 transition-colors"
-              >
-                {saving ? '…' : 'OK'}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function ExtraStickerBlock({ subtask, order, advanceById, onUpdated }) {
   const [saving, setSaving] = useState(false)
   const status = subtask.status
@@ -1155,13 +1047,13 @@ function ExtraStickerBlock({ subtask, order, advanceById, onUpdated }) {
 }
 
 // R20.5: items приходят пропом из OrderProgressTab (один fetch на вкладку).
-function SubtaskIndicator({ order, onUpdated, items = [] }) {
+// R27.0: блок «Виды изделий» (подзадачи track='variant') удалён — виды
+// продвигаются вместе с заказом, учёт по видам ведётся логами item_idx.
+function SubtaskIndicator({ order, onUpdated }) {
   const isPack3D = IS_3D_STICKERPACK(order.order_type)
-  const isMultiVariant = items.length > 1
-  const isMulti = isPack3D || isMultiVariant
   const { hasRole } = useAuth()
   // R11.3: грузим extras всегда (любой тип заказа может получить extra_stickers).
-  const { subtasks, variants, extras, advance, advanceVariant, advanceById } = useOrderSubtasks(order.id, isMulti)
+  const { subtasks, extras, advance, advanceById } = useOrderSubtasks(order.id, isPack3D)
   const canJump = hasRole(['admin', 'manager'])
 
   // R14.3 (бриф 03.06): подзадачи появляются только начиная с препресса.
@@ -1195,33 +1087,7 @@ function SubtaskIndicator({ order, onUpdated, items = [] }) {
   ) : null
 
   let mainBlock = null
-  if (isMultiVariant && !isPack3D) {
-    const route = getOrderRoute(order)
-    mainBlock = (
-      <div className="bg-surface rounded-2xl border border-border shadow-card p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Виды изделий ({items.length})</h3>
-          <span className="text-xs text-text-muted">независимый таймлайн на каждый вид</span>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {items.map((it) => {
-            const sub = variants.find((v) => v.item_idx === it.idx)
-            if (!sub) return null
-            return (
-              <VariantSubtaskBlock
-                key={it.idx}
-                item={it}
-                status={sub.status}
-                route={route}
-                onAdvance={advanceVariant}
-                canJump={canJump}
-              />
-            )
-          })}
-        </div>
-      </div>
-    )
-  } else if (isPack3D && subtasks.backgrounds && subtasks.stickers) {
+  if (isPack3D && subtasks.backgrounds && subtasks.stickers) {
     mainBlock = (
       <div className="bg-surface rounded-2xl border border-border shadow-card p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -1259,7 +1125,7 @@ export function OrderProgressTab({ order, onUpdated }) {
         </div>
       )}
 
-      <SubtaskIndicator order={order} onUpdated={onUpdated} items={items} />
+      <SubtaskIndicator order={order} onUpdated={onUpdated} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CurrentStageWidget order={order} logs={logs} refetch={refetch} onUpdated={onUpdated} items={items} />

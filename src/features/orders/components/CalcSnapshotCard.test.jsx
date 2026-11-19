@@ -26,11 +26,11 @@ function CalcProbe() {
   return <div data-testid="calc-state">{JSON.stringify(loc.state?.calcRestore)}</div>
 }
 
-function renderCard(order) {
+function renderCard(order, items) {
   return render(
     <MemoryRouter initialEntries={['/orders/o1']}>
       <Routes>
-        <Route path="/orders/o1" element={<CalcSnapshotCard order={order} />} />
+        <Route path="/orders/o1" element={<CalcSnapshotCard order={order} items={items} />} />
         <Route path="/calculator" element={<CalcProbe />} />
       </Routes>
     </MemoryRouter>,
@@ -62,5 +62,21 @@ describe('CalcSnapshotCard', () => {
     const state = JSON.parse(screen.getByTestId('calc-state').textContent)
     expect(state).toMatchObject({ product: 'pack', width: '105', height: '148', filmId: 'f2', views: [200] })
     expect(state.options.resin3d).toBe(true)
+  })
+
+  it('R27.0: виды изменены после расчёта — пометка; в калькулятор уходят текущие виды', () => {
+    renderCard({ price_final: 35751, calc_snapshot: SNAP }, [
+      { idx: 2, qty: 50, width_mm: 105, height_mm: 148 },
+      { idx: 1, qty: 150, width_mm: 105, height_mm: 148 },
+    ])
+    expect(screen.getByText('Виды изменены после расчёта: сейчас 150 + 50 шт')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть в калькуляторе' }))
+    const state = JSON.parse(screen.getByTestId('calc-state').textContent)
+    expect(state.views).toEqual([150, 50])
+  })
+
+  it('R27.0: виды совпадают с расчётом — без пометки', () => {
+    renderCard({ price_final: 35751, calc_snapshot: SNAP }, [{ idx: 1, qty: 200, width_mm: 105, height_mm: 148 }])
+    expect(screen.queryByText(/Виды изменены после расчёта/)).toBeNull()
   })
 })

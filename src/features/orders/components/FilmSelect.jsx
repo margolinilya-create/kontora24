@@ -116,10 +116,10 @@ export function FilmSelect({ label, value, onChange, includeOutOfStock = false, 
         className={SELECT_CLASS}
       >
         {options.length === 0 && (
-          <option value="" disabled>Нет плёнки на складе</option>
+          <option value="" disabled>Нет материала на складе</option>
         )}
         {!currentMaterial && options.length > 0 && (
-          <option value="" disabled>— выбрать плёнку —</option>
+          <option value="" disabled>— выбрать материал —</option>
         )}
         {grouped
           ? groupOptions(options).map((g) => (

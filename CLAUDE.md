@@ -875,3 +875,20 @@ R16.1 — миграция 057 + UI per-position. `k24_orders.{film_material_id,
 - Agentation только в DEV. Bitrix webhook: timingSafeEqual + белый список полей (неизвестное поле → 400), status-update без редиректов.
 
 **Открыто:** норма выборки stickerpack3D в планировщике (стикеры 2184/8ч vs фоны 600/8ч) — решение менеджера; атомарные RPC для смены статуса / replaceOrderItems / перевода маршрута; leaked password protection — включить в дашборде Auth.
+
+## R27 — ТЗ «доработки 19.11» (6 правок, миграции 110–111)
+
+Google Doc 1Lzcdn1Z…. План проверен ecc:architect + ecc:database-reviewer, сверен с ТЗ по критериям приёмки.
+
+| № | Что | Где |
+|---|-----|-----|
+| 1 | «Скопировать подробно»: две линии по 20 «—», блок «Дополнительно:» (только при опциях, порядок тумблеров, доп. виды в конце), «Итого» сразу под линией; без «Опции:/Доплаты:/Монтажная плёнка: да». Короткий текст не менялся | [copy-text.js](src/features/calculator/lib/copy-text.js) (`buildOptionLines`) |
+| 2 | Образец: номер и дата рисуются на `<canvas>` → `<img>` (html2canvas не сдвигает), `fitNumberFontSize` для длинных номеров; слои как были. Dev-стенд `/dev/sample-proof` (только DEV) + e2e `e2e/sample-proof.spec.js` | [SampleProof.jsx](src/features/techcard/components/SampleProof.jsx), [utils.js](src/features/techcard/utils.js) |
+| 3 | Субподряд: материал/ламинация/монтаж сохраняются, «У подрядчика: …» в шапке/этапе/тех-карте. Маршрут субподряда не меняется (нет печати/ламинации → списаний нет), прогноз пустой | `formatSubcontractMaterials` в [utils.js](src/shared/lib/utils.js) |
+| 4 | Калькулятор: «Материал» — все позиции категорий `order_field='print'`; без ценовой группы — автоцена `unit_cost/(roll_width_m·10000)·K` (K = `material_k`, 1,5) через RPC `calc_material_prices()` (111a, гейт view:calculator; выводит unit_cost — допустимо, калькулятор только у admin/manager). NFC-метка: цена склада в себестоимость штуки (без K), `nfcPerUnitDelta`, доп. материал заказа через `initialExtraSelection`, списание на упаковке. Блок «Разбивка себестоимости» (view:finance). Бумага Ситилайт + «Комплектующие» настроены 111b. Подписи «Плёнка» → «Материал». film_type у материала без кода = null | [calc.js](src/features/calculator/lib/calc.js), [materials.js](src/features/calculator/lib/materials.js), [calc-to-order.js](src/features/calculator/lib/calc-to-order.js) |
+| 5 | Доп. виды: одна RPC `replace_order_items(order, items, expected_count)` (110; права order:edit или автор нового заказа; FOR UPDATE; оптимистичная проверка). Виды с учётом работы не убираются и не перенумеровываются. Подзадачи track='variant' упразднены. Блок «Виды» в редакторе ([OrderVariantsEditor.jsx](src/features/orders/components/OrderVariantsEditor.jsx)), пометка «Виды изменены после расчёта», PDF «Кол-во видов» как тех-карта | [useOrderItems.js](src/features/orders/hooks/useOrderItems.js), [110_replace_order_items.sql](supabase/migrations/110_replace_order_items.sql) |
+| 6 | «Ручные операции»: часы × `options.manual_rate_rub` (500), фикс. доплата без наценки, в снимке и в notes заказа | calc.js |
+
+**Решения/отступления:** NFC без `bopp_bag` (упаковка есть во всех v2-маршрутах); «Итого» без пустой строки; тираж 45 старых заказов (qty = 1-й вид) не пересчитывается до правки видов; цена NFC в тесте ТЗ — складская 75/11 (в ТЗ округлено до 6,82).
+
+**Ограничения:** прогноз метров для бумаги в форме заказа не строится (`material-forecast` работает по коду плёнки); проверка образца в Safari/iPhone — вручную.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   calculate, optionDeltas, priceTiers, normalizeSettings, splitQty, clampQty, sumViews,
-  validateCalcSettings, markupFor, productLabel, orderTypeFor, setPath,
+  validateCalcSettings, markupFor, productLabel, orderTypeFor, setPath, clampManualHours,
   DEFAULT_CALC_SETTINGS, TIERS_STICKER, TIERS_PACK,
 } from './calc'
 
@@ -201,5 +201,142 @@ describe('настройки', () => {
     // наценки и опции — не ставки ₽/см², больше двух знаков разрешено
     s = setPath(S, 'vinyl.markup_sticker_max', 4.125)
     expect(validateCalcSettings(s)['vinyl.markup_sticker_max']).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// R27 (ТЗ 19.11, 4.5 и 1.1): материал по цене склада, NFC, ручные операции.
+// Бумага Ситилайт: unit_cost 185,35 ₽/п.м, ширина 1,27 м → 0,014594 ₽/см²,
+// × K 1,5 → 0,0219 ₽/см².
+// ---------------------------------------------------------------------------
+const PAPER_CM2 = 185.35 / (1.27 * 10000)
+
+describe('R27: контрольные расчёты 4.5', () => {
+  const sticker = { product: 'sticker', filmGroup: 'white', widthMm: 50, heightMm: 50, views: [300], options: { cut: true } }
+
+  it('стикер вырубной 50×50, 300 шт, резка, белая плёнка → 6,8 ₽/шт и 2 030 ₽', () => {
+    const r = calculate(sticker, S)
+    expect(r.pricePerUnitRounded).toBe(6.8)
+    expect(r.totalRounded).toBe(2030)
+    expect(r.productLabel).toBe('Стикер вырубной')
+  })
+
+  it('то же на бумаге Ситилайт (цена склада × K 1,5 = 0,0219 ₽/см²) → 6,2 ₽/шт и 1 866 ₽', () => {
+    const r = calculate({ ...sticker, materialPriceCm2: PAPER_CM2 }, S)
+    const material = r.costBreakdown.find((i) => i.key === 'film')
+    expect(material.label).toBe('Материал')
+    expect(Math.round(material.value * 10000) / 10000).toBe(0.0219)
+    expect(r.pricePerUnitRounded).toBe(6.2)
+    expect(r.totalRounded).toBe(1866)
+  })
+
+  it('коэффициент материала берётся из настроек; к цене группы не применяется', () => {
+    const k2 = setPath(S, 'material_k', 2)
+    expect(calculate({ ...sticker, materialPriceCm2: PAPER_CM2 }, k2).costBreakdown[0].value).toBeCloseTo(PAPER_CM2 * 2, 9)
+    expect(calculate(sticker, k2).totalRounded).toBe(2030)
+  })
+
+  it('3D стикерпак, белая, 105×148, 150 шт → 180,8 ₽/шт, 27 123 ₽', () => {
+    const r = calculate({ product: 'pack', filmGroup: 'white', widthMm: 105, heightMm: 148, views: [150], options: { resin3d: true } }, S)
+    expect(r.pricePerUnitRounded).toBe(180.8)
+    expect(r.totalRounded).toBe(27123)
+  })
+
+  // ТЗ даёт 40 450 ₽: пример посчитан с наценкой, округлённой до 2,3991 (или с
+  // ценой метки ≤ 6,8196 ₽, показанной как 6,82). Полная точность (как в А.4,
+  // сверенных с порталом до рубля): 38 450,67 + 2 000 = 40 450,67 → 40 451 ₽.
+  // Цена за штуку (256,3) и надбавка метки (21,3) совпадают с ТЗ.
+  it('+ виды 100+50, срочность, NFC 6,82 ₽, 2 ч ручных → 256,3 ₽/шт, 40 451 ₽ (ТЗ: 40 450), NFC +21,3 ₽/шт', () => {
+    const r = calculate({
+      product: 'pack', filmGroup: 'white', widthMm: 105, heightMm: 148, views: [100, 50],
+      nfcPrice: 6.82, manualHours: 2,
+      options: { resin3d: true, urgent: true, nfc: true, manual: true },
+    }, S)
+    expect(r.pricePerUnitRounded).toBe(256.3)
+    expect(r.total).toBeCloseTo(40450.67, 2)
+    expect(r.totalRounded).toBe(40451)
+    expect(Math.round(r.nfcPerUnitDelta * 10) / 10).toBe(21.3)
+    expect(r.nfcCostPerUnit).toBe(6.82)
+    // Ручные операции — фиксированная доплата, в цену за штуку не входит.
+    expect(r.extras.find((e) => e.key === 'manual')).toMatchObject({ hours: 2, rate: 500, amount: 1000 })
+  })
+})
+
+describe('R27: NFC-метка', () => {
+  const base = { product: 'pack', filmGroup: 'white', widthMm: 105, heightMm: 148, views: [150], options: { resin3d: true } }
+
+  it('надбавка = цена с меткой − без неё; K к метке не применяется', () => {
+    const off = calculate(base, S)
+    const on = calculate({ ...base, nfcPrice: 6.82, options: { ...base.options, nfc: true } }, S)
+    expect(on.pricePerUnit - off.pricePerUnit).toBeCloseTo(on.nfcPerUnitDelta, 9)
+    expect(on.costPerUnit - off.costPerUnit).toBeCloseTo(6.82, 9)
+    const k3 = calculate({ ...base, nfcPrice: 6.82, options: { ...base.options, nfc: true } }, setPath(S, 'material_k', 3))
+    expect(k3.totalRounded).toBe(on.totalRounded)
+  })
+
+  it('без цены метки опция не действует', () => {
+    const r = calculate({ ...base, options: { ...base.options, nfc: true } }, S)
+    expect(r.totalRounded).toBe(27123)
+    expect(r.input.options.nfc).toBe(false)
+    expect(r.nfcPerUnitDelta).toBe(0)
+  })
+
+  it('чип и таблица по тиражам учитывают метку', () => {
+    const input = { ...base, nfcPrice: 6.82 }
+    const d = optionDeltas(input, S)
+    expect(d.nfc).toBeCloseTo(calculate({ ...input, options: { ...base.options, nfc: true } }, S).total - 27123.12, 1)
+    const on = priceTiers({ ...input, options: { ...base.options, nfc: true } }, S)
+    const off = priceTiers(base, S)
+    expect(on.every((t, i) => t.pricePerUnit > off[i].pricePerUnit)).toBe(true)
+  })
+
+  it('срочность, резка и скидка действуют на метку', () => {
+    const plain = calculate({ ...base, nfcPrice: 10, options: { ...base.options, nfc: true } }, S)
+    const urgent = calculate({ ...base, nfcPrice: 10, options: { ...base.options, nfc: true, urgent: true, partner: true } }, S)
+    expect(urgent.nfcPerUnitDelta).toBeCloseTo(plain.nfcPerUnitDelta * 1.3 * 0.75, 9)
+  })
+})
+
+describe('R27: ручные операции', () => {
+  const base = CONTROL[0].input
+
+  it('сумма = часы × ставка, без наценки, срочности и скидки; чип = сумма', () => {
+    const on = calculate({ ...base, manualHours: 2, options: { manual: true, urgent: true, partner: true } }, S)
+    const off = calculate({ ...base, options: { urgent: true, partner: true } }, S)
+    expect(on.total - off.total).toBeCloseTo(1000, 9)
+    expect(on.pricePerUnit).toBeCloseTo(off.pricePerUnit, 9)
+    expect(optionDeltas({ ...base, manualHours: 1.5 }, S).manual).toBeCloseTo(750, 9)
+    expect(calculate({ ...base, manualHours: 2, options: { manual: true } }, setPath(S, 'options.manual_rate_rub', 800)).extrasTotal).toBe(1600)
+  })
+
+  it('таблица по тиражам добавляет сумму один раз', () => {
+    const on = priceTiers({ ...base, manualHours: 2, options: { manual: true } }, S)
+    const off = priceTiers(base, S)
+    on.forEach((t, i) => expect(t.total - off[i].total).toBeCloseTo(1000, 6))
+  })
+
+  it('часы: шаг 0,5, от 0,5 до 100, по умолчанию 1', () => {
+    expect(clampManualHours('')).toBe(1)
+    expect(clampManualHours('1,5')).toBe(1.5)
+    expect(clampManualHours(1.3)).toBe(1.5)
+    expect(clampManualHours(0)).toBe(0.5)
+    expect(clampManualHours(250)).toBe(100)
+    expect(calculate({ ...base, options: { manual: true } }, S).extras.find((e) => e.key === 'manual').hours).toBe(1)
+  })
+})
+
+describe('R27: настройки', () => {
+  it('новые ключи по умолчанию', () => {
+    const n = normalizeSettings({})
+    expect(n.material_k).toBe(1.5)
+    expect(n.nfc_material_id).toBeNull()
+    expect(n.options.manual_rate_rub).toBe(500)
+    expect(normalizeSettings({ nfc_material_id: 'abc' }).nfc_material_id).toBe('abc')
+  })
+
+  it('коэффициент материала 0,5–5', () => {
+    expect(validateCalcSettings(setPath(S, 'material_k', 0.4)).material_k).toBeTruthy()
+    expect(validateCalcSettings(setPath(S, 'material_k', 5.5)).material_k).toBeTruthy()
+    expect(validateCalcSettings(setPath(S, 'material_k', 1.25)).material_k).toBeUndefined()
   })
 })

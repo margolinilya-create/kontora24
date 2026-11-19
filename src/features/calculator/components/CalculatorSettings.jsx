@@ -19,7 +19,7 @@ import {
   calculate, costPerCm2, validateCalcSettings, getPath, setPath, normalizeSettings,
   FILM_GROUPS, TIERS_STICKER,
 } from '../lib/calc'
-import { countUnmappedFilms } from '../lib/films'
+import { resolvePrice, materialsWithoutPrice, materialDisplayName } from '../lib/materials'
 import { formatPrice } from '../lib/copy-text'
 
 const SECTIONS = [
@@ -37,6 +37,10 @@ const SECTIONS = [
       ['film_prices.holo', FILM_GROUPS.holo.label],
       ['film_prices.metal', FILM_GROUPS.metal.label],
     ],
+  },
+  {
+    title: 'Материалы по цене склада',
+    fields: [['material_k', 'Коэффициент материала, ×']],
   },
   {
     title: 'Винил',
@@ -61,6 +65,7 @@ const SECTIONS = [
       ['options.partner_pct', 'Партнёрская скидка, %'], ['options.bag_rub', 'Упаковка, ₽/шт'],
       ['options.extra_view_rub', 'Доп. вид, ₽'], ['options.design_rub', 'Разработка макета, ₽'],
       ['options.design_edit_rub', 'Правка макета, ₽'],
+      ['options.manual_rate_rub', 'Ручные операции, ₽/ч'],
     ],
   },
 ]
@@ -91,7 +96,10 @@ function toValue(form) {
 
 export function CalculatorSettings() {
   const canEdit = useCanDo('calc:settings')
-  const { raw, films, loading, error, refetch, save } = useCalculatorSettings()
+  const canFinance = useCanDo('view:finance')
+  const {
+    raw, films, prices, nfcCandidates, loading, error, refetch, save,
+  } = useCalculatorSettings()
   const [form, setForm] = useState(null)
   const [filmRows, setFilmRows] = useState([])
   const [saving, setSaving] = useState(false)
@@ -121,7 +129,12 @@ export function CalculatorSettings() {
   if (error) return <ErrorState error={error} onRetry={refetch} />
   if (loading || !form) return <Skeleton className="h-96" />
 
-  const unmapped = countUnmappedFilms(filmRows)
+  // Цены по текущему (несохранённому) вводу: группа/коэффициент применяются сразу.
+  const formSettings = parsed || raw
+  const withoutPrice = materialsWithoutPrice(filmRows, prices, formSettings)
+  const unmapped = withoutPrice.length
+  const warehouseRows = filmRows.filter((f) => !f.calc_price_group)
+  const hasPrice = (f) => resolvePrice(f, prices, formSettings).priceCm2 != null
 
   function setField(path, value) {
     setForm((prev) => setPath(prev, path, value))
@@ -141,9 +154,10 @@ export function CalculatorSettings() {
     setSaving(true)
     try {
       const value = { ...toValue(form) }
-      // Плёнку по умолчанию без группы не оставляем — она не видна в калькуляторе.
+      // Материал по умолчанию без цены (ни группы, ни автоцены по складу) не
+      // оставляем — он неактивен в калькуляторе. Позицию по цене склада — оставляем.
       const def = filmRows.find((f) => f.id === value.default_film_id)
-      if (!def || !def.calc_price_group) value.default_film_id = null
+      if (!def || resolvePrice(def, prices, value).priceCm2 == null) value.default_film_id = null
       await save(value, filmRows)
       setDirty(false)
       setHistoryKey((k) => k + 1)
@@ -191,15 +205,25 @@ export function CalculatorSettings() {
 
       <section className="bg-surface rounded-2xl border border-border p-4 space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold">Плёнки склада</h3>
+          <h3 className="text-sm font-semibold">Материалы склада</h3>
           {unmapped > 0 && (
             <p className="text-xs text-text bg-warning/25 rounded-lg px-2 py-1">
               Не настроены для калькулятора: {unmapped} {plural(unmapped, 'позиция', 'позиции', 'позиций')}
             </p>
           )}
         </div>
+        <p className="text-xs text-text-muted">
+          С ценовой группой позиция считается по цене группы, без группы — по цене склада × коэффициент материала.
+        </p>
+        {unmapped > 0 && (
+          <ul className="text-xs rounded-xl border border-warning/50 bg-warning/15 px-3 py-2 space-y-0.5" role="status">
+            {withoutPrice.map((w) => (
+              <li key={w.id} className="break-words"><span className="font-medium">{w.name}</span> — {w.reason}</li>
+            ))}
+          </ul>
+        )}
         {filmRows.length === 0 ? (
-          <p className="text-sm text-text-muted">На складе нет активных плёнок</p>
+          <p className="text-sm text-text-muted">На складе нет активных материалов печати</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="w-full text-sm">
@@ -233,7 +257,7 @@ export function CalculatorSettings() {
                       <input
                         aria-label={`Название в расчёте: ${f.name}`}
                         value={f.calc_display_name || ''}
-                        placeholder={f.calc_price_group ? FILM_GROUPS[f.calc_price_group].defaultName : ''}
+                        placeholder={materialDisplayName({ ...f, calc_display_name: '' })}
                         disabled={!canEdit}
                         maxLength={80}
                         onChange={(e) => setFilm(f.id, { calc_display_name: e.target.value })}
@@ -246,7 +270,7 @@ export function CalculatorSettings() {
                         name="calc-default-film"
                         aria-label={`По умолчанию: ${f.name}`}
                         checked={form.default_film_id === f.id}
-                        disabled={!canEdit || !f.calc_price_group}
+                        disabled={!canEdit || !hasPrice(f)}
                         onChange={() => setField('default_film_id', f.id)}
                         className="w-5 h-5 accent-[var(--color-accent)]"
                       />
@@ -257,6 +281,88 @@ export function CalculatorSettings() {
             </table>
           </div>
         )}
+      </section>
+
+      {warehouseRows.length > 0 && (
+        <section className="bg-surface rounded-2xl border border-border p-4 space-y-3">
+          <h3 className="text-sm font-semibold">Материалы по цене склада</h3>
+          <p className="text-xs text-text-muted">
+            Позиции без ценовой группы: ₽/см² = цена за погонный метр / (ширина рулона × 10 000), в расчёте — × коэффициент материала.
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full text-sm tabular-nums">
+              <thead className="bg-surface-2 text-xs text-text-muted">
+                <tr>
+                  <th scope="col" className="text-left font-medium px-3 py-2">Позиция</th>
+                  {canFinance && <th scope="col" className="text-right font-medium px-3 py-2 whitespace-nowrap">₽/п.м</th>}
+                  <th scope="col" className="text-right font-medium px-3 py-2 whitespace-nowrap">Ширина, м</th>
+                  <th scope="col" className="text-right font-medium px-3 py-2 whitespace-nowrap">₽/см² без K</th>
+                  <th scope="col" className="text-right font-medium px-3 py-2 whitespace-nowrap">₽/см² с K</th>
+                  <th scope="col" className="text-left font-medium px-3 py-2">Название в расчёте</th>
+                </tr>
+              </thead>
+              <tbody>
+                {warehouseRows.map((f) => {
+                  const p = resolvePrice(f, prices, formSettings)
+                  const row = prices?.get?.(f.id)
+                  const width = row?.roll_width_m ?? f.roll_width_m
+                  return (
+                    <tr key={f.id} className="border-t border-border">
+                      <td className="px-3 py-2 min-w-[160px]">
+                        {f.name}
+                        {p.priceCm2 == null && <span className="block text-xs text-warning">{p.reason}</span>}
+                      </td>
+                      {canFinance && (
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          {f.unit_cost != null ? formatPrice(f.unit_cost) : '—'}
+                        </td>
+                      )}
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        {width != null ? String(width).replace('.', ',') : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">{p.priceCm2Raw != null ? fmt4(p.priceCm2Raw) : '—'}</td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">{p.priceCm2 != null ? fmt4(p.priceCm2) : '—'}</td>
+                      <td className="px-3 py-2 min-w-[180px]">
+                        <input
+                          aria-label={`Название в расчёте (склад): ${f.name}`}
+                          value={f.calc_display_name || ''}
+                          placeholder={materialDisplayName({ ...f, calc_display_name: '' })}
+                          disabled={!canEdit}
+                          maxLength={80}
+                          onChange={(e) => setFilm(f.id, { calc_display_name: e.target.value })}
+                          className={`${INPUT_CLASS} border-border`}
+                        />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <section className="bg-surface rounded-2xl border border-border p-4 space-y-2">
+        <h3 className="text-sm font-semibold">NFC-метка</h3>
+        <label htmlFor="calc-set-nfc" className="block text-xs font-medium text-text-muted">NFC: позиция склада</label>
+        <select
+          id="calc-set-nfc"
+          value={form.nfc_material_id || ''}
+          disabled={!canEdit}
+          onChange={(e) => setField('nfc_material_id', e.target.value || null)}
+          className={`${INPUT_CLASS} border-border max-w-md`}
+        >
+          <option value="">— не выбрана (опция NFC недоступна)</option>
+          {form.nfc_material_id && !nfcCandidates.some((m) => m.id === form.nfc_material_id) && (
+            <option value={form.nfc_material_id}>Позиция не найдена или в архиве</option>
+          )}
+          {nfcCandidates.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+        <p className="text-xs text-text-muted">
+          Цена метки берётся со склада, коэффициент материала к ней не применяется. В заказе метка — доп. материал, списывается на упаковке.
+        </p>
       </section>
 
       {parsed && <SettingsPreview settings={parsed} />}

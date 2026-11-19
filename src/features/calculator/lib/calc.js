@@ -1,11 +1,12 @@
 // R25.5 (ТЗ 17.11, Фаза 5 + приложение А): чистая функция расчёта стоимости.
 // Формулы перенесены из калькулятора портала ОП v2.0 без изменений:
 //
-//   S = W·H/100 (см²),  C = c·S
-//   c = плёнка + краска + труд печати + аренда + налог [+ смола·k + заливка·k] [+ ламинация]
+//   S = W·H/100 (см²),  C = c·S [+ n_NFC]
+//   c = материал + краска + труд печати + аренда + налог [+ смола·k + заливка·k] [+ ламинация]
+//       материал = цена группы ИЛИ цена склада за 1 см² × K (R27.2)
 //   M = Mmax·(Mmin/Mmax)^t,  t = ln(q′/20)/ln(qmax/20),  q′ = min(max(q,20), qmax)
 //   P = C·M·(1+u)·(1+r)·(1−p) + b
-//   T = P·q + (N−1)·V + D + E + S·q·m
+//   T = P·q + (N−1)·V + D + E + S·q·m [+ часы·ставка] (R27.3)
 //
 // Считается с полной точностью; округление только при показе (P — 0,1 ₽, T — 1 ₽).
 // Без React и Supabase — легко тестируется и переиспользуется фазой 6
@@ -14,6 +15,12 @@
 export const MIN_QTY = 20
 export const MAX_QTY = 20000
 export const MAX_VIEWS = 9
+
+// R27.3 (ТЗ 19.11, №6): ручные операции — часы с шагом 0,5.
+export const MANUAL_HOURS_MIN = 0.5
+export const MANUAL_HOURS_MAX = 100
+export const MANUAL_HOURS_STEP = 0.5
+export const MANUAL_HOURS_DEFAULT = 1
 
 export const PRODUCTS = {
   sticker: { label: 'Стикер', qmax: 3000 },
@@ -49,8 +56,14 @@ export const DEFAULT_CALC_SETTINGS = Object.freeze({
   options: {
     urgent_pct: 30, cut_pct: 15, partner_pct: 25,
     bag_rub: 3, extra_view_rub: 1000, design_rub: 5000, design_edit_rub: 3000,
+    // R27.3: ручные операции — фиксированная доплата «часы × ставка».
+    manual_rate_rub: 500,
   },
   default_film_id: null,
+  // R27.2 (ТЗ 19.11, №4): коэффициент к цене материала по складу (позиции без
+  // ценовой группы) и позиция склада NFC-метки.
+  material_k: 1.5,
+  nfc_material_id: null,
 })
 
 // Ступени таблицы «Цены по тиражам» (А.2). Цена считается на нижней границе.
@@ -66,8 +79,9 @@ export const TIERS_PACK = [
   [1000, 1499], [1500, 1999], [2000, 4999], [5000, 9999], [10000, 20000],
 ]
 
+// Порядок = порядок переключателей в калькуляторе (и строк «Дополнительно:»).
 export const OPTION_KEYS = [
-  'resin3d', 'lamination', 'montage', 'urgent', 'bag', 'partner', 'cut', 'design', 'designEdit',
+  'resin3d', 'lamination', 'montage', 'urgent', 'bag', 'partner', 'cut', 'nfc', 'design', 'designEdit', 'manual',
 ]
 
 export const OPTION_LABELS = {
@@ -78,9 +92,14 @@ export const OPTION_LABELS = {
   bag: 'Упаковка в пакетик',
   partner: 'Партнёрский заказ',
   cut: 'Поштучная резка',
+  nfc: 'NFC-метка',
   design: 'Разработка макета',
   designEdit: 'Правка макета',
+  manual: 'Ручные операции',
 }
+
+// Строковые (id позиций склада) ключи настроек — не числа.
+const ID_KEYS = new Set(['default_film_id', 'nfc_material_id'])
 
 const isObj = (v) => v != null && typeof v === 'object' && !Array.isArray(v)
 
@@ -92,7 +111,7 @@ export function normalizeSettings(raw) {
       const b = base[k]
       const o = over?.[k]
       if (isObj(b)) out[k] = merge(b, isObj(o) ? o : {})
-      else if (k === 'default_film_id') out[k] = o ?? null
+      else if (ID_KEYS.has(k)) out[k] = (typeof o === 'string' && o.trim()) ? o : null
       else out[k] = (o === '' || o == null || !Number.isFinite(Number(o))) ? b : Number(o)
     }
     return out
@@ -117,11 +136,17 @@ export function markupFor(qty, qmax, mMax, mMin) {
  * Себестоимость 1 см² с разбивкой по статьям (А.1).
  * @returns {{ total: number, items: Array<{key, label, value}> }}
  */
-export function costPerCm2({ product, filmGroup, resin3d, lamination }, settings) {
+export function costPerCm2({ product, filmGroup, resin3d, lamination, materialPriceCm2 }, settings) {
   const s = normalizeSettings(settings)
   const branch = resin3d ? s.resin3d : s.vinyl
+  // R27.2: позиция без ценовой группы — цена склада за 1 см² × коэффициент K;
+  // с группой — цена группы, как раньше.
+  const warehouse = materialPriceCm2 != null && Number.isFinite(Number(materialPriceCm2)) && Number(materialPriceCm2) > 0
+  const material = warehouse
+    ? Number(materialPriceCm2) * s.material_k
+    : num(s.film_prices[filmGroup] ?? s.film_prices.white)
   const items = [
-    { key: 'film', label: 'Плёнка', value: num(s.film_prices[filmGroup] ?? s.film_prices.white) },
+    { key: 'film', label: 'Материал', value: material },
     { key: 'ink', label: 'Краска', value: s.ink },
     { key: 'labor_print', label: 'Труд — печать', value: s.labor_print },
   ]
@@ -167,6 +192,14 @@ export function splitQty(total, n) {
   return out
 }
 
+/** Часы ручных операций: шаг 0,5, от 0,5 до 100; пусто/битое → 1 ч. */
+export function clampManualHours(v) {
+  const n = Number(String(v ?? '').replace(',', '.'))
+  if (v === '' || v == null || !Number.isFinite(n)) return MANUAL_HOURS_DEFAULT
+  const stepped = Math.round(n / MANUAL_HOURS_STEP) * MANUAL_HOURS_STEP
+  return Math.min(Math.max(stepped, MANUAL_HOURS_MIN), MANUAL_HOURS_MAX)
+}
+
 /** Нормализация тиража на выходе из поля: < 20 → 20, > 20 000 → 20 000. */
 export function clampQty(v) {
   const q = Math.floor(num(v))
@@ -186,6 +219,11 @@ export function clampQty(v) {
  * @param {number[]} [input.views]  тираж по видам (N = длина; q = сумма)
  * @param {number}   [input.qty]    тираж, если views не передан (1 вид)
  * @param {Object}   [input.options] флаги OPTION_KEYS
+ * @param {number}   [input.materialPriceCm2] R27.2: ₽/см² позиции по складу (без K);
+ *                   пусто — цена ценовой группы filmGroup
+ * @param {number}   [input.nfcPrice] R27.2: цена NFC-метки, ₽/шт (без K). Опция
+ *                   nfc без цены не действует
+ * @param {number}   [input.manualHours] R27.3: часы ручных операций
  * @param {Object}   settings — k24_settings['calculator'] (нормализуется)
  */
 export function calculate(input, settings) {
@@ -194,6 +232,12 @@ export function calculate(input, settings) {
   const opts = { ...(input.options || {}) }
   // Поштучная резка — только у стикера (у стикерпака скрыта).
   if (product === 'pack') opts.cut = false
+  // NFC-метка без цены (позиция не задана / в архиве / без цены) не действует.
+  const nfcPrice = Number(input.nfcPrice)
+  if (!(Number.isFinite(nfcPrice) && nfcPrice > 0)) opts.nfc = false
+  const nfcUnit = opts.nfc ? nfcPrice : 0
+  const manualHours = clampManualHours(input.manualHours)
+  const materialPriceCm2 = Number(input.materialPriceCm2) > 0 ? Number(input.materialPriceCm2) : null
 
   const views = Array.isArray(input.views) && input.views.length > 0
     ? input.views.map((v) => Math.max(0, Math.floor(num(v))))
@@ -202,8 +246,11 @@ export function calculate(input, settings) {
   const viewsCount = views.length
 
   const S = areaCm2(input.widthMm, input.heightMm)
-  const cost = costPerCm2({ product, filmGroup: input.filmGroup, resin3d: !!opts.resin3d, lamination: !!opts.lamination }, s)
-  const C = cost.total * S
+  const cost = costPerCm2({
+    product, filmGroup: input.filmGroup, resin3d: !!opts.resin3d, lamination: !!opts.lamination, materialPriceCm2,
+  }, s)
+  // R27.2: NFC-метка — в себестоимость штуки (без K), наценивается вместе со всем.
+  const C = cost.total * S + nfcUnit
 
   const branch = opts.resin3d ? s.resin3d : s.vinyl
   const mMax = product === 'pack' ? branch.markup_pack_max : branch.markup_sticker_max
@@ -217,7 +264,10 @@ export function calculate(input, settings) {
   const p = opts.partner ? o.partner_pct / 100 : 0
   const b = opts.bag ? o.bag_rub : 0
 
-  const pricePerUnit = C * markup * (1 + u) * (1 + r) * (1 - p) + b
+  const priceFactor = markup * (1 + u) * (1 + r) * (1 - p)
+  const pricePerUnit = C * priceFactor + b
+  // Надбавка метки к цене за штуку = цена с меткой − без неё.
+  const nfcPerUnitDelta = nfcUnit * priceFactor
 
   const extras = []
   if (viewsCount > 1) {
@@ -226,6 +276,13 @@ export function calculate(input, settings) {
   if (opts.design) extras.push({ key: 'design', label: 'Разработка макета', amount: o.design_rub })
   if (opts.designEdit) extras.push({ key: 'design_edit', label: 'Правка макета', amount: o.design_edit_rub })
   if (opts.montage) extras.push({ key: 'montage', label: 'Монтажная плёнка', amount: S * qty * s.montage })
+  // R27.3: ручные операции — фиксированная доплата, без наценки/срочности/скидки.
+  if (opts.manual) {
+    extras.push({
+      key: 'manual', label: 'Ручные операции',
+      hours: manualHours, rate: o.manual_rate_rub, amount: manualHours * o.manual_rate_rub,
+    })
+  }
   const extrasTotal = extras.reduce((acc, e) => acc + e.amount, 0)
 
   const total = pricePerUnit * qty + extrasTotal
@@ -237,6 +294,9 @@ export function calculate(input, settings) {
       widthMm: num(input.widthMm),
       heightMm: num(input.heightMm),
       filmGroup: input.filmGroup,
+      materialPriceCm2,
+      nfcPrice: opts.nfc ? nfcPrice : null,
+      manualHours: opts.manual ? manualHours : null,
       views,
       options: OPTION_KEYS.reduce((acc, k) => ({ ...acc, [k]: !!opts[k] }), {}),
     },
@@ -249,6 +309,8 @@ export function calculate(input, settings) {
     costPerCm2: cost.total,
     costBreakdown: cost.items,
     costPerUnit: C,
+    nfcCostPerUnit: nfcUnit,
+    nfcPerUnitDelta,
     costTotal,
     markup,
     pricePerUnit,
@@ -257,18 +319,8 @@ export function calculate(input, settings) {
     extrasTotal,
     total,
     totalRounded: Math.round(total),
-    // Опции для текста клиенту: процентные — с процентом, упаковка — ₽/шт.
-    percentOptions: [
-      opts.urgent && { key: 'urgent', label: 'Срочность', text: `+${fmtPct(o.urgent_pct)}%` },
-      opts.cut && { key: 'cut', label: 'Поштучная резка', text: `+${fmtPct(o.cut_pct)}%` },
-      opts.partner && { key: 'partner', label: 'Партнёрская скидка', text: `−${fmtPct(o.partner_pct)}%` },
-      opts.bag && { key: 'bag', label: 'Упаковка в пакетик', text: `+${fmtPct(o.bag_rub)} ₽/шт` },
-    ].filter(Boolean),
+    // Строки опций для текста клиенту — buildOptionLines (copy-text.js, R27.3).
   }
-}
-
-function fmtPct(v) {
-  return String(v).replace('.', ',')
 }
 
 export function roundPrice(v) {
@@ -330,7 +382,11 @@ export const NUMBER_PATHS = [
   'resin3d.markup_sticker_max', 'resin3d.markup_sticker_min', 'resin3d.markup_pack_max', 'resin3d.markup_pack_min',
   'options.urgent_pct', 'options.cut_pct', 'options.partner_pct', 'options.bag_rub',
   'options.extra_view_rub', 'options.design_rub', 'options.design_edit_rub',
+  'options.manual_rate_rub', 'material_k',
 ]
+
+export const MATERIAL_K_MIN = 0.5
+export const MATERIAL_K_MAX = 5
 
 export function getPath(obj, path) {
   return path.split('.').reduce((acc, k) => (acc == null ? undefined : acc[k]), obj)
@@ -359,6 +415,10 @@ export function validateCalcSettings(settings) {
     if (RATE_PATHS.includes(path) && Math.abs(v * 100 - Math.round(v * 100)) > 1e-9) {
       errors[path] = 'Не больше двух знаков после запятой'
     }
+  }
+  if (!errors.material_k) {
+    const k = Number(getPath(settings, 'material_k'))
+    if (k < MATERIAL_K_MIN || k > MATERIAL_K_MAX) errors.material_k = 'От 0,5 до 5'
   }
   for (const branch of ['vinyl', 'resin3d']) {
     for (const kind of ['sticker', 'pack']) {

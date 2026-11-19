@@ -6,6 +6,9 @@
 // калькуляторы получают новые ставки без перезагрузки. k24_materials не в
 // realtime-публикации, но calc_save_settings пишет плёнки ДО ключа settings —
 // событие по settings перечитывает и плёнки.
+// R27.2: цены материалов по складу (₽/см² без K) и NFC-метки — RPC
+// calc_material_prices (миграция 111a; unit_cost в view замаскирован без
+// view:finance). Без RPC (ещё не применена) — калькулятор работает по группам.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
@@ -13,10 +16,13 @@ import { captureError } from '@/shared/lib/sentry'
 import { normalizeSettings } from '../lib/calc'
 import { fetchWarehouseCategories } from '@/features/warehouse/hooks/useWarehouseCategories'
 import { orderFieldMaterials } from '@/features/warehouse/lib/order-material-categories'
+import { indexMaterialPrices } from '../lib/materials'
 
 export const CALC_SETTINGS_KEY = 'calculator'
 
-const MATERIAL_COLS = 'id, type, name, material_code, archived_at, calc_price_group, calc_display_name, category_id'
+// unit_cost в view замаскирован без view:finance (NULL) — нужен только для
+// колонки «₽/п.м» в настройках.
+const MATERIAL_COLS = 'id, type, name, unit, unit_cost, stock_qty, roll_width_m, material_code, archived_at, calc_price_group, calc_display_name, category_id, category_name'
 
 function makeChannelId(prefix) {
   const uid = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
@@ -27,6 +33,9 @@ export function useCalculatorSettings() {
   const [raw, setRaw] = useState(null)
   const [films, setFilms] = useState([])
   const [laminations, setLaminations] = useState([])
+  const [allMaterials, setAllMaterials] = useState([])
+  const [categories, setCategories] = useState([])
+  const [priceRows, setPriceRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const mountedRef = useRef(true)
@@ -37,7 +46,7 @@ export function useCalculatorSettings() {
     try {
       // R25.7B (ТЗ 7.5/7.7): плёнки и ламинация — по отметкам категорий склада
       // («Материал печати» / «Ламинация»); без отметок — по служебному типу.
-      const [settingsR, materialsR, categories] = await Promise.all([
+      const [settingsR, materialsR, cats, pricesR] = await Promise.all([
         supabase.from('k24_settings').select('key, value').eq('key', CALC_SETTINGS_KEY).maybeSingle(),
         supabase
           .from('k24_materials_full')
@@ -48,14 +57,25 @@ export function useCalculatorSettings() {
           captureError(err, { tags: { source: 'useCalculatorSettings.categories' } })
           return []
         }),
+        supabase.rpc('calc_material_prices').then(
+          (r) => r,
+          (err) => ({ data: null, error: err }),
+        ),
       ])
       if (settingsR.error) throw settingsR.error
       if (materialsR.error) throw materialsR.error
       if (!mountedRef.current) return
       const mats = materialsR.data || []
       setRaw(settingsR.data?.value || null)
-      setFilms(orderFieldMaterials(mats, categories, 'print').items)
-      setLaminations(orderFieldMaterials(mats, categories, 'lamination').items)
+      if (pricesR?.error) {
+        // Не критично: без цен склада калькулятор считает по ценовым группам.
+        captureError(pricesR.error, { tags: { source: 'useCalculatorSettings.prices' } })
+      }
+      setFilms(orderFieldMaterials(mats, cats, 'print').items)
+      setLaminations(orderFieldMaterials(mats, cats, 'lamination').items)
+      setAllMaterials(mats)
+      setCategories(cats || [])
+      setPriceRows(Array.isArray(pricesR?.data) ? pricesR.data : [])
     } catch (err) {
       captureError(err, { tags: { source: 'useCalculatorSettings.load' } })
       if (mountedRef.current) setError(err)
@@ -94,12 +114,24 @@ export function useCalculatorSettings() {
   }, [load])
 
   const settings = useMemo(() => normalizeSettings(raw), [raw])
+  const { prices, nfc: nfcRow } = useMemo(() => indexMaterialPrices(priceRows), [priceRows])
+  // Кандидаты в NFC-метку: позиции категорий доп. материалов и «Комплектующих».
+  const nfcCandidates = useMemo(() => {
+    const ids = new Set((categories || [])
+      .filter((c) => c.order_field === 'extra' || c.name === 'Комплектующие')
+      .map((c) => c.id))
+    return allMaterials.filter((m) => m.category_id && ids.has(m.category_id))
+  }, [allMaterials, categories])
 
   return {
     raw,
     settings,
     films,
     laminations,
+    materials: allMaterials,
+    prices,
+    nfcRow,
+    nfcCandidates,
     loading,
     error,
     refetch: load,

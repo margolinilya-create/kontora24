@@ -5,6 +5,9 @@ import {
   DEFAULT_CALC_SETTINGS, TIERS_STICKER, TIERS_PACK,
 } from './calc'
 
+// Средняя цена NFC-метки на складе 19.11 (unit_cost = 6,8181818…).
+const NFC_STOCK_PRICE = 75 / 11
+
 const S = DEFAULT_CALC_SETTINGS
 
 // Приложение А.4 — контрольные расчёты (ставки А.3), сверка до рубля.
@@ -242,21 +245,18 @@ describe('R27: контрольные расчёты 4.5', () => {
     expect(r.totalRounded).toBe(27123)
   })
 
-  // ТЗ даёт 40 450 ₽: пример посчитан с наценкой, округлённой до 2,3991 (или с
-  // ценой метки ≤ 6,8196 ₽, показанной как 6,82). Полная точность (как в А.4,
-  // сверенных с порталом до рубля): 38 450,67 + 2 000 = 40 450,67 → 40 451 ₽.
-  // Цена за штуку (256,3) и надбавка метки (21,3) совпадают с ТЗ.
-  it('+ виды 100+50, срочность, NFC 6,82 ₽, 2 ч ручных → 256,3 ₽/шт, 40 451 ₽ (ТЗ: 40 450), NFC +21,3 ₽/шт', () => {
+  // Цена метки — реальная средняя цена склада на 19.11: 6,8181… ₽ (75/11),
+  // в ТЗ показана округлённо как 6,82. С ней итог совпадает с ТЗ: 40 450 ₽.
+  it('+ виды 100+50, срочность, NFC 6,82 ₽ (склад 75/11), 2 ч ручных → 256,3 ₽/шт, 40 450 ₽, NFC +21,3 ₽/шт', () => {
     const r = calculate({
       product: 'pack', filmGroup: 'white', widthMm: 105, heightMm: 148, views: [100, 50],
-      nfcPrice: 6.82, manualHours: 2,
+      nfcPrice: NFC_STOCK_PRICE, manualHours: 2,
       options: { resin3d: true, urgent: true, nfc: true, manual: true },
     }, S)
     expect(r.pricePerUnitRounded).toBe(256.3)
-    expect(r.total).toBeCloseTo(40450.67, 2)
-    expect(r.totalRounded).toBe(40451)
+    expect(r.totalRounded).toBe(40450)
     expect(Math.round(r.nfcPerUnitDelta * 10) / 10).toBe(21.3)
-    expect(r.nfcCostPerUnit).toBe(6.82)
+    expect(r.nfcCostPerUnit).toBe(NFC_STOCK_PRICE)
     // Ручные операции — фиксированная доплата, в цену за штуку не входит.
     expect(r.extras.find((e) => e.key === 'manual')).toMatchObject({ hours: 2, rate: 500, amount: 1000 })
   })

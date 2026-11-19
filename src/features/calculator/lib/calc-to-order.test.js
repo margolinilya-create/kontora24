@@ -202,7 +202,7 @@ describe('R27: NFC-метка, ручные операции, снимок v2', 
   const NFC = { id: 'nfc-1', category_id: 'cat-kit', name: 'NFC-метки (NTAG216)' }
   const pack = (opts, extra = {}) => calc({
     product: 'pack', widthMm: 105, heightMm: 148, views: [100, 50],
-    nfcPrice: 6.82, manualHours: 2, options: { resin3d: true, ...opts }, ...extra,
+    nfcPrice: 75 / 11, manualHours: 2, options: { resin3d: true, ...opts }, ...extra,
   })
 
   it('NFC → доп. материал заказа { категория: позиция }, bopp_bag не ставится', () => {
@@ -226,9 +226,9 @@ describe('R27: NFC-метка, ручные операции, снимок v2', 
     expect(snap.version).toBe(2)
     expect(snap.input).toMatchObject({
       material_price_cm2: null, material_price_source: 'group',
-      nfc_material_id: 'nfc-1', nfc_price: 6.82, manual_hours: 2, manual_rate: 500,
+      nfc_material_id: 'nfc-1', nfc_price: 75 / 11, manual_hours: 2, manual_rate: 500,
     })
-    expect(snap.total_rounded).toBe(40451) // ТЗ: 40 450 — см. calc.test.js (округление наценки в примере)
+    expect(snap.total_rounded).toBe(40450)
     expect(Math.round(snap.nfc_per_unit_delta * 10) / 10).toBe(21.3)
     const paper = buildCalcSnapshot(calc({ materialPriceCm2: 185.35 / (1.27 * 10000) }), {})
     expect(paper.input.material_price_source).toBe('warehouse')

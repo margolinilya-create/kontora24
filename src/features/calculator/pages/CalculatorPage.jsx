@@ -259,7 +259,9 @@ export default function CalculatorPage() {
         <p className="text-text-muted text-sm">Стоимость тиража по общим ставкам — для расчёта клиенту</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,440px)] items-start">
+      {/* grid-cols-1 (= minmax(0,1fr)): без шаблона неявная колонка растягивалась
+          по таблице «Цены по тиражам» → +74px горизонтальной прокрутки на 375px. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,440px)] items-start">
         {/* ------------------------------------------------ Ввод */}
         <section aria-label="Параметры расчёта" className="space-y-4 min-w-0">
           <div className="bg-surface rounded-2xl border border-border p-4 space-y-4">

@@ -47,11 +47,21 @@ const CabinetPage = lazy(() => import('@/features/cabinet/pages/CabinetPage'))
 const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'))
 const HelpPage = lazy(() => import('@/features/help/pages/HelpPage'))
 
+// R27.0: dev-only стенд образца для e2e (e2e/sample-proof.spec.js). В прод-сборке
+// import.meta.env.DEV === false → ветка и динамический import вырезаются.
+const SampleProofStand = import.meta.env.DEV
+  ? lazy(() => import('@/features/techcard/dev/SampleProofStand'))
+  : null
+const devRoutes = SampleProofStand
+  ? [{ path: '/dev/sample-proof', element: <SampleProofStand /> }]
+  : []
+
 export const routes = [
   {
     path: '/login',
     element: <LoginForm />,
   },
+  ...devRoutes,
   {
     element: (
       <AuthGuard>

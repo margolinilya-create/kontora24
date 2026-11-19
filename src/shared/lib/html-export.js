@@ -3,7 +3,7 @@
 // pixelWidth/pixelHeight (R9.4, бриф 26.05): для стикеров 120x75мм mobile-viewport
 // сжимает body, html2canvas видит scrollWidth = ширина viewport вместо настоящих
 // 340px. Передаём explicit размеры, чтобы не обрезался текст по горизонтали.
-async function renderCanvas(element, { scale, pixelWidth, pixelHeight }) {
+export async function renderCanvas(element, { scale = 2, pixelWidth, pixelHeight } = {}) {
   const { default: html2canvas } = await import('html2canvas')
   // R10.1: ждём загрузки @font-face (Modulord, Guidy, Bebas) — иначе html2canvas
   // снимет с fallback-шрифтом и метрики не совпадут с тем, что видит пользователь.

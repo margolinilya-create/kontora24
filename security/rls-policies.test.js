@@ -533,3 +533,24 @@ describe('R28.1 CRM: миграция 113 (сделки) аддитивна и �
     expect(view).toMatch(/route_snapshot,\s*deal_id\s*FROM k24_orders o;/)
   })
 })
+
+describe('R28.2 CRM: миграция 114 (лента/задачи) не трогает заказы', () => {
+  const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/114_r28_2_crm_feed_tasks.sql'), 'utf-8')
+
+  it('никаких триггеров/изменений на k24_orders — лента читает историю статусов', () => {
+    expect(sql).not.toMatch(/ON public\.k24_orders\b/)
+    expect(sql).not.toMatch(/ALTER TABLE public\.k24_orders\b/)
+  })
+
+  it('RLS на новых таблицах, лента — только чтение для authenticated', () => {
+    for (const t of ['k24_crm_notes', 'k24_crm_tasks', 'k24_activities']) {
+      expect(sql).toMatch(new RegExp(`ALTER TABLE public\\.${t}\\s+ENABLE ROW LEVEL SECURITY`))
+    }
+    expect(sql).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public\.k24_activities FROM authenticated/)
+    expect(sql).not.toMatch(/CREATE POLICY \w+ ON public\.k24_activities FOR (INSERT|UPDATE|DELETE|ALL)/)
+  })
+
+  it('триггер ленты не может заблокировать сделку (EXCEPTION внутри)', () => {
+    expect(sql).toMatch(/EXCEPTION WHEN others THEN\s+-- Лента — вторична/)
+  })
+})

@@ -19,6 +19,7 @@ import { activeStages, daysInStage, isOverdue, isRotting } from '../lib/deals'
 import { contactFullName } from '../lib/client-metrics'
 import { DealFormModal } from '../components/DealFormModal'
 import { LostReasonModal } from '../components/LostReasonModal'
+import { ActivityFeed } from '../components/ActivityFeed'
 
 function Field({ label, children }) {
   return (
@@ -186,6 +187,8 @@ export default function CrmDealDetailPage() {
           </ul>
         )}
       </section>
+
+      <ActivityFeed target={{ dealId: deal.id, clientId: deal.client_id }} scopeBy="deal" orders={orders} />
 
       <DealFormModal isOpen={editing} onClose={() => setEditing(false)} deal={deal} pipelines={pipelines} onSaved={refetch} />
       <LostReasonModal reasons={lostReasons} {...lostModal} />

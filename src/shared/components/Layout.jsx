@@ -11,6 +11,7 @@ import { useStageNotifications } from '@/shared/hooks/useStageNotifications'
 import { NAV_ITEMS } from '@/shared/constants'
 import { RoleEmulationBanner } from './RoleEmulationBanner'
 import { ShiftReminderModal } from '@/features/production/components/ShiftReminderModal'
+import { CrmTaskReminder } from '@/features/crm/components/CrmTaskReminder'
 
 const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map(item => [item.path, item.label]))
 
@@ -79,6 +80,8 @@ export function Layout() {
       </div>
       <RoleEmulationBanner />
       <ShiftReminderModal />
+      {/* R28.2: напоминания о задачах CRM — только при праве view:crm */}
+      <CrmTaskReminder />
     </div>
   )
 }

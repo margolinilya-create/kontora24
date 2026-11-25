@@ -14,6 +14,7 @@ import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
 import { useCrmCompany, useCrmDirectory } from '../hooks/useCrmData'
 import { DealFormModal } from '../components/DealFormModal'
+import { ActivityFeed } from '../components/ActivityFeed'
 import { setCompanyArchived, setContactArchived } from '../lib/crm-api'
 import { computeClientMetrics, contactFullName } from '../lib/client-metrics'
 import { CompanyFormModal } from '../components/CompanyFormModal'
@@ -217,6 +218,8 @@ export default function CrmClientDetailPage() {
           </ul>
         )}
       </section>
+
+      <ActivityFeed target={{ clientId: company.id }} scopeBy="client" orders={orders} />
 
       <DealFormModal
         isOpen={creatingDeal}

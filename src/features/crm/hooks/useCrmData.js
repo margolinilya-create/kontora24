@@ -14,7 +14,7 @@ import {
  * skeleton только при первой загрузке — повторные без мигания.
  * `key` — строка-ключ параметров: смена ключа = новый запрос.
  */
-function useAsyncData(loader, key, source) {
+export function useAsyncData(loader, key, source) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

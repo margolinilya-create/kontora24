@@ -17,6 +17,7 @@ import Modal from '@/shared/components/Modal'
 import { OnboardingTip } from '@/shared/components/OnboardingTip'
 import { ProductionStatsTab } from '../components/ProductionStatsTab'
 import { ActiveShiftsWidget } from '../components/ActiveShiftsWidget'
+import { MyTasksWidget } from '@/features/crm/components/MyTasksWidget'
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
@@ -407,6 +408,9 @@ export default function DashboardPage() {
 
               {/* R15.4 #1: виджет активных смен */}
               <ActiveShiftsWidget />
+
+              {/* R28.2: задачи CRM — только при праве view:crm */}
+              <MyTasksWidget />
 
               {/* Список срочных заказов (priority=urgent или просроченные) */}
               {urgentOrders.length > 0 && (

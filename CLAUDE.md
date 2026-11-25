@@ -892,3 +892,17 @@ Google Doc 1Lzcdn1Z…. План проверен ecc:architect + ecc:database-r
 **Решения/отступления:** NFC без `bopp_bag` (упаковка есть во всех v2-маршрутах); «Итого» без пустой строки; тираж 45 старых заказов (qty = 1-й вид) не пересчитывается до правки видов; цена NFC в тесте ТЗ — складская 75/11 (в ТЗ округлено до 6,82).
 
 **Ограничения:** прогноз метров для бумаги в форме заказа не строится (`material-forecast` работает по коду плёнки); проверка образца в Safari/iPhone — вручную.
+
+## R28 — CRM внутри Kontora24 (с 2026-11-25)
+
+Ядро CRM в нашей ERP вместо Bitrix24 (план — `/root/.claude/plans/cozy-gathering-fog.md`, у пользователя в чате). Ветка `claude/kontora24-crm-unified-feed-6ue1yp`, база — ветка R25–R27 `claude/document-review-and-plan-txwipp` (она в проде; main отстаёт на 68 коммитов — **не деплоить от main**).
+
+**Принципы для боевой ERP:** миграции только аддитивные (новые таблицы, nullable-колонки, без DROP/ALTER POLICY по существующим), к каждой — down-скрипт в `supabase/migrations/rollback/`, пробный прогон в транзакции с `RAISE EXCEPTION` (откат) до применения, скрытый запуск через право `view:crm` (по умолчанию только admin, менеджеру — вручную в «Права ролей»). Тест-сторож — `security/rls-policies.test.js` (блок R28.0).
+
+| Релиз | Что | Миграция |
+|-------|-----|----------|
+| R28.0 | Раздел «Клиенты» `/crm/clients`: компании/физлица (`k24_clients` + kind/inn/website/owner_id/source/custom/archived_at/merged_into), контакты `k24_contacts`, каналы связи `k24_contact_identities` (value_norm: E.164 / lower email / tg username — ключ будущей склейки каналов), карточка клиента с метриками (LTV/средний чек только с view:finance, «давно не заказывал» > 90 дн), заказы клиента через `k24_orders_full`, предупреждение о дублях (телефон/email/ИНН/название), архив. Хелпер `k24_has_permission(perm)` для новых RLS. Права `view:crm`, `crm:edit`, `crm:manage`, `crm:see_all`, `crm:import` (группа «CRM — клиенты») | 112 (в проде 25.11, применена двумя частями через execute_sql — `apply_migration` не дожидался подтверждения; запись в schema_migrations добавлена вручную) |
+
+Код: `src/features/crm/` — `lib/` (identity, identity-diff, client-metrics, crm-api), `hooks/useCrmData.js`, `components/` (CompanyFormModal, ContactFormModal, IdentityEditor, IdentityList, DuplicateWarning), `pages/` (CrmClientsPage, CrmClientDetailPage).
+
+**Дальше:** R28.1 сделки/воронки/канбан + «Создать заказ из сделки» (`k24_orders.deal_id` — колоночный GRANT + в конец `k24_orders_full`), R28.2 лента активности + задачи, R28.3 слияние дублей/Ctrl+K/импорт, R28.4 аналитика продаж. Каналы (почта, Telegram, Mango, формы сайта, MAX) и импорт Bitrix — после переезда БД в РФ (152-ФЗ).

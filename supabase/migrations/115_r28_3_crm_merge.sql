@@ -97,12 +97,12 @@ BEGIN
     RAISE EXCEPTION 'Один из контактов уже объединён с другим';
   END IF;
 
-  -- Каналы связи: совпадающие (kind + value_norm) у поглощённого удаляем, остальные переносим.
-  DELETE FROM k24_contact_identities d
+  -- Каналы связи: переносим только новые для основного (kind + value_norm);
+  -- совпадающие остаются у поглощённого (он в архиве) — без удаления данных.
+  UPDATE k24_contact_identities d SET contact_id = p_keep, is_primary = false
    WHERE d.contact_id = p_drop
-     AND EXISTS (SELECT 1 FROM k24_contact_identities k
-                  WHERE k.contact_id = p_keep AND k.kind = d.kind AND k.value_norm = d.value_norm);
-  UPDATE k24_contact_identities SET contact_id = p_keep, is_primary = false WHERE contact_id = p_drop;
+     AND NOT EXISTS (SELECT 1 FROM k24_contact_identities k
+                      WHERE k.contact_id = p_keep AND k.kind = d.kind AND k.value_norm = d.value_norm);
   GET DIAGNOSTICS v_ident = ROW_COUNT;
 
   UPDATE k24_deals      SET contact_id = p_keep WHERE contact_id = p_drop;

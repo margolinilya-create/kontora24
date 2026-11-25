@@ -115,17 +115,37 @@ export function escapeIlikePattern(s) {
  * оба создают. На UNIQUE constraint (если он есть) второй упадёт. Catch'им
  * ошибку и повторяем поиск — вернём найденную запись от первого менеджера.
  */
+/**
+ * R28.3: по цепочке merged_into находит действующего клиента (до 5 шагов).
+ * Для обычного клиента (merged_into = null) запросов не делает.
+ */
+export async function resolveMergedClient(client) {
+  let current = client
+  for (let i = 0; i < 5 && current?.merged_into; i++) {
+    const { data, error } = await supabase
+      .from('k24_clients')
+      .select('id, name, merged_into')
+      .eq('id', current.merged_into)
+      .maybeSingle()
+    if (error) throw error
+    if (!data) break
+    current = data
+  }
+  return current ? { id: current.id, name: current.name } : current
+}
+
 export async function findOrCreateClientByName(name) {
   const trimmed = normalizeClientName(name)
   if (!trimmed) return null
   const escaped = escapeIlikePattern(trimmed)
   const { data: existing, error: searchErr } = await supabase
     .from('k24_clients')
-    .select('id, name')
+    .select('id, name, merged_into')
     .ilike('name', escaped)
     .limit(1)
   if (searchErr) throw searchErr
-  if (existing && existing.length > 0) return existing[0]
+  // R28.3: клиент поглощён слиянием → заказ привязываем к основному.
+  if (existing && existing.length > 0) return resolveMergedClient(existing[0])
   try {
     return await createClient({ name: trimmed })
   } catch (err) {

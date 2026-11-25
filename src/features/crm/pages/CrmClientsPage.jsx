@@ -14,6 +14,13 @@ import { contactFullName } from '../lib/client-metrics'
 import { CompanyFormModal } from '../components/CompanyFormModal'
 import { ContactFormModal } from '../components/ContactFormModal'
 import { IdentityList } from '../components/IdentityList'
+import { ImportClientsModal } from '../components/ImportClientsModal'
+import { fetchExportData } from '../lib/crm-ops'
+import { buildExportAoa } from '../lib/import-clients'
+import { downloadXlsxBook } from '@/shared/lib/export-xlsx'
+import { toast } from '@/shared/stores/toast-store'
+import { translateError } from '@/shared/lib/error-translator'
+import { captureError } from '@/shared/lib/sentry'
 
 const TABS = [
   { key: 'clients', label: 'Клиенты' },
@@ -146,6 +153,24 @@ export default function CrmClientsPage() {
   const search = useDebounce(query, 300)
   const navigate = useNavigate()
   const canEdit = useCanDo('crm:edit')
+  const canImport = useCanDo('crm:import')
+  const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  async function doExport() {
+    setExporting(true)
+    try {
+      const { clients, contactsByClient } = await fetchExportData()
+      await downloadXlsxBook(`клиенты-${new Date().toISOString().slice(0, 10)}.xlsx`, [
+        { name: 'Клиенты', aoa: buildExportAoa(clients, contactsByClient) },
+      ])
+    } catch (err) {
+      captureError(err, { tags: { source: 'crm.CrmClientsPage.export' } })
+      toast.error(translateError(err).message)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   function selectTab(key) {
     setParams((prev) => {
@@ -164,6 +189,8 @@ export default function CrmClientsPage() {
         </div>
         {canEdit && (
           <div className="flex gap-2">
+            {canImport && <Button variant="ghost" onClick={() => setImporting(true)}>Импорт</Button>}
+            {canImport && <Button variant="ghost" loading={exporting} onClick={doExport}>Экспорт</Button>}
             <Button variant="secondary" onClick={() => setCreating('contact')}>+ Контакт</Button>
             <Button onClick={() => setCreating('client')}>+ Клиент</Button>
           </div>
@@ -193,6 +220,7 @@ export default function CrmClientsPage() {
         onClose={() => setCreating(null)}
         onSaved={(saved) => saved?.id && navigate(`/crm/clients/${saved.id}`)}
       />
+      <ImportClientsModal isOpen={importing} onClose={() => setImporting(false)} onDone={() => setReloadKey((k) => k + 1)} />
       <ContactFormModal
         isOpen={creating === 'contact'}
         onClose={() => setCreating(null)}

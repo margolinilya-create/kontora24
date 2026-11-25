@@ -15,6 +15,7 @@ import { captureError } from '@/shared/lib/sentry'
 import { useCrmCompany, useCrmDirectory } from '../hooks/useCrmData'
 import { DealFormModal } from '../components/DealFormModal'
 import { ActivityFeed } from '../components/ActivityFeed'
+import { MergeClientModal } from '../components/MergeClientModal'
 import { setCompanyArchived, setContactArchived } from '../lib/crm-api'
 import { computeClientMetrics, contactFullName } from '../lib/client-metrics'
 import { CompanyFormModal } from '../components/CompanyFormModal'
@@ -44,6 +45,8 @@ export default function CrmClientDetailPage() {
   const [contactModal, setContactModal] = useState(null) // { contact } — null = закрыто
   const [confirm, setConfirm] = useState(null) // { kind: 'company'|'contact', target? }
   const [creatingDeal, setCreatingDeal] = useState(false)
+  const [merging, setMerging] = useState(false)
+  const canManage = useCanDo('crm:manage')
   const { pipelines } = useCrmDirectory()
 
   const metrics = useMemo(() => computeClientMetrics(data?.orders || []), [data?.orders])
@@ -109,6 +112,7 @@ export default function CrmClientDetailPage() {
               <Button variant="secondary" onClick={() => setConfirm({ kind: 'company' })}>
                 {isArchived ? 'Из архива' : 'В архив'}
               </Button>
+              {canManage && !isArchived && <Button variant="secondary" onClick={() => setMerging(true)}>Объединить</Button>}
               <Button onClick={() => setEditingCompany(true)}>Изменить</Button>
             </div>
           )}
@@ -220,6 +224,8 @@ export default function CrmClientDetailPage() {
       </section>
 
       <ActivityFeed target={{ clientId: company.id }} scopeBy="client" orders={orders} />
+
+      {merging && <MergeClientModal isOpen onClose={() => setMerging(false)} company={company} onMerged={refetch} />}
 
       <DealFormModal
         isOpen={creatingDeal}

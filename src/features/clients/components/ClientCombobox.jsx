@@ -39,6 +39,8 @@ export function ClientCombobox({ currentClient, onChange, placeholder = 'Не в
         let q = supabase
           .from('k24_clients')
           .select('id, name, phone, email')
+          // R28.3: поглощённые слиянием клиенты не предлагаются.
+          .is('merged_into', null)
           .order('name')
           .limit(20)
         const search = debouncedQuery.replace(/[,()]/g, '').trim()

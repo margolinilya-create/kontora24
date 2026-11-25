@@ -12,6 +12,7 @@ import { NAV_ITEMS } from '@/shared/constants'
 import { RoleEmulationBanner } from './RoleEmulationBanner'
 import { ShiftReminderModal } from '@/features/production/components/ShiftReminderModal'
 import { CrmTaskReminder } from '@/features/crm/components/CrmTaskReminder'
+import { CommandPalette } from '@/features/crm/components/CommandPalette'
 
 const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map(item => [item.path, item.label]))
 
@@ -66,6 +67,8 @@ export function Layout() {
           <Link to="/help" className="ml-auto p-2.5 rounded-xl hover:bg-surface-2 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Справка">
             <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </Link>
+          {/* R28.3: глобальный поиск Ctrl+K — только при праве view:crm */}
+          <CommandPalette />
         </header>
 
         <Breadcrumbs />

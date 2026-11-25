@@ -84,3 +84,37 @@ describe('orderPrefillFromDeal', () => {
     expect(orderPrefillFromDeal(null)).toEqual({})
   })
 })
+
+import { dealsInPeriod, summarizeSales, buildFunnel, groupDeals, forecastByMonth } from './deals'
+
+describe('R28.4 аналитика продаж', () => {
+  const st = [
+    { id: 's1', name: 'Новая', sort: 1, kind: 'open', probability: 10 },
+    { id: 's2', name: 'КП', sort: 2, kind: 'open', probability: 50 },
+    { id: 'w', name: 'Выиграна', sort: 5, kind: 'won', probability: 100 },
+    { id: 'l', name: 'Проиграна', sort: 6, kind: 'lost', probability: 0 },
+  ]
+  const ids = Object.fromEntries(st.map((s) => [s.id, s]))
+  const ds = [
+    { id: 'a', stage_id: 's1', amount: 1000, created_at: '2026-11-01T00:00:00Z', expected_close: '2026-12-10' },
+    { id: 'b', stage_id: 's2', amount: 2000, created_at: '2026-11-02T00:00:00Z', expected_close: '2026-12-20', source: 'avito' },
+    { id: 'c', stage_id: 'w', amount: 3000, created_at: '2026-11-01T00:00:00Z', closed_at: '2026-11-11T00:00:00Z', source: 'avito' },
+    { id: 'd', stage_id: 'l', amount: 500, created_at: '2026-11-03T00:00:00Z' },
+    { id: 'e', stage_id: 's1', amount: 100, created_at: '2025-01-01T00:00:00Z', archived_at: 'x' },
+  ]
+  it('период и сводка', () => {
+    expect(dealsInPeriod(ds, '2026-11-01T12:00:00Z', null).map((d) => d.id)).toEqual(['b', 'd'])
+    expect(summarizeSales(dealsInPeriod(ds), ids)).toMatchObject({ created: 4, won: 1, wonSum: 3000, lost: 1, open: 2, winRate: 50, avgWon: 3000, avgCycleDays: 10 })
+  })
+  it('воронка учитывает пройденные этапы', () => {
+    const f = buildFunnel(dealsInPeriod(ds), st, [{ deal_id: 'd', meta: { from: 'КП', to: 'Проиграна' } }])
+    expect(f.map((x) => [x.name, x.count, x.pct])).toEqual([['Новая', 4, 100], ['КП', 3, 75]])
+  })
+  it('группировка по источнику', () => {
+    expect(groupDeals(dealsInPeriod(ds), ids, (d) => d.source, (k) => k).find((r) => r.key === 'avito')).toMatchObject({ key: 'avito', count: 2, won: 1, wonSum: 3000 })
+  })
+  it('прогноз по месяцам', () => {
+    expect(forecastByMonth(ds, ids, new Date('2026-12-15T00:00:00Z'))).toEqual([{ month: '2026-12', count: 2, sum: 3000, weighted: 1100, overdue: false }])
+    expect(forecastByMonth(ds, ids, new Date('2027-02-01T00:00:00Z'))[0].overdue).toBe(true)
+  })
+})

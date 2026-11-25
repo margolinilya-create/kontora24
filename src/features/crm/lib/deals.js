@@ -72,3 +72,108 @@ export function orderPrefillFromDeal(deal) {
   if (deal.source) out.source = deal.source
   return out
 }
+
+// ---------------------------------------------------------------------------
+// R28.4 — аналитика продаж
+// ---------------------------------------------------------------------------
+
+/** Сделки, созданные в периоде [from, to] (ISO или null), без архивных. */
+export function dealsInPeriod(deals, from, to) {
+  const f = from ? new Date(from).getTime() : -Infinity
+  const t = to ? new Date(to).getTime() : Infinity
+  return (deals || []).filter((d) => {
+    if (d.archived_at) return false
+    const c = new Date(d.created_at).getTime()
+    return c >= f && c <= t
+  })
+}
+
+/** Создано, выиграно/проиграно, доля выигранных (от закрытых), средний чек, средний цикл (дни). */
+export function summarizeSales(deals, stagesById) {
+  let won = 0; let wonSum = 0; let lost = 0; let open = 0; let openSum = 0; let cycleDays = 0
+  for (const d of deals || []) {
+    const kind = stagesById[d.stage_id]?.kind
+    const amount = Number(d.amount) || 0
+    if (kind === 'won') {
+      won += 1; wonSum += amount
+      if (d.closed_at) cycleDays += Math.max(0, (new Date(d.closed_at) - new Date(d.created_at)) / DAY_MS)
+    } else if (kind === 'lost') {
+      lost += 1
+    } else if (kind === 'open') {
+      open += 1; openSum += amount
+    }
+  }
+  const closed = won + lost
+  return {
+    created: (deals || []).length, won, wonSum, lost, open, openSum,
+    winRate: closed ? Math.round((won / closed) * 100) : null,
+    avgWon: won ? Math.round(wonSum / won) : null,
+    avgCycleDays: won ? Math.round(cycleDays / won) : null,
+  }
+}
+
+/**
+ * Воронка: сколько сделок дошло до каждого открытого этапа. Достигнутый этап —
+ * максимум из текущего и пройденных по ленте (meta.from/meta.to — имена этапов).
+ * Выигранная считается прошедшей все открытые этапы.
+ */
+export function buildFunnel(deals, stages, stageActivities) {
+  const open = activeStages(stages).filter((s) => s.kind === 'open')
+  if (!open.length) return []
+  const byName = new Map(open.map((s) => [s.name, s]))
+  const maxOpenSort = open[open.length - 1].sort
+  const stageById = Object.fromEntries((stages || []).map((s) => [s.id, s]))
+  const reached = new Map()
+  for (const d of deals || []) {
+    const cur = stageById[d.stage_id]
+    reached.set(d.id, cur?.kind === 'won' ? maxOpenSort : cur?.kind === 'open' ? cur.sort : -Infinity)
+  }
+  for (const a of stageActivities || []) {
+    if (!reached.has(a.deal_id)) continue
+    for (const name of [a.meta?.from, a.meta?.to]) {
+      const s = byName.get(name)
+      if (s && s.sort > reached.get(a.deal_id)) reached.set(a.deal_id, s.sort)
+    }
+  }
+  const total = (deals || []).length
+  return open.map((s) => {
+    let count = 0
+    for (const v of reached.values()) if (v >= s.sort) count += 1
+    return { stageId: s.id, name: s.name, color: s.color, count, pct: total ? Math.round((count / total) * 100) : 0 }
+  })
+}
+
+/** Группировка → [{ key, label, count, won, wonSum }] по убыванию количества. */
+export function groupDeals(deals, stagesById, keyFn, labelFn) {
+  const map = new Map()
+  for (const d of deals || []) {
+    const key = keyFn(d) ?? '—'
+    const row = map.get(key) || { key, label: labelFn(key), count: 0, won: 0, wonSum: 0 }
+    row.count += 1
+    if (stagesById[d.stage_id]?.kind === 'won') {
+      row.won += 1
+      row.wonSum += Number(d.amount) || 0
+    }
+    map.set(key, row)
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count)
+}
+
+/** Прогноз по месяцам ожидаемого закрытия: Σ сумма × вероятность (только открытые). */
+export function forecastByMonth(deals, stagesById, now = new Date()) {
+  const thisMonth = now.toISOString().slice(0, 7)
+  const map = new Map()
+  for (const d of deals || []) {
+    const st = stagesById[d.stage_id]
+    if (!st || st.kind !== 'open' || d.archived_at) continue
+    const key = d.expected_close ? d.expected_close.slice(0, 7) : 'без даты'
+    const row = map.get(key) || { month: key, count: 0, sum: 0, weighted: 0, overdue: key !== 'без даты' && key < thisMonth }
+    row.count += 1
+    row.sum += Number(d.amount) || 0
+    row.weighted += (Number(d.amount) || 0) * (st.probability || 0) / 100
+    map.set(key, row)
+  }
+  return [...map.values()]
+    .map((r) => ({ ...r, weighted: Math.round(r.weighted) }))
+    .sort((a, b) => (a.month === 'без даты' ? 1 : b.month === 'без даты' ? -1 : a.month.localeCompare(b.month)))
+}

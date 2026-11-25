@@ -1363,6 +1363,7 @@ export const NAV_ITEMS = [
   // R28.0: CRM. До загрузки прав (legacy roles) виден только admin — скрытый запуск.
   { path: '/crm/deals', label: 'Сделки', icon: 'Handshake', roles: ['admin'], permission: 'view:crm' },
   { path: '/crm/clients', label: 'Клиенты', icon: 'Users', roles: ['admin'], permission: 'view:crm' },
+  { path: '/crm/analytics', label: 'Аналитика продаж', icon: 'BarChart3', roles: ['admin'], permission: 'view:crm' },
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'], permission: 'stage:design' },
   { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'], permission: 'stage:prepress' },
   { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'], permission: 'stage:print' },

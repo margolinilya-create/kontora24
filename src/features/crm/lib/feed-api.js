@@ -131,3 +131,13 @@ export async function listOrderHistory(orderIds) {
   if (error) throw error
   return data || []
 }
+
+/** R28.4: смены этапов сделок (для воронки), не больше 5000 последних. */
+export async function listStageActivities(since = null) {
+  let q = supabase.from('k24_activities').select('deal_id, meta, occurred_at').eq('kind', 'deal_stage')
+    .order('occurred_at', { ascending: false }).limit(5000)
+  if (since) q = q.gte('occurred_at', since)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}

@@ -12,6 +12,7 @@ const SECTIONS = [
   { key: 'views', title: 'Доступ к разделам' },
   { key: 'actions', title: 'Действия' },
   { key: 'materials', title: 'Материалы / Склад' },
+  { key: 'crm', title: 'CRM — клиенты' },
 ]
 
 /**

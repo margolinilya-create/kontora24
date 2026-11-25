@@ -568,6 +568,10 @@ export const PERMISSIONS = {
     'material:archive', 'material:delete',
     'warehouse:edit_operation',
   ],
+  // R28.0: CRM (сид — миграция 112; view:crm по умолчанию только admin).
+  crm: [
+    'view:crm', 'crm:edit', 'crm:manage', 'crm:see_all', 'crm:import',
+  ],
 }
 
 export const PERMISSION_LABELS = {
@@ -613,6 +617,11 @@ export const PERMISSION_LABELS = {
   'material:archive': 'Архивировать/редактировать позиции склада',
   'material:delete': 'Полное удаление позиций склада',
   'warehouse:edit_operation': 'Уточнять операции склада (дата, поставщик, вид)',
+  'view:crm': 'Видеть раздел «Клиенты» (CRM)',
+  'crm:edit': 'Создавать и редактировать клиентов и контакты',
+  'crm:manage': 'Удалять и объединять записи CRM',
+  'crm:see_all': 'Видеть клиентов всех ответственных',
+  'crm:import': 'Импорт и экспорт базы клиентов',
   'user:manage': 'Управлять пользователями',
   'contractor:manage': 'Управлять подрядчиками',
   'order_type:manage': 'Настраивать типы заказов и этапы',
@@ -1351,6 +1360,8 @@ export const NAV_ITEMS = [
   { path: '/sales', label: 'Продажи', icon: 'Handshake', roles: MANAGER_ROLES, permission: 'view:sales' },
   // R25.5 (ТЗ 5.1): калькулятор стоимости — после «Продаж».
   { path: '/calculator', label: 'Калькулятор', icon: 'Calculator', roles: MANAGER_ROLES, permission: 'view:calculator' },
+  // R28.0: CRM. До загрузки прав (legacy roles) виден только admin — скрытый запуск.
+  { path: '/crm/clients', label: 'Клиенты', icon: 'Users', roles: ['admin'], permission: 'view:crm' },
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'], permission: 'stage:design' },
   { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'], permission: 'stage:prepress' },
   { path: '/production/print', label: 'Печать', icon: 'Printer', roles: ['admin', 'manager', 'printer'], permission: 'stage:print' },

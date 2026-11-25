@@ -476,3 +476,29 @@ describe('R27.0: RPC replace_order_items (виды заказа)', () => {
     expect(hook).not.toMatch(/from\('k24_order_items'\)\s*\.(insert|delete|update|upsert)/)
   })
 })
+
+describe('R28.0 CRM: миграция 112 аддитивна и закрыта правами', () => {
+  const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/112_r28_0_crm_core_clients.sql'), 'utf-8')
+
+  it('RLS включён на новых таблицах, анонимам доступа нет', () => {
+    expect(sql).toMatch(/ALTER TABLE public\.k24_contacts\s+ENABLE ROW LEVEL SECURITY/)
+    expect(sql).toMatch(/ALTER TABLE public\.k24_contact_identities ENABLE ROW LEVEL SECURITY/)
+    expect(sql).toMatch(/REVOKE ALL ON public\.k24_contacts, public\.k24_contact_identities FROM PUBLIC, anon/)
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.k24_has_permission\(text\) FROM PUBLIC, anon/)
+  })
+
+  it('видимость контактов требует view:crm', () => {
+    expect(sql).toMatch(/CREATE POLICY contacts_select[\s\S]*?k24_has_permission\('view:crm'\)/)
+  })
+
+  it('боевые объекты не меняются: нет DROP/ALTER POLICY/UPDATE/DELETE по существующим таблицам', () => {
+    expect(sql).not.toMatch(/\bDROP\s+(TABLE|COLUMN|POLICY|VIEW)\b/i)
+    expect(sql).not.toMatch(/\bALTER\s+POLICY\b/i)
+    expect(sql).not.toMatch(/\b(UPDATE|DELETE FROM)\s+public\.k24_(clients|orders)/i)
+    expect(sql).not.toMatch(/k24_orders/)
+  })
+
+  it('скрытый запуск: view:crm по умолчанию только у admin', () => {
+    expect(sql).toMatch(/WHEN 'view:crm'\s+THEN r\.role = 'admin'/)
+  })
+})

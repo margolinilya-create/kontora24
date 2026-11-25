@@ -1361,6 +1361,7 @@ export const NAV_ITEMS = [
   // R25.5 (ТЗ 5.1): калькулятор стоимости — после «Продаж».
   { path: '/calculator', label: 'Калькулятор', icon: 'Calculator', roles: MANAGER_ROLES, permission: 'view:calculator' },
   // R28.0: CRM. До загрузки прав (legacy roles) виден только admin — скрытый запуск.
+  { path: '/crm/deals', label: 'Сделки', icon: 'Handshake', roles: ['admin'], permission: 'view:crm' },
   { path: '/crm/clients', label: 'Клиенты', icon: 'Users', roles: ['admin'], permission: 'view:crm' },
   { path: '/production/design', label: 'Дизайн', icon: 'Palette', roles: ['admin', 'manager', 'designer'], permission: 'stage:design' },
   { path: '/production/prepress', label: 'Препресс', icon: 'FileCheck', roles: ['admin', 'manager', 'designer', 'printer'], permission: 'stage:prepress' },

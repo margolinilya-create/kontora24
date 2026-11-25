@@ -502,3 +502,34 @@ describe('R28.0 CRM: миграция 112 аддитивна и закрыта �
     expect(sql).toMatch(/WHEN 'view:crm'\s+THEN r\.role = 'admin'/)
   })
 })
+
+describe('R28.1 CRM: миграция 113 (сделки) аддитивна и не открывает финансы', () => {
+  const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/113_r28_1_crm_deals.sql'), 'utf-8')
+
+  it('RLS включён на всех новых таблицах, анонимам доступа нет', () => {
+    for (const t of ['k24_crm_pipelines', 'k24_crm_stages', 'k24_crm_lost_reasons', 'k24_deals']) {
+      expect(sql).toMatch(new RegExp(`ALTER TABLE public\\.${t}\\s+ENABLE ROW LEVEL SECURITY`))
+    }
+    expect(sql).toMatch(/REVOKE ALL ON public\.k24_crm_pipelines, public\.k24_crm_stages, public\.k24_crm_lost_reasons, public\.k24_deals FROM PUBLIC, anon/)
+  })
+
+  it('видимость сделок требует view:crm', () => {
+    expect(sql).toMatch(/CREATE POLICY deals_select[\s\S]*?k24_has_permission\('view:crm'\)/)
+  })
+
+  it('k24_orders: только nullable deal_id + колоночный GRANT, без DROP/ALTER POLICY', () => {
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS deal_id uuid REFERENCES public\.k24_deals\(id\) ON DELETE SET NULL/)
+    expect(sql).toMatch(/GRANT SELECT \(deal_id\) ON public\.k24_orders TO authenticated/)
+    expect(sql).not.toMatch(/\bDROP\s+(TABLE|COLUMN|POLICY|VIEW)\b/i)
+    expect(sql).not.toMatch(/\bALTER\s+POLICY\b/i)
+    expect(sql).not.toMatch(/GRANT SELECT ON public\.k24_orders\b/)
+  })
+
+  it('k24_orders_full: все 9 финансовых колонок по-прежнему за view:finance, deal_id — последняя', () => {
+    const view = sql.slice(sql.indexOf('CREATE OR REPLACE VIEW public.k24_orders_full'))
+    for (const col of ['cost_materials', 'cost_labor', 'cost_total', 'markup', 'discount_pct', 'price_final', 'price_per_unit', 'contractor_cost', 'calc_snapshot']) {
+      expect(view).toMatch(new RegExp(`'view:finance'::text AND rp\\.allowed\\)\\) THEN ${col} ELSE NULL::(numeric|jsonb) END AS ${col}`))
+    }
+    expect(view).toMatch(/route_snapshot,\s*deal_id\s*FROM k24_orders o;/)
+  })
+})

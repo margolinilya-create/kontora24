@@ -27,6 +27,8 @@ const SalesPage = lazy(() => import('@/features/sales/pages/SalesPage'))
 const CalculatorPage = lazy(() => import('@/features/calculator/pages/CalculatorPage'))
 const CrmClientsPage = lazy(() => import('@/features/crm/pages/CrmClientsPage'))
 const CrmClientDetailPage = lazy(() => import('@/features/crm/pages/CrmClientDetailPage'))
+const CrmDealsPage = lazy(() => import('@/features/crm/pages/CrmDealsPage'))
+const CrmDealDetailPage = lazy(() => import('@/features/crm/pages/CrmDealDetailPage'))
 const CreateOrderPage = lazy(() => import('@/features/orders/pages/CreateOrderPage'))
 const DesignQueuePage = lazy(() => import('@/features/production/pages/DesignQueuePage'))
 const PrepressQueuePage = lazy(() => import('@/features/production/pages/PrepressQueuePage'))
@@ -79,6 +81,8 @@ export const routes = [
       { path: 'calculator', element: <AuthGuard permission="view:calculator"><ErrorBoundary><CalculatorPage /></ErrorBoundary></AuthGuard> },
       { path: 'crm/clients', element: <AuthGuard permission="view:crm"><ErrorBoundary><CrmClientsPage /></ErrorBoundary></AuthGuard> },
       { path: 'crm/clients/:id', element: <AuthGuard permission="view:crm"><ErrorBoundary><CrmClientDetailPage /></ErrorBoundary></AuthGuard> },
+      { path: 'crm/deals', element: <AuthGuard permission="view:crm"><ErrorBoundary><CrmDealsPage /></ErrorBoundary></AuthGuard> },
+      { path: 'crm/deals/:id', element: <AuthGuard permission="view:crm"><ErrorBoundary><CrmDealDetailPage /></ErrorBoundary></AuthGuard> },
       { path: 'production/design', element: <AuthGuard permission="stage:design"><ErrorBoundary><DesignQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/prepress', element: <AuthGuard permission="stage:prepress"><ErrorBoundary><PrepressQueuePage /></ErrorBoundary></AuthGuard> },
       { path: 'production/print', element: <AuthGuard permission="stage:print"><ErrorBoundary><PrintQueuePage /></ErrorBoundary></AuthGuard> },

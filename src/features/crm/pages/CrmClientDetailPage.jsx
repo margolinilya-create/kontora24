@@ -12,7 +12,8 @@ import { formatDate, formatPrice, formatOrderNumber, formatOrderType } from '@/s
 import { toast } from '@/shared/stores/toast-store'
 import { translateError } from '@/shared/lib/error-translator'
 import { captureError } from '@/shared/lib/sentry'
-import { useCrmCompany } from '../hooks/useCrmData'
+import { useCrmCompany, useCrmDirectory } from '../hooks/useCrmData'
+import { DealFormModal } from '../components/DealFormModal'
 import { setCompanyArchived, setContactArchived } from '../lib/crm-api'
 import { computeClientMetrics, contactFullName } from '../lib/client-metrics'
 import { CompanyFormModal } from '../components/CompanyFormModal'
@@ -41,6 +42,8 @@ export default function CrmClientDetailPage() {
   const [editingCompany, setEditingCompany] = useState(false)
   const [contactModal, setContactModal] = useState(null) // { contact } — null = закрыто
   const [confirm, setConfirm] = useState(null) // { kind: 'company'|'contact', target? }
+  const [creatingDeal, setCreatingDeal] = useState(false)
+  const { pipelines } = useCrmDirectory()
 
   const metrics = useMemo(() => computeClientMetrics(data?.orders || []), [data?.orders])
 
@@ -63,7 +66,8 @@ export default function CrmClientDetailPage() {
     )
   }
 
-  const { company, contacts, orders } = data
+  const { company, contacts, orders, deals = [] } = data
+  const stagesById = Object.fromEntries(pipelines.flatMap((p) => p.stages).map((s) => [s.id, s]))
   const owner = profiles.find((p) => p.id === company.owner_id)
   const isArchived = !!company.archived_at
   const restoring = confirm?.kind === 'company' && isArchived
@@ -163,6 +167,35 @@ export default function CrmClientDetailPage() {
       </section>
 
       <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Сделки <span className="text-text-muted font-normal">{deals.length}</span></h2>
+          {canEdit && <Button size="sm" variant="secondary" onClick={() => setCreatingDeal(true)}>+ Сделка</Button>}
+        </div>
+        {deals.length === 0 ? (
+          <p className="text-sm text-text-muted">Сделок пока нет</p>
+        ) : (
+          <ul className="bg-surface rounded-xl border border-border divide-y divide-border">
+            {deals.map((d) => {
+              const st = stagesById[d.stage_id]
+              return (
+                <li key={d.id}>
+                  <Link to={`/crm/deals/${d.id}`} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 px-4 py-3 hover:bg-surface-2">
+                    <span className="text-xs text-text-muted sm:w-14 shrink-0">№ {d.number}</span>
+                    <span className="flex-1 min-w-0 truncate font-medium">{d.title}</span>
+                    <span className="inline-flex items-center gap-1.5 text-xs shrink-0">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: st?.color }} aria-hidden="true" />
+                      {st?.name || '—'}
+                    </span>
+                    <span className="text-sm shrink-0">{d.amount != null ? formatPrice(d.amount) : ''}</span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-2">
         <h2 className="font-semibold">Заказы <span className="text-text-muted font-normal">{orders.length}</span></h2>
         {orders.length === 0 ? (
           <p className="text-sm text-text-muted">Заказов пока нет</p>
@@ -185,6 +218,13 @@ export default function CrmClientDetailPage() {
         )}
       </section>
 
+      <DealFormModal
+        isOpen={creatingDeal}
+        onClose={() => setCreatingDeal(false)}
+        pipelines={pipelines}
+        defaultClient={{ id: company.id, name: company.name }}
+        onSaved={refetch}
+      />
       <CompanyFormModal isOpen={editingCompany} onClose={() => setEditingCompany(false)} company={company} onSaved={refetch} />
       <ContactFormModal
         isOpen={!!contactModal}

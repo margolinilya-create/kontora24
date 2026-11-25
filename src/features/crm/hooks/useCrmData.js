@@ -5,6 +5,9 @@ import { captureError } from '@/shared/lib/sentry'
 import {
   listCompanies, listContacts, getCompany, listCompanyOrders,
 } from '../lib/crm-api'
+import {
+  listPipelines, listLostReasons, listDeals, getDeal, listDealOrders,
+} from '../lib/deals-api'
 
 /**
  * Общая обвязка: последний запрос побеждает (гонки при быстром вводе в поиск),
@@ -40,7 +43,8 @@ function useAsyncData(loader, key, source) {
   useEffect(() => { refetch() }, [refetch])
   useRefetchOnFocus(refetch)
 
-  return { data, loading, error, refetch }
+  // setData — для оптимистичных правок (канбан), следующий refetch всё сверит.
+  return { data, loading, error, refetch, setData }
 }
 
 export function useCrmCompanies({ search = '', kind = 'all', archived = false, page = 1 }) {
@@ -65,14 +69,53 @@ export function useCrmCompany(id) {
   return useAsyncData(
     async () => {
       if (!id) return null
-      const [company, contacts, orders] = await Promise.all([
+      const [company, contacts, orders, deals] = await Promise.all([
         getCompany(id),
         listContacts({ clientId: id, page: 1 }),
         listCompanyOrders(id),
+        listDeals({ clientId: id }),
       ])
-      return { company, contacts: contacts.rows, orders }
+      return { company, contacts: contacts.rows, orders, deals }
     },
     String(id),
     'crm.useCrmCompany',
+  )
+}
+
+// ---------------------------------------------------------------------------
+// R28.1 — сделки
+// ---------------------------------------------------------------------------
+
+/** Воронки (с этапами) + причины проигрыша — справочники доски и форм. */
+export function useCrmDirectory() {
+  const res = useAsyncData(
+    async () => {
+      const [pipelines, lostReasons] = await Promise.all([listPipelines(), listLostReasons()])
+      return { pipelines, lostReasons }
+    },
+    'directory',
+    'crm.useCrmDirectory',
+  )
+  return { ...res, pipelines: res.data?.pipelines || [], lostReasons: res.data?.lostReasons || [] }
+}
+
+export function useCrmDeals({ pipelineId, search = '', includeArchived = false }) {
+  const res = useAsyncData(
+    () => (pipelineId ? listDeals({ pipelineId, search, includeArchived }) : Promise.resolve([])),
+    JSON.stringify([pipelineId, search, includeArchived]),
+    'crm.useCrmDeals',
+  )
+  return { ...res, deals: res.data || [], setDeals: res.setData }
+}
+
+export function useCrmDeal(id) {
+  return useAsyncData(
+    async () => {
+      if (!id) return null
+      const [deal, orders] = await Promise.all([getDeal(id), listDealOrders(id)])
+      return { deal, orders }
+    },
+    String(id),
+    'crm.useCrmDeal',
   )
 }

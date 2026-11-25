@@ -12,6 +12,7 @@ import { ContractorsSettings } from '../components/ContractorsSettings'
 import { PlanningSettings } from '@/features/production-planner/components/PlanningSettings'
 import { CalculatorSettings } from '@/features/calculator/components/CalculatorSettings'
 import { OrderTypesSettings } from '@/features/order-types/components/OrderTypesSettings'
+import { CrmSettings } from '@/features/crm/components/CrmSettings'
 import { useCanDo } from '@/features/auth/hooks/useCanDo'
 import Tabs from '@/shared/components/Tabs'
 
@@ -27,6 +28,8 @@ const SETTINGS_TABS = [
   { key: 'order_types', label: 'Типы заказов', permission: 'order_type:manage' },
   // R25.5 (ТЗ 5.5): видна только с правом calc:settings.
   { key: 'calculator', label: 'Калькулятор', permission: 'calc:settings' },
+  // R28.1: воронки / этапы / причины проигрыша CRM.
+  { key: 'crm', label: 'CRM', permission: 'view:crm' },
   { key: 'bitrix', label: 'Bitrix24' },
   { key: 'logs', label: 'Логи' },
   { key: 'import', label: 'Импорт' },
@@ -36,7 +39,8 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
   const canCalcSettings = useCanDo('calc:settings')
   const canOrderTypes = useCanDo('order_type:manage')
-  const allowed = { 'calc:settings': canCalcSettings, 'order_type:manage': canOrderTypes }
+  const canCrm = useCanDo('view:crm')
+  const allowed = { 'calc:settings': canCalcSettings, 'order_type:manage': canOrderTypes, 'view:crm': canCrm }
   const tabs = SETTINGS_TABS.filter((t) => !t.permission || allowed[t.permission])
 
   return (
@@ -62,6 +66,7 @@ export default function SettingsPage() {
       {activeTab === 'planning' && <PlanningSettings />}
       {activeTab === 'calculator' && canCalcSettings && <CalculatorSettings />}
       {activeTab === 'order_types' && canOrderTypes && <OrderTypesSettings />}
+      {activeTab === 'crm' && canCrm && <CrmSettings />}
       {activeTab === 'bitrix' && <BitrixSettings />}
       {activeTab === 'logs' && <IntegrationLog />}
       {activeTab === 'import' && <SheetsImport />}
